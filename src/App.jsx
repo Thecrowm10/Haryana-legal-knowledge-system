@@ -25,6 +25,12 @@ const SEED_RELATIONS = [
   { sourceId: 'mock-2', targetId: 'mock-4', label: 'Governs' },
 ];
 
+const INITIAL_TAXONOMY = [
+  { category: 'Document Types', items: ['Act', 'Amendment', 'Notification', 'Circular', 'Policy', 'Rules & Regulations', 'Order / Gazette'] },
+  { category: 'Departments',    items: ['Urban Local Bodies', 'Revenue & Disaster Mgmt.', 'Home Department', 'Industries & Commerce', 'Labour Department', 'Finance Department', 'Health & Family Welfare', 'Agriculture & Farmers Welfare', 'Panchayati Raj', 'General Administration'] },
+  { category: 'Legal Status',   items: ['Active', 'Repealed', 'Amended', 'Under Review', 'Suspended'] },
+];
+
 export default function App() {
   const { user, loading, loginAsRole, logout } = useAuth();
   const [activePage, setActivePage]       = useState(null);
@@ -33,6 +39,7 @@ export default function App() {
     DOCUMENTS.map(d => ({ ...d, uid: `mock-${d.id}` }))
   );
   const [relationships, setRelationships] = useState(SEED_RELATIONS);
+  const [taxonomy, setTaxonomy]           = useState(INITIAL_TAXONOMY);
 
   useEffect(() => {
     if (user && activePage === null) setActivePage(DEFAULT_PAGE[user.role]);
@@ -94,6 +101,7 @@ export default function App() {
             onAuditLog={addAuditLog}
             documents={documents}
             onAddDocument={addDocument}
+            taxonomy={taxonomy}
           />
         );
       case 'approver':
@@ -115,7 +123,7 @@ export default function App() {
           />
         );
       case 'admin':
-        return <AdminDashboard activePage={activePage} />;
+        return <AdminDashboard activePage={activePage} taxonomy={taxonomy} onUpdateTaxonomy={setTaxonomy} />;
       case 'auditor':
         return <AuditorDashboard activePage={activePage} />;
       default:

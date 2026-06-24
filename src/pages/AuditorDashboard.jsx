@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { ClipboardList, FileSearch, BarChart2, Download, CheckCircle, AlertCircle } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
@@ -52,7 +52,7 @@ export default function AuditorDashboard({ activePage }) {
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
           {[
-            { label: 'Total Log Entries', value: MOCK_AUDIT.length,                           color: 'var(--primary)', bg: 'rgba(26,107,60,.12)',  icon: ClipboardList },
+            { label: 'Total Log Entries', value: MOCK_AUDIT.length,                           color: 'var(--primary)', bg: 'rgba(26,86,219,.12)',  icon: ClipboardList },
             { label: 'AI Characters Generated', value: '0',                                   color: '#22c55e',        bg: 'rgba(34,197,94,.12)',  icon: CheckCircle   },
             { label: 'Compliance Status',  value: '100%',                                     color: '#22c55e',        bg: 'rgba(34,197,94,.12)',  icon: CheckCircle   },
           ].map(s => (
@@ -105,7 +105,7 @@ export default function AuditorDashboard({ activePage }) {
                   <td style={{ padding: '12px 16px' }}><Badge label={log.role} variant={log.role} /></td>
                   <td style={{ padding: '12px 16px', fontSize: 12.5, color: 'var(--text-color)' }}>{log.action}</td>
                   <td style={{ padding: '12px 16px' }}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: '#15803d' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: '#1e40af' }}>
                       <CheckCircle size={13} /> None
                     </span>
                   </td>
@@ -169,7 +169,7 @@ export default function AuditorDashboard({ activePage }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', background: 'rgba(34,197,94,.08)', border: '1px solid rgba(34,197,94,.2)', borderRadius: 10, marginBottom: 20 }}>
             <CheckCircle size={22} color="#22c55e" />
             <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#15803d' }}>Zero Generation Compliance — PASSED</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#1e40af' }}>Zero Generation Compliance — PASSED</div>
               <div style={{ fontSize: 12.5, color: '#166534', marginTop: 2 }}>No AI-generated text was present in any system response. All results are verbatim document pointers only.</div>
             </div>
           </div>
@@ -190,9 +190,9 @@ export default function AuditorDashboard({ activePage }) {
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                   <td style={{ padding: '13px 16px', fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>{m.month}</td>
                   <td style={{ padding: '13px 16px', fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-color)' }}>{m.totalQueries}</td>
-                  <td style={{ padding: '13px 16px', fontFamily: 'var(--mono)', fontSize: 12, fontWeight: 700, color: '#15803d' }}>{m.aiCharacters}</td>
+                  <td style={{ padding: '13px 16px', fontFamily: 'var(--mono)', fontSize: 12, fontWeight: 700, color: '#1e40af' }}>{m.aiCharacters}</td>
                   <td style={{ padding: '13px 16px' }}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 20, background: 'rgba(34,197,94,.1)', border: '1px solid rgba(34,197,94,.25)', fontSize: 11.5, fontWeight: 700, color: '#15803d' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 20, background: 'rgba(34,197,94,.1)', border: '1px solid rgba(34,197,94,.25)', fontSize: 11.5, fontWeight: 700, color: '#1e40af' }}>
                       <CheckCircle size={12} /> Compliant
                     </span>
                   </td>

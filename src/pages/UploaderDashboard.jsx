@@ -3,22 +3,25 @@ import {
   Upload, FileText, CheckCircle, X, TrendingUp, Archive, Download,
   RotateCcw, AlertCircle, Eye, GitBranch, Plus, Cpu, Link, Clock,
   Layers, ChevronRight, AlertTriangle, Users, CheckSquare, Square,
-  Edit3, Tag,
+  Edit3, Tag, Search,
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const DEPTS = [
+const DEFAULT_DEPTS = [
   'Urban Local Bodies','Revenue & Disaster Mgmt.','Home Department',
   'Industries & Commerce','Labour Department','Finance Department',
   'Health & Family Welfare','Agriculture & Farmers Welfare',
   'Panchayati Raj','General Administration',
 ];
-const TYPES  = ['Act','Amendment','Notification','Circular','Policy','Rules & Regulations','Order / Gazette'];
+const DEFAULT_TYPES = ['Act','Amendment','Notification','Circular','Policy','Rules & Regulations','Order / Gazette'];
 const LANGS  = ['English','Hindi','Bilingual'];
 const REL_TYPES = ['Amends','Amended by','References','Referenced by','Is under','Supplemented by','Notified under','Replaces','Replaced by','Related to'];
+const AMEND_CHANGE_TYPES = ['Amended', 'Substituted', 'Inserted', 'Deleted', 'Expanded'];
+const AMEND_CHANGE_COLORS = { Amended: '#f59e0b', Substituted: '#3b82f6', Inserted: '#22c55e', Deleted: '#ef4444', Expanded: '#8b5cf6' };
+const EMPTY_PROVISION = () => ({ section: '', chapter: '', subsection: '', page: '', changeType: 'Substituted', before: '', after: '' });
 
 // Workflow statuses: DRAFT → PENDING_REVIEW → PUBLISHED
 const WORKFLOW_STATUS = { DRAFT: 'draft', PENDING: 'pending', PUBLISHED: 'published' };
@@ -69,8 +72,6 @@ function wordConfidence(word) {
   if (specialRatio > 0.1)    return 52 + seed % 25;
   return 70 + seed % 20;
 }
-
-// ─── CHANGE 1: PDF.js text extraction ─────────────────────────────────────────
 // Extracts text + per-word confidence scores for every page.
 async function extractPdfText(file) {
   if (!file || !file.name.endsWith('.pdf')) return { text: '', numPages: 1, pageTexts: [], pageWords: [] };
@@ -116,8 +117,6 @@ async function extractPdfText(file) {
     return { text: '', numPages: 1, pageTexts: [], pageWords: [] };
   }
 }
-
-// ─── CHANGE 2: Auto metadata extraction from PDF text ─────────────────────────
 // Guesses title, year, doc type, and department from raw extracted text.
 function autoExtractMetadata(text, filename) {
   const cleaned = text.slice(0, 3000); // Only scan the first ~3000 chars (header/title area)
@@ -149,8 +148,6 @@ function autoExtractMetadata(text, filename) {
 
   return { title, year, type, dept };
 }
-
-// ─── CHANGE 7: Real citation detection from extracted PDF text ─────────────────
 // Uses regex patterns to find actual Act/Rules citations inside PDF text.
 // Then tries to match each detected citation against existing documents.
 const CITATION_REGEX = [
@@ -241,8 +238,6 @@ function detectCitationsLegacy(textOrTitle, allDocs) {
     return { citation, matchedDoc: matched || null, status: matched ? 'linked' : 'unresolved', relLabel: 'References' };
   });
 }
-
-// ─── CHANGE 8: Cross-dept notification detection ───────────────────────────────
 // Given a doc's detected citations and its own dept, returns list of other depts to notify.
 function detectCrossDeptNotifications(citations, uploaderDept) {
   const notifyDepts = new Set();
@@ -277,14 +272,12 @@ function isAccepted(f) {
 }
 function focusStyle(e) {
   e.target.style.borderColor = 'var(--primary)';
-  e.target.style.boxShadow   = '0 0 0 3px rgba(26,107,60,.1)';
+  e.target.style.boxShadow   = '0 0 0 3px rgba(26,86,219,.1)';
 }
 function blurStyle(e) {
   e.target.style.borderColor = 'var(--surface-border)';
   e.target.style.boxShadow   = 'none';
 }
-
-// ─── CHANGE 3: Hierarchical tag display ───────────────────────────────────────
 function HierarchyTag({ hierarchy, onChange }) {
   const [open, setOpen] = useState(false);
   const [local, setLocal] = useState(hierarchy || { act: '', chapter: '', section: '', subsection: '' });
@@ -335,8 +328,6 @@ function HierarchyTag({ hierarchy, onChange }) {
     </div>
   );
 }
-
-// ─── CHANGE 5: Version conflict modal ─────────────────────────────────────────
 function VersionConflictModal({ existingDoc, newVersion, onUploadAsNew, onCancel }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -372,8 +363,6 @@ function VersionConflictModal({ existingDoc, newVersion, onUploadAsNew, onCancel
     </div>
   );
 }
-
-// ─── CHANGE 8: Cross-dept notification banner ──────────────────────────────────
 function CrossDeptBanner({ notifications, onDismiss }) {
   if (!notifications || notifications.length === 0) return null;
   return (
@@ -453,8 +442,6 @@ function AnalysisCard({ docTitle, citations, analyzing }) {
     </div>
   );
 }
-
-// ─── CHANGE 4: Workflow status badge ──────────────────────────────────────────
 function WorkflowBadge({ status }) {
   const config = {
     [WORKFLOW_STATUS.DRAFT]:     { label: 'DRAFT',          bg: 'rgba(148,163,184,.12)', color: '#64748b' },
@@ -470,22 +457,25 @@ function WorkflowBadge({ status }) {
 }
 
 // ─── Main component ────────────────────────────────────────────────────────────
-export default function UploaderDashboard({ activePage, onAuditLog, documents = [], onAddDocument }) {
+export default function UploaderDashboard({ activePage, onAuditLog, documents = [], onAddDocument, taxonomy = [] }) {
+  const TYPES = taxonomy.find(t => t.category === 'Document Types')?.items ?? DEFAULT_TYPES;
+  const DEPTS = taxonomy.find(t => t.category === 'Departments')?.items    ?? DEFAULT_DEPTS;
   const [uploads, setUploads] = useState(
     documents.filter(d => d.uploader === 'Priya Sharma')
       .map(d => ({ ...d, version: d.version || '1.0', ocrStatus: d.ocrStatus || 'completed', workflowStatus: d.workflowStatus || WORKFLOW_STATUS.PUBLISHED }))
   );
   const [files, setFiles]           = useState([]);
   const [dragOver, setDragOver]     = useState(false);
-  const [form, setForm]             = useState({ act: '', year: '', dept: '', type: '', version: '1.0', lang: 'English', desc: '' });
+  const [form, setForm]             = useState({ act: '', dept: '', type: '', version: '1.0', desc: '', gazette: '', authority: '', enactmentDate: '', parentAct: '', changeTypes: [] });
+  const [amendmentProvisions, setAmendmentProvisions] = useState([]);
   const [hierarchy, setHierarchy]   = useState({ act: '', chapter: '', section: '', subsection: '' });
   const [rejected, setRejected]     = useState([]);
   const [versionModal, setVersionModal] = useState(null);
-
-  // CHANGE 5: Version conflict state
   const [conflictModal, setConflictModal] = useState(null); // { existingDoc, pendingDocs, pendingRelations }
 
-  // CHANGE 8: Cross-dept notification state
+  // Correction request state
+  const [correctionModal, setCorrectionModal] = useState(null); // { doc }
+  const [correctionReason, setCorrectionReason] = useState('');
   const [crossDeptNotifs, setCrossDeptNotifs] = useState([]);
 
   // Relationship state
@@ -497,16 +487,20 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
 
   // AI analysis state
   const [analysisResults, setAnalysisResults] = useState([]);
-
-  // CHANGE 6: Bulk edit state
   const [selectedIds, setSelectedIds]   = useState(new Set());
+  const [bulkSelectMode, setBulkSelectMode] = useState(false);
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
   const [bulkFields, setBulkFields]     = useState({ dept: '', type: '', year: '' });
-
-  // CHANGE 2: Auto metadata fill state
   const [autoFillLoading, setAutoFillLoading] = useState(false);
 
-  const inputRef = useRef();
+  // Table filter + sort
+  const [tableSearch, setTableSearch] = useState('');
+  const [filterType,  setFilterType]  = useState('');
+  const [sortCol,     setSortCol]     = useState('uploadedAt');
+  const [sortDir,     setSortDir]     = useState('desc');
+
+  const inputRef     = useRef();
+  const uploadsTableRef = useRef();
   const fmt      = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const approvedDocs = documents.filter(d => d.status === 'approved');
@@ -514,7 +508,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     .filter(d => d.title.toLowerCase().includes(relSearch.toLowerCase()) && d.uid !== relTarget)
     .slice(0, 8);
 
-  // ── CHANGE 1 + 2: When files are added, auto-extract metadata from first PDF ──
   async function addFiles(fileList) {
     const arr = Array.from(fileList);
     setRejected(arr.filter(f => !isAccepted(f)).map(f => f.name));
@@ -533,7 +526,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
       setForm(f => ({
         ...f,
         act:  f.act  || meta.title,
-        year: f.year || meta.year,
         type: f.type || meta.type,
         dept: f.dept || meta.dept,
       }));
@@ -555,7 +547,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
 
   // ── Finalize upload (called after conflict check passes) ───────────────────
   async function finalizeUpload(newDocs, finalRelations) {
-    // CHANGE 4: start as DRAFT
     const docsWithWorkflow = newDocs.map(d => ({ ...d, workflowStatus: WORKFLOW_STATUS.DRAFT }));
 
     // Show skeleton analysis
@@ -570,10 +561,9 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     });
 
     setFiles([]); setRelations([]);
-    setForm({ act:'',year:'',dept:'',type:'',version:'1.0',lang:'English',desc:'' });
+    setForm({ act:'',dept:'',type:'',version:'1.0',desc:'',gazette:'',authority:'',enactmentDate:'',parentAct:'',changeTypes:[] });
     setHierarchy({ act:'',chapter:'',section:'',subsection:'' });
-
-    // CHANGE 1 + 7: Extract real citations from PDF text after 1.8s
+    setAmendmentProvisions([]);
     setTimeout(async () => {
       const allDocsNow = [...documents, ...docsWithWorkflow.map(d => ({ ...d, uid: `upload-${d.id}` }))];
       const allNotifs  = [];
@@ -595,12 +585,8 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         citations.filter(c => c.status === 'linked').forEach(c => {
           onAddDocument?.({ ...doc, uid: `upload-${doc.id}` }, [{ targetId: c.matchedDoc.uid, targetTitle: c.matchedDoc.title, label: c.relLabel || 'References' }]);
         });
-
-        // CHANGE 8: detect cross-dept notifications
         const notifs = detectCrossDeptNotifications(citations, doc.dept);
         notifs.forEach(dept => allNotifs.push({ dept, docTitle: doc.title }));
-
-        // CHANGE 4: advance workflow to PENDING_REVIEW after upload completes
         setUploads(u => u.map(ud =>
           ud.id === doc.id ? { ...ud, workflowStatus: WORKFLOW_STATUS.PENDING } : ud
         ));
@@ -615,7 +601,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     onAuditLog?.(`Uploaded ${docsWithWorkflow.length} document(s): ${docsWithWorkflow.map(d => d.title).join(', ')}`);
   }
 
-  // ── CHANGE 5: Submit with version conflict detection ───────────────────────
   async function handleSubmit(e) {
     e.preventDefault();
     if (files.length === 0) return;
@@ -629,7 +614,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         title:         form.act || f.name.replace(/\.(pdf|zip)$/i, ''),
         type:          form.type || 'Act',
         dept:          form.dept || 'General',
-        year:          Number(form.year) || new Date().getFullYear(),
+        year:          form.enactmentDate ? new Date(form.enactmentDate).getFullYear() : new Date().getFullYear(),
         status:        'pending',
         legalStatus:   'active',
         pages:         f.name.endsWith('.zip') ? null : (numPages || 1),
@@ -642,6 +627,10 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         isZip:         f.name.endsWith('.zip'),
         fileUrl:       f.name.endsWith('.pdf') ? URL.createObjectURL(f) : null,
         hierarchy,
+        gazette:           form.gazette || '',
+        authority:         form.authority || '',
+        enactmentDate:     form.enactmentDate || '',
+        amendmentProvisions: form.type === 'Amendment' ? amendmentProvisions.filter(p => p.section) : [],
         extractedText:  extractedText || '',
         extractedPages: pageTexts.length > 0 ? pageTexts : null,
         extractedWords: pageWords.length  > 0 ? pageWords : null,
@@ -676,8 +665,11 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     finalizeUpload(updatedDocs, pendingRelations);
   }
 
-  // ── CHANGE 6: Bulk edit handlers ───────────────────────────────────────────
+  const draftUploads = uploads.filter(d => !d.workflowStatus || d.workflowStatus === WORKFLOW_STATUS.DRAFT);
+
   function toggleSelectDoc(id) {
+    const doc = uploads.find(d => d.id === id);
+    if (doc && doc.workflowStatus && doc.workflowStatus !== WORKFLOW_STATUS.DRAFT) return;
     setSelectedIds(prev => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
@@ -685,8 +677,8 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     });
   }
   function toggleSelectAll() {
-    if (selectedIds.size === uploads.length) setSelectedIds(new Set());
-    else setSelectedIds(new Set(uploads.map(d => d.id)));
+    if (selectedIds.size === draftUploads.length && draftUploads.length > 0) setSelectedIds(new Set());
+    else setSelectedIds(new Set(draftUploads.map(d => d.id)));
   }
   function applyBulkEdit() {
     setUploads(u => u.map(doc => {
@@ -734,7 +726,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)', display: 'flex', alignItems: 'center', gap: 8 }}>
                       v{ver.v}
-                      {i === 0 && <span style={{ fontSize: 10, background: 'rgba(26,107,60,.12)', color: 'var(--primary)', padding: '1px 7px', borderRadius: 20, fontWeight: 700 }}>CURRENT</span>}
+                      {i === 0 && <span style={{ fontSize: 10, background: 'rgba(26,86,219,.12)', color: 'var(--primary)', padding: '1px 7px', borderRadius: 20, fontWeight: 700 }}>CURRENT</span>}
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 2, fontFamily: 'var(--mono)' }}>{ver.date} — {ver.note}</div>
                   </div>
@@ -754,7 +746,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         {/* Stats row */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
           {[
-            { label: 'Total Uploads',   value: uploads.length, bg: 'rgba(26,107,60,.12)',  color: 'var(--primary)', icon: FileText },
+            { label: 'Total Uploads',   value: uploads.length, bg: 'rgba(26,86,219,.12)',  color: 'var(--primary)', icon: FileText },
             { label: 'Approved',        value: approved,        bg: 'rgba(34,197,94,.12)',  color: '#22c55e',        icon: CheckCircle },
             { label: 'Pending Review',  value: pending,         bg: 'rgba(245,158,11,.12)', color: '#f59e0b',        icon: TrendingUp },
             { label: 'Published',       value: published,       bg: 'rgba(59,130,246,.12)', color: '#3b82f6',        icon: Eye },
@@ -773,12 +765,75 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
           ))}
         </div>
 
-        {/* CHANGE 6: Bulk edit toolbar */}
+        {/* Document type breakdown */}
+        {(() => {
+          const typeCounts = TYPES.map(t => ({ type: t, count: uploads.filter(d => d.type === t).length }));
+          const maxCount   = Math.max(...typeCounts.map(x => x.count), 1);
+          const TYPE_COLORS = {
+            'Act':                  { bg: 'rgba(26,86,219,.12)',   bar: 'var(--primary)',  text: 'var(--primary)'  },
+            'Amendment':            { bg: 'rgba(59,130,246,.12)',  bar: '#3b82f6',         text: '#1d4ed8'         },
+            'Notification':         { bg: 'rgba(245,158,11,.12)',  bar: '#f59e0b',         text: '#d97706'         },
+            'Circular':             { bg: 'rgba(168,85,247,.12)',  bar: '#a855f7',         text: '#7c3aed'         },
+            'Policy':               { bg: 'rgba(20,184,166,.12)',  bar: '#14b8a6',         text: '#0f766e'         },
+            'Rules & Regulations':  { bg: 'rgba(239,68,68,.10)',   bar: '#ef4444',         text: '#dc2626'         },
+            'Order / Gazette':      { bg: 'rgba(234,179,8,.12)',   bar: '#eab308',         text: '#a16207'         },
+          };
+          return (
+            <>
+              <Card>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <FileText size={15} color="var(--primary)" />
+                  Document Type Breakdown
+                  <span style={{ marginLeft: 'auto', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '2px 10px', borderRadius: 20 }}>
+                    {typeCounts.length} type{typeCounts.length !== 1 ? 's' : ''} uploaded
+                  </span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
+                  {typeCounts.map(({ type, count }) => {
+                    const c      = TYPE_COLORS[type] || { bg: 'rgba(148,163,184,.12)', bar: '#94a3b8', text: '#64748b' };
+                    const active = filterType === type;
+                    return (
+                      <div key={type}
+                        onClick={() => {
+                          const next = active ? '' : type;
+                          setFilterType(next);
+                          if (next && count > 0) setTimeout(() => uploadsTableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+                        }}
+                        style={{
+                          padding: '12px 14px', borderRadius: 10, cursor: count > 0 ? 'pointer' : 'default',
+                          background: active ? c.bar : c.bg,
+                          border: `1.5px solid ${active ? c.bar : 'rgba(0,0,0,.06)'}`,
+                          display: 'flex', flexDirection: 'column', gap: 8,
+                          transition: 'all .2s',
+                          boxShadow: active ? `0 4px 14px ${c.bar}33` : 'none',
+                          opacity: count === 0 ? 0.45 : 1,
+                        }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: active ? 'white' : c.text }}>{type}</span>
+                          <span style={{ fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 800, color: active ? 'white' : c.text, lineHeight: 1 }}>{count}</span>
+                        </div>
+                        <div style={{ height: 5, borderRadius: 99, background: active ? 'rgba(255,255,255,.3)' : 'rgba(0,0,0,.08)', overflow: 'hidden' }}>
+                          <div style={{ height: '100%', borderRadius: 99, background: active ? 'white' : c.bar, width: `${(count / maxCount) * 100}%`, transition: 'width .5s ease' }} />
+                        </div>
+                        <span style={{ fontSize: 10.5, color: active ? 'rgba(255,255,255,.8)' : c.text, fontFamily: 'var(--mono)', opacity: active ? 1 : .75 }}>
+                          {uploads.length > 0 ? `${Math.round((count / uploads.length) * 100)}% of uploads` : '0%'}
+                          {count > 0 && <span style={{ marginLeft: 6 }}>· {active ? 'click to clear' : 'click to filter'}</span>}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Card>
+
+            </>
+          );
+        })()}
         {selectedIds.size > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderRadius: 10, background: 'rgba(26,107,60,.06)', border: '1px solid rgba(26,107,60,.2)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderRadius: 10, background: 'rgba(26,86,219,.06)', border: '1px solid rgba(26,86,219,.2)' }}>
             <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--primary)' }}>{selectedIds.size} selected</span>
+            <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>· Draft only</span>
             <button onClick={() => setBulkEditOpen(v => !v)}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 7, border: '1px solid rgba(26,107,60,.3)', background: 'rgba(26,107,60,.08)', color: 'var(--primary)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 7, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.08)', color: 'var(--primary)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
               <Edit3 size={12} /> Bulk Edit
             </button>
             <button onClick={() => setSelectedIds(new Set())}
@@ -791,9 +846,13 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         {/* Bulk edit panel */}
         {bulkEditOpen && selectedIds.size > 0 && (
           <Card>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
               <Tag size={14} color="var(--primary)" />
-              Bulk Edit — {selectedIds.size} Documents
+              Bulk Edit — {selectedIds.size} Draft Document{selectedIds.size !== 1 ? 's' : ''}
+            </div>
+            <div style={{ fontSize: 11.5, color: '#d97706', background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 7, padding: '6px 12px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <AlertTriangle size={12} color="#d97706" />
+              Only Draft documents can be edited. Pending and Published documents require a Correction Request.
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
               {[
@@ -830,53 +889,133 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         )}
 
         {/* Uploads table */}
+        {(() => {
+          // ── compute filtered + sorted list ──────────────────────────────
+          const SORT_KEY = { 'title': d => d.title, 'type': d => d.type, 'dept': d => d.dept,
+            'year': d => d.year, 'uploadedAt': d => d.uploadedAt, 'status': d => d.status };
+          const filtered = uploads
+            .filter(d => !tableSearch || d.title.toLowerCase().includes(tableSearch.toLowerCase()))
+            .filter(d => !filterType  || d.type === filterType)
+            .sort((a, b) => {
+              const ka = SORT_KEY[sortCol]?.(a) ?? '';
+              const kb = SORT_KEY[sortCol]?.(b) ?? '';
+              return sortDir === 'asc' ? (ka > kb ? 1 : -1) : (ka < kb ? 1 : -1);
+            });
+
+          function toggleSort(col) {
+            if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+            else { setSortCol(col); setSortDir('asc'); }
+          }
+
+          const SortBtn = ({ col, label }) => {
+            const active = sortCol === col;
+            return (
+              <button onClick={() => toggleSort(col)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3, padding: 0, fontFamily: 'var(--mono)', fontSize: 10.5, fontWeight: 700, letterSpacing: '.07em', textTransform: 'uppercase', color: active ? 'var(--primary)' : 'var(--text-color-secondary)' }}>
+                {label}
+                <span style={{ fontSize: 9, lineHeight: 1, opacity: active ? 1 : 0.4 }}>{active ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}</span>
+              </button>
+            );
+          };
+
+          return (
+        <div ref={uploadsTableRef} style={{ scrollMarginTop: 16 }}>
         <Card padding="0">
-          <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          {/* Card header */}
+          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>My Uploads</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '3px 10px', borderRadius: 20 }}>{uploads.length} docs</span>
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '2px 9px', borderRadius: 20 }}>
+              {filtered.length}{filtered.length !== uploads.length ? ` / ${uploads.length}` : ''} docs
+            </span>
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+              {bulkSelectMode ? (
+                <button onClick={() => { setBulkSelectMode(false); setSelectedIds(new Set()); setBulkEditOpen(false); }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 7, border: '1px solid rgba(239,68,68,.3)', background: 'rgba(239,68,68,.06)', color: '#dc2626', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                  <X size={12} /> Cancel Selection
+                </button>
+              ) : (
+                <button onClick={() => setBulkSelectMode(true)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                  <CheckSquare size={13} /> Select
+                </button>
+              )}
               <button onClick={downloadAuditTrail}
                 style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                <Download size={13} /> Download Audit Trail
+                <Download size={13} /> Audit Trail
               </button>
             </div>
           </div>
+
+          {/* Search + active filter chip */}
+          <div style={{ padding: '10px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, background: 'var(--surface-50)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '6px 12px', flex: 1, maxWidth: 300 }}>
+              <Search size={13} color="var(--text-color-secondary)" />
+              <input value={tableSearch} onChange={e => setTableSearch(e.target.value)} placeholder="Search by title…"
+                style={{ background: 'transparent', border: 'none', outline: 'none', fontSize: 12.5, color: 'var(--text-color)', width: '100%' }} />
+              {tableSearch && <button onClick={() => setTableSearch('')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', padding: 0 }}><X size={12} /></button>}
+            </div>
+            {filterType && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px 5px 12px', borderRadius: 20, background: 'var(--primary-light)', border: '1px solid var(--primary-border)', fontSize: 12.5, fontWeight: 600, color: 'var(--primary)', whiteSpace: 'nowrap' }}>
+                {filterType}
+                <button onClick={() => setFilterType('')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--primary)', display: 'flex', padding: 0, marginLeft: 2 }}><X size={11} /></button>
+              </div>
+            )}
+          </div>
+
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
               <colgroup>
-                <col style={{ width: '3%'  }} />
-                <col style={{ width: '24%' }} /><col style={{ width: '9%' }} /><col style={{ width: '13%' }} />
+                {bulkSelectMode && <col style={{ width: '3%' }} />}
+                <col style={{ width: bulkSelectMode ? '22%' : '25%' }} /><col style={{ width: '9%' }} /><col style={{ width: '13%' }} />
                 <col style={{ width: '6%' }} /><col style={{ width: '10%' }} /><col style={{ width: '10%' }} />
-                <col style={{ width: '9%' }} /><col style={{ width: '10%' }} /><col style={{ width: '6%'  }} />
+                <col style={{ width: '9%' }} /><col style={{ width: '10%' }} /><col style={{ width: '8%'  }} />
               </colgroup>
               <thead>
                 <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
-                  <th style={{ padding: '11px 10px' }}>
-                    <button onClick={toggleSelectAll} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', alignItems: 'center' }}>
-                      {selectedIds.size === uploads.length && uploads.length > 0
-                        ? <CheckSquare size={14} color="var(--primary)" />
-                        : <Square size={14} />
-                      }
-                    </button>
-                  </th>
-                  {['Document Title','Type','Department','Year','Workflow','Status','Uploaded On','OCR','Actions'].map(h => (
-                    <th key={h} style={{ ...LABEL, padding: '11px 14px', textAlign: 'left' }}>{h}</th>
-                  ))}
+                  {bulkSelectMode && (
+                    <th style={{ padding: '10px 10px' }}>
+                      <button onClick={toggleSelectAll} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', alignItems: 'center' }}>
+                        {selectedIds.size === draftUploads.length && draftUploads.length > 0
+                          ? <CheckSquare size={14} color="var(--primary)" />
+                          : <Square size={14} />}
+                      </button>
+                    </th>
+                  )}
+                  <th style={{ padding: '10px 14px', textAlign: 'left' }}><SortBtn col="title" label="Document Title" /></th>
+                  <th style={{ padding: '10px 14px', textAlign: 'left' }}><SortBtn col="type" label="Type" /></th>
+                  <th style={{ padding: '10px 14px', textAlign: 'left' }}><SortBtn col="dept" label="Department" /></th>
+                  <th style={{ padding: '10px 14px', textAlign: 'left' }}><SortBtn col="year" label="Year" /></th>
+                  <th style={{ ...LABEL, padding: '10px 14px', textAlign: 'left' }}>Workflow</th>
+                  <th style={{ padding: '10px 14px', textAlign: 'left' }}><SortBtn col="status" label="Status" /></th>
+                  <th style={{ padding: '10px 14px', textAlign: 'left' }}><SortBtn col="uploadedAt" label="Uploaded On" /></th>
+                  <th style={{ ...LABEL, padding: '10px 14px', textAlign: 'left' }}>OCR</th>
+                  <th style={{ ...LABEL, padding: '10px 14px', textAlign: 'left' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {uploads.length === 0 && (
+                {filtered.length === 0 && (
                   <tr><td colSpan={10} style={{ padding: '52px 0', textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>No uploads yet.</td></tr>
                 )}
-                {uploads.map(doc => (
-                  <tr key={doc.id} style={{ borderBottom: '1px solid var(--surface-border)', transition: 'background .15s', background: selectedIds.has(doc.id) ? 'rgba(26,107,60,.04)' : 'transparent' }}
+                {filtered.map(doc => {
+                  const isDraft = !doc.workflowStatus || doc.workflowStatus === WORKFLOW_STATUS.DRAFT;
+                  const isPublished = doc.workflowStatus === WORKFLOW_STATUS.PUBLISHED;
+                  const isPending = doc.workflowStatus === WORKFLOW_STATUS.PENDING;
+                  return (
+                  <tr key={doc.id} style={{ borderBottom: '1px solid var(--surface-border)', transition: 'background .15s', background: selectedIds.has(doc.id) ? 'rgba(26,86,219,.04)' : 'transparent' }}
                     onMouseEnter={e => { if (!selectedIds.has(doc.id)) e.currentTarget.style.background = 'var(--surface-hover)'; }}
                     onMouseLeave={e => { if (!selectedIds.has(doc.id)) e.currentTarget.style.background = 'transparent'; }}>
-                    <td style={{ padding: '12px 10px' }}>
-                      <button onClick={() => toggleSelectDoc(doc.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', alignItems: 'center' }}>
-                        {selectedIds.has(doc.id) ? <CheckSquare size={14} color="var(--primary)" /> : <Square size={14} />}
-                      </button>
-                    </td>
+                    {bulkSelectMode && (
+                      <td style={{ padding: '12px 10px' }}>
+                        {isDraft ? (
+                          <button onClick={() => toggleSelectDoc(doc.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', alignItems: 'center' }}>
+                            {selectedIds.has(doc.id) ? <CheckSquare size={14} color="var(--primary)" /> : <Square size={14} />}
+                          </button>
+                        ) : (
+                          <div style={{ width: 14, height: 14 }} title={isPublished ? 'Published — use Request Correction' : 'Under review'}>
+                            <Square size={14} color="var(--surface-200)" />
+                          </div>
+                        )}
+                      </td>
+                    )}
                     <td style={{ padding: '12px 14px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
                         {doc.isZip ? <Archive size={13} color="#f59e0b" /> : <FileText size={13} color="var(--primary)" />}
@@ -907,11 +1046,15 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                       </button>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </Card>
+        </div>
+          );
+        })()}
       </div>
     );
   }
@@ -919,8 +1062,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   // ── Upload page ────────────────────────────────────────────────────────────
   return (
     <div style={{ maxWidth: 860, animation: 'fadeSlideIn .3s ease' }}>
-
-      {/* CHANGE 5: Version conflict modal */}
       {conflictModal && (
         <VersionConflictModal
           existingDoc={conflictModal.existingDoc}
@@ -929,8 +1070,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
           onCancel={() => setConflictModal(null)}
         />
       )}
-
-      {/* CHANGE 8: Cross-dept notification banner */}
       <CrossDeptBanner notifications={crossDeptNotifs} onDismiss={() => setCrossDeptNotifs([])} />
 
       {/* AI Analysis Results */}
@@ -955,7 +1094,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
             <AnalysisCard key={i} docTitle={r.docTitle} citations={r.citations} analyzing={r.analyzing} />
           ))}
           {analysisResults.every(r => !r.analyzing) && (
-            <div style={{ padding: '10px 14px', borderRadius: 9, background: 'rgba(26,107,60,.06)', border: '1px solid rgba(26,107,60,.2)', fontSize: 12.5, color: '#15803d', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ padding: '10px 14px', borderRadius: 9, background: 'rgba(26,86,219,.06)', border: '1px solid rgba(26,86,219,.2)', fontSize: 12.5, color: '#1e40af', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
               <CheckCircle size={14} />
               Analysis complete — linked documents are now visible in the Knowledge Graph.
             </div>
@@ -981,11 +1120,11 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         onDragOver={e => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
         style={{
-          border: `2px dashed ${dragOver ? 'var(--primary)' : files.length > 0 ? 'rgba(26,107,60,.4)' : 'var(--surface-border)'}`,
+          border: `2px dashed ${dragOver ? 'var(--primary)' : files.length > 0 ? 'rgba(26,86,219,.4)' : 'var(--surface-border)'}`,
           borderRadius: 'var(--radius)', padding: files.length > 0 ? '20px 24px' : '44px 32px',
           textAlign: 'center', cursor: files.length > 0 ? 'default' : 'pointer',
-          transition: 'all .25s', background: dragOver ? 'rgba(26,107,60,.04)' : files.length > 0 ? 'rgba(26,107,60,.02)' : 'var(--surface-card)',
-          marginBottom: 20, boxShadow: dragOver ? '0 0 0 4px rgba(26,107,60,.08)' : 'var(--card-shadow)',
+          transition: 'all .25s', background: dragOver ? 'rgba(26,86,219,.04)' : files.length > 0 ? 'rgba(26,86,219,.02)' : 'var(--surface-card)',
+          marginBottom: 20, boxShadow: dragOver ? '0 0 0 4px rgba(26,86,219,.08)' : 'var(--card-shadow)',
         }}>
         <input ref={inputRef} type="file" accept=".pdf,.zip" multiple style={{ display: 'none' }}
           onChange={e => { addFiles(e.target.files); e.target.value = ''; }} />
@@ -1002,7 +1141,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 )}
               </div>
               <button onClick={e => { e.stopPropagation(); inputRef.current?.click(); }}
-                style={{ fontSize: 12, fontWeight: 600, color: 'var(--primary)', background: 'rgba(26,107,60,.08)', border: '1px solid rgba(26,107,60,.2)', borderRadius: 7, padding: '5px 12px', cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                style={{ fontSize: 12, fontWeight: 600, color: 'var(--primary)', background: 'rgba(26,86,219,.08)', border: '1px solid rgba(26,86,219,.2)', borderRadius: 7, padding: '5px 12px', cursor: 'pointer', fontFamily: 'var(--font)' }}>
                 + Add More
               </button>
             </div>
@@ -1026,13 +1165,13 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
           </div>
         ) : (
           <>
-            <div style={{ width: 52, height: 52, borderRadius: 13, background: dragOver ? 'rgba(26,107,60,.12)' : 'var(--surface-ground)', border: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px', color: dragOver ? 'var(--primary)' : 'var(--text-color-secondary)', transition: 'all .25s' }}>
+            <div style={{ width: 52, height: 52, borderRadius: 13, background: dragOver ? 'rgba(26,86,219,.12)' : 'var(--surface-ground)', border: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px', color: dragOver ? 'var(--primary)' : 'var(--text-color-secondary)', transition: 'all .25s' }}>
               <Upload size={24} />
             </div>
             <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-heading)', marginBottom: 5 }}>Drop files here or click to browse</div>
             <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', marginBottom: 8 }}>Select multiple PDFs or a ZIP archive — up to 50 MB per file</div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: 10.5, color: 'var(--primary)', background: 'rgba(26,107,60,.08)', border: '1px solid rgba(26,107,60,.2)', padding: '3px 10px', borderRadius: 20 }}>.PDF</span>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 10.5, color: 'var(--primary)', background: 'rgba(26,86,219,.08)', border: '1px solid rgba(26,86,219,.2)', padding: '3px 10px', borderRadius: 20 }}>.PDF</span>
               <span style={{ fontFamily: 'var(--mono)', fontSize: 10.5, color: '#f59e0b', background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.3)', padding: '3px 10px', borderRadius: 20 }}>.ZIP</span>
             </div>
           </>
@@ -1055,17 +1194,35 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 placeholder={files.length > 1 ? 'Leave blank to use each filename' : 'e.g. Haryana Municipal Act, 1973'}
                 style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
             </div>
-            {[
-              { lbl: 'Year of Enactment *', key: 'year', type: 'number', ph: 'e.g. 1973', req: true },
-              { lbl: 'Version / Amendment No.', key: 'version', type: 'text', ph: 'e.g. 1.0', req: false },
-            ].map(({ lbl, key, type, ph, req }) => (
-              <div key={key}>
-                <div style={{ ...LABEL, marginBottom: 7 }}>{lbl}</div>
-                <input type={type} value={form[key]} onChange={e => fmt(key, e.target.value)} placeholder={ph} required={req}
-                  style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
-              </div>
-            ))}
-            {[['Department *','dept',DEPTS,true],['Document Type *','type',TYPES,true],['Language','lang',LANGS,false]].map(([lbl,key,opts,req]) => (
+
+            {/* Gazette Reference — full width, always */}
+            <div style={{ gridColumn: '1 / -1' }}>
+              <div style={{ ...LABEL, marginBottom: 7 }}>Gazette Reference <span style={{ color: '#ef4444' }}>*</span></div>
+              <input value={form.gazette} onChange={e => fmt('gazette', e.target.value)} required
+                placeholder="e.g. Gazette of India Extraordinary, Part II, Sec. 1, No. 312, dated 18 Dec 1976"
+                style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+            </div>
+
+            {/* Issuing Authority + Enactment Date */}
+            <div>
+              <div style={{ ...LABEL, marginBottom: 7 }}>Issuing Authority <span style={{ color: '#ef4444' }}>*</span></div>
+              <input value={form.authority} onChange={e => fmt('authority', e.target.value)} required
+                placeholder="e.g. Parliament of India / Governor of Haryana"
+                style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+            </div>
+            <div>
+              <div style={{ ...LABEL, marginBottom: 7 }}>Enactment / Issue Date <span style={{ color: '#ef4444' }}>*</span></div>
+              <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
+                style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+            </div>
+
+            <div>
+              <div style={{ ...LABEL, marginBottom: 7 }}>Version / Amendment No.</div>
+              <input value={form.version} onChange={e => fmt('version', e.target.value)} placeholder="e.g. 1.0"
+                style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+            </div>
+            {/* Year auto-derived from enactmentDate — no separate field needed */}
+            {[['Department *','dept',DEPTS,true],['Document Type *','type',TYPES,true]].map(([lbl,key,opts,req]) => (
               <div key={key}>
                 <div style={{ ...LABEL, marginBottom: 7 }}>{lbl}</div>
                 <select value={form[key]} onChange={e => fmt(key, e.target.value)} required={req}
@@ -1076,8 +1233,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 </select>
               </div>
             ))}
-
-            {/* CHANGE 3: Hierarchical tagging */}
             <div style={{ gridColumn: '1 / -1' }}>
               <div style={{ ...LABEL, marginBottom: 7 }}>Hierarchical Tags</div>
               <HierarchyTag hierarchy={hierarchy} onChange={setHierarchy} />
@@ -1091,6 +1246,86 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 onFocus={focusStyle} onBlur={blurStyle} />
             </div>
           </div>
+
+          {/* ── Amendment info — simplified, conditional on type = Amendment ── */}
+          {form.type === 'Amendment' && (
+            <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--surface-border)' }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Edit3 size={13} color="var(--primary)" />
+                Amendment Details
+              </div>
+              <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginBottom: 16 }}>
+                AI will compare both documents and extract exact changes — you only need to specify the parent act and what kind of changes are present.
+              </div>
+
+              {/* Parent Act selector */}
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ ...LABEL, marginBottom: 7 }}>Parent Act being amended <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    value={form.parentAct ? (documents.find(d => d.uid === form.parentAct)?.title || form.parentAct) : relSearch}
+                    onChange={e => { setRelSearch(e.target.value); fmt('parentAct', ''); setShowRelDrop(true); }}
+                    onFocus={() => setShowRelDrop(true)}
+                    onBlur={() => setTimeout(() => setShowRelDrop(false), 150)}
+                    placeholder="Search the act this amendment modifies…"
+                    style={{ ...INPUT_BASE, paddingRight: form.parentAct ? 36 : 14 }}
+                    onFocus={focusStyle} onBlur={blurStyle}
+                  />
+                  {form.parentAct && (
+                    <button type="button" onClick={() => { fmt('parentAct', ''); setRelSearch(''); }}
+                      style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex' }}>
+                      <X size={13} />
+                    </button>
+                  )}
+                  {showRelDrop && !form.parentAct && relFiltered.length > 0 && (
+                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,.12)', zIndex: 50, marginTop: 4, maxHeight: 200, overflowY: 'auto' }}>
+                      {relFiltered.map(d => (
+                        <div key={d.uid} onMouseDown={() => { fmt('parentAct', d.uid); setRelSearch(''); setShowRelDrop(false); }}
+                          style={{ padding: '9px 14px', cursor: 'pointer', borderBottom: '1px solid var(--surface-border)', fontSize: 12.5, transition: 'background .15s' }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                          <div style={{ fontWeight: 600, color: 'var(--text-heading)' }}>{d.title}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', marginTop: 2 }}>{d.year} · {d.dept}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {form.parentAct && (
+                  <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', borderRadius: 8, background: 'rgba(26,86,219,.05)', border: '1px solid rgba(26,86,219,.15)' }}>
+                    <GitBranch size={12} color="var(--primary)" />
+                    <span style={{ fontSize: 12, color: 'var(--text-color-secondary)' }}>Amends →</span>
+                    <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-heading)' }}>{documents.find(d => d.uid === form.parentAct)?.title}</span>
+                    <span style={{ fontSize: 11, color: 'var(--primary)', fontFamily: 'var(--mono)', background: 'var(--primary-light)', padding: '1px 8px', borderRadius: 20, marginLeft: 'auto' }}>AI will compare</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Change types — multi-select chips */}
+              <div>
+                <div style={{ ...LABEL, marginBottom: 8 }}>Types of changes present in this amendment <span style={{ color: 'var(--text-color-secondary)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(tick all that apply)</span></div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {AMEND_CHANGE_TYPES.map(ct => {
+                    const active = form.changeTypes.includes(ct);
+                    const c = AMEND_CHANGE_COLORS[ct] || '#94a3b8';
+                    return (
+                      <button key={ct} type="button"
+                        onClick={() => fmt('changeTypes', active ? form.changeTypes.filter(x => x !== ct) : [...form.changeTypes, ct])}
+                        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 16px', borderRadius: 20, border: `1.5px solid ${active ? c : 'var(--surface-border)'}`, background: active ? c + '15' : 'transparent', color: active ? c : 'var(--text-color-secondary)', fontFamily: 'var(--font)', fontSize: 12.5, fontWeight: active ? 700 : 400, cursor: 'pointer', transition: 'all .15s' }}>
+                        {active && <span style={{ fontSize: 11 }}>✓</span>}
+                        {ct}
+                      </button>
+                    );
+                  })}
+                </div>
+                {form.changeTypes.length > 0 && (
+                  <div style={{ marginTop: 10, fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
+                    AI will identify exact sections and extract before/after text for: <strong style={{ color: 'var(--text-color)' }}>{form.changeTypes.join(', ')}</strong> changes
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Manual relationship override */}
           <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--surface-border)' }}>
@@ -1135,7 +1370,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
             {relations.length > 0 && (
               <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 7 }}>
                 {relations.map((r, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 12px', borderRadius: 8, background: 'rgba(26,107,60,.05)', border: '1px solid rgba(26,107,60,.15)' }}>
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 12px', borderRadius: 8, background: 'rgba(26,86,219,.05)', border: '1px solid rgba(26,86,219,.15)' }}>
                     <GitBranch size={12} color="var(--primary)" />
                     <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary)', fontFamily: 'var(--mono)' }}>{r.label}</span>
                     <span style={{ fontSize: 12.5, color: 'var(--text-heading)', flex: 1 }}>→ {r.targetTitle}</span>
@@ -1147,7 +1382,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--surface-border)' }}>
-            <button type="button" onClick={() => { setForm({ act:'',year:'',dept:'',type:'',version:'1.0',lang:'English',desc:'' }); setFiles([]); setRelations([]); setAnalysisResults([]); setHierarchy({ act:'',chapter:'',section:'',subsection:'' }); setCrossDeptNotifs([]); }}
+            <button type="button" onClick={() => { setForm({ act:'',dept:'',type:'',version:'1.0',desc:'',gazette:'',authority:'',enactmentDate:'',parentAct:'',changeTypes:[] }); setFiles([]); setRelations([]); setAnalysisResults([]); setHierarchy({ act:'',chapter:'',section:'',subsection:'' }); setCrossDeptNotifs([]); setAmendmentProvisions([]); }}
               style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)', padding: '9px 22px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
               onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
               onMouseLeave={e => e.currentTarget.style.background = 'var(--surface-card)'}>

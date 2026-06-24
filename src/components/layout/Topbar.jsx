@@ -1,8 +1,8 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { Menu, Search, Bell, ChevronDown, LogOut, User, Settings } from 'lucide-react';
 
 const ROLE_META = {
-  citizen:  { label: 'Citizen',         color: '#1A6B3C', bg: 'rgba(26,107,60,.1)' },
+  citizen:  { label: 'Citizen',         color: '#1a56db', bg: 'rgba(26,86,219,.1)' },
   uploader: { label: 'Dept. Uploader',  color: '#3b82f6', bg: 'rgba(59,130,246,.1)' },
   approver: { label: 'Dept. Approver',  color: '#f59e0b', bg: 'rgba(245,158,11,.1)' },
   csoffice: { label: 'CS Office',       color: '#22c55e', bg: 'rgba(34,197,94,.1)' },

@@ -1,4 +1,4 @@
-
+﻿
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
@@ -14,10 +14,10 @@
   --surface-hover:   #e9ecef;
 
   /* Government green primary (replaces Diamond's indigo) */
-  --primary:        #1A6B3C;
-  --primary-dark:   #124D2B;
-  --primary-light:  rgba(26, 107, 60, 0.1);
-  --primary-border: rgba(26, 107, 60, 0.25);
+  --primary:        #1a56db;
+  --primary-dark:   #1341a0;
+  --primary-light:  rgba(26, 86, 219, 0.1);
+  --primary-border: rgba(26, 86, 219, 0.25);
 
   /* Text */
   --text-color:           #495057;
@@ -35,7 +35,8 @@
 
   --radius:  12px;
   --radius-sm: 8px;
-  --font: 'Segoe UI', Inter, system-ui, -apple-system, Roboto, sans-serif;
+  --font: 'Noto Sans', 'Segoe UI', Inter, system-ui, -apple-system, Roboto, sans-serif;
+  --font-devanagari: 'Noto Sans Devanagari', 'Noto Sans', sans-serif;
   --mono: 'Consolas', 'IBM Plex Mono', ui-monospace, monospace;
 }
 
@@ -59,3 +60,43 @@ body {
 @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes pulse2 { 0%,100%{opacity:1;} 50%{opacity:.3;} }
 @keyframes bounce { 0%,80%,100%{transform:scale(0);} 40%{transform:scale(1);} }
+
+/* ── DBIM / GIGW compliance — enable in production ────────────────
+@keyframes fadeSlideInUp { from { opacity: 0; transform: translateY(100%); } to { opacity: 1; transform: translateY(0); } }
+
+.skip-nav {
+  position: absolute; left: -9999px; top: auto;
+  width: 1px; height: 1px; overflow: hidden; z-index: -1;
+  text-decoration: none;
+}
+.skip-nav:focus {
+  position: fixed; left: 50%; transform: translateX(-50%); top: 0;
+  width: auto; height: auto; overflow: visible; z-index: 9999;
+  background: var(--primary); color: #fff; padding: 8px 20px;
+  border-radius: 0 0 8px 8px; font-size: 14px; font-weight: 600;
+  box-shadow: 0 4px 12px rgba(0,0,0,.3);
+}
+
+html[data-font-size="large"] body { zoom: 1.18; }
+html[data-font-size="small"]  body { zoom: 0.9; }
+
+html[data-contrast="high"] {
+  --surface-card:    #1a1a1a;
+  --surface-ground:  #111111;
+  --surface-section: #1a1a1a;
+  --surface-border:  #555555;
+  --surface-hover:   #2a2a2a;
+  --surface-50:      #1a1a1a;
+  --surface-100:     #222222;
+  --surface-200:     #333333;
+  --text-color:           #f0f0f0;
+  --text-heading:         #ffffff;
+  --text-color-secondary: #bbbbbb;
+  --primary:       #4ade80;
+  --primary-dark:  #22c55e;
+  --primary-light: rgba(74,222,128,0.15);
+  --primary-border:rgba(74,222,128,0.35);
+}
+
+:lang(hi), [lang="hi"] { font-family: var(--font-devanagari); }
+── end DBIM/GIGW compliance ── */

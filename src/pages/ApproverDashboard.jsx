@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+﻿import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   CheckCircle, XCircle, FileText, ChevronDown, Search, Clock,
   Check, X, Eye, AlignLeft, Cpu, Link, AlertTriangle, ChevronRight,
@@ -346,7 +346,7 @@ function WordEditPopover({ editingWord, isSuspicious, onSave, onMarkCorrect, onC
           </button>
           {isSuspicious && (
             <button onClick={() => onMarkCorrect(editingWord.key, editingWord.text)}
-              style={{ flex: 1, background: 'rgba(34,197,94,.12)', color: '#15803d',
+              style={{ flex: 1, background: 'rgba(34,197,94,.12)', color: '#1e40af',
                 border: '1px solid rgba(34,197,94,.3)', borderRadius: 6, padding: '6px 0',
                 fontSize: 11.5, fontWeight: 600, cursor: 'pointer' }}>
               ✓ Mark correct
@@ -530,7 +530,7 @@ function AiAnalysisPanel({ analysis }) {
         {/* Hierarchy breadcrumb — uses ChevronRight icon */}
         <div>
           <div style={{ ...LABEL, marginBottom: 8 }}>Hierarchy Tags</div>
-          <div style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(26,107,60,.04)', border: '1px solid rgba(26,107,60,.15)', fontSize: 11.5, color: 'var(--text-color-secondary)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2, lineHeight: 1.8 }}>
+          <div style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(26,86,219,.04)', border: '1px solid rgba(26,86,219,.15)', fontSize: 11.5, color: 'var(--text-color-secondary)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2, lineHeight: 1.8 }}>
             <span style={{ color: 'var(--primary)', fontWeight: 700 }}>{analysis.hierarchy.act}</span>
             {analysis.hierarchy.chapter && (
               <><ChevronRight size={11} color="#94a3b8" style={{ flexShrink: 0 }} /><span>{analysis.hierarchy.chapter}</span></>
@@ -713,7 +713,7 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, activePage 
                 <X size={14} /> Reject
               </button>
               <button onClick={handleApprove}
-                style={{ background: 'rgba(34,197,94,.1)', border: '1px solid rgba(34,197,94,.3)', color: '#15803d', padding: '9px 20px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                style={{ background: 'rgba(34,197,94,.1)', border: '1px solid rgba(34,197,94,.3)', color: '#1e40af', padding: '9px 20px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
                 onMouseEnter={e => e.currentTarget.style.background = 'rgba(34,197,94,.18)'}
                 onMouseLeave={e => e.currentTarget.style.background = 'rgba(34,197,94,.1)'}>
                 <Check size={14} /> Approve
@@ -803,7 +803,7 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
           { icon: Clock,       label: 'Pending',  value: pending.length,                                        bg: 'rgba(245,158,11,.12)', color: '#f59e0b' },
           { icon: CheckCircle, label: 'Approved', value: reviewed.filter(d => d.status === 'approved').length,  bg: 'rgba(34,197,94,.12)',  color: '#22c55e' },
           { icon: XCircle,     label: 'Rejected', value: reviewed.filter(d => d.status === 'rejected').length,  bg: 'rgba(239,68,68,.12)',  color: '#ef4444' },
-          { icon: FileText,    label: 'Total',    value: docs.length,                                           bg: 'rgba(26,107,60,.12)',  color: 'var(--primary)' },
+          { icon: FileText,    label: 'Total',    value: docs.length,                                           bg: 'rgba(26,86,219,.12)',  color: 'var(--primary)' },
         ].map(s => (
           <Card key={s.label}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
@@ -825,8 +825,8 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
           <button key={f} onClick={() => setFilter(f)} style={{
             fontFamily: 'var(--mono)', fontSize: 11, letterSpacing: '.05em',
             padding: '5px 14px', borderRadius: 20, cursor: 'pointer',
-            border: `1px solid ${filter === f ? 'rgba(26,107,60,.3)' : 'var(--surface-border)'}`,
-            background: filter === f ? 'rgba(26,107,60,.1)' : 'var(--surface-card)',
+            border: `1px solid ${filter === f ? 'rgba(26,86,219,.3)' : 'var(--surface-border)'}`,
+            background: filter === f ? 'rgba(26,86,219,.1)' : 'var(--surface-card)',
             color: filter === f ? 'var(--primary)' : 'var(--text-color-secondary)',
             transition: 'all .18s', textTransform: 'uppercase',
           }}>{f}</button>
@@ -859,7 +859,7 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
         const isOpen = expanded === doc.id;
         return (
           <div key={doc.id} ref={isOpen ? expandedRef : null}>
-            <Card style={{ padding: 0, borderColor: isOpen ? 'rgba(26,107,60,.3)' : 'var(--surface-border)', transition: 'border-color .2s', overflow: 'hidden' }}>
+            <Card style={{ padding: 0, borderColor: isOpen ? 'rgba(26,86,219,.3)' : 'var(--surface-border)', transition: 'border-color .2s', overflow: 'hidden' }}>
 
               {/* Header row — click to expand */}
               <div onClick={() => setExpanded(isOpen ? null : doc.id)}
@@ -896,7 +896,7 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
                   {!isOpen && doc.status === 'pending' && (
                     <div style={{ display: 'flex', gap: 6 }}>
                       {[
-                        { icon: Eye,       color: '#1a6b3c', label: 'PDF' },
+                        { icon: Eye,       color: '#1a56db', label: 'PDF' },
                         { icon: AlignLeft, color: '#3b82f6', label: 'OCR' },
                         { icon: Cpu,       color: '#8b5cf6', label: 'AI'  },
                       ].map(({ icon: Icon, color, label }) => (

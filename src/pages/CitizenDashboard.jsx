@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+﻿import { useState, useEffect, useRef } from 'react';
 import { Search, FileText, Filter, X, BookOpen, Building2, ArrowRight, Download, Bookmark, BookmarkCheck, MapPin, ChevronRight } from 'lucide-react';
 import { DOCUMENTS } from '../data/mockData';
 import Card from '../components/ui/Card';
@@ -100,10 +100,10 @@ function DirectAnswer({ query, docs }) {
   if (!passage) return null;
 
   return (
-    <div style={{ marginBottom: 18, borderRadius: 12, border: '1.5px solid rgba(26,107,60,.35)',
-      background: 'rgba(26,107,60,.04)', overflow: 'hidden' }}>
+    <div style={{ marginBottom: 18, borderRadius: 12, border: '1.5px solid rgba(26,86,219,.35)',
+      background: 'rgba(26,86,219,.04)', overflow: 'hidden' }}>
       {/* Header */}
-      <div style={{ padding: '9px 16px', background: 'rgba(26,107,60,.09)', borderBottom: '1px solid rgba(26,107,60,.2)',
+      <div style={{ padding: '9px 16px', background: 'rgba(26,86,219,.09)', borderBottom: '1px solid rgba(26,86,219,.2)',
         display: 'flex', alignItems: 'center', gap: 10 }}>
         <BookOpen size={13} color="var(--primary)" />
         <span style={{ fontSize: 10.5, fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--primary)',
@@ -146,7 +146,7 @@ function DirectAnswer({ query, docs }) {
 }
 
 const LABEL    = { fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)' };
-const TYPE_PILL = { fontFamily: 'var(--mono)', fontSize: 10, fontWeight: 600, padding: '3px 8px', borderRadius: 5, letterSpacing: '.04em', textTransform: 'uppercase', background: 'rgba(26,107,60,.1)', color: 'var(--primary)', border: '1px solid rgba(26,107,60,.25)' };
+const TYPE_PILL = { fontFamily: 'var(--mono)', fontSize: 10, fontWeight: 600, padding: '3px 8px', borderRadius: 5, letterSpacing: '.04em', textTransform: 'uppercase', background: 'rgba(26,86,219,.1)', color: 'var(--primary)', border: '1px solid rgba(26,86,219,.25)' };
 
 function loadBookmarks() {
   try { return JSON.parse(localStorage.getItem('hlks_bookmarks') || '[]'); } catch { return []; }
@@ -183,7 +183,7 @@ function PdfViewerModal({ doc, query, onClose }) {
         <div style={{ padding: '22px', borderBottom: '1px solid var(--surface-border)' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 18 }}>
             {[['Page', Math.ceil(doc.pages / 3)], ['Section', doc.section], ['Paragraph', doc.paragraph], ['Total Pages', doc.pages]].map(([k, v]) => (
-              <div key={k} style={{ background: 'rgba(26,107,60,.06)', border: '1px solid rgba(26,107,60,.2)', borderRadius: 10, padding: '14px', textAlign: 'center' }}>
+              <div key={k} style={{ background: 'rgba(26,86,219,.06)', border: '1px solid rgba(26,86,219,.2)', borderRadius: 10, padding: '14px', textAlign: 'center' }}>
                 <div style={{ ...LABEL, color: 'var(--primary)', marginBottom: 6, fontSize: 9.5 }}>{k}</div>
                 <div style={{ fontFamily: 'var(--mono)', fontSize: 24, fontWeight: 700, color: 'var(--primary)', lineHeight: 1 }}>{v}</div>
               </div>
@@ -196,7 +196,7 @@ function PdfViewerModal({ doc, query, onClose }) {
               <span>{doc.title}</span>
               <span>Page {Math.ceil(doc.pages / 3)} of {doc.pages}</span>
             </div>
-            <div style={{ background: 'rgba(26,107,60,.1)', border: '2px solid var(--primary)', borderRadius: 6, padding: '14px 16px', fontSize: 13, color: '#1e3a2f', lineHeight: 1.85, position: 'relative' }}>
+            <div style={{ background: 'rgba(26,86,219,.1)', border: '2px solid var(--primary)', borderRadius: 6, padding: '14px 16px', fontSize: 13, color: '#1e3364', lineHeight: 1.85, position: 'relative' }}>
               <div style={{ position: 'absolute', top: -10, left: 12, background: 'var(--primary)', color: 'white', fontSize: 9.5, fontWeight: 700, fontFamily: 'var(--mono)', padding: '2px 8px', borderRadius: 4, letterSpacing: '.06em' }}>
                 § SECTION {doc.section} · EXACT MATCH
               </div>
@@ -288,7 +288,7 @@ export default function CitizenDashboard({ activePage, onAuditLog }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
           {[
-            { icon: FileText,  label: 'Published Documents', value: APPROVED.length,                            bg: 'rgba(26,107,60,.12)',  color: 'var(--primary)' },
+            { icon: FileText,  label: 'Published Documents', value: APPROVED.length,                            bg: 'rgba(26,86,219,.12)',  color: 'var(--primary)' },
             { icon: Building2, label: 'Departments',         value: DEPTS.length - 1,                          bg: 'rgba(59,130,246,.12)', color: '#3b82f6' },
             { icon: BookOpen,  label: 'Document Types',      value: TYPES.length - 1,                          bg: 'rgba(245,158,11,.12)', color: '#f59e0b' },
           ].map(s => (
@@ -326,7 +326,7 @@ export default function CitizenDashboard({ activePage, onAuditLog }) {
                   <td style={{ padding: '12px 14px', fontSize: 12.5, color: 'var(--text-color-secondary)' }}>{doc.dept}</td>
                   <td style={{ padding: '12px 14px', fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-color-secondary)' }}>{doc.year}</td>
                   <td style={{ padding: '12px 14px' }}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 20, background: doc.legalStatus === 'active' ? 'rgba(34,197,94,.1)' : 'rgba(239,68,68,.1)', color: doc.legalStatus === 'active' ? '#15803d' : '#b91c1c', border: `1px solid ${doc.legalStatus === 'active' ? 'rgba(34,197,94,.25)' : 'rgba(239,68,68,.25)'}` }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 20, background: doc.legalStatus === 'active' ? 'rgba(34,197,94,.1)' : 'rgba(239,68,68,.1)', color: doc.legalStatus === 'active' ? '#1e40af' : '#b91c1c', border: `1px solid ${doc.legalStatus === 'active' ? 'rgba(34,197,94,.25)' : 'rgba(239,68,68,.25)'}` }}>
                       {doc.legalStatus}
                     </span>
                   </td>
@@ -413,7 +413,7 @@ export default function CitizenDashboard({ activePage, onAuditLog }) {
             {/* Bookmark button */}
             {query && searched && (
               <button onClick={() => toggleBookmark(query)} title={isBookmarked ? 'Remove bookmark' : 'Save this query'}
-                style={{ background: isBookmarked ? 'rgba(26,107,60,.1)' : 'var(--surface-card)', border: `1px solid ${isBookmarked ? 'rgba(26,107,60,.3)' : 'var(--surface-border)'}`, color: isBookmarked ? 'var(--primary)' : 'var(--text-color-secondary)', padding: '9px 14px', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 500, fontFamily: 'var(--font)', transition: 'all .2s' }}>
+                style={{ background: isBookmarked ? 'rgba(26,86,219,.1)' : 'var(--surface-card)', border: `1px solid ${isBookmarked ? 'rgba(26,86,219,.3)' : 'var(--surface-border)'}`, color: isBookmarked ? 'var(--primary)' : 'var(--text-color-secondary)', padding: '9px 14px', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 500, fontFamily: 'var(--font)', transition: 'all .2s' }}>
                 {isBookmarked ? <BookmarkCheck size={14} /> : <Bookmark size={14} />}
                 {isBookmarked ? 'Saved' : 'Save'}
               </button>
@@ -439,8 +439,8 @@ export default function CitizenDashboard({ activePage, onAuditLog }) {
           ].map(([lbl, val, setter, opts]) => (
             <select key={lbl} value={val} onChange={e => setter(e.target.value)}
               style={{
-                background: val !== 'All' ? 'rgba(26,107,60,.08)' : 'var(--surface-card)',
-                border: `1px solid ${val !== 'All' ? 'rgba(26,107,60,.3)' : 'var(--surface-border)'}`,
+                background: val !== 'All' ? 'rgba(26,86,219,.08)' : 'var(--surface-card)',
+                border: `1px solid ${val !== 'All' ? 'rgba(26,86,219,.3)' : 'var(--surface-border)'}`,
                 color: val !== 'All' ? 'var(--primary)' : 'var(--text-color-secondary)',
                 borderRadius: 7, padding: '6px 28px 6px 11px', fontFamily: 'var(--font)', fontSize: 12.5, outline: 'none', cursor: 'pointer',
                 appearance: 'none',
@@ -516,14 +516,14 @@ export default function CitizenDashboard({ activePage, onAuditLog }) {
                     {results.map(doc => (
                       <tr key={doc.id}
                         onClick={() => { setSelected(doc); onAuditLog?.(`Viewed: ${doc.title}`); }}
-                        style={{ cursor: 'pointer', background: selected?.id === doc.id ? 'rgba(26,107,60,.06)' : 'transparent', borderBottom: '1px solid var(--surface-border)', transition: 'background .15s', borderLeft: selected?.id === doc.id ? '3px solid var(--primary)' : '3px solid transparent' }}
+                        style={{ cursor: 'pointer', background: selected?.id === doc.id ? 'rgba(26,86,219,.06)' : 'transparent', borderBottom: '1px solid var(--surface-border)', transition: 'background .15s', borderLeft: selected?.id === doc.id ? '3px solid var(--primary)' : '3px solid transparent' }}
                         onMouseEnter={e => { if (selected?.id !== doc.id) e.currentTarget.style.background = 'var(--surface-hover)'; }}
                         onMouseLeave={e => { if (selected?.id !== doc.id) e.currentTarget.style.background = 'transparent'; }}>
                         <td style={{ padding: '12px 14px', fontSize: 13, fontWeight: 600, color: 'var(--text-heading)', maxWidth: 180 }}>{doc.title}</td>
                         <td style={{ padding: '12px 14px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)', whiteSpace: 'nowrap' }}>{doc.dept}</td>
                         <td style={{ padding: '12px 14px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)' }}>{doc.year}</td>
                         <td style={{ padding: '12px 14px' }}>
-                          <span style={{ display: 'inline-block', fontSize: 10.5, fontWeight: 600, padding: '2px 8px', borderRadius: 20, textTransform: 'uppercase', fontFamily: 'var(--mono)', background: doc.legalStatus === 'active' ? 'rgba(34,197,94,.1)' : 'rgba(239,68,68,.1)', color: doc.legalStatus === 'active' ? '#15803d' : '#b91c1c' }}>
+                          <span style={{ display: 'inline-block', fontSize: 10.5, fontWeight: 600, padding: '2px 8px', borderRadius: 20, textTransform: 'uppercase', fontFamily: 'var(--mono)', background: doc.legalStatus === 'active' ? 'rgba(34,197,94,.1)' : 'rgba(239,68,68,.1)', color: doc.legalStatus === 'active' ? '#1e40af' : '#b91c1c' }}>
                             {doc.legalStatus}
                           </span>
                         </td>
@@ -557,20 +557,20 @@ export default function CitizenDashboard({ activePage, onAuditLog }) {
 
                   {/* Legal status */}
                   <div style={{ marginBottom: 16 }}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 14px', borderRadius: 20, fontSize: 11.5, fontWeight: 700, background: selected.legalStatus === 'active' ? 'rgba(34,197,94,.1)' : 'rgba(239,68,68,.1)', color: selected.legalStatus === 'active' ? '#15803d' : '#b91c1c', border: `1px solid ${selected.legalStatus === 'active' ? 'rgba(34,197,94,.25)' : 'rgba(239,68,68,.25)'}` }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 14px', borderRadius: 20, fontSize: 11.5, fontWeight: 700, background: selected.legalStatus === 'active' ? 'rgba(34,197,94,.1)' : 'rgba(239,68,68,.1)', color: selected.legalStatus === 'active' ? '#1e40af' : '#b91c1c', border: `1px solid ${selected.legalStatus === 'active' ? 'rgba(34,197,94,.25)' : 'rgba(239,68,68,.25)'}` }}>
                       Legal Status: {selected.legalStatus.toUpperCase()}
                     </span>
                   </div>
 
                   {/* Document pointer — E-07 */}
-                  <div style={{ background: 'rgba(26,107,60,.06)', border: '1px solid rgba(26,107,60,.2)', borderRadius: 10, padding: '16px 18px', marginBottom: 16 }}>
+                  <div style={{ background: 'rgba(26,86,219,.06)', border: '1px solid rgba(26,86,219,.2)', borderRadius: 10, padding: '16px 18px', marginBottom: 16 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 12 }}>
                       <MapPin size={13} color="var(--primary)" />
                       <span style={{ fontFamily: 'var(--mono)', fontSize: 10, fontWeight: 700, color: 'var(--primary)', letterSpacing: '.08em', textTransform: 'uppercase' }}>Document Pointer — Zero-Generation Mode</span>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
                       {[['Page', Math.ceil(selected.pages / 3)], ['Section', selected.section], ['Paragraph', selected.paragraph]].map(([k, v]) => (
-                        <div key={k} style={{ background: 'var(--surface-card)', border: '1px solid rgba(26,107,60,.2)', borderRadius: 8, padding: '12px', textAlign: 'center' }}>
+                        <div key={k} style={{ background: 'var(--surface-card)', border: '1px solid rgba(26,86,219,.2)', borderRadius: 8, padding: '12px', textAlign: 'center' }}>
                           <div style={{ ...LABEL, color: 'var(--primary)', marginBottom: 6, fontSize: 9.5 }}>{k}</div>
                           <div style={{ fontFamily: 'var(--mono)', fontSize: 22, fontWeight: 700, color: 'var(--primary)', lineHeight: 1 }}>{v}</div>
                         </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { Users, ShieldCheck, Settings, Activity, ClipboardList, Trash2, Edit2, Plus, CheckCircle, XCircle } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
@@ -25,14 +25,39 @@ const MOCK_AUDIT = [
   { time: '2026-05-24 14:10', user: 'Harish Gupta',  role: 'approver', action: 'Approved: Excise Policy Circular 2026' },
 ];
 
-const TAXONOMY = [
-  { category: 'Document Types', items: ['Act', 'Amendment', 'Notification', 'Circular', 'Policy', 'Rules & Regulations', 'Order / Gazette'] },
-  { category: 'Departments',    items: ['Revenue', 'Legal', 'Home', 'Finance', 'Health', 'Agriculture', 'Urban Local Bodies'] },
-  { category: 'Legal Status',   items: ['Active', 'Repealed', 'Amended', 'Under Review', 'Suspended'] },
-];
+export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxonomy }) {
+  const [users, setUsers]       = useState(MOCK_USERS);
+  const [editState, setEditState] = useState(null); // { category, index, value }
+  const [addState, setAddState]   = useState(null); // { category, value }
 
-export default function AdminDashboard({ activePage }) {
-  const [users, setUsers] = useState(MOCK_USERS);
+  function updateCategory(category, newItems) {
+    onUpdateTaxonomy(taxonomy.map(t => t.category === category ? { ...t, items: newItems } : t));
+  }
+  function startEdit(category, index, value) {
+    setEditState({ category, index, value });
+    setAddState(null);
+  }
+  function saveEdit() {
+    if (!editState?.value.trim()) return;
+    const t = taxonomy.find(t => t.category === editState.category);
+    updateCategory(editState.category, t.items.map((it, i) => i === editState.index ? editState.value.trim() : it));
+    setEditState(null);
+  }
+  function deleteItem(category, index) {
+    const t = taxonomy.find(t => t.category === category);
+    updateCategory(category, t.items.filter((_, i) => i !== index));
+  }
+  function startAdd(category) {
+    setAddState({ category, value: '' });
+    setEditState(null);
+  }
+  function saveAdd() {
+    if (!addState?.value.trim()) return;
+    const t = taxonomy.find(t => t.category === addState.category);
+    if (t.items.includes(addState.value.trim())) return;
+    updateCategory(addState.category, [...t.items, addState.value.trim()]);
+    setAddState(null);
+  }
 
   function toggleStatus(id) {
     setUsers(u => u.map(usr => usr.id === id ? { ...usr, status: usr.status === 'active' ? 'inactive' : 'active' } : usr));
@@ -46,7 +71,7 @@ export default function AdminDashboard({ activePage }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
           {[
-            { label: 'Total Users',    value: users.length, color: 'var(--primary)',  bg: 'rgba(26,107,60,.12)',  icon: Users },
+            { label: 'Total Users',    value: users.length, color: 'var(--primary)',  bg: 'rgba(26,86,219,.12)',  icon: Users },
             { label: 'Active',         value: active,       color: '#22c55e',         bg: 'rgba(34,197,94,.12)',  icon: CheckCircle },
             { label: 'Inactive',       value: inactive,     color: '#f59e0b',         bg: 'rgba(245,158,11,.12)', icon: XCircle },
           ].map(s => (
@@ -89,7 +114,7 @@ export default function AdminDashboard({ activePage }) {
                   <td style={{ padding: '12px 16px' }}><Badge label={u.role} variant={u.role} /></td>
                   <td style={{ padding: '12px 16px', fontSize: 12.5, color: 'var(--text-color-secondary)' }}>{u.dept}</td>
                   <td style={{ padding: '12px 16px' }}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: u.status === 'active' ? '#15803d' : '#b45309' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: u.status === 'active' ? '#1e40af' : '#b45309' }}>
                       <span style={{ width: 6, height: 6, borderRadius: '50%', background: u.status === 'active' ? '#22c55e' : '#f59e0b', display: 'inline-block' }} />
                       {u.status}
                     </span>
@@ -170,26 +195,78 @@ export default function AdminDashboard({ activePage }) {
 
   // ── Taxonomy Editor ──────────────────────────────────────────────────────
   if (activePage === 'taxonomy') {
+    const INPUT_STYLE = {
+      flex: 1, border: '1px solid var(--primary)', borderRadius: 6, padding: '4px 8px',
+      fontSize: 12.5, outline: 'none', fontFamily: 'var(--font)', color: 'var(--text-color)',
+      background: 'var(--surface-card)',
+    };
+    const BTN = (color, label, onClick) => (
+      <button onClick={onClick} style={{
+        background: 'transparent', border: 'none', cursor: 'pointer',
+        color, padding: '2px 4px', fontSize: 11, fontWeight: 600, fontFamily: 'var(--font)',
+      }}>{label}</button>
+    );
     return (
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
-        {TAXONOMY.map(t => (
+        {taxonomy.map(t => (
           <Card key={t.category}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, paddingBottom: 12, borderBottom: '1px solid var(--surface-border)' }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)' }}>{t.category}</div>
-              <button style={{ background: 'var(--primary)', color: 'white', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)' }}>{t.category}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 2 }}>{t.items.length} items</div>
+              </div>
+              <button onClick={() => startAdd(t.category)} style={{ background: 'var(--primary)', color: 'white', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
                 <Plus size={11} /> Add
               </button>
             </div>
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {t.items.map(item => (
-                <div key={item} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px', borderRadius: 7, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)' }}>
-                  <span style={{ fontSize: 12.5, color: 'var(--text-color)' }}>{item}</span>
-                  <div style={{ display: 'flex', gap: 4 }}>
-                    <button style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', padding: 2 }}><Edit2 size={11} /></button>
-                    <button style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 2 }}><Trash2 size={11} /></button>
+              {t.items.map((item, idx) => {
+                const isEditing = editState?.category === t.category && editState?.index === idx;
+                return (
+                  <div key={item + idx} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px', borderRadius: 7, background: isEditing ? 'rgba(26,86,219,.04)' : 'var(--surface-ground)', border: `1px solid ${isEditing ? 'var(--primary-border)' : 'var(--surface-border)'}` }}>
+                    {isEditing ? (
+                      <>
+                        <input
+                          autoFocus
+                          value={editState.value}
+                          onChange={e => setEditState(s => ({ ...s, value: e.target.value }))}
+                          onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditState(null); }}
+                          style={INPUT_STYLE}
+                        />
+                        {BTN('var(--primary)', 'Save', saveEdit)}
+                        {BTN('var(--text-color-secondary)', 'Cancel', () => setEditState(null))}
+                      </>
+                    ) : (
+                      <>
+                        <span style={{ fontSize: 12.5, color: 'var(--text-color)', flex: 1 }}>{item}</span>
+                        <button onClick={() => startEdit(t.category, idx, item)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', padding: 2, display: 'flex' }} title="Edit">
+                          <Edit2 size={11} />
+                        </button>
+                        <button onClick={() => deleteItem(t.category, idx)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 2, display: 'flex' }} title="Delete">
+                          <Trash2 size={11} />
+                        </button>
+                      </>
+                    )}
                   </div>
+                );
+              })}
+
+              {/* ── Add new item input ── */}
+              {addState?.category === t.category && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px', borderRadius: 7, background: 'rgba(26,86,219,.04)', border: '1px solid var(--primary-border)' }}>
+                  <input
+                    autoFocus
+                    placeholder={`New ${t.category.replace(/s$/, '').toLowerCase()}…`}
+                    value={addState.value}
+                    onChange={e => setAddState(s => ({ ...s, value: e.target.value }))}
+                    onKeyDown={e => { if (e.key === 'Enter') saveAdd(); if (e.key === 'Escape') setAddState(null); }}
+                    style={INPUT_STYLE}
+                  />
+                  {BTN('var(--primary)', 'Add', saveAdd)}
+                  {BTN('var(--text-color-secondary)', 'Cancel', () => setAddState(null))}
                 </div>
-              ))}
+              )}
             </div>
           </Card>
         ))}
@@ -221,7 +298,7 @@ export default function AdminDashboard({ activePage }) {
           {[['API Server','Operational'],['Database','Operational'],['OCR Service','Operational'],['Search Index','Operational'],['Audit Logger','Operational']].map(([svc, status]) => (
             <div key={svc} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--surface-border)' }}>
               <span style={{ fontSize: 13, color: 'var(--text-color)' }}>{svc}</span>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: '#15803d' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: '#1e40af' }}>
                 <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} /> {status}
               </span>
             </div>
