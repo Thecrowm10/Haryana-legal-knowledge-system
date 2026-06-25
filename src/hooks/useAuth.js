@@ -12,8 +12,27 @@ function decodeJwt(token) {
   }
 }
 
+function restoreUserFromToken() {
+  const token = localStorage.getItem('token');
+  if (!token) return null;
+  const payload = decodeJwt(token);
+  if (!payload) { localStorage.removeItem('token'); return null; }
+  if (payload.exp && payload.exp * 1000 < Date.now()) {
+    localStorage.removeItem('token');
+    return null;
+  }
+  return {
+    username: payload.username,
+    role:     payload.role,
+    name:     payload.username,
+    email:    payload.email,
+    dept:     payload.department ?? '',
+    isActive: payload.is_active,
+  };
+}
+
 export function useAuth() {
-  const [user, setUser]       = useState(null);
+  const [user, setUser] = useState(restoreUserFromToken);
   const [error, setError]     = useState('');
   const [loading, setLoading] = useState(false);
 
