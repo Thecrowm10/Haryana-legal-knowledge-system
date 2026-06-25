@@ -1,8 +1,8 @@
 ﻿import { useState, useEffect } from 'react';
-import { Users, ShieldCheck, Settings, Activity, ClipboardList, Trash2, Edit2, Plus, CheckCircle, XCircle, Building2, X } from 'lucide-react';
+import { Users, ShieldCheck, Settings, Activity, ClipboardList, Trash2, Edit2, Plus, CheckCircle, XCircle, Building2, X, Eye, EyeOff } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
-import { getUsers, getRoles, updateUser } from '../services/users';
+import { getUsers, getRoles, updateUser, registerUser } from '../services/users';
 import { getDepartments, createDepartment } from '../services/departments';
 
 const LABEL = { fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)' };
@@ -125,6 +125,42 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     setAddState(null);
   }
 
+  // ── Add User modal state ─────────────────────────────────────────────────
+  const EMPTY_ADD_FORM = { username: '', email: '', password: '', first_name: '', last_name: '', role_id: '', department_id: '' };
+  const [addingUser, setAddingUser]   = useState(false);
+  const [addForm, setAddForm]         = useState(EMPTY_ADD_FORM);
+  const [addSaving, setAddSaving]     = useState(false);
+  const [addError, setAddError]       = useState('');
+  const [showAddPass, setShowAddPass] = useState(false);
+
+  function handleAddUser() {
+    if (!addForm.username.trim()) { setAddError('Username is required.'); return; }
+    if (!addForm.email.trim())    { setAddError('Email is required.'); return; }
+    if (!addForm.password)        { setAddError('Password is required.'); return; }
+    setAddSaving(true);
+    setAddError('');
+    registerUser({
+      username:      addForm.username.trim(),
+      email:         addForm.email.trim(),
+      password:      addForm.password,
+      first_name:    addForm.first_name.trim(),
+      last_name:     addForm.last_name.trim(),
+      role_id:       addForm.role_id       ? Number(addForm.role_id)       : undefined,
+      department_id: addForm.department_id ? Number(addForm.department_id) : undefined,
+    })
+      .then(res => {
+        setUsers(prev => [normalizeUser(res.data), ...prev]);
+        setAddingUser(false);
+        setAddForm(EMPTY_ADD_FORM);
+        setShowAddPass(false);
+      })
+      .catch(err => {
+        const detail = err.response?.data?.detail;
+        setAddError(typeof detail === 'string' ? detail : 'Failed to create user.');
+      })
+      .finally(() => setAddSaving(false));
+  }
+
   // ── Edit modal state ─────────────────────────────────────────────────────
   const [editingUser, setEditingUser] = useState(null);
   const [editForm, setEditForm]       = useState({});
@@ -215,7 +251,8 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
         <Card padding="0">
           <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>System Users</div>
-            <button style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--primary)', color: 'white', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
+            <button onClick={() => { setAddingUser(true); setAddError(''); setAddForm(EMPTY_ADD_FORM); setShowAddPass(false); }}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--primary)', color: 'white', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
               <Plus size={13} /> Add User
             </button>
           </div>
@@ -278,6 +315,133 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
           </table>
           )}
         </Card>
+
+        {/* ── Add User Modal ── */}
+        {addingUser && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            onClick={e => { if (e.target === e.currentTarget) setAddingUser(false); }}>
+            <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.45)', backdropFilter: 'blur(4px)' }} />
+            <div style={{ position: 'relative', zIndex: 1, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 16, width: 'clamp(320px, 90vw, 540px)', boxShadow: '0 24px 64px rgba(0,0,0,.25)', overflow: 'hidden' }}>
+
+              {/* Header */}
+              <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)' }}>Add New User</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-color-secondary)', marginTop: 2 }}>Create a new system account</div>
+                </div>
+                <button onClick={() => setAddingUser(false)}
+                  style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '6px', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex' }}>
+                  <X size={14} />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div style={{ padding: '22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+                {/* Username + Email */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Username *</label>
+                    <input style={{ ...INP_STYLE, borderColor: addError.toLowerCase().includes('username') ? 'rgba(239,68,68,.6)' : undefined }}
+                      placeholder="e.g. firstname.lastname"
+                      autoComplete="off"
+                      value={addForm.username}
+                      onChange={e => { setAddForm(f => ({ ...f, username: e.target.value })); setAddError(''); }} />
+                  </div>
+                  <div>
+                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Email *</label>
+                    <input style={{ ...INP_STYLE, borderColor: addError.toLowerCase().includes('email') ? 'rgba(239,68,68,.6)' : undefined }}
+                      type="email" placeholder="user@example.com"
+                      autoComplete="off"
+                      value={addForm.email}
+                      onChange={e => { setAddForm(f => ({ ...f, email: e.target.value })); setAddError(''); }} />
+                  </div>
+                </div>
+
+                {/* Password */}
+                <div>
+                  <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Password *</label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      style={{ ...INP_STYLE, paddingRight: 38, borderColor: addError.toLowerCase().includes('password') ? 'rgba(239,68,68,.6)' : undefined }}
+                      type={showAddPass ? 'text' : 'password'}
+                      placeholder="Set a password"
+                      autoComplete="new-password"
+                      value={addForm.password}
+                      onChange={e => { setAddForm(f => ({ ...f, password: e.target.value })); setAddError(''); }} />
+                    <button type="button" onClick={() => setShowAddPass(s => !s)}
+                      style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex' }}>
+                      {showAddPass ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* First + Last name */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>First Name</label>
+                    <input style={INP_STYLE} placeholder="First name"
+                      value={addForm.first_name}
+                      onChange={e => setAddForm(f => ({ ...f, first_name: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Last Name</label>
+                    <input style={INP_STYLE} placeholder="Last name"
+                      value={addForm.last_name}
+                      onChange={e => setAddForm(f => ({ ...f, last_name: e.target.value }))} />
+                  </div>
+                </div>
+
+                {/* Role + Department */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Role</label>
+                    <select style={{ ...INP_STYLE, cursor: 'pointer' }}
+                      value={addForm.role_id}
+                      onChange={e => setAddForm(f => ({ ...f, role_id: e.target.value }))}>
+                      <option value="">— Select Role —</option>
+                      {roles.map(r => (
+                        <option key={r.id} value={r.id}>{r.name.charAt(0).toUpperCase() + r.name.slice(1)}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Department</label>
+                    <select style={{ ...INP_STYLE, cursor: 'pointer' }}
+                      value={addForm.department_id}
+                      onChange={e => setAddForm(f => ({ ...f, department_id: e.target.value }))}>
+                      <option value="">— None —</option>
+                      {depts.map(d => (
+                        <option key={d.id} value={d.id}>{d.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {addError && (
+                  <div style={{ padding: '9px 12px', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, fontSize: 12.5, color: '#ef4444', display: 'flex', gap: 7, alignItems: 'center' }}>
+                    <span>⚠</span> {addError}
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div style={{ padding: '14px 22px', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                <button onClick={() => setAddingUser(false)}
+                  style={{ padding: '9px 18px', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'var(--text-color)', fontFamily: 'var(--font)' }}>
+                  Cancel
+                </button>
+                <button onClick={handleAddUser} disabled={addSaving}
+                  style={{ padding: '9px 20px', background: addSaving ? 'var(--surface-border)' : 'var(--primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: addSaving ? 'not-allowed' : 'pointer', color: addSaving ? 'var(--text-color-secondary)' : 'white', fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 7 }}>
+                  {addSaving
+                    ? <><div style={{ width: 12, height: 12, border: '2px solid rgba(0,0,0,.2)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin .7s linear infinite' }} /> Creating…</>
+                    : <><Plus size={13} /> Create User</>
+                  }
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ── Edit User Modal ── */}
         {editingUser && (
