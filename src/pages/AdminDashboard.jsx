@@ -1,8 +1,8 @@
 ﻿import { useState, useEffect } from 'react';
-import { Users, ShieldCheck, Settings, Activity, ClipboardList, Trash2, Edit2, Plus, CheckCircle, XCircle, Building2 } from 'lucide-react';
+import { Users, ShieldCheck, Settings, Activity, ClipboardList, Trash2, Edit2, Plus, CheckCircle, XCircle, Building2, X } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
-import { getUsers } from '../services/users';
+import { getUsers, updateUser } from '../services/users';
 import { getDepartments, createDepartment } from '../services/departments';
 
 const LABEL = { fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)' };
@@ -11,11 +11,16 @@ function normalizeUser(u) {
   return {
     id:        u.id,
     name:      `${u.first_name} ${u.last_name}`.trim() || u.username,
+    firstName: u.first_name ?? '',
+    lastName:  u.last_name ?? '',
     username:  u.username,
-    email:     u.email,
+    email:     u.email ?? '',
     role:      u.role?.name ?? '—',
+    roleId:    u.role?.id ?? null,
     dept:      u.department?.name ?? '—',
+    deptId:    u.department?.id ?? null,
     status:    u.is_active ? 'active' : 'inactive',
+    isActive:  u.is_active,
     lastLogin: u.last_login ? u.last_login.split('T')[0] : '—',
   };
 }
@@ -58,7 +63,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   const [createSuccess, setCreateSuccess] = useState('');
 
   useEffect(() => {
-    if (activePage !== 'departments' && activePage !== 'taxonomy') return;
+    if (!['departments', 'taxonomy', 'users'].includes(activePage)) return;
     setDeptsLoading(true);
     setDeptsError('');
     getDepartments()
@@ -116,14 +121,75 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     setAddState(null);
   }
 
-  function toggleStatus(id) {
-    setUsers(u => u.map(usr => usr.id === id ? { ...usr, status: usr.status === 'active' ? 'inactive' : 'active' } : usr));
+  // ── Edit modal state ─────────────────────────────────────────────────────
+  const [editingUser, setEditingUser] = useState(null);
+  const [editForm, setEditForm]       = useState({});
+  const [editSaving, setEditSaving]   = useState(false);
+  const [editError, setEditError]     = useState('');
+  const [togglingId, setTogglingId]   = useState(null);
+
+  function openEdit(u) {
+    setEditingUser(u);
+    setEditForm({
+      first_name:    u.firstName,
+      last_name:     u.lastName,
+      email:         u.email,
+      is_active:     u.isActive,
+      role_id:       u.roleId,
+      department_id: u.deptId,
+    });
+    setEditError('');
+  }
+
+  function handleEditSave() {
+    setEditSaving(true);
+    setEditError('');
+    updateUser({ user_id: editingUser.id, ...editForm })
+      .then(res => {
+        setUsers(prev => prev.map(u => u.id === editingUser.id ? normalizeUser(res.data) : u));
+        setEditingUser(null);
+      })
+      .catch(err => {
+        const detail = err.response?.data?.detail;
+        setEditError(typeof detail === 'string' ? detail : 'Failed to save changes.');
+      })
+      .finally(() => setEditSaving(false));
+  }
+
+  function handleToggle(u) {
+    setTogglingId(u.id);
+    updateUser({
+      user_id:       u.id,
+      first_name:    u.firstName,
+      last_name:     u.lastName,
+      email:         u.email,
+      is_active:     !u.isActive,
+      role_id:       u.roleId,
+      department_id: u.deptId,
+    })
+      .then(res => setUsers(prev => prev.map(x => x.id === u.id ? normalizeUser(res.data) : x)))
+      .catch(() => {})
+      .finally(() => setTogglingId(null));
   }
 
   // ── User Management ──────────────────────────────────────────────────────
   if (activePage === 'users') {
     const active   = users.filter(u => u.status === 'active').length;
     const inactive = users.filter(u => u.status === 'inactive').length;
+    // derive unique roles from loaded users for the role dropdown
+    const availableRoles = [...new Map(
+      users.filter(u => u.roleId).map(u => [u.roleId, { id: u.roleId, name: u.role }])
+    ).values()];
+
+    const INP_STYLE = {
+      width: '100%', padding: '9px 12px',
+      background: 'var(--surface-ground)',
+      border: '1px solid var(--surface-border)',
+      borderRadius: 8, fontSize: 13,
+      color: 'var(--text-color)', outline: 'none',
+      fontFamily: 'var(--font)',
+    };
+
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
@@ -193,12 +259,16 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                   <td style={{ padding: '12px 16px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)' }}>{u.lastLogin}</td>
                   <td style={{ padding: '12px 16px' }}>
                     <div style={{ display: 'flex', gap: 6 }}>
-                      <button title="Edit" style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 6, padding: '5px 8px', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex' }}>
+                      <button title="Edit" onClick={() => openEdit(u)}
+                        style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 6, padding: '5px 8px', cursor: 'pointer', color: 'var(--primary)', display: 'flex' }}>
                         <Edit2 size={12} />
                       </button>
-                      <button title={u.status === 'active' ? 'Deactivate' : 'Activate'} onClick={() => toggleStatus(u.id)}
-                        style={{ background: u.status === 'active' ? 'rgba(239,68,68,.08)' : 'rgba(34,197,94,.08)', border: `1px solid ${u.status === 'active' ? 'rgba(239,68,68,.2)' : 'rgba(34,197,94,.2)'}`, borderRadius: 6, padding: '5px 8px', cursor: 'pointer', color: u.status === 'active' ? '#ef4444' : '#22c55e', display: 'flex' }}>
-                        {u.status === 'active' ? <XCircle size={12} /> : <CheckCircle size={12} />}
+                      <button
+                        title={u.isActive ? 'Deactivate' : 'Activate'}
+                        disabled={togglingId === u.id}
+                        onClick={() => handleToggle(u)}
+                        style={{ background: u.isActive ? 'rgba(239,68,68,.08)' : 'rgba(34,197,94,.08)', border: `1px solid ${u.isActive ? 'rgba(239,68,68,.2)' : 'rgba(34,197,94,.2)'}`, borderRadius: 6, padding: '5px 8px', cursor: togglingId === u.id ? 'not-allowed' : 'pointer', color: u.isActive ? '#ef4444' : '#22c55e', display: 'flex', opacity: togglingId === u.id ? 0.5 : 1 }}>
+                        {u.isActive ? <XCircle size={12} /> : <CheckCircle size={12} />}
                       </button>
                     </div>
                   </td>
@@ -208,6 +278,120 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
           </table>
           )}
         </Card>
+
+        {/* ── Edit User Modal ── */}
+        {editingUser && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            onClick={e => { if (e.target === e.currentTarget) setEditingUser(null); }}>
+            <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.45)', backdropFilter: 'blur(4px)' }} />
+            <div style={{
+              position: 'relative', zIndex: 1,
+              background: 'var(--surface-card)',
+              border: '1px solid var(--surface-border)',
+              borderRadius: 16,
+              width: 'clamp(320px, 90vw, 520px)',
+              boxShadow: '0 24px 64px rgba(0,0,0,.25)',
+              overflow: 'hidden',
+            }}>
+              {/* Modal header */}
+              <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)' }}>Edit User</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-color-secondary)', marginTop: 2 }}>{editingUser.username}</div>
+                </div>
+                <button onClick={() => setEditingUser(null)}
+                  style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '6px', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex' }}>
+                  <X size={14} />
+                </button>
+              </div>
+
+              {/* Modal body */}
+              <div style={{ padding: '22px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>First Name</label>
+                    <input style={INP_STYLE} value={editForm.first_name}
+                      onChange={e => setEditForm(f => ({ ...f, first_name: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Last Name</label>
+                    <input style={INP_STYLE} value={editForm.last_name}
+                      onChange={e => setEditForm(f => ({ ...f, last_name: e.target.value }))} />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Email</label>
+                  <input style={INP_STYLE} type="email" value={editForm.email}
+                    onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Role</label>
+                    <select style={{ ...INP_STYLE, cursor: 'pointer' }}
+                      value={editForm.role_id ?? ''}
+                      onChange={e => setEditForm(f => ({ ...f, role_id: e.target.value ? Number(e.target.value) : null }))}>
+                      <option value="">— Select Role —</option>
+                      {availableRoles.map(r => (
+                        <option key={r.id} value={r.id}>{r.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Department</label>
+                    <select style={{ ...INP_STYLE, cursor: 'pointer' }}
+                      value={editForm.department_id ?? ''}
+                      onChange={e => setEditForm(f => ({ ...f, department_id: e.target.value ? Number(e.target.value) : null }))}>
+                      <option value="">— None —</option>
+                      {depts.map(d => (
+                        <option key={d.id} value={d.id}>{d.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Active status toggle */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: 'var(--surface-ground)', borderRadius: 10, border: '1px solid var(--surface-border)' }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>Account Status</div>
+                    <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 2 }}>
+                      {editForm.is_active ? 'User can log in and access the system' : 'User is blocked from logging in'}
+                    </div>
+                  </div>
+                  <button type="button"
+                    onClick={() => setEditForm(f => ({ ...f, is_active: !f.is_active }))}
+                    style={{ width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer', background: editForm.is_active ? '#22c55e' : 'var(--surface-border)', position: 'relative', transition: 'background .2s', flexShrink: 0 }}>
+                    <span style={{ position: 'absolute', top: 3, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left .2s', left: editForm.is_active ? 23 : 3, boxShadow: '0 1px 4px rgba(0,0,0,.25)' }} />
+                  </button>
+                </div>
+
+                {editError && (
+                  <div style={{ padding: '9px 12px', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, fontSize: 12.5, color: '#ef4444', display: 'flex', gap: 7, alignItems: 'center' }}>
+                    <span>⚠</span> {editError}
+                  </div>
+                )}
+              </div>
+
+              {/* Modal footer */}
+              <div style={{ padding: '14px 22px', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                <button onClick={() => setEditingUser(null)}
+                  style={{ padding: '9px 18px', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'var(--text-color)', fontFamily: 'var(--font)' }}>
+                  Cancel
+                </button>
+                <button onClick={handleEditSave} disabled={editSaving}
+                  style={{ padding: '9px 20px', background: editSaving ? 'var(--surface-border)' : 'var(--primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: editSaving ? 'not-allowed' : 'pointer', color: editSaving ? 'var(--text-color-secondary)' : 'white', fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 7 }}>
+                  {editSaving
+                    ? <><div style={{ width: 12, height: 12, border: '2px solid rgba(0,0,0,.2)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin .7s linear infinite' }} /> Saving…</>
+                    : 'Save Changes'
+                  }
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
     );
   }
