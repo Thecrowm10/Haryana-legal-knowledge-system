@@ -2,7 +2,7 @@
 import { Users, ShieldCheck, Settings, Activity, ClipboardList, Trash2, Edit2, Plus, CheckCircle, XCircle, Building2, X } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
-import { getUsers, updateUser } from '../services/users';
+import { getUsers, getRoles, updateUser } from '../services/users';
 import { getDepartments, createDepartment } from '../services/departments';
 
 const LABEL = { fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)' };
@@ -37,18 +37,22 @@ const MOCK_AUDIT = [
 ];
 
 export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxonomy }) {
-  const [users, setUsers]           = useState([]);
+  const [users, setUsers]               = useState([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersError, setUsersError]     = useState('');
-  const [editState, setEditState]   = useState(null); // { category, index, value }
-  const [addState, setAddState]     = useState(null); // { category, value }
+  const [roles, setRoles]               = useState([]);
+  const [editState, setEditState]       = useState(null); // { category, index, value }
+  const [addState, setAddState]         = useState(null); // { category, value }
 
   useEffect(() => {
     if (activePage !== 'users') return;
     setUsersLoading(true);
     setUsersError('');
-    getUsers()
-      .then(res => setUsers(res.data.map(normalizeUser)))
+    Promise.all([getUsers(), getRoles()])
+      .then(([usersRes, rolesRes]) => {
+        setUsers(usersRes.data.map(normalizeUser));
+        setRoles(rolesRes.data);
+      })
       .catch(() => setUsersError('Failed to load users. Please try again.'))
       .finally(() => setUsersLoading(false));
   }, [activePage]);
@@ -176,10 +180,6 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   if (activePage === 'users') {
     const active   = users.filter(u => u.status === 'active').length;
     const inactive = users.filter(u => u.status === 'inactive').length;
-    // derive unique roles from loaded users for the role dropdown
-    const availableRoles = [...new Map(
-      users.filter(u => u.roleId).map(u => [u.roleId, { id: u.roleId, name: u.role }])
-    ).values()];
 
     const INP_STYLE = {
       width: '100%', padding: '9px 12px',
@@ -334,8 +334,8 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                       value={editForm.role_id ?? ''}
                       onChange={e => setEditForm(f => ({ ...f, role_id: e.target.value ? Number(e.target.value) : null }))}>
                       <option value="">— Select Role —</option>
-                      {availableRoles.map(r => (
-                        <option key={r.id} value={r.id}>{r.name}</option>
+                      {roles.map(r => (
+                        <option key={r.id} value={r.id}>{r.name.charAt(0).toUpperCase() + r.name.slice(1)}</option>
                       ))}
                     </select>
                   </div>
