@@ -32,7 +32,7 @@ const INITIAL_TAXONOMY = [
 ];
 
 export default function App() {
-  const { user, loading, loginAsRole, logout } = useAuth();
+  const { user, loading, error: authError, loginAsRole, logout } = useAuth();
   const [activePage, setActivePage]       = useState(null);
   const [auditLog, setAuditLog]           = useState([]);
   const [documents, setDocuments]         = useState(
@@ -81,7 +81,7 @@ export default function App() {
     addAuditLog(`Approved document: ${doc?.title}`);
   }
 
-  if (!user) return <Login onLogin={loginAsRole} loading={loading} />;
+  if (!user) return <Login onLogin={loginAsRole} loading={loading} authError={authError} />;
   if (activePage === null) return null;
 
   function renderDashboard() {

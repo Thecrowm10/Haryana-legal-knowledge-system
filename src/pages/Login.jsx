@@ -1,39 +1,30 @@
-import { useState } from 'react';
-import { Upload, CheckSquare, Search, Monitor, ChevronDown, Eye, EyeOff, Shield, Lock, User, Users, ArrowRight, BookOpen, Settings, FileSearch } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, Eye, EyeOff, Shield, Lock, User, ArrowRight } from 'lucide-react';
 import haryanaLogo from '../assets/haryana-logo.png';
 
-const ROLES = [
-  { key: 'uploader',  label: 'Department Uploader',  username: 'dept.uploader',  icon: Upload      },
-  { key: 'approver',  label: 'Department Approver',  username: 'dept.approver',  icon: CheckSquare },
-  { key: 'csoffice',  label: 'CS Office Dashboard',  username: 'cs.office',      icon: Monitor     },
-  { key: 'admin',     label: 'System Administrator', username: 'sys.admin',       icon: Settings    },
-  { key: 'auditor',   label: 'Auditor',              username: 'auditor.user',    icon: FileSearch  },
-];
+export default function Login({ onLogin, loading, authError }) {
+  const [screen, setScreen]       = useState('portal'); // 'portal' | 'login'
+  const [username, setUsername]   = useState('');
+  const [password, setPassword]   = useState('');
+  const [showPass, setShowPass]   = useState(false);
+  const [formError, setFormError] = useState('');
+  const [shake, setShake]         = useState(false);
 
-export default function Login({ onLogin }) {
-  const [screen, setScreen]             = useState('portal'); // 'portal' | 'login'
-  const [selectedRole, setSelectedRole] = useState(null);
-  const [password, setPassword]         = useState('');
-  const [showPass, setShowPass]         = useState(false);
-  const [dropOpen, setDropOpen]         = useState(false);
-  const [error, setError]               = useState('');
-  const [loading, setLoading]           = useState(false);
-  const [shake, setShake]               = useState(false);
+  useEffect(() => {
+    if (authError) {
+      setShake(true);
+      setTimeout(() => setShake(false), 500);
+    }
+  }, [authError]);
+
+  const error = formError || authError;
 
   const handleLogin = () => {
-    setError('');
-    if (!selectedRole) { setError('Please select a user role.'); return; }
-    if (!password)     { setError('Password is required.'); return; }
-    if (password !== '123') {
-      setError('Incorrect password. Please try again.');
-      setShake(true); setTimeout(() => setShake(false), 500);
-      return;
-    }
-    setLoading(true);
-    setTimeout(() => { setLoading(false); onLogin(selectedRole.key); }, 900);
+    setFormError('');
+    if (!username.trim()) { setFormError('Username is required.'); return; }
+    if (!password)        { setFormError('Password is required.'); return; }
+    onLogin({ username: username.trim(), password });
   };
-
-  const r = selectedRole;
 
   // ── Portal Selection Screen ──────────────────────────────────────────────
   if (screen === 'portal') return (
@@ -78,7 +69,7 @@ export default function Login({ onLogin }) {
           <div style={{ display:'flex', gap:24, flexWrap:'wrap', justifyContent:'center' }}>
 
             {/* Public Access */}
-            <div className="lk-portal-card" onClick={() => onLogin('citizen')} style={{
+            <div className="lk-portal-card" onClick={() => onLogin({ role: 'citizen' })} style={{
               width: 280, padding:'32px 28px', borderRadius:20, cursor:'pointer',
               background:'rgba(255,255,255,.08)', backdropFilter:'blur(28px)',
               border:'1px solid rgba(255,255,255,.16)', borderTop:'1px solid rgba(255,255,255,.24)',
@@ -249,77 +240,33 @@ export default function Login({ onLogin }) {
               </div>
             </div>
 
-            <button onClick={() => { setScreen('portal'); setSelectedRole(null); setPassword(''); setError(''); }}
+            <button onClick={() => { setScreen('portal'); setUsername(''); setPassword(''); setFormError(''); }}
               style={{ background:'transparent', border:'none', color:'rgba(255,255,255,.4)', fontSize:11.5, fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', gap:5, marginBottom:14, padding:0, fontFamily:'Plus Jakarta Sans,sans-serif', letterSpacing:'.04em' }}>
               ← Back to Portal Selection
             </button>
             <h2 style={{ fontSize:21, fontWeight:800, color:'#fff', letterSpacing:'-.02em', marginBottom:3 }}>Official Login</h2>
             <p style={{ fontSize:12.5, color:'rgba(255,255,255,.42)', marginBottom:20 }}>Department & Administration Portal</p>
 
-            {/* ROLE SELECT — absolute dropdown, floats over password */}
-            <div style={{ marginBottom:14, position:'relative', zIndex: dropOpen ? 100 : 1 }}>
+            {/* Username */}
+            <div style={{ marginBottom:14 }}>
               <label style={{ display:'flex', alignItems:'center', gap:5, fontSize:10.5, fontWeight:700, color:'rgba(255,255,255,.5)', marginBottom:7, letterSpacing:'.08em', textTransform:'uppercase' }}>
-                <User size={10} color='rgba(255,255,255,.4)'/> User Role
+                <User size={10} color='rgba(255,255,255,.4)'/> Username
               </label>
-              <div
-                className={`lk-trigger${dropOpen?' open':''}`}
-                onClick={()=>setDropOpen(o=>!o)}
+              <input
+                className="lk-inp"
+                type="text"
+                value={username}
+                onChange={e => { setUsername(e.target.value); setFormError(''); }}
+                onKeyDown={e => e.key === 'Enter' && handleLogin()}
+                placeholder="Enter your username"
+                autoComplete="username"
                 style={{
-                  display:'flex', alignItems:'center', justifyContent:'space-between',
-                  padding:'11px 13px',
+                  width:'100%', padding:'11px 13px',
                   background:'rgba(255,255,255,.10)',
-                  border:'1px solid rgba(255,255,255,.18)',
-                  borderRadius:'11px',
-                  cursor:'pointer', userSelect:'none',
+                  border:`1px solid ${error && error.toLowerCase().includes('username') ? 'rgba(248,113,113,.55)' : 'rgba(255,255,255,.18)'}`,
+                  borderRadius:11, fontSize:13.5, color:'#fff',
                 }}
-              >
-                {r ? (
-                  <div style={{ display:'flex', alignItems:'center', gap:9 }}>
-                    <div style={{ width:26, height:26, borderRadius:7, background:'rgba(74,222,128,.15)', border:'1px solid rgba(74,222,128,.28)', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                      <r.icon size={12} color='#4ade80' strokeWidth={2}/>
-                    </div>
-                    <div>
-                      <div style={{ fontSize:13, fontWeight:600, color:'#fff' }}>{r.label}</div>
-                      <div style={{ fontSize:10, fontFamily:'monospace', color:'rgba(255,255,255,.35)' }}>{r.username}</div>
-                    </div>
-                  </div>
-                ) : (
-                  <span style={{ fontSize:13, color:'rgba(255,255,255,.28)' }}>— Select Role —</span>
-                )}
-                <ChevronDown size={13} color='rgba(255,255,255,.4)' style={{ transition:'transform .22s', transform:dropOpen?'rotate(180deg)':'none', flexShrink:0 }}/>
-              </div>
-
-              {dropOpen && (
-                <div className="lk-roles" style={{
-                  position:'absolute', top:'calc(100% + 4px)', left:0, right:0,
-                  background:'rgba(8,22,13,.92)',
-                  backdropFilter:'blur(24px)', WebkitBackdropFilter:'blur(24px)',
-                  border:'1px solid rgba(74,222,128,.28)',
-                  borderRadius:11, overflow:'hidden',
-                  boxShadow:'0 12px 36px rgba(0,0,0,.5)',
-                }}>
-                  {ROLES.map((ro,i)=>(
-                    <div key={ro.key} className="lk-opt"
-                      onClick={()=>{ setSelectedRole(ro); setDropOpen(false); setError(''); }}
-                      style={{
-                        display:'flex', alignItems:'center', gap:10, padding:'11px 13px',
-                        cursor:'pointer',
-                        background: selectedRole?.key===ro.key ? 'rgba(74,222,128,.1)' : 'transparent',
-                        borderTop: i>0 ? '1px solid rgba(255,255,255,.06)' : 'none',
-                      }}
-                    >
-                      <div style={{ width:28, height:28, borderRadius:7, background:'rgba(255,255,255,.07)', border:'1px solid rgba(255,255,255,.1)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                        <ro.icon size={13} color='rgba(255,255,255,.6)' strokeWidth={2}/>
-                      </div>
-                      <div style={{ flex:1 }}>
-                        <div style={{ fontSize:13, fontWeight:600, color:'#fff' }}>{ro.label}</div>
-                        <div style={{ fontSize:10, fontFamily:'monospace', color:'rgba(255,255,255,.32)' }}>{ro.username}</div>
-                      </div>
-                      {selectedRole?.key===ro.key && <div style={{ width:7, height:7, borderRadius:'50%', background:'#4ade80', flexShrink:0 }}/>}
-                    </div>
-                  ))}
-                </div>
-              )}
+              />
             </div>
 
             {/* Password */}
@@ -332,7 +279,7 @@ export default function Login({ onLogin }) {
                   className="lk-inp"
                   type={showPass?'text':'password'}
                   value={password}
-                  onChange={e=>{ setPassword(e.target.value); setError(''); }}
+                  onChange={e=>{ setPassword(e.target.value); setFormError(''); }}
                   onKeyDown={e=>e.key==='Enter'&&handleLogin()}
                   placeholder="Enter your password"
                   style={{

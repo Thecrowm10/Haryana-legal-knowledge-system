@@ -1,39 +1,59 @@
 import { useState } from 'react';
-import { API_MODE } from '../data/users';
-import axios from 'axios';
+import api from '../services/api';
 
-const ROLE_PROFILES = {
-  uploader: { username: 'uploader', role: 'uploader', name: 'Priya Sharma',  dept: 'Revenue Dept.' },
-  approver: { username: 'approver', role: 'approver', name: 'Sunil Verma',   dept: 'Legal Dept.' },
-  citizen:  { username: 'citizen',  role: 'citizen',  name: 'Ramesh Kumar',  dept: 'Public' },
-  csoffice: { username: 'csoffice', role: 'csoffice', name: 'Anita Singh',   dept: 'CS Office' },
-  admin:    { username: 'admin',    role: 'admin',    name: 'Vikram Rao',    dept: 'HARTRON / IT Admin' },
-  auditor:  { username: 'auditor', role: 'auditor',  name: 'Deepa Nair',    dept: 'Finance Dept.' },
-};
+const CITIZEN_PROFILE = { username: 'citizen', role: 'citizen', name: 'Guest Citizen', dept: '' };
+
+function decodeJwt(token) {
+  try {
+    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(atob(base64));
+  } catch {
+    return null;
+  }
+}
 
 export function useAuth() {
-  const [user, setUser] = useState(null);
-  const [error, setError] = useState('');
+  const [user, setUser]       = useState(null);
+  const [error, setError]     = useState('');
   const [loading, setLoading] = useState(false);
 
-  async function loginAsRole(role) {
+  async function loginAsRole({ username, password, role }) {
+    if (role === 'citizen') {
+      setUser(CITIZEN_PROFILE);
+      return;
+    }
+
     setLoading(true);
     setError('');
     try {
-      if (API_MODE) {
-        const res = await axios.post('/api/auth/login', { role });
-        setUser(res.data.user);
-      } else {
-        setUser(ROLE_PROFILES[role]);
-      }
-    } catch {
-      setError('Login failed. Please try again.');
+      const res = await api.post('/auth/login', { username, password });
+      const token = res.data.access_token;
+      localStorage.setItem('token', token);
+
+      const payload = decodeJwt(token);
+      if (!payload) throw new Error('Invalid token received');
+
+      setUser({
+        username:  payload.username,
+        role:      payload.role,
+        name:      payload.username,
+        email:     payload.email,
+        dept:      payload.department ?? '',
+        isActive:  payload.is_active,
+      });
+    } catch (err) {
+      localStorage.removeItem('token');
+      const detail = err.response?.data?.detail;
+      setError(typeof detail === 'string' ? detail : 'Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
   }
 
-  function logout() { setUser(null); }
+  function logout() {
+    localStorage.removeItem('token');
+    setUser(null);
+  }
 
   return { user, error, loading, loginAsRole, logout };
 }
