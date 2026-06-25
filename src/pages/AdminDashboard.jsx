@@ -1,18 +1,23 @@
-﻿import { useState } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { Users, ShieldCheck, Settings, Activity, ClipboardList, Trash2, Edit2, Plus, CheckCircle, XCircle } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
+import { getUsers } from '../services/users';
 
 const LABEL = { fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)' };
 
-const MOCK_USERS = [
-  { id: 1, name: 'Priya Sharma',  username: 'dept.uploader', role: 'uploader', dept: 'Revenue Dept.',  status: 'active',   lastLogin: '2026-05-24' },
-  { id: 2, name: 'Sunil Verma',   username: 'dept.approver', role: 'approver', dept: 'Legal Dept.',    status: 'active',   lastLogin: '2026-05-25' },
-  { id: 3, name: 'Anita Singh',   username: 'cs.office',     role: 'csoffice', dept: 'CS Office',      status: 'active',   lastLogin: '2026-05-25' },
-  { id: 4, name: 'Ramesh Kumar',  username: 'dept.uploader2',role: 'uploader', dept: 'Home Dept.',     status: 'inactive', lastLogin: '2026-05-10' },
-  { id: 5, name: 'Deepa Nair',    username: 'auditor.1',     role: 'auditor',  dept: 'Finance Dept.',  status: 'active',   lastLogin: '2026-05-22' },
-  { id: 6, name: 'Harish Gupta',  username: 'dept.approver2',role: 'approver', dept: 'Revenue Dept.',  status: 'active',   lastLogin: '2026-05-23' },
-];
+function normalizeUser(u) {
+  return {
+    id:        u.id,
+    name:      `${u.first_name} ${u.last_name}`.trim() || u.username,
+    username:  u.username,
+    email:     u.email,
+    role:      u.role?.name ?? '—',
+    dept:      u.department?.name ?? '—',
+    status:    u.is_active ? 'active' : 'inactive',
+    lastLogin: u.last_login ? u.last_login.split('T')[0] : '—',
+  };
+}
 
 const MOCK_AUDIT = [
   { time: '2026-05-25 10:42', user: 'Priya Sharma',  role: 'uploader', action: 'Uploaded document: Haryana Municipal Act 2024' },
@@ -26,9 +31,21 @@ const MOCK_AUDIT = [
 ];
 
 export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxonomy }) {
-  const [users, setUsers]       = useState(MOCK_USERS);
-  const [editState, setEditState] = useState(null); // { category, index, value }
-  const [addState, setAddState]   = useState(null); // { category, value }
+  const [users, setUsers]           = useState([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersError, setUsersError]     = useState('');
+  const [editState, setEditState]   = useState(null); // { category, index, value }
+  const [addState, setAddState]     = useState(null); // { category, value }
+
+  useEffect(() => {
+    if (activePage !== 'users') return;
+    setUsersLoading(true);
+    setUsersError('');
+    getUsers()
+      .then(res => setUsers(res.data.map(normalizeUser)))
+      .catch(() => setUsersError('Failed to load users. Please try again.'))
+      .finally(() => setUsersLoading(false));
+  }, [activePage]);
 
   function updateCategory(category, newItems) {
     onUpdateTaxonomy(taxonomy.map(t => t.category === category ? { ...t, items: newItems } : t));
@@ -96,6 +113,17 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
               <Plus size={13} /> Add User
             </button>
           </div>
+          {usersLoading && (
+            <div style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>
+              Loading users…
+            </div>
+          )}
+          {usersError && (
+            <div style={{ padding: '20px 18px', fontSize: 13, color: '#ef4444' }}>
+              {usersError}
+            </div>
+          )}
+          {!usersLoading && !usersError && (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
@@ -109,7 +137,10 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 <tr key={u.id} style={{ borderBottom: '1px solid var(--surface-border)', transition: 'background .15s' }}
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                  <td style={{ padding: '12px 16px', fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>{u.name}</td>
+                  <td style={{ padding: '12px 16px' }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>{u.name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 2 }}>{u.email}</div>
+                  </td>
                   <td style={{ padding: '12px 16px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)' }}>{u.username}</td>
                   <td style={{ padding: '12px 16px' }}><Badge label={u.role} variant={u.role} /></td>
                   <td style={{ padding: '12px 16px', fontSize: 12.5, color: 'var(--text-color-secondary)' }}>{u.dept}</td>
@@ -135,6 +166,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
               ))}
             </tbody>
           </table>
+          )}
         </Card>
       </div>
     );
