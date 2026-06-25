@@ -15,6 +15,7 @@ const DEFAULT_PAGE = {
   uploader: 'upload',
   approver: 'pending',
   csoffice: 'analytics',
+  officer:  'analytics',
   admin:    'users',
   auditor:  'auditlog',
 };
@@ -114,6 +115,7 @@ export default function App() {
           />
         );
       case 'csoffice':
+      case 'officer':
         return (
           <CSODashboard
             activePage={activePage}

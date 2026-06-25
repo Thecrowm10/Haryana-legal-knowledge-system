@@ -29,6 +29,15 @@ const MENU_CONFIG = {
       { icon: ClipboardList, label: 'Audit Log',       id: 'audit' },
     ]},
   ],
+  officer: [
+    { label: 'ANALYTICS', items: [
+      { icon: BarChart2, label: 'Dashboard',       id: 'analytics' },
+    ]},
+    { label: 'KNOWLEDGE', items: [
+      { icon: GitBranch,     label: 'Knowledge Graph', id: 'graph' },
+      { icon: ClipboardList, label: 'Audit Log',       id: 'audit' },
+    ]},
+  ],
   admin: [
     { label: 'ADMINISTRATION', items: [
       { icon: Users,       label: 'User Management',    id: 'users' },
