@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Upload, FileText, CheckCircle, X, TrendingUp, Archive, Download,
   RotateCcw, AlertCircle, Eye, GitBranch, Plus, Cpu, Link, Clock,
@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
+import { getDepartments, getDocumentTypes } from '../services/departments';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -458,8 +459,13 @@ function WorkflowBadge({ status }) {
 
 // ─── Main component ────────────────────────────────────────────────────────────
 export default function UploaderDashboard({ activePage, onAuditLog, documents = [], onAddDocument, taxonomy = [] }) {
-  const TYPES = taxonomy.find(t => t.category === 'Document Types')?.items ?? DEFAULT_TYPES;
-  const DEPTS = taxonomy.find(t => t.category === 'Departments')?.items    ?? DEFAULT_DEPTS;
+  const [DEPTS, setDepts] = useState(DEFAULT_DEPTS);
+  const [TYPES, setTypes] = useState(DEFAULT_TYPES);
+
+  useEffect(() => {
+    getDepartments().then(res => setDepts(res.data.map(d => d.name))).catch(() => {});
+    getDocumentTypes().then(res => setTypes(res.data.map(d => d.name))).catch(() => {});
+  }, []);
   const [uploads, setUploads] = useState(
     documents.filter(d => d.uploader === 'Priya Sharma')
       .map(d => ({ ...d, version: d.version || '1.0', ocrStatus: d.ocrStatus || 'completed', workflowStatus: d.workflowStatus || WORKFLOW_STATUS.PUBLISHED }))

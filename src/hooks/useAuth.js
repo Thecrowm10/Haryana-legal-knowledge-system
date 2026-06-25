@@ -70,8 +70,14 @@ export function useAuth() {
   }
 
   function logout() {
+    const token = localStorage.getItem('token');
     localStorage.removeItem('token');
     setUser(null);
+    if (token) {
+      api.post('/auth/logout', null, {
+        headers: { Authorization: `Bearer ${token}` },
+      }).catch(() => {});
+    }
   }
 
   return { user, error, loading, loginAsRole, logout };
