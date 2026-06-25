@@ -8,6 +8,7 @@ import {
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import { getDepartments, getDocumentTypes } from '../services/departments';
+import { uploadPdfFile, uploadPdfMetadata } from '../services/pdf';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -459,12 +460,14 @@ function WorkflowBadge({ status }) {
 
 // ─── Main component ────────────────────────────────────────────────────────────
 export default function UploaderDashboard({ activePage, onAuditLog, documents = [], onAddDocument, taxonomy = [] }) {
-  const [DEPTS, setDepts] = useState(DEFAULT_DEPTS);
-  const [TYPES, setTypes] = useState(DEFAULT_TYPES);
+  const [deptsData, setDeptsData] = useState([]);
+  const [typesData, setTypesData] = useState([]);
+  const DEPTS = deptsData.length > 0 ? deptsData.map(d => d.name) : DEFAULT_DEPTS;
+  const TYPES = typesData.length > 0 ? typesData.map(d => d.name) : DEFAULT_TYPES;
 
   useEffect(() => {
-    getDepartments().then(res => setDepts(res.data.map(d => d.name))).catch(() => {});
-    getDocumentTypes().then(res => setTypes(res.data.map(d => d.name))).catch(() => {});
+    getDepartments().then(res => setDeptsData(res.data)).catch(() => {});
+    getDocumentTypes().then(res => setTypesData(res.data)).catch(() => {});
   }, []);
   const [uploads, setUploads] = useState(
     documents.filter(d => d.uploader === 'Priya Sharma')
@@ -498,6 +501,9 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
   const [bulkFields, setBulkFields]     = useState({ dept: '', type: '', year: '' });
   const [autoFillLoading, setAutoFillLoading] = useState(false);
+  const [fileRefs,    setFileRefs]    = useState([]); // [{ fileName, fileRef, originalFilename, fileSize }]
+  const [uploadStep, setUploadStep]   = useState(null); // null | 'uploading' | 'ready' | 'saving' | 'done' | 'error'
+  const [uploadError, setUploadError] = useState('');
 
   // Table filter + sort
   const [tableSearch, setTableSearch] = useState('');
@@ -539,7 +545,10 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     }
   }
 
-  function removeFile(name) { setFiles(f => f.filter(x => x.name !== name)); }
+  function removeFile(name) {
+    setFiles(f => f.filter(x => x.name !== name));
+    setFileRefs(r => r.filter(x => x.fileName !== name));
+  }
   function handleDrop(e) { e.preventDefault(); setDragOver(false); addFiles(e.dataTransfer.files); }
 
   function addRelation() {
@@ -566,7 +575,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
       setUploads(u => [{ ...doc, uid }, ...u]);
     });
 
-    setFiles([]); setRelations([]);
+    setFiles([]); setFileRefs([]); setRelations([]);
     setForm({ act:'',dept:'',type:'',version:'1.0',desc:'',gazette:'',authority:'',enactmentDate:'',parentAct:'',changeTypes:[] });
     setHierarchy({ act:'',chapter:'',section:'',subsection:'' });
     setAmendmentProvisions([]);
@@ -607,19 +616,82 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     onAuditLog?.(`Uploaded ${docsWithWorkflow.length} document(s): ${docsWithWorkflow.map(d => d.title).join(', ')}`);
   }
 
+  // ── Step 1: upload files to get file_refs ──────────────────────────────────
+  async function handleUploadFile() {
+    if (files.length === 0) return;
+    setUploadStep('uploading');
+    setUploadError('');
+    const refs = [];
+    for (const f of files) {
+      try {
+        const fd = new FormData();
+        fd.append('file', f);
+        const res = await uploadPdfFile(fd);
+        refs.push({
+          fileName:         f.name,
+          fileRef:          res.data.file_ref,
+          originalFilename: res.data.original_filename ?? f.name,
+          fileSize:         res.data.file_size ?? f.size,
+        });
+      } catch (err) {
+        const detail = err.response?.data?.detail;
+        setUploadError(typeof detail === 'string' ? detail : `Upload failed for "${f.name}"`);
+        setUploadStep('error');
+        return;
+      }
+    }
+    setFileRefs(refs);
+    setUploadStep('ready');
+  }
+
+  // ── Step 2: save metadata (called on form submit) ───────────────────────────
   async function handleSubmit(e) {
     e.preventDefault();
-    if (files.length === 0) return;
+    if (files.length === 0 || fileRefs.length === 0) return;
 
-    const newDocs = await Promise.all(files.map(async f => {
+    setUploadStep('saving');
+    setUploadError('');
+
+    const deptObj = deptsData.find(d => d.name === form.dept);
+    const typeObj = typesData.find(d => d.name === form.type);
+    const newDocs = [];
+
+    for (const f of files) {
+      const refEntry = fileRefs.find(r => r.fileName === f.name);
+      if (!refEntry) continue;
+
+      let apiDoc;
+      try {
+        const payload = {
+          file_ref:          refEntry.fileRef,
+          act_name:          form.act || f.name.replace(/\.(pdf|zip)$/i, ''),
+          gazette_reference: form.gazette || '',
+          issuing_authority: form.authority || '',
+          enactment_date:    form.enactmentDate || null,
+          version_no:        form.version || '1.0',
+          department_id:     deptObj?.id ?? null,
+          document_type_id:  typeObj?.id ?? null,
+          tag_ids:           [],
+          description:       form.desc || '',
+        };
+        const res2 = await uploadPdfMetadata(payload);
+        apiDoc = res2.data;
+      } catch (err) {
+        const detail = err.response?.data?.detail;
+        setUploadError(typeof detail === 'string' ? detail : `Metadata save failed for "${f.name}"`);
+        setUploadStep('error');
+        return;
+      }
+
       const { text: extractedText, numPages, pageTexts, pageWords } = f.name.endsWith('.pdf')
         ? await extractPdfText(f)
         : { text: '', numPages: null, pageTexts: [], pageWords: [] };
-      return {
-        id:            Date.now() + Math.random(),
-        title:         form.act || f.name.replace(/\.(pdf|zip)$/i, ''),
-        type:          form.type || 'Act',
-        dept:          form.dept || 'General',
+
+      newDocs.push({
+        id:            apiDoc.id ?? (Date.now() + Math.random()),
+        title:         apiDoc.act_name || form.act || f.name.replace(/\.(pdf|zip)$/i, ''),
+        type:          typeObj?.name || form.type || 'Act',
+        dept:          deptObj?.name || form.dept || 'General',
         year:          form.enactmentDate ? new Date(form.enactmentDate).getFullYear() : new Date().getFullYear(),
         status:        'pending',
         legalStatus:   'active',
@@ -627,31 +699,32 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         uploader:      'Priya Sharma',
         uploadedAt:    new Date().toISOString().split('T')[0],
         section:       '1', paragraph: '1',
-        version:       form.version || '1.0',
+        version:       apiDoc.version_no || form.version || '1.0',
         ocrStatus:     f.name.endsWith('.zip') ? 'queued' : 'processing',
-        fileName:      f.name,
+        fileName:      refEntry.originalFilename,
         isZip:         f.name.endsWith('.zip'),
         fileUrl:       f.name.endsWith('.pdf') ? URL.createObjectURL(f) : null,
         hierarchy,
-        gazette:           form.gazette || '',
-        authority:         form.authority || '',
-        enactmentDate:     form.enactmentDate || '',
+        gazette:           apiDoc.gazette_reference || form.gazette || '',
+        authority:         apiDoc.issuing_authority || form.authority || '',
+        enactmentDate:     apiDoc.enactment_date || form.enactmentDate || '',
         amendmentProvisions: form.type === 'Amendment' ? amendmentProvisions.filter(p => p.section) : [],
         extractedText:  extractedText || '',
         extractedPages: pageTexts.length > 0 ? pageTexts : null,
         extractedWords: pageWords.length  > 0 ? pageWords : null,
         ocrConfidence:  extractedText ? 95 : null,
-      };
-    }));
+      });
+    }
 
-    // Check for a title collision with an existing non-rejected document
+    setUploadStep('done');
+    setTimeout(() => { setUploadStep(null); setFileRefs([]); }, 2000);
+
     const conflict = newDocs.find(d =>
       documents.some(ex => ex.title.toLowerCase() === d.title.toLowerCase() && ex.status !== 'rejected')
     );
-
     if (conflict) {
-      const existing    = documents.find(ex => ex.title.toLowerCase() === conflict.title.toLowerCase());
-      const currentVer  = parseFloat(existing.version || '1.0');
+      const existing   = documents.find(ex => ex.title.toLowerCase() === conflict.title.toLowerCase());
+      const currentVer = parseFloat(existing.version || '1.0');
       setConflictModal({
         existingDoc:      existing,
         newVersion:       (currentVer + 0.1).toFixed(1),
@@ -1119,18 +1192,47 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         </div>
       )}
 
-      {/* Drop zone */}
+      {/* ── Step indicator ──────────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 20 }}>
+        {[
+          { n: 1, label: 'Select & Upload File', done: fileRefs.length > 0, active: fileRefs.length === 0 },
+          { n: 2, label: 'Fill Document Details', done: uploadStep === 'done', active: fileRefs.length > 0 && uploadStep !== 'done' },
+        ].map((s, i) => (
+          <div key={s.n} style={{ display: 'flex', alignItems: 'center', flex: i === 0 ? 'none' : 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+              <div style={{
+                width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                background: s.done ? '#16a34a' : s.active ? 'var(--primary)' : 'var(--surface-ground)',
+                border: s.done || s.active ? 'none' : '2px solid var(--surface-border)',
+                color: s.done || s.active ? 'white' : 'var(--text-color-secondary)',
+                fontSize: 12, fontWeight: 700, transition: 'all .3s',
+              }}>
+                {s.done ? <CheckCircle size={14} /> : s.n}
+              </div>
+              <span style={{ fontSize: 12.5, fontWeight: s.active ? 700 : 500, color: s.done ? '#16a34a' : s.active ? 'var(--primary)' : 'var(--text-color-secondary)', whiteSpace: 'nowrap', transition: 'all .3s' }}>
+                {s.label}
+              </span>
+            </div>
+            {i === 0 && (
+              <div style={{ flex: 1, height: 2, margin: '0 12px', background: fileRefs.length > 0 ? '#16a34a' : 'var(--surface-border)', borderRadius: 2, minWidth: 32, transition: 'background .4s' }} />
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* ── Drop zone (Step 1) ──────────────────────────────────────────────── */}
       <div
-        onClick={() => files.length === 0 && inputRef.current?.click()}
-        onDrop={handleDrop}
-        onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+        onClick={() => fileRefs.length === 0 && files.length === 0 && inputRef.current?.click()}
+        onDrop={e => { if (fileRefs.length === 0) handleDrop(e); else e.preventDefault(); }}
+        onDragOver={e => { e.preventDefault(); if (fileRefs.length === 0) setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
         style={{
-          border: `2px dashed ${dragOver ? 'var(--primary)' : files.length > 0 ? 'rgba(26,86,219,.4)' : 'var(--surface-border)'}`,
+          border: `2px dashed ${fileRefs.length > 0 ? '#16a34a' : dragOver ? 'var(--primary)' : files.length > 0 ? 'rgba(26,86,219,.4)' : 'var(--surface-border)'}`,
           borderRadius: 'var(--radius)', padding: files.length > 0 ? '20px 24px' : '44px 32px',
-          textAlign: 'center', cursor: files.length > 0 ? 'default' : 'pointer',
-          transition: 'all .25s', background: dragOver ? 'rgba(26,86,219,.04)' : files.length > 0 ? 'rgba(26,86,219,.02)' : 'var(--surface-card)',
-          marginBottom: 20, boxShadow: dragOver ? '0 0 0 4px rgba(26,86,219,.08)' : 'var(--card-shadow)',
+          textAlign: 'center', cursor: fileRefs.length > 0 ? 'default' : files.length > 0 ? 'default' : 'pointer',
+          transition: 'all .25s',
+          background: fileRefs.length > 0 ? 'rgba(22,163,74,.03)' : dragOver ? 'rgba(26,86,219,.04)' : files.length > 0 ? 'rgba(26,86,219,.02)' : 'var(--surface-card)',
+          marginBottom: 16, boxShadow: dragOver ? '0 0 0 4px rgba(26,86,219,.08)' : 'var(--card-shadow)',
         }}>
         <input ref={inputRef} type="file" accept=".pdf,.zip" multiple style={{ display: 'none' }}
           onChange={e => { addFiles(e.target.files); e.target.value = ''; }} />
@@ -1139,34 +1241,43 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
           <div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)' }}>{files.length} file{files.length !== 1 ? 's' : ''} selected</div>
+                {fileRefs.length > 0
+                  ? <span style={{ fontSize: 13, fontWeight: 700, color: '#16a34a', display: 'flex', alignItems: 'center', gap: 6 }}><CheckCircle size={15} /> {files.length} file{files.length !== 1 ? 's' : ''} uploaded successfully</span>
+                  : <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)' }}>{files.length} file{files.length !== 1 ? 's' : ''} selected</span>
+                }
                 {autoFillLoading && (
-                  <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: '#3b82f6', fontWeight: 700 }}>
-                    ⚡ Auto-extracting metadata…
-                  </span>
+                  <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: '#3b82f6', fontWeight: 700 }}>⚡ Auto-extracting metadata…</span>
                 )}
               </div>
-              <button onClick={e => { e.stopPropagation(); inputRef.current?.click(); }}
-                style={{ fontSize: 12, fontWeight: 600, color: 'var(--primary)', background: 'rgba(26,86,219,.08)', border: '1px solid rgba(26,86,219,.2)', borderRadius: 7, padding: '5px 12px', cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                + Add More
-              </button>
+              {fileRefs.length === 0 && (
+                <button onClick={e => { e.stopPropagation(); inputRef.current?.click(); }}
+                  style={{ fontSize: 12, fontWeight: 600, color: 'var(--primary)', background: 'rgba(26,86,219,.08)', border: '1px solid rgba(26,86,219,.2)', borderRadius: 7, padding: '5px 12px', cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                  + Add More
+                </button>
+              )}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {files.map(f => (
-                <div key={f.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 8, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', textAlign: 'left' }}>
-                  {fileIcon(f)}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</div>
-                    <div style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', marginTop: 1 }}>
-                      {formatSize(f.size)}{f.name.endsWith('.zip') && <span style={{ marginLeft: 8, color: '#f59e0b', fontWeight: 700 }}>ZIP BATCH</span>}
+              {files.map(f => {
+                const uploaded = fileRefs.some(r => r.fileName === f.name);
+                return (
+                  <div key={f.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 8, background: uploaded ? 'rgba(22,163,74,.06)' : 'var(--surface-ground)', border: `1px solid ${uploaded ? 'rgba(22,163,74,.25)' : 'var(--surface-border)'}`, textAlign: 'left', transition: 'all .3s' }}>
+                    {fileIcon(f)}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</div>
+                      <div style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', marginTop: 1 }}>
+                        {formatSize(f.size)}{f.name.endsWith('.zip') && <span style={{ marginLeft: 8, color: '#f59e0b', fontWeight: 700 }}>ZIP BATCH</span>}
+                        {uploaded && <span style={{ marginLeft: 8, color: '#16a34a', fontWeight: 700 }}>✓ UPLOADED</span>}
+                      </div>
                     </div>
+                    {fileRefs.length === 0 && (
+                      <button onClick={e => { e.stopPropagation(); removeFile(f.name); }}
+                        style={{ background: 'transparent', border: '1px solid var(--surface-border)', borderRadius: 5, width: 24, height: 24, cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <X size={12} />
+                      </button>
+                    )}
                   </div>
-                  <button onClick={e => { e.stopPropagation(); removeFile(f.name); }}
-                    style={{ background: 'transparent', border: '1px solid var(--surface-border)', borderRadius: 5, width: 24, height: 24, cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <X size={12} />
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         ) : (
@@ -1184,11 +1295,45 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         )}
       </div>
 
-      {/* Metadata form */}
-      <Card>
+      {/* ── Upload File button (Step 1 action) ──────────────────────────────── */}
+      {files.length > 0 && fileRefs.length === 0 && (
+        <div style={{ marginBottom: 20 }}>
+          {uploadError && uploadStep === 'error' && (
+            <div style={{ marginBottom: 10, padding: '10px 14px', borderRadius: 8, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <AlertCircle size={14} color="#ef4444" style={{ flexShrink: 0 }} />
+              <span style={{ fontSize: 12.5, color: '#dc2626', flex: 1 }}>{uploadError}</span>
+              <button type="button" onClick={() => { setUploadError(''); setUploadStep(null); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444' }}><X size={12} /></button>
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={handleUploadFile}
+            disabled={uploadStep === 'uploading'}
+            style={{
+              width: '100%', padding: '13px 24px', borderRadius: 10, border: 'none',
+              background: uploadStep === 'uploading' ? 'var(--surface-200)' : 'var(--primary)',
+              color: uploadStep === 'uploading' ? '#94a3b8' : 'white',
+              fontSize: 14, fontWeight: 700, cursor: uploadStep === 'uploading' ? 'not-allowed' : 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9,
+              fontFamily: 'var(--font)', boxShadow: uploadStep === 'uploading' ? 'none' : '0 2px 8px rgba(26,86,219,.25)',
+              transition: 'all .2s',
+            }}>
+            {uploadStep === 'uploading'
+              ? <><Clock size={16} /> Uploading {files.length > 1 ? `${files.length} files` : 'file'}…</>
+              : <><Upload size={16} /> Upload {files.length > 1 ? `${files.length} Files` : 'File'}</>
+            }
+          </button>
+          <div style={{ marginTop: 8, fontSize: 11.5, color: 'var(--text-color-secondary)', textAlign: 'center' }}>
+            File will be securely stored — you can fill in the details on the next step.
+          </div>
+        </div>
+      )}
+
+      {/* Metadata form — only shown after Step 1 is complete */}
+      {fileRefs.length > 0 && <Card>
         <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 4, paddingBottom: 14, borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 8 }}>
           <FileText size={15} color="var(--primary)" />
-          Document Metadata
+          Document Details
           {files.length > 1 && <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, background: 'rgba(59,130,246,.1)', color: '#3b82f6', padding: '2px 9px', borderRadius: 20 }}>Applied to all {files.length} files</span>}
           {autoFillLoading && <span style={{ marginLeft: 'auto', fontSize: 11, fontFamily: 'var(--mono)', color: '#3b82f6', fontWeight: 700 }}>⚡ AUTO-FILLING…</span>}
         </div>
@@ -1387,22 +1532,41 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
             )}
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--surface-border)' }}>
-            <button type="button" onClick={() => { setForm({ act:'',dept:'',type:'',version:'1.0',desc:'',gazette:'',authority:'',enactmentDate:'',parentAct:'',changeTypes:[] }); setFiles([]); setRelations([]); setAnalysisResults([]); setHierarchy({ act:'',chapter:'',section:'',subsection:'' }); setCrossDeptNotifs([]); setAmendmentProvisions([]); }}
+          {uploadError && uploadStep === 'error' && (
+            <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 8, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <AlertCircle size={14} color="#ef4444" style={{ flexShrink: 0 }} />
+              <span style={{ fontSize: 12.5, color: '#dc2626', flex: 1 }}>{uploadError}</span>
+              <button type="button" onClick={() => { setUploadError(''); setUploadStep('ready'); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444' }}><X size={12} /></button>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--surface-border)' }}>
+            <button type="button" onClick={() => { setForm({ act:'',dept:'',type:'',version:'1.0',desc:'',gazette:'',authority:'',enactmentDate:'',parentAct:'',changeTypes:[] }); setFiles([]); setFileRefs([]); setRelations([]); setAnalysisResults([]); setHierarchy({ act:'',chapter:'',section:'',subsection:'' }); setCrossDeptNotifs([]); setAmendmentProvisions([]); setUploadStep(null); setUploadError(''); }}
               style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)', padding: '9px 22px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
               onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
               onMouseLeave={e => e.currentTarget.style.background = 'var(--surface-card)'}>
               Clear All
             </button>
-            <button type="submit" disabled={files.length === 0}
-              style={{ background: files.length > 0 ? 'var(--primary)' : 'var(--surface-200)', color: files.length > 0 ? 'white' : '#94a3b8', border: 'none', padding: '9px 26px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700, cursor: files.length > 0 ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', gap: 8 }}
-              onMouseEnter={e => { if (files.length > 0) e.currentTarget.style.background = 'var(--primary-dark)'; }}
-              onMouseLeave={e => { if (files.length > 0) e.currentTarget.style.background = 'var(--primary)'; }}>
-              <Upload size={14} /> Submit {files.length > 1 ? `${files.length} Files` : 'for Approval'}
+            <button type="submit"
+              disabled={fileRefs.length === 0 || uploadStep === 'saving' || uploadStep === 'done'}
+              style={{
+                background: uploadStep === 'done' ? '#16a34a' : fileRefs.length > 0 && uploadStep !== 'saving' ? 'var(--primary)' : 'var(--surface-200)',
+                color: fileRefs.length > 0 || uploadStep === 'done' ? 'white' : '#94a3b8',
+                border: 'none', padding: '10px 28px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700,
+                cursor: fileRefs.length > 0 && uploadStep === 'ready' ? 'pointer' : 'not-allowed',
+                display: 'flex', alignItems: 'center', gap: 8,
+                boxShadow: fileRefs.length > 0 && uploadStep === 'ready' ? '0 2px 8px rgba(26,86,219,.2)' : 'none',
+                transition: 'all .2s',
+              }}
+              onMouseEnter={e => { if (fileRefs.length > 0 && uploadStep === 'ready') e.currentTarget.style.background = 'var(--primary-dark)'; }}
+              onMouseLeave={e => { if (fileRefs.length > 0 && uploadStep === 'ready') e.currentTarget.style.background = 'var(--primary)'; }}>
+              {uploadStep === 'saving' && <><Clock size={14} /> Saving details…</>}
+              {uploadStep === 'done'   && <><CheckCircle size={14} /> Submitted!</>}
+              {(uploadStep === 'ready' || !uploadStep) && <><CheckCircle size={14} /> Submit for Approval</>}
             </button>
           </div>
         </form>
-      </Card>
+      </Card>}
     </div>
   );
 }
