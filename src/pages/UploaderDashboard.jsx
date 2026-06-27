@@ -5,8 +5,13 @@ import {
   Layers, ChevronRight, AlertTriangle, Users, CheckSquare, Square,
   Edit3, Tag, Search,
 } from 'lucide-react';
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfjsWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl;
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
+import SelectField from '../components/ui/SelectField';
+import { useAuth } from '../hooks/useAuth';
 import { getDepartments, getDocumentTypes } from '../services/departments';
 import { uploadPdfFile, uploadPdfMetadata } from '../services/pdf';
 
@@ -20,10 +25,67 @@ const DEFAULT_DEPTS = [
 ];
 const DEFAULT_TYPES = ['Act','Amendment','Notification','Circular','Policy','Rules & Regulations','Order / Gazette'];
 const LANGS  = ['English','Hindi','Bilingual'];
-const REL_TYPES = ['Amends','Amended by','References','Referenced by','Is under','Supplemented by','Notified under','Replaces','Replaced by','Related to'];
+const REL_TYPES = [
+  'Replaces', 'Replaced by', 'Amends', 'Amended by',
+  'In Continuation of', 'Continued by', 'Issued Under',
+  'Implements', 'Implemented by', 'References', 'Referenced by',
+  'Notified under', 'Supplemented by', 'Related to',
+];
+
+const REL_TYPES_BY_DOCTYPE = {
+  'Act':                 ['Amended by', 'Replaces', 'Replaced by', 'Related to'],
+  'Amendment':           ['Amends', 'In Continuation of', 'Continued by', 'Related to'],
+  'Circular':            ['Issued Under', 'In Continuation of', 'Continued by', 'Replaces', 'Replaced by', 'References', 'Referenced by', 'Supplemented by'],
+  'Notification':        ['Issued Under', 'Notified under', 'In Continuation of', 'Continued by', 'Replaces', 'Replaced by', 'References', 'Referenced by'],
+  'Policy':              ['Replaces', 'Replaced by', 'Implements', 'Implemented by', 'References', 'Referenced by', 'Related to'],
+  'Order / Gazette':     ['Issued Under', 'Amends', 'Amended by', 'Replaces', 'Replaced by', 'In Continuation of', 'Continued by', 'Implements', 'Implemented by', 'References'],
+  'Rules & Regulations': ['Amends', 'Amended by', 'Replaces', 'Replaced by', 'Issued Under', 'References', 'Referenced by'],
+};
+
+const REL_TARGET_TYPES = {
+  'Act':                 ['Act', 'Amendment', 'Rules & Regulations', 'Notification'],
+  'Amendment':           ['Act', 'Rules & Regulations'],
+  'Circular':            ['Circular', 'Act', 'Order / Gazette', 'Policy', 'Notification', 'Rules & Regulations'],
+  'Notification':        ['Act', 'Rules & Regulations', 'Order / Gazette', 'Notification', 'Circular', 'Policy'],
+  'Policy':              ['Act', 'Policy', 'Notification', 'Order / Gazette', 'Circular', 'Rules & Regulations'],
+  'Order / Gazette':     ['Act', 'Order / Gazette', 'Notification', 'Rules & Regulations', 'Policy'],
+  'Rules & Regulations': ['Act', 'Rules & Regulations', 'Amendment', 'Notification', 'Policy'],
+};
+
 const AMEND_CHANGE_TYPES = ['Amended', 'Substituted', 'Inserted', 'Deleted', 'Expanded'];
 const AMEND_CHANGE_COLORS = { Amended: '#f59e0b', Substituted: '#3b82f6', Inserted: '#22c55e', Deleted: '#ef4444', Expanded: '#8b5cf6' };
 const EMPTY_PROVISION = () => ({ section: '', chapter: '', subsection: '', page: '', changeType: 'Substituted', before: '', after: '' });
+
+// ─── Type selector card colours & descriptions ────────────────────────────────
+const TYPE_CARD_COLORS = {
+  'Act':                 { bg: 'rgba(26,86,219,.08)',  accent: '#1a56db', text: '#1e40af' },
+  'Amendment':           { bg: 'rgba(245,158,11,.08)', accent: '#f59e0b', text: '#d97706' },
+  'Notification':        { bg: 'rgba(139,92,246,.08)', accent: '#8b5cf6', text: '#7c3aed' },
+  'Circular':            { bg: 'rgba(20,184,166,.08)', accent: '#14b8a6', text: '#0f766e' },
+  'Policy':              { bg: 'rgba(34,197,94,.08)',  accent: '#22c55e', text: '#16a34a' },
+  'Rules & Regulations': { bg: 'rgba(239,68,68,.08)',  accent: '#ef4444', text: '#dc2626' },
+  'Order / Gazette':     { bg: 'rgba(234,179,8,.08)',  accent: '#eab308', text: '#a16207' },
+};
+const TYPE_CARD_DESC = {
+  'Act':                 'Primary legislation enacted by legislature',
+  'Amendment':           'Modification to an existing Act or Rule',
+  'Notification':        'Official government notice or announcement',
+  'Circular':            'Internal directive or instruction',
+  'Policy':              'Government policy document or framework',
+  'Rules & Regulations': 'Subsidiary legislation under an Act',
+  'Order / Gazette':     'Executive order or gazette notification',
+};
+
+// ─── Per-type dynamic metadata fields ─────────────────────────────────────────
+const TYPE_FIELDS = {
+  'Act': [], // handled inline in form
+  'Amendment': [], // handled inline
+  'Notification': [], // handled inline
+  'Circular': [], // handled inline
+  'Policy': [], // handled inline
+  'Rules & Regulations': [], // handled inline
+  'Order / Gazette': [], // handled inline
+};
 
 // Workflow statuses: DRAFT → PENDING_REVIEW → PUBLISHED
 const WORKFLOW_STATUS = { DRAFT: 'draft', PENDING: 'pending', PUBLISHED: 'published' };
@@ -78,19 +140,8 @@ function wordConfidence(word) {
 async function extractPdfText(file) {
   if (!file || !file.name.endsWith('.pdf')) return { text: '', numPages: 1, pageTexts: [], pageWords: [] };
   try {
-    if (!window.pdfjsLib) {
-      await new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-        script.onload = resolve;
-        script.onerror = reject;
-        document.head.appendChild(script);
-      });
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    }
     const arrayBuffer = await file.arrayBuffer();
-    const pdf         = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const pdf         = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
     const pages = await Promise.all(
       Array.from({ length: pdf.numPages }, async (_, i) => {
@@ -280,54 +331,38 @@ function blurStyle(e) {
   e.target.style.borderColor = 'var(--surface-border)';
   e.target.style.boxShadow   = 'none';
 }
-function HierarchyTag({ hierarchy, onChange }) {
-  const [open, setOpen] = useState(false);
-  const [local, setLocal] = useState(hierarchy || { act: '', chapter: '', section: '', subsection: '' });
 
-  function save() {
-    onChange?.(local);
-    setOpen(false);
+function HierarchyTag({ hierarchy, onOpen, isRef, legalAuthorities }) {
+  const hasValues = hierarchy?.act || hierarchy?.chapter || hierarchy?.section;
+  const hasAuth = legalAuthorities?.some(a => a.act);
+  const firstAuth = legalAuthorities?.find(a => a.act);
+  const extraCount = legalAuthorities ? legalAuthorities.filter(a => a.act).length - 1 : 0;
+
+  if (isRef && legalAuthorities !== undefined) {
+    const firstSec = firstAuth?.sections?.find(s => s);
+    return (
+      <button type="button" onClick={onOpen}
+        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: hasAuth ? 'var(--primary)' : 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+        <Layers size={13} />
+        {hasAuth
+          ? `${firstAuth.act}${firstSec ? ' › ' + firstSec : ''}${extraCount > 0 ? ` · +${extraCount} more` : ''}`
+          : 'Set Legal Authority'}
+        <ChevronRight size={12} />
+      </button>
+    );
   }
 
-  const hasValues = local.act || local.chapter || local.section;
-
   return (
-    <div>
-      <button type="button" onClick={() => setOpen(v => !v)}
-        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: hasValues ? 'var(--primary)' : 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-        <Layers size={13} />
-        {hasValues
-          ? `${local.act || '—'} › ${local.chapter || '—'} › ${local.section || '—'}`
-          : 'Set Hierarchical Tags'}
-        <ChevronRight size={12} style={{ transform: open ? 'rotate(90deg)' : 'none', transition: 'transform .2s' }} />
-      </button>
-      {open && (
-        <div style={{ marginTop: 10, padding: '14px 16px', borderRadius: 10, border: '1px solid var(--surface-border)', background: 'var(--surface-card)', display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {[
-            { label: 'Act Name', key: 'act', ph: 'e.g. Haryana Municipal Act 1973' },
-            { label: 'Chapter', key: 'chapter', ph: 'e.g. Chapter III — Taxation' },
-            { label: 'Section', key: 'section', ph: 'e.g. Section 45 — Property Tax' },
-            { label: 'Sub-section', key: 'subsection', ph: 'e.g. (2)(a)' },
-          ].map(({ label, key, ph }) => (
-            <div key={key}>
-              <div style={{ ...LABEL, marginBottom: 5 }}>{label}</div>
-              <input value={local[key]} onChange={e => setLocal(v => ({ ...v, [key]: e.target.value }))}
-                placeholder={ph} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
-            </div>
-          ))}
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
-            <button type="button" onClick={() => setOpen(false)}
-              style={{ padding: '7px 16px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-              Cancel
-            </button>
-            <button type="button" onClick={save}
-              style={{ padding: '7px 16px', borderRadius: 7, border: 'none', background: 'var(--primary)', color: 'white', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-              Save Tags
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
+    <button type="button" onClick={onOpen}
+      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: hasValues ? 'var(--primary)' : 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+      <Layers size={13} />
+      {hasValues
+        ? (isRef
+            ? `${hierarchy.act || '—'} › ${hierarchy.section || '—'}`
+            : `${hierarchy.act || '—'} › ${hierarchy.chapter || '—'} › ${hierarchy.section || '—'}`)
+        : (isRef ? 'Set Act Reference' : 'Set Hierarchical Tags')}
+      <ChevronRight size={12} />
+    </button>
   );
 }
 function VersionConflictModal({ existingDoc, newVersion, onUploadAsNew, onCancel }) {
@@ -460,6 +495,7 @@ function WorkflowBadge({ status }) {
 
 // ─── Main component ────────────────────────────────────────────────────────────
 export default function UploaderDashboard({ activePage, onAuditLog, documents = [], onAddDocument, taxonomy = [] }) {
+  const { user } = useAuth();
   const [deptsData, setDeptsData] = useState([]);
   const [typesData, setTypesData] = useState([]);
   const DEPTS = deptsData.length > 0 ? deptsData.map(d => d.name) : DEFAULT_DEPTS;
@@ -469,14 +505,16 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     getDepartments().then(res => setDeptsData(res.data)).catch(() => {});
     getDocumentTypes().then(res => setTypesData(res.data)).catch(() => {});
   }, []);
+
   const [uploads, setUploads] = useState(
     documents.filter(d => d.uploader === 'Priya Sharma')
       .map(d => ({ ...d, version: d.version || '1.0', ocrStatus: d.ocrStatus || 'completed', workflowStatus: d.workflowStatus || WORKFLOW_STATUS.PUBLISHED }))
   );
   const [files, setFiles]           = useState([]);
   const [dragOver, setDragOver]     = useState(false);
-  const [form, setForm]             = useState({ act: '', dept: '', type: '', version: '1.0', desc: '', gazette: '', authority: '', enactmentDate: '', parentAct: '', changeTypes: [] });
+  const [form, setForm]             = useState({ act: '', dept: user?.dept || '', type: '', version: '1.0', desc: '', enactmentDate: '', parentAct: '', changeTypes: [] });
   const [amendmentProvisions, setAmendmentProvisions] = useState([]);
+  const [typeFields, setTypeFields]  = useState({});
   const [hierarchy, setHierarchy]   = useState({ act: '', chapter: '', section: '', subsection: '' });
   const [rejected, setRejected]     = useState([]);
   const [versionModal, setVersionModal] = useState(null);
@@ -490,9 +528,17 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   // Relationship state
   const [relations, setRelations]     = useState([]);
   const [relType, setRelType]         = useState(REL_TYPES[0]);
+  const [relDocType, setRelDocType]   = useState('');
   const [relTarget, setRelTarget]     = useState('');
   const [relSearch, setRelSearch]     = useState('');
+  const [relNote, setRelNote]         = useState('');
+  const [amendChanges, setAmendChanges] = useState([{ chapter: '', section: '', subsection: '', changeType: 'Amended', description: '' }]);
+  const [legalAuthorities, setLegalAuthorities] = useState([{ act: '', sections: [''] }]);
   const [showRelDrop, setShowRelDrop] = useState(false);
+  const [parentActSearch, setParentActSearch] = useState('');
+  const [showParentActDrop, setShowParentActDrop] = useState(false);
+  const [drawerType,      setDrawerType]      = useState(null); // null | 'hierarchy' | 'relationship'
+  const [drawerHierarchy, setDrawerHierarchy] = useState({ act: '', chapter: '', section: '', subsection: '' });
 
   // AI analysis state
   const [analysisResults, setAnalysisResults] = useState([]);
@@ -507,7 +553,8 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
 
   // Table filter + sort
   const [tableSearch, setTableSearch] = useState('');
-  const [filterType,  setFilterType]  = useState('');
+  const [filterType,   setFilterType]   = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
   const [sortCol,     setSortCol]     = useState('uploadedAt');
   const [sortDir,     setSortDir]     = useState('desc');
 
@@ -517,7 +564,14 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
 
   const approvedDocs = documents.filter(d => d.status === 'approved');
   const relFiltered  = approvedDocs
-    .filter(d => d.title.toLowerCase().includes(relSearch.toLowerCase()) && d.uid !== relTarget)
+    .filter(d =>
+      d.title.toLowerCase().includes(relSearch.toLowerCase()) &&
+      d.uid !== relTarget &&
+      (!relDocType || d.type === relDocType)
+    )
+    .slice(0, 8);
+  const parentActFiltered = approvedDocs
+    .filter(d => d.title.toLowerCase().includes(parentActSearch.toLowerCase()))
     .slice(0, 8);
 
   async function addFiles(fileList) {
@@ -553,10 +607,15 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
 
   function addRelation() {
     if (!relTarget) return;
-    const doc = documents.find(d => d.uid === relTarget);
-    if (!doc || relations.find(r => r.targetId === relTarget && r.label === relType)) return;
-    setRelations(r => [...r, { targetId: relTarget, targetTitle: doc.title, label: relType }]);
-    setRelTarget(''); setRelSearch('');
+    if (relTarget.startsWith('__pending__:')) {
+      const pendingName = relTarget.replace('__pending__:', '');
+      setRelations(r => [...r, { targetId: null, targetTitle: pendingName, targetType: relDocType, label: relType, note: relNote.trim(), isPending: true }]);
+    } else {
+      const doc = documents.find(d => d.uid === relTarget);
+      if (!doc || relations.find(r => r.targetId === relTarget && r.label === relType)) return;
+      setRelations(r => [...r, { targetId: relTarget, targetTitle: doc.title, targetType: doc.type || relDocType, label: relType, note: relNote.trim(), isPending: false }]);
+    }
+    setRelTarget(''); setRelSearch(''); setRelNote(''); setRelDocType('');
   }
   function removeRelation(idx) { setRelations(r => r.filter((_, i) => i !== idx)); }
 
@@ -576,9 +635,9 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     });
 
     setFiles([]); setFileRefs([]); setRelations([]);
-    setForm({ act:'',dept:'',type:'',version:'1.0',desc:'',gazette:'',authority:'',enactmentDate:'',parentAct:'',changeTypes:[] });
+    setForm({ act:'',dept:user?.dept||'',type:'',version:'1.0',desc:'',enactmentDate:'',parentAct:'',changeTypes:[] });
     setHierarchy({ act:'',chapter:'',section:'',subsection:'' });
-    setAmendmentProvisions([]);
+    setAmendmentProvisions([]); setParentActSearch(''); setTypeFields({});
     setTimeout(async () => {
       const allDocsNow = [...documents, ...docsWithWorkflow.map(d => ({ ...d, uid: `upload-${d.id}` }))];
       const allNotifs  = [];
@@ -644,20 +703,45 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     setUploadStep('ready');
   }
 
-  // ── Step 2: save metadata (called on form submit) ───────────────────────────
+  // ── Upload + save in one go (called on form submit) ───────────────────────
   async function handleSubmit(e) {
     e.preventDefault();
-    if (files.length === 0 || fileRefs.length === 0) return;
+    if (files.length === 0) return;
 
-    setUploadStep('saving');
     setUploadError('');
+
+    // Step 1: upload files → collect refs locally
+    setUploadStep('uploading');
+    const refs = [];
+    for (const f of files) {
+      try {
+        const fd = new FormData();
+        fd.append('file', f);
+        const res = await uploadPdfFile(fd);
+        refs.push({
+          fileName:         f.name,
+          fileRef:          res.data.file_ref,
+          originalFilename: res.data.original_filename ?? f.name,
+          fileSize:         res.data.file_size ?? f.size,
+        });
+      } catch (err) {
+        const detail = err.response?.data?.detail;
+        setUploadError(typeof detail === 'string' ? detail : `Upload failed for "${f.name}"`);
+        setUploadStep('error');
+        return;
+      }
+    }
+    setFileRefs(refs);
+
+    // Step 2: save metadata
+    setUploadStep('saving');
 
     const deptObj = deptsData.find(d => d.name === form.dept);
     const typeObj = typesData.find(d => d.name === form.type);
     const newDocs = [];
 
     for (const f of files) {
-      const refEntry = fileRefs.find(r => r.fileName === f.name);
+      const refEntry = refs.find(r => r.fileName === f.name);
       if (!refEntry) continue;
 
       let apiDoc;
@@ -665,8 +749,8 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         const payload = {
           file_ref:          refEntry.fileRef,
           act_name:          form.act || f.name.replace(/\.(pdf|zip)$/i, ''),
-          gazette_reference: form.gazette || '',
-          issuing_authority: form.authority || '',
+          gazette_reference: '',
+          issuing_authority: deptObj?.name || form.dept || '',
           enactment_date:    form.enactmentDate || null,
           version_no:        form.version || '1.0',
           department_id:     deptObj?.id ?? null,
@@ -705,8 +789,8 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         isZip:         f.name.endsWith('.zip'),
         fileUrl:       f.name.endsWith('.pdf') ? URL.createObjectURL(f) : null,
         hierarchy,
-        gazette:           apiDoc.gazette_reference || form.gazette || '',
-        authority:         apiDoc.issuing_authority || form.authority || '',
+        gazette:           '',
+        authority:         deptObj?.name || form.dept || '',
         enactmentDate:     apiDoc.enactment_date || form.enactmentDate || '',
         amendmentProvisions: form.type === 'Amendment' ? amendmentProvisions.filter(p => p.section) : [],
         extractedText:  extractedText || '',
@@ -823,90 +907,30 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         )}
 
         {/* Stats row */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
           {[
-            { label: 'Total Uploads',   value: uploads.length, bg: 'rgba(26,86,219,.12)',  color: 'var(--primary)', icon: FileText },
-            { label: 'Approved',        value: approved,        bg: 'rgba(34,197,94,.12)',  color: '#22c55e',        icon: CheckCircle },
-            { label: 'Pending Review',  value: pending,         bg: 'rgba(245,158,11,.12)', color: '#f59e0b',        icon: TrendingUp },
-            { label: 'Published',       value: published,       bg: 'rgba(59,130,246,.12)', color: '#3b82f6',        icon: Eye },
-          ].map(s => (
-            <Card key={s.label}>
+            { label: 'Total Uploads',  value: uploads.length, bg: 'rgba(26,86,219,.12)',  color: 'var(--primary)', icon: FileText,    filter: 'all' },
+            { label: 'Approved',       value: approved,        bg: 'rgba(34,197,94,.12)',  color: '#22c55e',        icon: CheckCircle, filter: 'approved' },
+            { label: 'Pending Review', value: pending,         bg: 'rgba(245,158,11,.12)', color: '#f59e0b',        icon: TrendingUp,  filter: 'pending' },
+          ].map(s => {
+            const isActive = filterStatus === s.filter;
+            return (
+            <Card key={s.label} style={{ cursor: 'pointer', outline: isActive ? `2px solid ${s.color}` : '2px solid transparent', transition: 'all .2s' }}
+              onClick={() => { setFilterStatus(f => f === s.filter ? '' : s.filter); setTimeout(() => uploadsTableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
                 <div>
-                  <div style={{ ...LABEL, marginBottom: 8 }}>{s.label}</div>
-                  <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--text-heading)', fontFamily: 'var(--mono)', lineHeight: 1 }}>{s.value}</div>
+                  <div style={{ ...LABEL, marginBottom: 8, color: isActive ? s.color : undefined }}>{s.label}</div>
+                  <div style={{ fontSize: 28, fontWeight: 700, color: isActive ? s.color : 'var(--text-heading)', fontFamily: 'var(--mono)', lineHeight: 1 }}>{s.value}</div>
                 </div>
-                <div style={{ width: 44, height: 44, borderRadius: 11, background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: 44, height: 44, borderRadius: 11, background: isActive ? s.color + '22' : s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background .2s' }}>
                   <s.icon size={20} color={s.color} strokeWidth={1.8} />
                 </div>
               </div>
             </Card>
-          ))}
+          );})}
+
         </div>
 
-        {/* Document type breakdown */}
-        {(() => {
-          const typeCounts = TYPES.map(t => ({ type: t, count: uploads.filter(d => d.type === t).length }));
-          const maxCount   = Math.max(...typeCounts.map(x => x.count), 1);
-          const TYPE_COLORS = {
-            'Act':                  { bg: 'rgba(26,86,219,.12)',   bar: 'var(--primary)',  text: 'var(--primary)'  },
-            'Amendment':            { bg: 'rgba(59,130,246,.12)',  bar: '#3b82f6',         text: '#1d4ed8'         },
-            'Notification':         { bg: 'rgba(245,158,11,.12)',  bar: '#f59e0b',         text: '#d97706'         },
-            'Circular':             { bg: 'rgba(168,85,247,.12)',  bar: '#a855f7',         text: '#7c3aed'         },
-            'Policy':               { bg: 'rgba(20,184,166,.12)',  bar: '#14b8a6',         text: '#0f766e'         },
-            'Rules & Regulations':  { bg: 'rgba(239,68,68,.10)',   bar: '#ef4444',         text: '#dc2626'         },
-            'Order / Gazette':      { bg: 'rgba(234,179,8,.12)',   bar: '#eab308',         text: '#a16207'         },
-          };
-          return (
-            <>
-              <Card>
-                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <FileText size={15} color="var(--primary)" />
-                  Document Type Breakdown
-                  <span style={{ marginLeft: 'auto', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '2px 10px', borderRadius: 20 }}>
-                    {typeCounts.length} type{typeCounts.length !== 1 ? 's' : ''} uploaded
-                  </span>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
-                  {typeCounts.map(({ type, count }) => {
-                    const c      = TYPE_COLORS[type] || { bg: 'rgba(148,163,184,.12)', bar: '#94a3b8', text: '#64748b' };
-                    const active = filterType === type;
-                    return (
-                      <div key={type}
-                        onClick={() => {
-                          const next = active ? '' : type;
-                          setFilterType(next);
-                          if (next && count > 0) setTimeout(() => uploadsTableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
-                        }}
-                        style={{
-                          padding: '12px 14px', borderRadius: 10, cursor: count > 0 ? 'pointer' : 'default',
-                          background: active ? c.bar : c.bg,
-                          border: `1.5px solid ${active ? c.bar : 'rgba(0,0,0,.06)'}`,
-                          display: 'flex', flexDirection: 'column', gap: 8,
-                          transition: 'all .2s',
-                          boxShadow: active ? `0 4px 14px ${c.bar}33` : 'none',
-                          opacity: count === 0 ? 0.45 : 1,
-                        }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <span style={{ fontSize: 12, fontWeight: 700, color: active ? 'white' : c.text }}>{type}</span>
-                          <span style={{ fontFamily: 'var(--mono)', fontSize: 18, fontWeight: 800, color: active ? 'white' : c.text, lineHeight: 1 }}>{count}</span>
-                        </div>
-                        <div style={{ height: 5, borderRadius: 99, background: active ? 'rgba(255,255,255,.3)' : 'rgba(0,0,0,.08)', overflow: 'hidden' }}>
-                          <div style={{ height: '100%', borderRadius: 99, background: active ? 'white' : c.bar, width: `${(count / maxCount) * 100}%`, transition: 'width .5s ease' }} />
-                        </div>
-                        <span style={{ fontSize: 10.5, color: active ? 'rgba(255,255,255,.8)' : c.text, fontFamily: 'var(--mono)', opacity: active ? 1 : .75 }}>
-                          {uploads.length > 0 ? `${Math.round((count / uploads.length) * 100)}% of uploads` : '0%'}
-                          {count > 0 && <span style={{ marginLeft: 6 }}>· {active ? 'click to clear' : 'click to filter'}</span>}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </Card>
-
-            </>
-          );
-        })()}
         {selectedIds.size > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderRadius: 10, background: 'rgba(26,86,219,.06)', border: '1px solid rgba(26,86,219,.2)' }}>
             <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--primary)' }}>{selectedIds.size} selected</span>
@@ -972,7 +996,11 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
           // ── compute filtered + sorted list ──────────────────────────────
           const SORT_KEY = { 'title': d => d.title, 'type': d => d.type, 'dept': d => d.dept,
             'year': d => d.year, 'uploadedAt': d => d.uploadedAt, 'status': d => d.status };
-          const filtered = uploads
+          const baseList = filterStatus === 'all'      ? uploads
+                         : filterStatus === 'approved' ? uploads.filter(d => d.status === 'approved')
+                         : filterStatus === 'pending'  ? uploads.filter(d => d.workflowStatus === WORKFLOW_STATUS.PENDING || d.status === 'pending')
+                         : uploads.filter(d => d.workflowStatus === WORKFLOW_STATUS.PUBLISHED);
+          const allFiltered = baseList
             .filter(d => !tableSearch || d.title.toLowerCase().includes(tableSearch.toLowerCase()))
             .filter(d => !filterType  || d.type === filterType)
             .sort((a, b) => {
@@ -980,6 +1008,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
               const kb = SORT_KEY[sortCol]?.(b) ?? '';
               return sortDir === 'asc' ? (ka > kb ? 1 : -1) : (ka < kb ? 1 : -1);
             });
+          const filtered = filterStatus ? allFiltered : allFiltered.slice(0, 5);
 
           function toggleSort(col) {
             if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -1003,7 +1032,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
           <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>My Uploads</div>
             <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '2px 9px', borderRadius: 20 }}>
-              {filtered.length}{filtered.length !== uploads.length ? ` / ${uploads.length}` : ''} docs
+              {filterStatus ? `${filtered.length} docs` : `Last 5 of ${allFiltered.length} published`}
             </span>
             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
               {bulkSelectMode ? (
@@ -1024,20 +1053,52 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
             </div>
           </div>
 
-          {/* Search + active filter chip */}
-          <div style={{ padding: '10px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, background: 'var(--surface-50)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '6px 12px', flex: 1, maxWidth: 300 }}>
-              <Search size={13} color="var(--text-color-secondary)" />
-              <input value={tableSearch} onChange={e => setTableSearch(e.target.value)} placeholder="Search by title…"
-                style={{ background: 'transparent', border: 'none', outline: 'none', fontSize: 12.5, color: 'var(--text-color)', width: '100%' }} />
-              {tableSearch && <button onClick={() => setTableSearch('')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', padding: 0 }}><X size={12} /></button>}
-            </div>
-            {filterType && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px 5px 12px', borderRadius: 20, background: 'var(--primary-light)', border: '1px solid var(--primary-border)', fontSize: 12.5, fontWeight: 600, color: 'var(--primary)', whiteSpace: 'nowrap' }}>
-                {filterType}
-                <button onClick={() => setFilterType('')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--primary)', display: 'flex', padding: 0, marginLeft: 2 }}><X size={11} /></button>
+          {/* Search + type filter buttons */}
+          <div style={{ padding: '10px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', gap: 8, background: 'var(--surface-50)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '6px 12px', flex: 1, maxWidth: 300 }}>
+                <Search size={13} color="var(--text-color-secondary)" />
+                <input value={tableSearch} onChange={e => setTableSearch(e.target.value)} placeholder="Search by title…"
+                  style={{ background: 'transparent', border: 'none', outline: 'none', fontSize: 12.5, color: 'var(--text-color)', width: '100%' }} />
+                {tableSearch && <button onClick={() => setTableSearch('')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', padding: 0 }}><X size={12} /></button>}
               </div>
-            )}
+              {filterStatus && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px 5px 12px', borderRadius: 20, background: 'rgba(34,197,94,.1)', border: '1px solid rgba(34,197,94,.3)', fontSize: 12.5, fontWeight: 600, color: '#16a34a', whiteSpace: 'nowrap' }}>
+                  {{ all: 'All Uploads', approved: 'Approved', pending: 'Pending Review' }[filterStatus]}
+                  <button onClick={() => setFilterStatus('')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#16a34a', display: 'flex', padding: 0, marginLeft: 2 }}><X size={11} /></button>
+                </div>
+              )}
+            </div>
+            {/* Type filter pills */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              {TYPES.map(type => {
+                const count  = uploads.filter(d => d.type === type).length;
+                const active = filterType === type;
+                const c = TYPE_CARD_COLORS[type] || { accent: '#94a3b8', bg: 'rgba(148,163,184,.1)', text: '#64748b' };
+                return (
+                  <button key={type} type="button"
+                    onClick={() => setFilterType(active ? '' : type)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 5,
+                      padding: '4px 10px', borderRadius: 20, cursor: 'pointer', fontFamily: 'var(--font)',
+                      fontSize: 12, fontWeight: 600, transition: 'all .15s',
+                      background: active ? c.accent : 'var(--surface-card)',
+                      border: `1.5px solid ${active ? c.accent : c.accent + '55'}`,
+                      color: active ? 'white' : c.text || c.accent,
+                      opacity: count === 0 ? 0.4 : 1,
+                    }}>
+                    {type}
+                    <span style={{ fontSize: 10, fontFamily: 'var(--mono)', background: active ? 'rgba(255,255,255,.25)' : 'var(--surface-ground)', color: active ? 'white' : 'var(--text-color-secondary)', padding: '0px 5px', borderRadius: 10 }}>{count}</span>
+                  </button>
+                );
+              })}
+              {filterType && (
+                <button type="button" onClick={() => setFilterType('')}
+                  style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 20, cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 11, fontWeight: 600, background: 'transparent', border: '1.5px dashed var(--surface-border)', color: 'var(--text-color-secondary)' }}>
+                  <X size={10} /> Clear
+                </button>
+              )}
+            </div>
           </div>
 
           <div style={{ overflowX: 'auto' }}>
@@ -1072,7 +1133,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
               </thead>
               <tbody>
                 {filtered.length === 0 && (
-                  <tr><td colSpan={10} style={{ padding: '52px 0', textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>No uploads yet.</td></tr>
+                  <tr><td colSpan={10} style={{ padding: '52px 0', textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>No published documents yet.</td></tr>
                 )}
                 {filtered.map(doc => {
                   const isDraft = !doc.workflowStatus || doc.workflowStatus === WORKFLOW_STATUS.DRAFT;
@@ -1140,7 +1201,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
 
   // ── Upload page ────────────────────────────────────────────────────────────
   return (
-    <div style={{ maxWidth: 860, animation: 'fadeSlideIn .3s ease' }}>
+    <div style={{ animation: 'fadeSlideIn .3s ease' }}>
       {conflictModal && (
         <VersionConflictModal
           existingDoc={conflictModal.existingDoc}
@@ -1192,381 +1253,963 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         </div>
       )}
 
-      {/* ── Step indicator ──────────────────────────────────────────────────── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginBottom: 20 }}>
-        {[
-          { n: 1, label: 'Select & Upload File', done: fileRefs.length > 0, active: fileRefs.length === 0 },
-          { n: 2, label: 'Fill Document Details', done: uploadStep === 'done', active: fileRefs.length > 0 && uploadStep !== 'done' },
-        ].map((s, i) => (
-          <div key={s.n} style={{ display: 'flex', alignItems: 'center', flex: i === 0 ? 'none' : 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-              <div style={{
-                width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                background: s.done ? '#16a34a' : s.active ? 'var(--primary)' : 'var(--surface-ground)',
-                border: s.done || s.active ? 'none' : '2px solid var(--surface-border)',
-                color: s.done || s.active ? 'white' : 'var(--text-color-secondary)',
-                fontSize: 12, fontWeight: 700, transition: 'all .3s',
-              }}>
-                {s.done ? <CheckCircle size={14} /> : s.n}
+      {/* ── Hidden file input — always present ─────────────────────────────── */}
+      <input ref={inputRef} type="file" accept=".pdf,.zip" multiple style={{ display: 'none' }}
+        onChange={e => { addFiles(e.target.files); e.target.value = ''; }} />
+
+      {/* ── State 1a: Type selector (no type, no file) ─────────────────────── */}
+      {files.length === 0 && !form.type && (
+        <div style={{ position: 'relative', minHeight: 'calc(100vh - 220px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {/* Blurred drop zone behind */}
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', filter: 'blur(5px)', opacity: 0.3, pointerEvents: 'none' }}>
+            <div style={{ width: '100%', maxWidth: 640, border: '2px dashed var(--surface-border)', borderRadius: 24, padding: '80px 56px', textAlign: 'center', background: 'var(--surface-card)' }}>
+              <div style={{ width: 80, height: 80, borderRadius: 20, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 22px' }}>
+                <Upload size={36} color="var(--text-color-secondary)" strokeWidth={1.6} />
               </div>
-              <span style={{ fontSize: 12.5, fontWeight: s.active ? 700 : 500, color: s.done ? '#16a34a' : s.active ? 'var(--primary)' : 'var(--text-color-secondary)', whiteSpace: 'nowrap', transition: 'all .3s' }}>
-                {s.label}
-              </span>
+              <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 10 }}>Drop files here or click to browse</div>
+              <div style={{ fontSize: 14, color: 'var(--text-color-secondary)' }}>Select multiple PDFs or a ZIP archive — up to 50 MB per file</div>
             </div>
-            {i === 0 && (
-              <div style={{ flex: 1, height: 2, margin: '0 12px', background: fileRefs.length > 0 ? '#16a34a' : 'var(--surface-border)', borderRadius: 2, minWidth: 32, transition: 'background .4s' }} />
-            )}
           </div>
-        ))}
-      </div>
 
-      {/* ── Drop zone (Step 1) ──────────────────────────────────────────────── */}
-      <div
-        onClick={() => fileRefs.length === 0 && files.length === 0 && inputRef.current?.click()}
-        onDrop={e => { if (fileRefs.length === 0) handleDrop(e); else e.preventDefault(); }}
-        onDragOver={e => { e.preventDefault(); if (fileRefs.length === 0) setDragOver(true); }}
-        onDragLeave={() => setDragOver(false)}
-        style={{
-          border: `2px dashed ${fileRefs.length > 0 ? '#16a34a' : dragOver ? 'var(--primary)' : files.length > 0 ? 'rgba(26,86,219,.4)' : 'var(--surface-border)'}`,
-          borderRadius: 'var(--radius)', padding: files.length > 0 ? '20px 24px' : '44px 32px',
-          textAlign: 'center', cursor: fileRefs.length > 0 ? 'default' : files.length > 0 ? 'default' : 'pointer',
-          transition: 'all .25s',
-          background: fileRefs.length > 0 ? 'rgba(22,163,74,.03)' : dragOver ? 'rgba(26,86,219,.04)' : files.length > 0 ? 'rgba(26,86,219,.02)' : 'var(--surface-card)',
-          marginBottom: 16, boxShadow: dragOver ? '0 0 0 4px rgba(26,86,219,.08)' : 'var(--card-shadow)',
-        }}>
-        <input ref={inputRef} type="file" accept=".pdf,.zip" multiple style={{ display: 'none' }}
-          onChange={e => { addFiles(e.target.files); e.target.value = ''; }} />
-
-        {files.length > 0 ? (
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                {fileRefs.length > 0
-                  ? <span style={{ fontSize: 13, fontWeight: 700, color: '#16a34a', display: 'flex', alignItems: 'center', gap: 6 }}><CheckCircle size={15} /> {files.length} file{files.length !== 1 ? 's' : ''} uploaded successfully</span>
-                  : <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)' }}>{files.length} file{files.length !== 1 ? 's' : ''} selected</span>
-                }
-                {autoFillLoading && (
-                  <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: '#3b82f6', fontWeight: 700 }}>⚡ Auto-extracting metadata…</span>
-                )}
-              </div>
-              {fileRefs.length === 0 && (
-                <button onClick={e => { e.stopPropagation(); inputRef.current?.click(); }}
-                  style={{ fontSize: 12, fontWeight: 600, color: 'var(--primary)', background: 'rgba(26,86,219,.08)', border: '1px solid rgba(26,86,219,.2)', borderRadius: 7, padding: '5px 12px', cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                  + Add More
-                </button>
-              )}
+          {/* Type selector cards */}
+          <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 720, padding: '0 8px' }}>
+            <div style={{ textAlign: 'center', marginBottom: 28 }}>
+              <div style={{ fontSize: 21, fontWeight: 800, color: 'var(--text-heading)', marginBottom: 8 }}>Select Document Type</div>
+              <div style={{ fontSize: 13.5, color: 'var(--text-color-secondary)' }}>Choose first — fields will adapt to your selection before upload</div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {files.map(f => {
-                const uploaded = fileRefs.some(r => r.fileName === f.name);
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+              {TYPES.map(type => {
+                const c = TYPE_CARD_COLORS[type] || { bg: 'rgba(148,163,184,.08)', accent: '#94a3b8', text: '#64748b' };
                 return (
-                  <div key={f.name} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 8, background: uploaded ? 'rgba(22,163,74,.06)' : 'var(--surface-ground)', border: `1px solid ${uploaded ? 'rgba(22,163,74,.25)' : 'var(--surface-border)'}`, textAlign: 'left', transition: 'all .3s' }}>
-                    {fileIcon(f)}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</div>
-                      <div style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', marginTop: 1 }}>
-                        {formatSize(f.size)}{f.name.endsWith('.zip') && <span style={{ marginLeft: 8, color: '#f59e0b', fontWeight: 700 }}>ZIP BATCH</span>}
-                        {uploaded && <span style={{ marginLeft: 8, color: '#16a34a', fontWeight: 700 }}>✓ UPLOADED</span>}
-                      </div>
+                  <button key={type} type="button"
+                    onClick={() => { fmt('type', type); setTypeFields({}); setLegalAuthorities([{ act: '', sections: [''] }]); setAmendChanges([{ chapter: '', section: '', subsection: '', changeType: 'Amended', description: '' }]); setHierarchy({ act: '', chapter: '', section: '', subsection: '' }); setRelations([]); }}
+                    style={{ padding: '18px 14px 16px', borderRadius: 14, border: `1.5px solid ${c.accent}25`, background: 'var(--surface-card)', cursor: 'pointer', textAlign: 'center', transition: 'all .2s', fontFamily: 'var(--font)', boxShadow: 'var(--card-shadow)' }}
+                    onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.background = c.bg; e.currentTarget.style.borderColor = c.accent + '55'; e.currentTarget.style.boxShadow = `0 8px 24px ${c.accent}22`; }}
+                    onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.background = 'var(--surface-card)'; e.currentTarget.style.borderColor = c.accent + '25'; e.currentTarget.style.boxShadow = 'var(--card-shadow)'; }}>
+                    <div style={{ width: 38, height: 38, borderRadius: 10, background: c.bg, border: `1px solid ${c.accent}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px' }}>
+                      <FileText size={17} color={c.accent} strokeWidth={1.8} />
                     </div>
-                    {fileRefs.length === 0 && (
-                      <button onClick={e => { e.stopPropagation(); removeFile(f.name); }}
-                        style={{ background: 'transparent', border: '1px solid var(--surface-border)', borderRadius: 5, width: 24, height: 24, cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <X size={12} />
-                      </button>
-                    )}
-                  </div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: c.text, marginBottom: 5, lineHeight: 1.3 }}>{type}</div>
+                    <div style={{ fontSize: 10.5, color: 'var(--text-color-secondary)', lineHeight: 1.45 }}>{TYPE_CARD_DESC[type] || ''}</div>
+                  </button>
                 );
               })}
             </div>
           </div>
-        ) : (
-          <>
-            <div style={{ width: 52, height: 52, borderRadius: 13, background: dragOver ? 'rgba(26,86,219,.12)' : 'var(--surface-ground)', border: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px', color: dragOver ? 'var(--primary)' : 'var(--text-color-secondary)', transition: 'all .25s' }}>
-              <Upload size={24} />
-            </div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-heading)', marginBottom: 5 }}>Drop files here or click to browse</div>
-            <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', marginBottom: 8 }}>Select multiple PDFs or a ZIP archive — up to 50 MB per file</div>
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: 10.5, color: 'var(--primary)', background: 'rgba(26,86,219,.08)', border: '1px solid rgba(26,86,219,.2)', padding: '3px 10px', borderRadius: 20 }}>.PDF</span>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: 10.5, color: '#f59e0b', background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.3)', padding: '3px 10px', borderRadius: 20 }}>.ZIP</span>
-            </div>
-          </>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* ── Upload File button (Step 1 action) ──────────────────────────────── */}
-      {files.length > 0 && fileRefs.length === 0 && (
-        <div style={{ marginBottom: 20 }}>
-          {uploadError && uploadStep === 'error' && (
-            <div style={{ marginBottom: 10, padding: '10px 14px', borderRadius: 8, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <AlertCircle size={14} color="#ef4444" style={{ flexShrink: 0 }} />
-              <span style={{ fontSize: 12.5, color: '#dc2626', flex: 1 }}>{uploadError}</span>
-              <button type="button" onClick={() => { setUploadError(''); setUploadStep(null); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444' }}><X size={12} /></button>
+      {/* ── State 1b: Drop zone (type selected, no file yet) ─────────────────── */}
+      {files.length === 0 && form.type && (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 'calc(100vh - 220px)', gap: 16 }}>
+          {/* Type chip */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px 7px 10px', borderRadius: 40, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', boxShadow: 'var(--card-shadow)' }}>
+            <div style={{ width: 26, height: 26, borderRadius: 7, background: TYPE_CARD_COLORS[form.type]?.bg || 'rgba(148,163,184,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <FileText size={13} color={TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'} />
             </div>
-          )}
-          <button
-            type="button"
-            onClick={handleUploadFile}
-            disabled={uploadStep === 'uploading'}
+            <span style={{ fontSize: 13, fontWeight: 700, color: TYPE_CARD_COLORS[form.type]?.text || 'var(--text-heading)' }}>{form.type}</span>
+            <span style={{ width: 1, height: 14, background: 'var(--surface-border)' }} />
+            <button type="button" onClick={() => { fmt('type', ''); setTypeFields({}); }}
+              style={{ fontSize: 12, color: 'var(--text-color-secondary)', background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'var(--font)', padding: 0, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <X size={12} /> Change
+            </button>
+          </div>
+          {/* Bigger drop zone */}
+          <div
+            onClick={() => inputRef.current?.click()}
+            onDrop={handleDrop}
+            onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
             style={{
-              width: '100%', padding: '13px 24px', borderRadius: 10, border: 'none',
-              background: uploadStep === 'uploading' ? 'var(--surface-200)' : 'var(--primary)',
-              color: uploadStep === 'uploading' ? '#94a3b8' : 'white',
-              fontSize: 14, fontWeight: 700, cursor: uploadStep === 'uploading' ? 'not-allowed' : 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9,
-              fontFamily: 'var(--font)', boxShadow: uploadStep === 'uploading' ? 'none' : '0 2px 8px rgba(26,86,219,.25)',
-              transition: 'all .2s',
+              width: '100%', maxWidth: 680,
+              border: `2px dashed ${dragOver ? (TYPE_CARD_COLORS[form.type]?.accent || 'var(--primary)') : 'var(--surface-border)'}`,
+              borderRadius: 24, padding: '80px 56px', textAlign: 'center', cursor: 'pointer',
+              background: dragOver ? (TYPE_CARD_COLORS[form.type]?.bg || 'rgba(26,86,219,.05)') : 'var(--surface-card)',
+              transition: 'all .25s',
+              boxShadow: dragOver ? `0 0 0 6px ${TYPE_CARD_COLORS[form.type]?.accent || '#1a56db'}18` : 'var(--card-shadow)',
             }}>
-            {uploadStep === 'uploading'
-              ? <><Clock size={16} /> Uploading {files.length > 1 ? `${files.length} files` : 'file'}…</>
-              : <><Upload size={16} /> Upload {files.length > 1 ? `${files.length} Files` : 'File'}</>
-            }
-          </button>
-          <div style={{ marginTop: 8, fontSize: 11.5, color: 'var(--text-color-secondary)', textAlign: 'center' }}>
-            File will be securely stored — you can fill in the details on the next step.
+            <div style={{ width: 80, height: 80, borderRadius: 20, background: dragOver ? (TYPE_CARD_COLORS[form.type]?.bg || 'rgba(26,86,219,.12)') : 'var(--surface-ground)', border: `1px solid ${dragOver ? (TYPE_CARD_COLORS[form.type]?.accent || 'var(--primary)') + '40' : 'var(--surface-border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 22px', transition: 'all .25s' }}>
+              <Upload size={36} color={dragOver ? (TYPE_CARD_COLORS[form.type]?.accent || 'var(--primary)') : 'var(--text-color-secondary)'} strokeWidth={1.6} />
+            </div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 10 }}>Drop files here or click to browse</div>
+            <div style={{ fontSize: 14, color: 'var(--text-color-secondary)', marginBottom: 22 }}>Select multiple PDFs or a ZIP archive — up to 50 MB per file</div>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--primary)', background: 'rgba(26,86,219,.08)', border: '1px solid rgba(26,86,219,.2)', padding: '4px 14px', borderRadius: 20 }}>.PDF</span>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: '#f59e0b', background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.3)', padding: '4px 14px', borderRadius: 20 }}>.ZIP</span>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Metadata form — only shown after Step 1 is complete */}
-      {fileRefs.length > 0 && <Card>
-        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 4, paddingBottom: 14, borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 8 }}>
+      {/* ── State 2: Document details form (file selected / uploading) ───────── */}
+      {files.length > 0 && <Card>
+        {/* Card header */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, paddingBottom: 12, borderBottom: '1px solid var(--surface-border)' }}>
           <FileText size={15} color="var(--primary)" />
-          Document Details
-          {files.length > 1 && <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, background: 'rgba(59,130,246,.1)', color: '#3b82f6', padding: '2px 9px', borderRadius: 20 }}>Applied to all {files.length} files</span>}
-          {autoFillLoading && <span style={{ marginLeft: 'auto', fontSize: 11, fontFamily: 'var(--mono)', color: '#3b82f6', fontWeight: 700 }}>⚡ AUTO-FILLING…</span>}
+          <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>Document Details</span>
+          {files.length > 1 && <span style={{ fontSize: 11, fontWeight: 600, background: 'rgba(59,130,246,.1)', color: '#3b82f6', padding: '2px 9px', borderRadius: 20 }}>Applied to all {files.length} files</span>}
+          {autoFillLoading && <span style={{ marginLeft: 4, fontSize: 11, fontFamily: 'var(--mono)', color: '#3b82f6', fontWeight: 700 }}>⚡ AUTO-FILLING…</span>}
         </div>
-        <form onSubmit={handleSubmit}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 18 }}>
-            <div style={{ gridColumn: '1 / -1' }}>
-              <div style={{ ...LABEL, marginBottom: 7 }}>Act / Instrument Name {files.length <= 1 && <span style={{ color: '#ef4444' }}>*</span>}</div>
-              <input value={form.act} onChange={e => fmt('act', e.target.value)} required={files.length <= 1}
-                placeholder={files.length > 1 ? 'Leave blank to use each filename' : 'e.g. Haryana Municipal Act, 1973'}
-                style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
-            </div>
 
-            {/* Gazette Reference — full width, always */}
-            <div style={{ gridColumn: '1 / -1' }}>
-              <div style={{ ...LABEL, marginBottom: 7 }}>Gazette Reference <span style={{ color: '#ef4444' }}>*</span></div>
-              <input value={form.gazette} onChange={e => fmt('gazette', e.target.value)} required
-                placeholder="e.g. Gazette of India Extraordinary, Part II, Sec. 1, No. 312, dated 18 Dec 1976"
-                style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
-            </div>
-
-            {/* Issuing Authority + Enactment Date */}
-            <div>
-              <div style={{ ...LABEL, marginBottom: 7 }}>Issuing Authority <span style={{ color: '#ef4444' }}>*</span></div>
-              <input value={form.authority} onChange={e => fmt('authority', e.target.value)} required
-                placeholder="e.g. Parliament of India / Governor of Haryana"
-                style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
-            </div>
-            <div>
-              <div style={{ ...LABEL, marginBottom: 7 }}>Enactment / Issue Date <span style={{ color: '#ef4444' }}>*</span></div>
-              <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
-                style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
-            </div>
-
-            <div>
-              <div style={{ ...LABEL, marginBottom: 7 }}>Version / Amendment No.</div>
-              <input value={form.version} onChange={e => fmt('version', e.target.value)} placeholder="e.g. 1.0"
-                style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
-            </div>
-            {/* Year auto-derived from enactmentDate — no separate field needed */}
-            {[['Department *','dept',DEPTS,true],['Document Type *','type',TYPES,true]].map(([lbl,key,opts,req]) => (
-              <div key={key}>
-                <div style={{ ...LABEL, marginBottom: 7 }}>{lbl}</div>
-                <select value={form[key]} onChange={e => fmt(key, e.target.value)} required={req}
-                  style={{ ...INPUT_BASE, cursor: 'pointer', appearance: 'none', backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E\")", backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center' }}
-                  onFocus={focusStyle} onBlur={blurStyle}>
-                  <option value="">— Select {lbl.replace(' *','')} —</option>
-                  {opts.map(o => <option key={o}>{o}</option>)}
-                </select>
+        {/* File info banner — full width, prominent */}
+        <div style={{ marginBottom: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {files.slice(0, 2).map(f => {
+            const uploaded = fileRefs.some(r => r.fileName === f.name);
+            const isUploading = uploadStep === 'uploading' && !uploaded;
+            return (
+              <div key={f.name} style={{
+                display: 'flex', alignItems: 'center', gap: 14,
+                padding: '10px 14px', borderRadius: 10,
+                background: uploaded ? 'rgba(22,163,74,.05)' : isUploading ? 'rgba(59,130,246,.05)' : 'var(--surface-ground)',
+                border: `1.5px solid ${uploaded ? 'rgba(22,163,74,.25)' : isUploading ? 'rgba(59,130,246,.2)' : 'var(--surface-border)'}`,
+                transition: 'all .3s',
+              }}>
+                {/* File icon */}
+                <div style={{ width: 36, height: 36, borderRadius: 8, background: uploaded ? 'rgba(22,163,74,.1)' : 'rgba(26,86,219,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  {fileIcon(f)}
+                </div>
+                {/* Name + size + type badge */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</div>
+                    {form.type && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0, padding: '2px 10px 2px 7px', borderRadius: 20, background: TYPE_CARD_COLORS[form.type]?.bg || 'rgba(148,163,184,.1)', border: `1px solid ${TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'}30` }}>
+                        <FileText size={10} color={TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'} />
+                        <span style={{ fontSize: 11, fontWeight: 700, color: TYPE_CARD_COLORS[form.type]?.text || '#64748b', fontFamily: 'var(--mono)' }}>{form.type}</span>
+                        <button type="button"
+                          onClick={() => { fmt('type', ''); setTypeFields({}); setFiles([]); setFileRefs([]); setUploadStep(null); setUploadError(''); }}
+                          style={{ marginLeft: 3, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', padding: 0, lineHeight: 1 }}
+                          title="Change type">
+                          <X size={10} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>{formatSize(f.size)}</div>
+                </div>
+                {/* Status badge */}
+                {isUploading && (
+                  <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: '#3b82f6', fontWeight: 700, background: 'rgba(59,130,246,.1)', padding: '3px 10px', borderRadius: 20, whiteSpace: 'nowrap' }}>UPLOADING…</span>
+                )}
+                {uploaded && (
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#16a34a', background: 'rgba(22,163,74,.1)', padding: '3px 10px', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' }}>
+                    <CheckCircle size={11} /> Uploaded
+                  </span>
+                )}
+                {/* Replace button */}
+                <button type="button"
+                  onClick={() => { setFiles([]); setFileRefs([]); setUploadStep(null); setUploadError(''); setTimeout(() => inputRef.current?.click(), 50); }}
+                  style={{ fontSize: 12, fontWeight: 600, color: 'var(--primary)', background: 'rgba(26,86,219,.08)', border: '1px solid rgba(26,86,219,.2)', borderRadius: 7, padding: '5px 14px', cursor: 'pointer', fontFamily: 'var(--font)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  Replace
+                </button>
+                {/* Remove button */}
+                <button type="button"
+                  onClick={() => { removeFile(f.name); if (files.length <= 1) { setFileRefs([]); setUploadStep(null); setUploadError(''); } }}
+                  style={{ width: 28, height: 28, borderRadius: 7, border: '1px solid var(--surface-border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <X size={13} />
+                </button>
               </div>
-            ))}
+            );
+          })}
+          {files.length > 2 && (
+            <div style={{ fontSize: 12, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', fontWeight: 600, paddingLeft: 4 }}>+{files.length - 2} more files</div>
+          )}
+        </div>
+
+        {uploadError && uploadStep === 'error' && (
+          <div style={{ marginBottom: 14, padding: '10px 14px', borderRadius: 8, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <AlertCircle size={14} color="#ef4444" style={{ flexShrink: 0 }} />
+            <span style={{ fontSize: 12.5, color: '#dc2626', flex: 1 }}>{uploadError}</span>
+            <button type="button" onClick={() => { setUploadError(''); setUploadStep(null); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444' }}><X size={12} /></button>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+
+            {/* Always: Document name */}
             <div style={{ gridColumn: '1 / -1' }}>
-              <div style={{ ...LABEL, marginBottom: 7 }}>Hierarchical Tags</div>
-              <HierarchyTag hierarchy={hierarchy} onChange={setHierarchy} />
+              <div style={{ ...LABEL, marginBottom: 6 }}>
+                {{
+                  'Act': 'Act / Instrument Name',
+                  'Amendment': 'Amendment Name',
+                  'Notification': 'Notification Title',
+                  'Circular': 'Circular Title',
+                  'Policy': 'Policy Name',
+                  'Rules & Regulations': 'Rules / Regulation Name',
+                  'Order / Gazette': 'Order / Gazette Title',
+                }[form.type] || 'Document Name'}
+                {files.length <= 1 && <span style={{ color: '#ef4444' }}> *</span>}
+              </div>
+              <input value={form.act} onChange={e => fmt('act', e.target.value)} required={files.length <= 1}
+                placeholder={files.length > 1 ? 'Leave blank to use each filename' : ({
+                  'Act': 'e.g. Haryana Municipal Act, 1973',
+                  'Amendment': 'e.g. The XYZ (Amendment) Act, 2022',
+                  'Notification': 'e.g. Gazette Notification No. 123',
+                  'Circular': 'e.g. Circular No. 45/2023',
+                  'Policy': 'e.g. Haryana Industrial Policy 2020',
+                  'Rules & Regulations': 'e.g. Haryana Municipal Rules, 1975',
+                  'Order / Gazette': 'e.g. Government Order No. 12/2021',
+                }[form.type] || 'Enter document name')}
+                style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
             </div>
 
+            {/* ── ACT: all fields inline ── */}
+            {form.type === 'Act' && (<>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Act Number <span style={{ color: '#ef4444' }}>*</span></div>
+                <input value={typeFields.actNumber || ''} onChange={e => setTypeFields(f => ({ ...f, actNumber: e.target.value }))}
+                  placeholder="e.g. Act No. 12 of 1973" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Short Title</div>
+                <input value={typeFields.shortTitle || ''} onChange={e => setTypeFields(f => ({ ...f, shortTitle: e.target.value }))}
+                  placeholder="e.g. Haryana Municipal Act" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Issue Date <span style={{ color: '#ef4444' }}>*</span></div>
+                <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
+                  style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Effective From</div>
+                <input type="date" value={typeFields.commencementDate || ''} onChange={e => setTypeFields(f => ({ ...f, commencementDate: e.target.value }))}
+                  style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Gazette Reference</div>
+                <input value={typeFields.gazetteRef || ''} onChange={e => setTypeFields(f => ({ ...f, gazetteRef: e.target.value }))}
+                  placeholder="e.g. Haryana Gazette, 15 Jan 1973" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Department</div>
+                <div style={{ ...INPUT_BASE, color: 'var(--text-color)', opacity: 0.8, userSelect: 'none', display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0, opacity: 0.7 }} />
+                  {user?.dept || form.dept || '—'}
+                </div>
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Relationships</div>
+                <button type="button" onClick={() => setDrawerType('relationship')}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: relations.length > 0 ? 'var(--primary)' : 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                  <GitBranch size={13} />
+                  {relations.length > 0 ? `${relations.length} Relationship${relations.length !== 1 ? 's' : ''} Added` : 'Add Relationship'}
+                  <ChevronRight size={12} />
+                </button>
+              </div>
+            </>)}
+
+            {/* ── Amendment: unified inline fields ── */}
+            {form.type === 'Amendment' && (<>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Amendment Number <span style={{ color: '#ef4444' }}>*</span></div>
+                <input value={typeFields.amendmentNumber || ''} onChange={e => setTypeFields(f => ({ ...f, amendmentNumber: e.target.value }))}
+                  placeholder="e.g. Amendment No. 3 of 2022" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Issue Date <span style={{ color: '#ef4444' }}>*</span></div>
+                <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
+                  style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Effective From</div>
+                <input type="date" value={typeFields.commencementDate || ''} onChange={e => setTypeFields(f => ({ ...f, commencementDate: e.target.value }))}
+                  style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Gazette Reference</div>
+                <input value={typeFields.gazetteRef || ''} onChange={e => setTypeFields(f => ({ ...f, gazetteRef: e.target.value }))}
+                  placeholder="e.g. Haryana Gazette No. 45/2022" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Department</div>
+                <div style={{ ...INPUT_BASE, color: 'var(--text-color)', opacity: 0.8, userSelect: 'none', display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0, opacity: 0.7 }} />
+                  {user?.dept || form.dept || '—'}
+                </div>
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Document Type</div>
+                <div style={{ ...INPUT_BASE, display: 'flex', alignItems: 'center', gap: 8, userSelect: 'none', cursor: 'default' }}>
+                  <div style={{ width: 22, height: 22, borderRadius: 6, background: TYPE_CARD_COLORS[form.type]?.bg || 'rgba(148,163,184,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <FileText size={11} color={TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'} />
+                  </div>
+                  <span style={{ fontWeight: 600, color: TYPE_CARD_COLORS[form.type]?.text || 'var(--text-color)', flex: 1 }}>{form.type}</span>
+                  <span style={{ fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: 0.6 }}>LOCKED</span>
+                </div>
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Hierarchical Tags</div>
+                <HierarchyTag hierarchy={hierarchy} onOpen={() => { setDrawerHierarchy({ ...hierarchy }); setDrawerType('hierarchy'); }} isRef={false} />
+              </div>
+            </>)}
+
+            {/* ── Circular: unified inline fields ── */}
+            {form.type === 'Circular' && (<>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Circular Number <span style={{ color: '#ef4444' }}>*</span></div>
+                <input value={typeFields.circularNumber || ''} onChange={e => setTypeFields(f => ({ ...f, circularNumber: e.target.value }))}
+                  placeholder="e.g. Circular No. 7/2023" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Issue Date <span style={{ color: '#ef4444' }}>*</span></div>
+                <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
+                  style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Valid Until</div>
+                <input value={typeFields.validity || ''} onChange={e => setTypeFields(f => ({ ...f, validity: e.target.value }))}
+                  placeholder="e.g. 31 March 2025 / Until further orders" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Department</div>
+                <div style={{ ...INPUT_BASE, color: 'var(--text-color)', opacity: 0.8, userSelect: 'none', display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0, opacity: 0.7 }} />
+                  {user?.dept || form.dept || '—'}
+                </div>
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Document Type</div>
+                <div style={{ ...INPUT_BASE, display: 'flex', alignItems: 'center', gap: 8, userSelect: 'none', cursor: 'default' }}>
+                  <div style={{ width: 22, height: 22, borderRadius: 6, background: TYPE_CARD_COLORS[form.type]?.bg || 'rgba(148,163,184,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <FileText size={11} color={TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'} />
+                  </div>
+                  <span style={{ fontWeight: 600, color: TYPE_CARD_COLORS[form.type]?.text || 'var(--text-color)', flex: 1 }}>{form.type}</span>
+                  <span style={{ fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: 0.6 }}>LOCKED</span>
+                </div>
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Legal Authority</div>
+                <HierarchyTag hierarchy={hierarchy} onOpen={() => setDrawerType('hierarchy')} isRef={true} legalAuthorities={legalAuthorities} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Relationships</div>
+                <button type="button" onClick={() => setDrawerType('relationship')}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: relations.length > 0 ? 'var(--primary)' : 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                  <GitBranch size={13} />
+                  {relations.length > 0 ? `${relations.length} Relationship${relations.length !== 1 ? 's' : ''} Added` : 'Add Relationship'}
+                  <ChevronRight size={12} />
+                </button>
+              </div>
+            </>)}
+
+            {/* ── Notification: unified inline fields ── */}
+            {form.type === 'Notification' && (<>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Notification Number <span style={{ color: '#ef4444' }}>*</span></div>
+                <input value={typeFields.notificationNumber || ''} onChange={e => setTypeFields(f => ({ ...f, notificationNumber: e.target.value }))}
+                  placeholder="e.g. No. 4/12/2022-Rev" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Issue Date <span style={{ color: '#ef4444' }}>*</span></div>
+                <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
+                  style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Effective From</div>
+                <input type="date" value={typeFields.commencementDate || ''} onChange={e => setTypeFields(f => ({ ...f, commencementDate: e.target.value }))}
+                  style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Gazette Reference</div>
+                <input value={typeFields.gazetteRef || ''} onChange={e => setTypeFields(f => ({ ...f, gazetteRef: e.target.value }))}
+                  placeholder="e.g. Haryana Gazette Extra., 12 Jan 2023" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Department</div>
+                <div style={{ ...INPUT_BASE, color: 'var(--text-color)', opacity: 0.8, userSelect: 'none', display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0, opacity: 0.7 }} />
+                  {user?.dept || form.dept || '—'}
+                </div>
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Document Type</div>
+                <div style={{ ...INPUT_BASE, display: 'flex', alignItems: 'center', gap: 8, userSelect: 'none', cursor: 'default' }}>
+                  <div style={{ width: 22, height: 22, borderRadius: 6, background: TYPE_CARD_COLORS[form.type]?.bg || 'rgba(148,163,184,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <FileText size={11} color={TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'} />
+                  </div>
+                  <span style={{ fontWeight: 600, color: TYPE_CARD_COLORS[form.type]?.text || 'var(--text-color)', flex: 1 }}>{form.type}</span>
+                  <span style={{ fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: 0.6 }}>LOCKED</span>
+                </div>
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Legal Authority</div>
+                <HierarchyTag hierarchy={hierarchy} onOpen={() => setDrawerType('hierarchy')} isRef={true} legalAuthorities={legalAuthorities} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Relationships</div>
+                <button type="button" onClick={() => setDrawerType('relationship')}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: relations.length > 0 ? 'var(--primary)' : 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                  <GitBranch size={13} />
+                  {relations.length > 0 ? `${relations.length} Relationship${relations.length !== 1 ? 's' : ''} Added` : 'Add Relationship'}
+                  <ChevronRight size={12} />
+                </button>
+              </div>
+            </>)}
+
+            {/* ── Order / Gazette: unified inline fields ── */}
+            {form.type === 'Order / Gazette' && (<>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Order / Gazette Number <span style={{ color: '#ef4444' }}>*</span></div>
+                <input value={typeFields.orderNumber || ''} onChange={e => setTypeFields(f => ({ ...f, orderNumber: e.target.value }))}
+                  placeholder="e.g. Govt. Order No. 45/2022" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Issue Date <span style={{ color: '#ef4444' }}>*</span></div>
+                <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
+                  style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Effective From</div>
+                <input type="date" value={typeFields.commencementDate || ''} onChange={e => setTypeFields(f => ({ ...f, commencementDate: e.target.value }))}
+                  style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Department</div>
+                <div style={{ ...INPUT_BASE, color: 'var(--text-color)', opacity: 0.8, userSelect: 'none', display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0, opacity: 0.7 }} />
+                  {user?.dept || form.dept || '—'}
+                </div>
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Document Type</div>
+                <div style={{ ...INPUT_BASE, display: 'flex', alignItems: 'center', gap: 8, userSelect: 'none', cursor: 'default' }}>
+                  <div style={{ width: 22, height: 22, borderRadius: 6, background: TYPE_CARD_COLORS[form.type]?.bg || 'rgba(148,163,184,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <FileText size={11} color={TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'} />
+                  </div>
+                  <span style={{ fontWeight: 600, color: TYPE_CARD_COLORS[form.type]?.text || 'var(--text-color)', flex: 1 }}>{form.type}</span>
+                  <span style={{ fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: 0.6 }}>LOCKED</span>
+                </div>
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Legal Authority</div>
+                <HierarchyTag hierarchy={hierarchy} onOpen={() => setDrawerType('hierarchy')} isRef={true} legalAuthorities={legalAuthorities} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Relationships</div>
+                <button type="button" onClick={() => setDrawerType('relationship')}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: relations.length > 0 ? 'var(--primary)' : 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                  <GitBranch size={13} />
+                  {relations.length > 0 ? `${relations.length} Relationship${relations.length !== 1 ? 's' : ''} Added` : 'Add Relationship'}
+                  <ChevronRight size={12} />
+                </button>
+              </div>
+            </>)}
+
+            {/* ── Policy ── */}
+            {form.type === 'Policy' && (<>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Policy Number / ID <span style={{ color: '#ef4444' }}>*</span></div>
+                <input value={typeFields.policyNumber || ''} onChange={e => setTypeFields(f => ({ ...f, policyNumber: e.target.value }))}
+                  placeholder="e.g. HRY-POL-2023-04" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Issue Date <span style={{ color: '#ef4444' }}>*</span></div>
+                <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
+                  style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Effective From</div>
+                <input type="date" value={typeFields.effectiveFrom || ''} onChange={e => setTypeFields(f => ({ ...f, effectiveFrom: e.target.value }))}
+                  style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Sector / Domain</div>
+                <input value={typeFields.sector || ''} onChange={e => setTypeFields(f => ({ ...f, sector: e.target.value }))}
+                  placeholder="e.g. Agriculture, Urban Development" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Implementing Agency</div>
+                <input value={typeFields.implementingAgency || ''} onChange={e => setTypeFields(f => ({ ...f, implementingAgency: e.target.value }))}
+                  placeholder="e.g. HSIIDC, HUDA, All Departments" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Next Review Date</div>
+                <input type="date" value={typeFields.reviewDate || ''} onChange={e => setTypeFields(f => ({ ...f, reviewDate: e.target.value }))}
+                  style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Department</div>
+                <div style={{ ...INPUT_BASE, color: 'var(--text-color)', opacity: 0.8, userSelect: 'none', display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0, opacity: 0.7 }} />
+                  {user?.dept || form.dept || '—'}
+                </div>
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Document Type</div>
+                <div style={{ ...INPUT_BASE, display: 'flex', alignItems: 'center', gap: 8, userSelect: 'none', cursor: 'default' }}>
+                  <div style={{ width: 22, height: 22, borderRadius: 6, background: TYPE_CARD_COLORS[form.type]?.bg || 'rgba(148,163,184,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <FileText size={11} color={TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'} />
+                  </div>
+                  <span style={{ fontWeight: 600, color: TYPE_CARD_COLORS[form.type]?.text || 'var(--text-color)', flex: 1 }}>{form.type}</span>
+                  <span style={{ fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: 0.6 }}>LOCKED</span>
+                </div>
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Legal Authority</div>
+                <HierarchyTag hierarchy={hierarchy} onOpen={() => setDrawerType('hierarchy')} isRef={true} legalAuthorities={legalAuthorities} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Relationships</div>
+                <button type="button" onClick={() => setDrawerType('relationship')}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: relations.length > 0 ? 'var(--primary)' : 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                  <GitBranch size={13} />
+                  {relations.length > 0 ? `${relations.length} Relationship${relations.length !== 1 ? 's' : ''} Added` : 'Add Relationship'}
+                  <ChevronRight size={12} />
+                </button>
+              </div>
+            </>)}
+
+            {/* ── Rules & Regulations ── */}
+            {form.type === 'Rules & Regulations' && (<>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Rule Number <span style={{ color: '#ef4444' }}>*</span></div>
+                <input value={typeFields.ruleNumber || ''} onChange={e => setTypeFields(f => ({ ...f, ruleNumber: e.target.value }))}
+                  placeholder="e.g. Rule No. 5 of 2021" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Issue Date <span style={{ color: '#ef4444' }}>*</span></div>
+                <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
+                  style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Effective From</div>
+                <input type="date" value={typeFields.effectiveFrom || ''} onChange={e => setTypeFields(f => ({ ...f, effectiveFrom: e.target.value }))}
+                  style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Gazette Reference</div>
+                <input value={typeFields.gazetteRef || ''} onChange={e => setTypeFields(f => ({ ...f, gazetteRef: e.target.value }))}
+                  placeholder="e.g. Haryana Gazette Extra., Part I, No. 12, 21 Jan 2021" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Rule Making Authority</div>
+                <input value={typeFields.ruleAuthority || ''} onChange={e => setTypeFields(f => ({ ...f, ruleAuthority: e.target.value }))}
+                  placeholder="e.g. Governor of Haryana" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Department</div>
+                <div style={{ ...INPUT_BASE, color: 'var(--text-color)', opacity: 0.8, userSelect: 'none', display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0, opacity: 0.7 }} />
+                  {user?.dept || form.dept || '—'}
+                </div>
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Document Type</div>
+                <div style={{ ...INPUT_BASE, display: 'flex', alignItems: 'center', gap: 8, userSelect: 'none', cursor: 'default' }}>
+                  <div style={{ width: 22, height: 22, borderRadius: 6, background: TYPE_CARD_COLORS[form.type]?.bg || 'rgba(148,163,184,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <FileText size={11} color={TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'} />
+                  </div>
+                  <span style={{ fontWeight: 600, color: TYPE_CARD_COLORS[form.type]?.text || 'var(--text-color)', flex: 1 }}>{form.type}</span>
+                  <span style={{ fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: 0.6 }}>LOCKED</span>
+                </div>
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Act Reference</div>
+                <HierarchyTag hierarchy={hierarchy} onOpen={() => { setDrawerHierarchy({ ...hierarchy }); setDrawerType('hierarchy'); }} isRef={true} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Relationships</div>
+                <button type="button" onClick={() => setDrawerType('relationship')}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: relations.length > 0 ? 'var(--primary)' : 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                  <GitBranch size={13} />
+                  {relations.length > 0 ? `${relations.length} Relationship${relations.length !== 1 ? 's' : ''} Added` : 'Add Relationship'}
+                  <ChevronRight size={12} />
+                </button>
+              </div>
+            </>)}
+
+            {/* ── All other non-Act, non-Amendment, non-Circular, non-Notification types ── */}
+            {!['Act', 'Amendment', 'Circular', 'Notification', 'Order / Gazette', 'Policy', 'Rules & Regulations'].includes(form.type) && (<>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Issue Date <span style={{ color: '#ef4444' }}>*</span></div>
+                <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
+                  style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Document Type</div>
+                <div style={{ ...INPUT_BASE, display: 'flex', alignItems: 'center', gap: 8, userSelect: 'none', cursor: 'default' }}>
+                  <div style={{ width: 22, height: 22, borderRadius: 6, background: TYPE_CARD_COLORS[form.type]?.bg || 'rgba(148,163,184,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <FileText size={11} color={TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'} />
+                  </div>
+                  <span style={{ fontWeight: 600, color: TYPE_CARD_COLORS[form.type]?.text || 'var(--text-color)', flex: 1 }}>{form.type || '—'}</span>
+                  <span style={{ fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: 0.6 }}>LOCKED</span>
+                </div>
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Department</div>
+                <div style={{ ...INPUT_BASE, color: 'var(--text-color)', opacity: 0.8, userSelect: 'none', display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0, opacity: 0.7 }} />
+                  {user?.dept || form.dept || '—'}
+                </div>
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{['Circular', 'Notification', 'Policy', 'Order / Gazette'].includes(form.type) ? 'Act Reference' : 'Hierarchical Tags'}</div>
+                <HierarchyTag hierarchy={hierarchy} onOpen={() => { setDrawerHierarchy({ ...hierarchy }); setDrawerType('hierarchy'); }} isRef={['Circular', 'Notification', 'Policy', 'Order / Gazette'].includes(form.type)} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Relationships</div>
+                <button type="button" onClick={() => setDrawerType('relationship')}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: relations.length > 0 ? 'var(--primary)' : 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                  <GitBranch size={13} />
+                  {relations.length > 0 ? `${relations.length} Relationship${relations.length !== 1 ? 's' : ''} Added` : 'Add Relationship'}
+                  <ChevronRight size={12} />
+                </button>
+              </div>
+              {TYPE_FIELDS[form.type]?.map(field => (
+                <div key={field.key} style={{ gridColumn: field.fullWidth ? '1 / -1' : 'auto' }}>
+                  <div style={{ ...LABEL, marginBottom: 6 }}>{field.label}{field.required && <span style={{ color: '#ef4444' }}> *</span>}</div>
+                  <input type={field.inputType || 'text'} value={typeFields[field.key] || ''}
+                    onChange={e => setTypeFields(f => ({ ...f, [field.key]: e.target.value }))}
+                    placeholder={field.placeholder || ''} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                </div>
+              ))}
+            </>)}
+
+            {/* Always: Description */}
             <div style={{ gridColumn: '1 / -1' }}>
-              <div style={{ ...LABEL, marginBottom: 7 }}>Description / Remarks</div>
-              <textarea value={form.desc} onChange={e => fmt('desc', e.target.value)} rows={3}
+              <div style={{ ...LABEL, marginBottom: 6 }}>Description / Remarks</div>
+              <textarea value={form.desc} onChange={e => fmt('desc', e.target.value)} rows={2}
                 placeholder="Brief description or upload remarks…"
                 style={{ ...INPUT_BASE, resize: 'vertical', lineHeight: 1.6 }}
                 onFocus={focusStyle} onBlur={blurStyle} />
             </div>
           </div>
 
-          {/* ── Amendment info — simplified, conditional on type = Amendment ── */}
-          {form.type === 'Amendment' && (
-            <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--surface-border)' }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Edit3 size={13} color="var(--primary)" />
-                Amendment Details
-              </div>
-              <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginBottom: 16 }}>
-                AI will compare both documents and extract exact changes — you only need to specify the parent act and what kind of changes are present.
-              </div>
-
-              {/* Parent Act selector */}
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ ...LABEL, marginBottom: 7 }}>Parent Act being amended <span style={{ color: '#ef4444' }}>*</span></div>
-                <div style={{ position: 'relative' }}>
-                  <input
-                    value={form.parentAct ? (documents.find(d => d.uid === form.parentAct)?.title || form.parentAct) : relSearch}
-                    onChange={e => { setRelSearch(e.target.value); fmt('parentAct', ''); setShowRelDrop(true); }}
-                    onFocus={() => setShowRelDrop(true)}
-                    onBlur={() => setTimeout(() => setShowRelDrop(false), 150)}
-                    placeholder="Search the act this amendment modifies…"
-                    style={{ ...INPUT_BASE, paddingRight: form.parentAct ? 36 : 14 }}
-                    onFocus={focusStyle} onBlur={blurStyle}
-                  />
-                  {form.parentAct && (
-                    <button type="button" onClick={() => { fmt('parentAct', ''); setRelSearch(''); }}
-                      style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex' }}>
-                      <X size={13} />
-                    </button>
-                  )}
-                  {showRelDrop && !form.parentAct && relFiltered.length > 0 && (
-                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,.12)', zIndex: 50, marginTop: 4, maxHeight: 200, overflowY: 'auto' }}>
-                      {relFiltered.map(d => (
-                        <div key={d.uid} onMouseDown={() => { fmt('parentAct', d.uid); setRelSearch(''); setShowRelDrop(false); }}
-                          style={{ padding: '9px 14px', cursor: 'pointer', borderBottom: '1px solid var(--surface-border)', fontSize: 12.5, transition: 'background .15s' }}
-                          onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
-                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                          <div style={{ fontWeight: 600, color: 'var(--text-heading)' }}>{d.title}</div>
-                          <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', marginTop: 2 }}>{d.year} · {d.dept}</div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                {form.parentAct && (
-                  <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', borderRadius: 8, background: 'rgba(26,86,219,.05)', border: '1px solid rgba(26,86,219,.15)' }}>
-                    <GitBranch size={12} color="var(--primary)" />
-                    <span style={{ fontSize: 12, color: 'var(--text-color-secondary)' }}>Amends →</span>
-                    <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-heading)' }}>{documents.find(d => d.uid === form.parentAct)?.title}</span>
-                    <span style={{ fontSize: 11, color: 'var(--primary)', fontFamily: 'var(--mono)', background: 'var(--primary-light)', padding: '1px 8px', borderRadius: 20, marginLeft: 'auto' }}>AI will compare</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Change types — multi-select chips */}
-              <div>
-                <div style={{ ...LABEL, marginBottom: 8 }}>Types of changes present in this amendment <span style={{ color: 'var(--text-color-secondary)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(tick all that apply)</span></div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {AMEND_CHANGE_TYPES.map(ct => {
-                    const active = form.changeTypes.includes(ct);
-                    const c = AMEND_CHANGE_COLORS[ct] || '#94a3b8';
-                    return (
-                      <button key={ct} type="button"
-                        onClick={() => fmt('changeTypes', active ? form.changeTypes.filter(x => x !== ct) : [...form.changeTypes, ct])}
-                        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 16px', borderRadius: 20, border: `1.5px solid ${active ? c : 'var(--surface-border)'}`, background: active ? c + '15' : 'transparent', color: active ? c : 'var(--text-color-secondary)', fontFamily: 'var(--font)', fontSize: 12.5, fontWeight: active ? 700 : 400, cursor: 'pointer', transition: 'all .15s' }}>
-                        {active && <span style={{ fontSize: 11 }}>✓</span>}
-                        {ct}
-                      </button>
-                    );
-                  })}
-                </div>
-                {form.changeTypes.length > 0 && (
-                  <div style={{ marginTop: 10, fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
-                    AI will identify exact sections and extract before/after text for: <strong style={{ color: 'var(--text-color)' }}>{form.changeTypes.join(', ')}</strong> changes
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Manual relationship override */}
-          <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid var(--surface-border)' }}>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <GitBranch size={13} color="var(--primary)" />
-              Manual Relationship Override
-              <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-color-secondary)' }}>— optional, AI will auto-detect on upload</span>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr 38px', gap: 10, alignItems: 'start' }}>
-              <select value={relType} onChange={e => setRelType(e.target.value)}
-                style={{ ...INPUT_BASE, cursor: 'pointer', appearance: 'none', backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E\")", backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center', padding: '10px 28px 10px 12px' }}>
-                {REL_TYPES.map(r => <option key={r}>{r}</option>)}
-              </select>
-              <div style={{ position: 'relative' }}>
-                <input
-                  value={relSearch || (documents.find(d => d.uid === relTarget)?.title || '')}
-                  onChange={e => { setRelSearch(e.target.value); setRelTarget(''); setShowRelDrop(true); }}
-                  onFocus={() => setShowRelDrop(true)}
-                  onBlur={() => setTimeout(() => setShowRelDrop(false), 150)}
-                  placeholder="Search existing document to link…"
-                  style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle}
-                />
-                {showRelDrop && relFiltered.length > 0 && (
-                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,.12)', zIndex: 50, marginTop: 4, maxHeight: 200, overflowY: 'auto' }}>
-                    {relFiltered.map(d => (
-                      <div key={d.uid} onMouseDown={() => { setRelTarget(d.uid); setRelSearch(''); setShowRelDrop(false); }}
-                        style={{ padding: '9px 14px', cursor: 'pointer', borderBottom: '1px solid var(--surface-border)', fontSize: 12.5, transition: 'background .15s' }}
-                        onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
-                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                        <div style={{ fontWeight: 600, color: 'var(--text-heading)' }}>{d.title}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', marginTop: 2 }}>{d.year} · {d.dept}</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <button type="button" onClick={addRelation} disabled={!relTarget}
-                style={{ height: 42, width: 38, borderRadius: 8, border: 'none', background: relTarget ? 'var(--primary)' : 'var(--surface-200)', color: relTarget ? 'white' : '#94a3b8', cursor: relTarget ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Plus size={16} />
-              </button>
-            </div>
-            {relations.length > 0 && (
-              <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 7 }}>
-                {relations.map((r, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 12px', borderRadius: 8, background: 'rgba(26,86,219,.05)', border: '1px solid rgba(26,86,219,.15)' }}>
-                    <GitBranch size={12} color="var(--primary)" />
-                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary)', fontFamily: 'var(--mono)' }}>{r.label}</span>
-                    <span style={{ fontSize: 12.5, color: 'var(--text-heading)', flex: 1 }}>→ {r.targetTitle}</span>
-                    <button type="button" onClick={() => removeRelation(i)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)' }}><X size={12} /></button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {uploadError && uploadStep === 'error' && (
-            <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 8, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', display: 'flex', alignItems: 'center', gap: 8 }}>
-              <AlertCircle size={14} color="#ef4444" style={{ flexShrink: 0 }} />
-              <span style={{ fontSize: 12.5, color: '#dc2626', flex: 1 }}>{uploadError}</span>
-              <button type="button" onClick={() => { setUploadError(''); setUploadStep('ready'); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444' }}><X size={12} /></button>
-            </div>
-          )}
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--surface-border)' }}>
-            <button type="button" onClick={() => { setForm({ act:'',dept:'',type:'',version:'1.0',desc:'',gazette:'',authority:'',enactmentDate:'',parentAct:'',changeTypes:[] }); setFiles([]); setFileRefs([]); setRelations([]); setAnalysisResults([]); setHierarchy({ act:'',chapter:'',section:'',subsection:'' }); setCrossDeptNotifs([]); setAmendmentProvisions([]); setUploadStep(null); setUploadError(''); }}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--surface-border)' }}>
+            <button type="button"
+              onClick={() => { setForm({ act:'',dept:user?.dept||'',type:'',version:'1.0',desc:'',enactmentDate:'',parentAct:'',changeTypes:[] }); setFiles([]); setFileRefs([]); setRelations([]); setAnalysisResults([]); setHierarchy({ act:'',chapter:'',section:'',subsection:'' }); setCrossDeptNotifs([]); setAmendmentProvisions([]); setParentActSearch(''); setRelNote(''); setTypeFields({}); setUploadStep(null); setUploadError(''); }}
               style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)', padding: '9px 22px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
               onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
               onMouseLeave={e => e.currentTarget.style.background = 'var(--surface-card)'}>
               Clear All
             </button>
             <button type="submit"
-              disabled={fileRefs.length === 0 || uploadStep === 'saving' || uploadStep === 'done'}
+              disabled={files.length === 0 || uploadStep === 'uploading' || uploadStep === 'saving' || uploadStep === 'done'}
               style={{
-                background: uploadStep === 'done' ? '#16a34a' : fileRefs.length > 0 && uploadStep !== 'saving' ? 'var(--primary)' : 'var(--surface-200)',
-                color: fileRefs.length > 0 || uploadStep === 'done' ? 'white' : '#94a3b8',
+                background: uploadStep === 'done' ? '#16a34a' : files.length > 0 && !uploadStep ? 'var(--primary)' : uploadStep === 'error' ? 'var(--primary)' : 'var(--surface-200)',
+                color: uploadStep === 'done' || (files.length > 0 && (!uploadStep || uploadStep === 'error')) ? 'white' : '#94a3b8',
                 border: 'none', padding: '10px 28px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700,
-                cursor: fileRefs.length > 0 && uploadStep === 'ready' ? 'pointer' : 'not-allowed',
+                cursor: files.length > 0 && !uploadStep ? 'pointer' : 'not-allowed',
                 display: 'flex', alignItems: 'center', gap: 8,
-                boxShadow: fileRefs.length > 0 && uploadStep === 'ready' ? '0 2px 8px rgba(26,86,219,.2)' : 'none',
+                boxShadow: files.length > 0 && !uploadStep ? '0 2px 8px rgba(26,86,219,.2)' : 'none',
                 transition: 'all .2s',
-              }}
-              onMouseEnter={e => { if (fileRefs.length > 0 && uploadStep === 'ready') e.currentTarget.style.background = 'var(--primary-dark)'; }}
-              onMouseLeave={e => { if (fileRefs.length > 0 && uploadStep === 'ready') e.currentTarget.style.background = 'var(--primary)'; }}>
-              {uploadStep === 'saving' && <><Clock size={14} /> Saving details…</>}
-              {uploadStep === 'done'   && <><CheckCircle size={14} /> Submitted!</>}
-              {(uploadStep === 'ready' || !uploadStep) && <><CheckCircle size={14} /> Submit for Approval</>}
+              }}>
+              {uploadStep === 'uploading' && <><Clock size={14} /> Uploading file…</>}
+              {uploadStep === 'saving'    && <><Clock size={14} /> Saving details…</>}
+              {uploadStep === 'done'      && <><CheckCircle size={14} /> Submitted!</>}
+              {(!uploadStep || uploadStep === 'ready' || uploadStep === 'error') && <><CheckCircle size={14} /> Submit for Approval</>}
             </button>
           </div>
         </form>
       </Card>}
+
+      {/* ── Drawer: Hierarchical Tags / Relationship ── */}
+      {drawerType && (
+        <>
+          {/* Blurred backdrop */}
+          <div
+            onClick={() => setDrawerType(null)}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.25)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', zIndex: 300, animation: 'drawerFadeIn .2s ease' }}
+          />
+
+          {/* Slide-in panel */}
+          <div style={{
+            position: 'fixed', right: 0, top: 0, height: '100vh', width: 420,
+            background: 'var(--surface-card)',
+            boxShadow: '-4px 0 40px rgba(0,0,0,.18)',
+            zIndex: 301,
+            display: 'flex', flexDirection: 'column',
+            animation: 'drawerSlideIn .28s cubic-bezier(.22,1,.36,1)',
+          }}>
+
+            {/* Drawer header */}
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 34, height: 34, borderRadius: 9, background: 'var(--primary-light)', border: '1px solid var(--primary-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                {drawerType === 'hierarchy' ? <Layers size={16} color="var(--primary)" /> : <GitBranch size={16} color="var(--primary)" />}
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)' }}>
+                  {drawerType === 'hierarchy'
+  ? (['Circular', 'Notification', 'Order / Gazette'].includes(form.type) ? 'Legal Authority' : ['Policy'].includes(form.type) ? 'Act Reference' : 'Hierarchical Tags')
+  : 'Add Relationship'}
+                </div>
+                <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 1 }}>
+                  {drawerType === 'hierarchy' ? 'Tag this document within the act/chapter/section hierarchy' : (form.type === 'Amendment' ? 'Set parent act details and link related documents' : 'Link this document to an existing document')}
+                </div>
+              </div>
+              <button onClick={() => setDrawerType(null)}
+                style={{ width: 30, height: 30, borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-color-secondary)', flexShrink: 0 }}>
+                <X size={14} />
+              </button>
+            </div>
+
+            {/* Drawer body */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
+
+              {/* ── Hierarchy form ── */}
+              {drawerType === 'hierarchy' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {/* Act Name / Parent Act Name — hidden for Circular/Notification/Order/Policy (captured inside dynamic list) */}
+                  {!['Circular', 'Notification', 'Order / Gazette', 'Policy'].includes(form.type) && (
+                    <div>
+                      <div style={{ ...LABEL, marginBottom: 6 }}>
+                        {form.type === 'Amendment' ? 'Parent Act Name' : 'Act Name'}
+                      </div>
+                      <input value={drawerHierarchy.act}
+                        onChange={e => setDrawerHierarchy(v => ({ ...v, act: e.target.value }))}
+                        placeholder="e.g. Haryana Municipal Act 1973" style={{ ...INPUT_BASE, width: '100%' }}
+                        onFocus={focusStyle} onBlur={blurStyle} />
+                    </div>
+                  )}
+
+                  {/* Circular / Notification / Order / Policy: dynamic multiple legal authorities */}
+                  {['Circular', 'Notification', 'Order / Gazette', 'Policy'].includes(form.type) && (<>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ ...LABEL }}>Legal Authorities</span>
+                      <button type="button"
+                        onClick={() => setLegalAuthorities(p => [...p, { act: '', section: '' }])}
+                        style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: 'var(--primary)', background: 'var(--primary-light)', border: '1px solid var(--primary-border)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                        <Plus size={12} /> Add Another
+                      </button>
+                    </div>
+                    {legalAuthorities.map((auth, i) => (
+                      <div key={i} style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>AUTHORITY {i + 1}</span>
+                          {legalAuthorities.length > 1 && (
+                            <button type="button" onClick={() => setLegalAuthorities(p => p.filter((_, idx) => idx !== i))}
+                              style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)' }}>
+                              <X size={13} />
+                            </button>
+                          )}
+                        </div>
+                        <div>
+                          <div style={{ ...LABEL, marginBottom: 5 }}>Act / Rule Name</div>
+                          <input value={auth.act}
+                            onChange={e => setLegalAuthorities(p => p.map((r, idx) => idx === i ? { ...r, act: e.target.value } : r))}
+                            placeholder="e.g. Haryana GST Act, 2017" style={{ ...INPUT_BASE, fontSize: 12 }}
+                            onFocus={focusStyle} onBlur={blurStyle} />
+                        </div>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                            <div style={{ ...LABEL }}>Sections / Provisions</div>
+                            <button type="button"
+                              onClick={() => setLegalAuthorities(p => p.map((r, idx) => idx === i ? { ...r, sections: [...(r.sections || ['']), ''] } : r))}
+                              style={{ fontSize: 11, fontWeight: 600, color: 'var(--primary)', background: 'var(--primary-light)', border: '1px solid var(--primary-border)', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <Plus size={10} /> Add Section
+                            </button>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            {(auth.sections || ['']).map((sec, si) => (
+                              <div key={si} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                <input value={sec}
+                                  onChange={e => setLegalAuthorities(p => p.map((r, idx) => idx === i ? { ...r, sections: (r.sections || ['']).map((s, sIdx) => sIdx === si ? e.target.value : s) } : r))}
+                                  placeholder={`e.g. Section ${si === 0 ? '4' : '17'}`} style={{ ...INPUT_BASE, fontSize: 12, flex: 1 }}
+                                  onFocus={focusStyle} onBlur={blurStyle} />
+                                {(auth.sections || ['']).length > 1 && (
+                                  <button type="button"
+                                    onClick={() => setLegalAuthorities(p => p.map((r, idx) => idx === i ? { ...r, sections: (r.sections || ['']).filter((_, sIdx) => sIdx !== si) } : r))}
+                                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', flexShrink: 0 }}>
+                                    <X size={12} />
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </>)}
+
+
+                  {/* Rules & Regulations: full Chapter/Section/Sub-section */}
+                  {!['Circular', 'Notification', 'Policy', 'Order / Gazette', 'Amendment'].includes(form.type) && [
+                    { label: 'Chapter', key: 'chapter', ph: 'e.g. Chapter III — Taxation' },
+                    { label: 'Section', key: 'section', ph: 'e.g. Section 45 — Property Tax' },
+                    { label: 'Sub-section', key: 'subsection', ph: 'e.g. (2)(a)' },
+                  ].map(({ label, key, ph }) => (
+                    <div key={key}>
+                      <div style={{ ...LABEL, marginBottom: 6 }}>{label}</div>
+                      <input value={drawerHierarchy[key]}
+                        onChange={e => setDrawerHierarchy(v => ({ ...v, [key]: e.target.value }))}
+                        placeholder={ph} style={{ ...INPUT_BASE, width: '100%' }}
+                        onFocus={focusStyle} onBlur={blurStyle} />
+                    </div>
+                  ))}
+
+                  {/* Amendment: dynamic change entries */}
+                  {form.type === 'Amendment' && (
+                    <>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 4, borderTop: '1px solid var(--surface-border)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <Edit3 size={12} color="var(--primary)" />
+                          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-heading)' }}>Changes Made</span>
+                        </div>
+                        <button type="button"
+                          onClick={() => setAmendChanges(p => [...p, { chapter: '', section: '', subsection: '', changeType: 'Amended', description: '' }])}
+                          style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: 'var(--primary)', background: 'var(--primary-light)', border: '1px solid var(--primary-border)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                          <Plus size={12} /> Add Change
+                        </button>
+                      </div>
+
+                      {amendChanges.map((ch, i) => (
+                        <div key={i} style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>CHANGE {i + 1}</span>
+                            {amendChanges.length > 1 && (
+                              <button type="button" onClick={() => setAmendChanges(p => p.filter((_, idx) => idx !== i))}
+                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)' }}>
+                                <X size={13} />
+                              </button>
+                            )}
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                            {[
+                              { key: 'chapter', ph: 'Chapter III' },
+                              { key: 'section', ph: 'Section 45' },
+                              { key: 'subsection', ph: '(2)(a)' },
+                            ].map(({ key, ph }) => (
+                              <input key={key} value={ch[key]}
+                                onChange={e => setAmendChanges(p => p.map((r, idx) => idx === i ? { ...r, [key]: e.target.value } : r))}
+                                placeholder={ph} style={{ ...INPUT_BASE, fontSize: 12 }}
+                                onFocus={focusStyle} onBlur={blurStyle} />
+                            ))}
+                          </div>
+                          <SelectField value={ch.changeType}
+                            onChange={e => setAmendChanges(p => p.map((r, idx) => idx === i ? { ...r, changeType: e.target.value } : r))}>
+                            {AMEND_CHANGE_TYPES.map(o => <option key={o}>{o}</option>)}
+                          </SelectField>
+                          <textarea value={ch.description}
+                            onChange={e => setAmendChanges(p => p.map((r, idx) => idx === i ? { ...r, description: e.target.value } : r))}
+                            rows={2} placeholder="Describe what specifically changed here…"
+                            style={{ ...INPUT_BASE, resize: 'vertical', lineHeight: 1.6, fontSize: 12 }}
+                            onFocus={focusStyle} onBlur={blurStyle} />
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* ── Relationship form ── */}
+              {drawerType === 'relationship' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+                  {/* Other Relationships — hidden for Amendment */}
+                  {form.type !== 'Amendment' && (<>
+                    <div>
+                      <div style={{ ...LABEL, marginBottom: 6 }}>Relationship Type</div>
+                      <SelectField value={relType} onChange={e => setRelType(e.target.value)}>
+                        {(REL_TYPES_BY_DOCTYPE[form.type] || REL_TYPES).map(r => <option key={r}>{r}</option>)}
+                      </SelectField>
+                    </div>
+                    <div>
+                      <div style={{ ...LABEL, marginBottom: 6 }}>Target Document Type</div>
+                      <SelectField value={relDocType} onChange={e => { setRelDocType(e.target.value); setRelTarget(''); setRelSearch(''); }} placeholder="Select Type">
+                        {(REL_TARGET_TYPES[form.type] || Object.keys(TYPE_CARD_COLORS)).map(t => <option key={t}>{t}</option>)}
+                      </SelectField>
+                    </div>
+                    <div>
+                      <div style={{ ...LABEL, marginBottom: 6 }}>Link to Document</div>
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          value={relSearch || (documents.find(d => d.uid === relTarget)?.title || '')}
+                          onChange={e => { setRelSearch(e.target.value); setRelTarget(''); setShowRelDrop(true); }}
+                          onFocus={() => setShowRelDrop(true)}
+                          onBlur={() => setTimeout(() => setShowRelDrop(false), 150)}
+                          placeholder="Search existing document to link…"
+                          style={{ ...INPUT_BASE, width: '100%' }} onFocus={focusStyle} onBlur={blurStyle}
+                        />
+                        {showRelDrop && relSearch.trim() && (
+                          <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,.15)', zIndex: 50, marginTop: 4, maxHeight: 220, overflowY: 'auto' }}>
+                            {relFiltered.length > 0 ? relFiltered.map(d => (
+                              <div key={d.uid} onMouseDown={() => { setRelTarget(d.uid); setRelSearch(''); setShowRelDrop(false); }}
+                                style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid var(--surface-border)', fontSize: 12.5, transition: 'background .15s' }}
+                                onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                <div style={{ fontWeight: 600, color: 'var(--text-heading)' }}>{d.title}</div>
+                                <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', marginTop: 2 }}>{d.year} · {d.dept}</div>
+                              </div>
+                            )) : (
+                              <div
+                                onMouseDown={() => { setRelTarget('__pending__:' + relSearch.trim()); setShowRelDrop(false); }}
+                                style={{ padding: '10px 14px', cursor: 'pointer', fontSize: 12.5 }}
+                                onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  <span style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', background: 'rgba(245,158,11,.1)', border: '1px solid rgba(245,158,11,.3)', borderRadius: 20, padding: '1px 8px', fontFamily: 'var(--mono)' }}>PENDING</span>
+                                  <span style={{ fontWeight: 600, color: 'var(--text-heading)' }}>"{relSearch.trim()}"</span>
+                                </div>
+                                <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 3 }}>Document not in system yet — save as pending, will auto-link when uploaded</div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ ...LABEL, marginBottom: 6 }}>How are these related? <span style={{ color: 'var(--text-color-secondary)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span></div>
+                      <textarea
+                        value={relNote}
+                        onChange={e => setRelNote(e.target.value)}
+                        rows={3}
+                        placeholder="e.g. Section 45 of this Act is referenced in Chapter III of the linked document for determining tax liability…"
+                        style={{ ...INPUT_BASE, resize: 'vertical', lineHeight: 1.6, fontSize: 12.5 }}
+                        onFocus={focusStyle} onBlur={blurStyle}
+                      />
+                    </div>
+                    <button type="button" onClick={addRelation} disabled={!relTarget}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '9px', borderRadius: 8, border: 'none', background: relTarget ? (relTarget.startsWith('__pending__:') ? '#f59e0b' : 'var(--primary)') : 'var(--surface-200)', color: relTarget ? 'white' : '#94a3b8', cursor: relTarget ? 'pointer' : 'not-allowed', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700, width: '100%' }}>
+                      <Plus size={14} /> Add Relationship
+                    </button>
+                  </>)}
+
+                  {relations.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      <div style={{ ...LABEL }}>Added Relationships</div>
+                      {relations.map((r, i) => (
+                        <div key={i} style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(26,86,219,.05)', border: '1px solid rgba(26,86,219,.15)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <GitBranch size={12} color="var(--primary)" style={{ flexShrink: 0 }} />
+                            <span style={{ fontSize: 12, fontWeight: 700, color: r.isPending ? '#f59e0b' : 'var(--primary)', fontFamily: 'var(--mono)' }}>{r.label}</span>
+                            {r.targetType && <span style={{ fontSize: 10.5, fontWeight: 600, color: TYPE_CARD_COLORS[r.targetType]?.text || 'var(--text-color-secondary)', background: TYPE_CARD_COLORS[r.targetType]?.bg || 'rgba(148,163,184,.1)', padding: '1px 7px', borderRadius: 20, flexShrink: 0 }}>{r.targetType}</span>}
+                            {r.isPending && <span style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', background: 'rgba(245,158,11,.1)', border: '1px solid rgba(245,158,11,.3)', borderRadius: 20, padding: '1px 8px', fontFamily: 'var(--mono)', flexShrink: 0 }}>PENDING</span>}
+                            <span style={{ fontSize: 12.5, color: 'var(--text-heading)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>→ {r.targetTitle}</span>
+                            <button type="button" onClick={() => removeRelation(i)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', flexShrink: 0 }}><X size={12} /></button>
+                          </div>
+                          {r.note && (
+                            <div style={{ marginTop: 7, fontSize: 12, color: 'var(--text-color-secondary)', lineHeight: 1.5, paddingLeft: 20, borderLeft: '2px solid rgba(26,86,219,.2)', fontStyle: 'italic' }}>
+                              {r.note}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Drawer footer */}
+            <div style={{ padding: '16px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button type="button" onClick={() => setDrawerType(null)}
+                style={{ padding: '9px 20px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                Cancel
+              </button>
+              <button type="button"
+                onClick={() => {
+                  if (drawerType === 'hierarchy') setHierarchy({ ...drawerHierarchy });
+                  setDrawerType(null);
+                  if (drawerType === 'relationship') { setRelTarget(''); setRelSearch(''); }
+                }}
+                style={{ padding: '9px 24px', borderRadius: 8, border: 'none', background: 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                {drawerType === 'hierarchy' ? 'Save Tags' : 'Done'}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

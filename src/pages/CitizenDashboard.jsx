@@ -437,18 +437,29 @@ export default function CitizenDashboard({ activePage, onAuditLog }) {
             ['Type',          type,        setType,        TYPES],
             ['Legal Status',  legalStatus, setLegalStatus, STATUSES],
           ].map(([lbl, val, setter, opts]) => (
-            <select key={lbl} value={val} onChange={e => setter(e.target.value)}
-              style={{
-                background: val !== 'All' ? 'rgba(26,86,219,.08)' : 'var(--surface-card)',
-                border: `1px solid ${val !== 'All' ? 'rgba(26,86,219,.3)' : 'var(--surface-border)'}`,
-                color: val !== 'All' ? 'var(--primary)' : 'var(--text-color-secondary)',
-                borderRadius: 7, padding: '6px 28px 6px 11px', fontFamily: 'var(--font)', fontSize: 12.5, outline: 'none', cursor: 'pointer',
-                appearance: 'none',
-                backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E\")",
-                backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center',
-              }}>
-              {opts.map(o => <option key={o} value={o}>{o === 'All' ? `— ${lbl} —` : o}</option>)}
-            </select>
+            <div key={lbl} style={{ position: 'relative' }}>
+              <select value={val} onChange={e => setter(e.target.value)}
+                style={{
+                  background: val !== 'All'
+                    ? 'rgba(26,86,219,.12)'
+                    : 'rgba(255,255,255,0.65)',
+                  backdropFilter: 'blur(12px)',
+                  WebkitBackdropFilter: 'blur(12px)',
+                  border: `1.5px solid ${val !== 'All' ? 'rgba(26,86,219,.35)' : 'rgba(255,255,255,0.55)'}`,
+                  boxShadow: val !== 'All'
+                    ? '0 2px 10px rgba(26,86,219,0.12), inset 0 1px 0 rgba(255,255,255,0.6)'
+                    : '0 2px 10px rgba(26,86,219,0.06), inset 0 1px 0 rgba(255,255,255,0.8)',
+                  color: val !== 'All' ? 'var(--primary)' : 'var(--text-color-secondary)',
+                  borderRadius: 10, padding: '6px 30px 6px 11px', fontFamily: 'var(--font)', fontSize: 12.5, outline: 'none', cursor: 'pointer',
+                  appearance: 'none', fontWeight: val !== 'All' ? 600 : 400,
+                  transition: 'all .2s',
+                }}>
+                {opts.map(o => <option key={o} value={o}>{o === 'All' ? lbl : o}</option>)}
+              </select>
+              <div style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: val !== 'All' ? 'var(--primary)' : 'var(--text-color-secondary)', display: 'flex' }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+              </div>
+            </div>
           ))}
         </div>
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import api from '../services/api';
 
 const CITIZEN_PROFILE = { username: 'citizen', role: 'citizen', name: 'Guest Citizen', dept: '' };
@@ -35,6 +35,12 @@ export function useAuth() {
   const [user, setUser] = useState(restoreUserFromToken);
   const [error, setError]     = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const handler = () => setUser(null);
+    window.addEventListener('hlks:session-expired', handler);
+    return () => window.removeEventListener('hlks:session-expired', handler);
+  }, []);
 
   async function loginAsRole({ username, password, role }) {
     if (role === 'citizen') {
