@@ -122,3 +122,5 @@ The project is API-ready. To switch from mock data to a real backend:
    const api = axios.create({ baseURL: 'https://your-backend-url/api' });
    ```
 3. All API endpoints are already defined in `src/services/documents.js` and `src/services/analytics.js`.
+Username: dept.uploader
+Password: upload123

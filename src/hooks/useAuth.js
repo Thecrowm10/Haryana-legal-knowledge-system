@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
 
-const CITIZEN_PROFILE = { username: 'citizen', role: 'citizen', name: 'Guest Citizen', dept: '' };
+const CITIZEN_PROFILE  = { username: 'citizen',       role: 'citizen',  name: 'Guest Citizen',      dept: '' };
+const DEV_UPLOADER     = { username: 'dept.uploader', role: 'uploader', name: 'Dev Uploader (Mock)', dept: 'Urban Local Bodies' };
 
 function decodeJwt(token) {
   try {
@@ -45,6 +46,12 @@ export function useAuth() {
   async function loginAsRole({ username, password, role }) {
     if (role === 'citizen') {
       setUser(CITIZEN_PROFILE);
+      return;
+    }
+
+    // DEV BYPASS — SQL server nahi hai toh mock uploader use karo
+    if (username === 'dept.uploader' && password === 'upload123') {
+      setUser(DEV_UPLOADER);
       return;
     }
 

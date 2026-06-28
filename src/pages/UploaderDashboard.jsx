@@ -501,10 +501,20 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   const DEPTS = deptsData.length > 0 ? deptsData.map(d => d.name) : DEFAULT_DEPTS;
   const TYPES = typesData.length > 0 ? typesData.map(d => d.name) : DEFAULT_TYPES;
 
+  const [showTypeChanger, setShowTypeChanger] = useState(false);
+
   useEffect(() => {
+    if (!localStorage.getItem('token')) return;
     getDepartments().then(res => setDeptsData(res.data)).catch(() => {});
     getDocumentTypes().then(res => setTypesData(res.data)).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!showTypeChanger) return;
+    const close = () => setShowTypeChanger(false);
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, [showTypeChanger]);
 
   const [uploads, setUploads] = useState(
     documents.filter(d => d.uploader === 'Priya Sharma')
@@ -1373,15 +1383,26 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</div>
                     {form.type && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0, padding: '2px 10px 2px 7px', borderRadius: 20, background: TYPE_CARD_COLORS[form.type]?.bg || 'rgba(148,163,184,.1)', border: `1px solid ${TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'}30` }}>
-                        <FileText size={10} color={TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'} />
-                        <span style={{ fontSize: 11, fontWeight: 700, color: TYPE_CARD_COLORS[form.type]?.text || '#64748b', fontFamily: 'var(--mono)' }}>{form.type}</span>
-                        <button type="button"
-                          onClick={() => { fmt('type', ''); setTypeFields({}); setFiles([]); setFileRefs([]); setUploadStep(null); setUploadError(''); }}
-                          style={{ marginLeft: 3, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', padding: 0, lineHeight: 1 }}
-                          title="Change type">
-                          <X size={10} />
-                        </button>
+                      <div style={{ position: 'relative', flexShrink: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '2px 10px 2px 7px', borderRadius: 20, background: TYPE_CARD_COLORS[form.type]?.bg || 'rgba(148,163,184,.1)', border: `1px solid ${TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'}30`, cursor: 'pointer' }}
+                          onClick={e => { e.stopPropagation(); setShowTypeChanger(v => !v); }}>
+                          <FileText size={10} color={TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'} />
+                          <span style={{ fontSize: 11, fontWeight: 700, color: TYPE_CARD_COLORS[form.type]?.text || '#64748b', fontFamily: 'var(--mono)' }}>{form.type}</span>
+                          <ChevronRight size={10} color={TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'} style={{ transform: showTypeChanger ? 'rotate(90deg)' : 'none', transition: 'transform .15s' }} />
+                        </div>
+                        {showTypeChanger && (
+                          <div onClick={e => e.stopPropagation()} style={{ position: 'absolute', top: '110%', left: 0, zIndex: 100, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,.15)', minWidth: 180, overflow: 'hidden' }}>
+                            {Object.keys(TYPE_CARD_COLORS).map(t => (
+                              <button key={t} type="button"
+                                onClick={() => { fmt('type', t); setTypeFields({}); setShowTypeChanger(false); }}
+                                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px', background: t === form.type ? (TYPE_CARD_COLORS[t]?.bg || 'rgba(148,163,184,.1)') : 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 12.5, fontWeight: t === form.type ? 700 : 500, color: t === form.type ? (TYPE_CARD_COLORS[t]?.text || '#64748b') : 'var(--text-color)', textAlign: 'left' }}>
+                                <div style={{ width: 8, height: 8, borderRadius: '50%', background: TYPE_CARD_COLORS[t]?.accent || '#94a3b8', flexShrink: 0 }} />
+                                {t}
+                                {t === form.type && <CheckCircle size={11} color={TYPE_CARD_COLORS[t]?.accent} style={{ marginLeft: 'auto' }} />}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1529,16 +1550,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 </div>
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Document Type</div>
-                <div style={{ ...INPUT_BASE, display: 'flex', alignItems: 'center', gap: 8, userSelect: 'none', cursor: 'default' }}>
-                  <div style={{ width: 22, height: 22, borderRadius: 6, background: TYPE_CARD_COLORS[form.type]?.bg || 'rgba(148,163,184,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <FileText size={11} color={TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'} />
-                  </div>
-                  <span style={{ fontWeight: 600, color: TYPE_CARD_COLORS[form.type]?.text || 'var(--text-color)', flex: 1 }}>{form.type}</span>
-                  <span style={{ fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: 0.6 }}>LOCKED</span>
-                </div>
-              </div>
-              <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>Hierarchical Tags</div>
                 <HierarchyTag hierarchy={hierarchy} onOpen={() => { setDrawerHierarchy({ ...hierarchy }); setDrawerType('hierarchy'); }} isRef={false} />
               </div>
@@ -1566,16 +1577,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 <div style={{ ...INPUT_BASE, color: 'var(--text-color)', opacity: 0.8, userSelect: 'none', display: 'flex', alignItems: 'center', gap: 7 }}>
                   <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0, opacity: 0.7 }} />
                   {user?.dept || form.dept || '—'}
-                </div>
-              </div>
-              <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Document Type</div>
-                <div style={{ ...INPUT_BASE, display: 'flex', alignItems: 'center', gap: 8, userSelect: 'none', cursor: 'default' }}>
-                  <div style={{ width: 22, height: 22, borderRadius: 6, background: TYPE_CARD_COLORS[form.type]?.bg || 'rgba(148,163,184,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <FileText size={11} color={TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'} />
-                  </div>
-                  <span style={{ fontWeight: 600, color: TYPE_CARD_COLORS[form.type]?.text || 'var(--text-color)', flex: 1 }}>{form.type}</span>
-                  <span style={{ fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: 0.6 }}>LOCKED</span>
                 </div>
               </div>
               <div>
@@ -1623,16 +1624,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 </div>
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Document Type</div>
-                <div style={{ ...INPUT_BASE, display: 'flex', alignItems: 'center', gap: 8, userSelect: 'none', cursor: 'default' }}>
-                  <div style={{ width: 22, height: 22, borderRadius: 6, background: TYPE_CARD_COLORS[form.type]?.bg || 'rgba(148,163,184,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <FileText size={11} color={TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'} />
-                  </div>
-                  <span style={{ fontWeight: 600, color: TYPE_CARD_COLORS[form.type]?.text || 'var(--text-color)', flex: 1 }}>{form.type}</span>
-                  <span style={{ fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: 0.6 }}>LOCKED</span>
-                </div>
-              </div>
-              <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>Legal Authority</div>
                 <HierarchyTag hierarchy={hierarchy} onOpen={() => setDrawerType('hierarchy')} isRef={true} legalAuthorities={legalAuthorities} />
               </div>
@@ -1669,16 +1660,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 <div style={{ ...INPUT_BASE, color: 'var(--text-color)', opacity: 0.8, userSelect: 'none', display: 'flex', alignItems: 'center', gap: 7 }}>
                   <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0, opacity: 0.7 }} />
                   {user?.dept || form.dept || '—'}
-                </div>
-              </div>
-              <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Document Type</div>
-                <div style={{ ...INPUT_BASE, display: 'flex', alignItems: 'center', gap: 8, userSelect: 'none', cursor: 'default' }}>
-                  <div style={{ width: 22, height: 22, borderRadius: 6, background: TYPE_CARD_COLORS[form.type]?.bg || 'rgba(148,163,184,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <FileText size={11} color={TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'} />
-                  </div>
-                  <span style={{ fontWeight: 600, color: TYPE_CARD_COLORS[form.type]?.text || 'var(--text-color)', flex: 1 }}>{form.type}</span>
-                  <span style={{ fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: 0.6 }}>LOCKED</span>
                 </div>
               </div>
               <div>
@@ -1736,16 +1717,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 </div>
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Document Type</div>
-                <div style={{ ...INPUT_BASE, display: 'flex', alignItems: 'center', gap: 8, userSelect: 'none', cursor: 'default' }}>
-                  <div style={{ width: 22, height: 22, borderRadius: 6, background: TYPE_CARD_COLORS[form.type]?.bg || 'rgba(148,163,184,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <FileText size={11} color={TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'} />
-                  </div>
-                  <span style={{ fontWeight: 600, color: TYPE_CARD_COLORS[form.type]?.text || 'var(--text-color)', flex: 1 }}>{form.type}</span>
-                  <span style={{ fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: 0.6 }}>LOCKED</span>
-                </div>
-              </div>
-              <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>Legal Authority</div>
                 <HierarchyTag hierarchy={hierarchy} onOpen={() => setDrawerType('hierarchy')} isRef={true} legalAuthorities={legalAuthorities} />
               </div>
@@ -1795,16 +1766,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 </div>
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Document Type</div>
-                <div style={{ ...INPUT_BASE, display: 'flex', alignItems: 'center', gap: 8, userSelect: 'none', cursor: 'default' }}>
-                  <div style={{ width: 22, height: 22, borderRadius: 6, background: TYPE_CARD_COLORS[form.type]?.bg || 'rgba(148,163,184,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <FileText size={11} color={TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'} />
-                  </div>
-                  <span style={{ fontWeight: 600, color: TYPE_CARD_COLORS[form.type]?.text || 'var(--text-color)', flex: 1 }}>{form.type}</span>
-                  <span style={{ fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: 0.6 }}>LOCKED</span>
-                </div>
-              </div>
-              <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>Act Reference</div>
                 <HierarchyTag hierarchy={hierarchy} onOpen={() => { setDrawerHierarchy({ ...hierarchy }); setDrawerType('hierarchy'); }} isRef={true} />
               </div>
@@ -1825,16 +1786,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 <div style={{ ...LABEL, marginBottom: 6 }}>Issue Date <span style={{ color: '#ef4444' }}>*</span></div>
                 <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
                   style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
-              </div>
-              <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Document Type</div>
-                <div style={{ ...INPUT_BASE, display: 'flex', alignItems: 'center', gap: 8, userSelect: 'none', cursor: 'default' }}>
-                  <div style={{ width: 22, height: 22, borderRadius: 6, background: TYPE_CARD_COLORS[form.type]?.bg || 'rgba(148,163,184,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <FileText size={11} color={TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'} />
-                  </div>
-                  <span style={{ fontWeight: 600, color: TYPE_CARD_COLORS[form.type]?.text || 'var(--text-color)', flex: 1 }}>{form.type || '—'}</span>
-                  <span style={{ fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: 0.6 }}>LOCKED</span>
-                </div>
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>Department</div>
