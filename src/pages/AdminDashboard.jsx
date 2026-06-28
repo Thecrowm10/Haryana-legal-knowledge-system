@@ -2,6 +2,7 @@
 import { Users, ShieldCheck, Settings, Activity, ClipboardList, Trash2, Edit2, Plus, CheckCircle, XCircle, Building2, X, Eye, EyeOff } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
+import SelectField from '../components/ui/SelectField';
 import { getUsers, getRoles, updateUser, registerUser } from '../services/users';
 import { getDepartments, createDepartment } from '../services/departments';
 
@@ -396,25 +397,19 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
                     <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Role</label>
-                    <select style={{ ...INP_STYLE, cursor: 'pointer' }}
-                      value={addForm.role_id}
-                      onChange={e => setAddForm(f => ({ ...f, role_id: e.target.value }))}>
-                      <option value="">— Select Role —</option>
+                    <SelectField value={addForm.role_id} onChange={e => setAddForm(f => ({ ...f, role_id: e.target.value }))} placeholder="Select Role">
                       {roles.map(r => (
                         <option key={r.id} value={r.id}>{r.name.charAt(0).toUpperCase() + r.name.slice(1)}</option>
                       ))}
-                    </select>
+                    </SelectField>
                   </div>
                   <div>
                     <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Department</label>
-                    <select style={{ ...INP_STYLE, cursor: 'pointer' }}
-                      value={addForm.department_id}
-                      onChange={e => setAddForm(f => ({ ...f, department_id: e.target.value }))}>
-                      <option value="">— None —</option>
+                    <SelectField value={addForm.department_id} onChange={e => setAddForm(f => ({ ...f, department_id: e.target.value }))} placeholder="Select Department">
                       {depts.map(d => (
                         <option key={d.id} value={d.id}>{d.name}</option>
                       ))}
-                    </select>
+                    </SelectField>
                   </div>
                 </div>
 
@@ -494,25 +489,19 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
                     <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Role</label>
-                    <select style={{ ...INP_STYLE, cursor: 'pointer' }}
-                      value={editForm.role_id ?? ''}
-                      onChange={e => setEditForm(f => ({ ...f, role_id: e.target.value ? Number(e.target.value) : null }))}>
-                      <option value="">— Select Role —</option>
+                    <SelectField value={editForm.role_id ?? ''} onChange={e => setEditForm(f => ({ ...f, role_id: e.target.value ? Number(e.target.value) : null }))} placeholder="Select Role">
                       {roles.map(r => (
                         <option key={r.id} value={r.id}>{r.name.charAt(0).toUpperCase() + r.name.slice(1)}</option>
                       ))}
-                    </select>
+                    </SelectField>
                   </div>
                   <div>
                     <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Department</label>
-                    <select style={{ ...INP_STYLE, cursor: 'pointer' }}
-                      value={editForm.department_id ?? ''}
-                      onChange={e => setEditForm(f => ({ ...f, department_id: e.target.value ? Number(e.target.value) : null }))}>
-                      <option value="">— None —</option>
+                    <SelectField value={editForm.department_id ?? ''} onChange={e => setEditForm(f => ({ ...f, department_id: e.target.value ? Number(e.target.value) : null }))} placeholder="No Department">
                       {depts.map(d => (
                         <option key={d.id} value={d.id}>{d.name}</option>
                       ))}
-                    </select>
+                    </SelectField>
                   </div>
                 </div>
 

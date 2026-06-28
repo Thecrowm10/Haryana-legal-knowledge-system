@@ -1,5 +1,5 @@
 ﻿import { useState } from 'react';
-import { Menu, Search, Bell, ChevronDown, LogOut, User, Settings } from 'lucide-react';
+import { Menu, Bell, ChevronDown, LogOut, User, Settings } from 'lucide-react';
 
 const ROLE_META = {
   citizen:  { label: 'Citizen',         color: '#1a56db', bg: 'rgba(26,86,219,.1)' },
@@ -21,7 +21,6 @@ const BREADCRUMBS = {
 
 export default function Topbar({ user, activePage, onLogout, onToggleSidebar }) {
   const [profileOpen, setProfileOpen] = useState(false);
-  const [searchVal, setSearchVal] = useState('');
   const rm = ROLE_META[user.role] || ROLE_META.citizen;
   const crumbs = BREADCRUMBS[activePage] || ['Dashboard'];
 
@@ -56,19 +55,6 @@ export default function Topbar({ user, activePage, onLogout, onToggleSidebar }) 
             }}>{c}</span>
           </span>
         ))}
-      </div>
-
-      {/* Search */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 8,
-        background: 'var(--surface-ground)', border: '1px solid var(--surface-border)',
-        borderRadius: 8, padding: '6px 12px', width: 220, transition: 'border-color .2s',
-      }}
-        onFocusCapture={e => e.currentTarget.style.borderColor = 'var(--primary)'}
-        onBlurCapture={e => e.currentTarget.style.borderColor = 'var(--surface-border)'}>
-        <Search size={14} color="var(--text-color-secondary)" style={{ flexShrink: 0 }} />
-        <input value={searchVal} onChange={e => setSearchVal(e.target.value)} placeholder="Search…"
-          style={{ background: 'transparent', border: 'none', outline: 'none', fontSize: 13, color: 'var(--text-color)', width: '100%' }} />
       </div>
 
       {/* Bell */}

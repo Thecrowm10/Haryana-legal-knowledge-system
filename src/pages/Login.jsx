@@ -30,9 +30,8 @@ export default function Login({ onLogin, loading, authError }) {
   if (screen === 'portal') return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
         .lk * { box-sizing:border-box; margin:0; padding:0; }
-        .lk { font-family:'Plus Jakarta Sans',sans-serif; }
+        .lk { font-family:'Plus Jakarta Sans Variable','Plus Jakarta Sans',sans-serif; }
         @keyframes fadeLeft  { from{opacity:0;transform:translateX(-24px)} to{opacity:1;transform:none} }
         @keyframes fadeUp    { from{opacity:0;transform:translateY(20px)}  to{opacity:1;transform:none} }
         @keyframes pulse     { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.8)} }
@@ -131,9 +130,8 @@ export default function Login({ onLogin, loading, authError }) {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
         .lk * { box-sizing:border-box; margin:0; padding:0; }
-        .lk { font-family:'Plus Jakarta Sans',sans-serif; }
+        .lk { font-family:'Plus Jakarta Sans Variable','Plus Jakarta Sans',sans-serif; }
 
         @keyframes fadeLeft  { from{opacity:0;transform:translateX(-24px)} to{opacity:1;transform:none} }
         @keyframes fadeRight { from{opacity:0;transform:translateX(24px)}  to{opacity:1;transform:none} }
