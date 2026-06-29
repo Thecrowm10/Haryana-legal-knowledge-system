@@ -13,7 +13,7 @@ import Badge from '../components/ui/Badge';
 import SelectField from '../components/ui/SelectField';
 import { useAuth } from '../hooks/useAuth';
 import { getDepartments, getDocumentTypes } from '../services/departments';
-import { uploadPdfFile, uploadPdfMetadata } from '../services/pdf';
+import { uploadPdfFile, uploadPdfMetadata, getMyDocuments } from '../services/pdf';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -516,10 +516,51 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     return () => document.removeEventListener('click', close);
   }, [showTypeChanger]);
 
-  const [uploads, setUploads] = useState(
-    documents.filter(d => d.uploader === 'Priya Sharma')
-      .map(d => ({ ...d, version: d.version || '1.0', ocrStatus: d.ocrStatus || 'completed', workflowStatus: d.workflowStatus || WORKFLOW_STATUS.PUBLISHED }))
-  );
+  const [uploads, setUploads] = useState([]);
+  const [myDocsLoading, setMyDocsLoading] = useState(false);
+  const [myDocsError,   setMyDocsError]   = useState('');
+
+  function mapApiDoc(d) {
+    return {
+      id:              d.id,
+      uid:             `api-${d.id}`,
+      title:           d.document_name,
+      type:            d.document_type_name,
+      dept:            d.department_name,
+      year:            d.issue_date ? new Date(d.issue_date).getFullYear() : new Date(d.created_at).getFullYear(),
+      status:          d.status || 'pending',
+      workflowStatus:  d.status === 'approved' ? WORKFLOW_STATUS.PUBLISHED : WORKFLOW_STATUS.PENDING,
+      version:         d.version_no || '1.0',
+      fileName:        d.original_filename,
+      fileSize:        d.file_size,
+      desc:            d.description || '',
+      uploadedAt:      d.created_at?.split('T')[0] || '',
+      ocrStatus:       'completed',
+      gazette:         d.gazette_reference || '',
+      authority:       d.legal_authority || '',
+      enactmentDate:   d.issue_date || '',
+      effectiveFrom:   d.effective_from || '',
+      referenceNumber: d.reference_number || '',
+      shortTitle:      d.short_title || '',
+      tags:            d.tags || [],
+      relationships:   d.relationships || [],
+    };
+  }
+
+  useEffect(() => {
+    if (activePage !== 'myuploads') return;
+    if (!localStorage.getItem('token')) return;
+    setMyDocsLoading(true);
+    setMyDocsError('');
+    getMyDocuments()
+      .then(res => setUploads((res.data.documents || []).map(mapApiDoc)))
+      .catch(err => {
+        const detail = err.response?.data?.detail;
+        setMyDocsError(typeof detail === 'string' ? detail : 'Failed to load your documents');
+      })
+      .finally(() => setMyDocsLoading(false));
+  }, [activePage]);
+
   const [files, setFiles]           = useState([]);
   const [dragOver, setDragOver]     = useState(false);
   const [form, setForm]             = useState({ act: '', dept: user?.dept || '', type: '', version: '1.0', desc: '', enactmentDate: '', parentAct: '', changeTypes: [] });
@@ -950,6 +991,25 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
           </div>
         )}
 
+        {/* API loading / error */}
+        {myDocsLoading && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {[1, 2, 3].map(i => (
+              <div key={i} style={{ height: 52, borderRadius: 10, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', animation: 'pulse 1.4s ease-in-out infinite', opacity: 1 - i * 0.15 }} />
+            ))}
+          </div>
+        )}
+        {myDocsError && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderRadius: 10, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', color: '#dc2626' }}>
+            <AlertCircle size={15} style={{ flexShrink: 0 }} />
+            <span style={{ fontSize: 13 }}>{myDocsError}</span>
+            <button onClick={() => { setMyDocsError(''); setMyDocsLoading(true); getMyDocuments().then(r => setUploads((r.data.documents||[]).map(mapApiDoc))).catch(e => setMyDocsError(e.response?.data?.detail || 'Failed to load')).finally(() => setMyDocsLoading(false)); }}
+              style={{ marginLeft: 'auto', padding: '5px 14px', borderRadius: 7, border: '1px solid rgba(239,68,68,.3)', background: 'transparent', color: '#dc2626', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+              Retry
+            </button>
+          </div>
+        )}
+
         {/* Stats row */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
           {[
@@ -1040,10 +1100,9 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
           // ── compute filtered + sorted list ──────────────────────────────
           const SORT_KEY = { 'title': d => d.title, 'type': d => d.type, 'dept': d => d.dept,
             'year': d => d.year, 'uploadedAt': d => d.uploadedAt, 'status': d => d.status };
-          const baseList = filterStatus === 'all'      ? uploads
-                         : filterStatus === 'approved' ? uploads.filter(d => d.status === 'approved')
+          const baseList = filterStatus === 'approved' ? uploads.filter(d => d.status === 'approved')
                          : filterStatus === 'pending'  ? uploads.filter(d => d.workflowStatus === WORKFLOW_STATUS.PENDING || d.status === 'pending')
-                         : uploads.filter(d => d.workflowStatus === WORKFLOW_STATUS.PUBLISHED);
+                         : uploads;
           const allFiltered = baseList
             .filter(d => !tableSearch || d.title.toLowerCase().includes(tableSearch.toLowerCase()))
             .filter(d => !filterType  || d.type === filterType)
@@ -1052,7 +1111,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
               const kb = SORT_KEY[sortCol]?.(b) ?? '';
               return sortDir === 'asc' ? (ka > kb ? 1 : -1) : (ka < kb ? 1 : -1);
             });
-          const filtered = filterStatus ? allFiltered : allFiltered.slice(0, 5);
+          const filtered = allFiltered;
 
           function toggleSort(col) {
             if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -1076,7 +1135,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
           <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>My Uploads</div>
             <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '2px 9px', borderRadius: 20 }}>
-              {filterStatus ? `${filtered.length} docs` : `Last 5 of ${allFiltered.length} published`}
+              {`${filtered.length} document${filtered.length !== 1 ? 's' : ''}`}
             </span>
             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
               {bulkSelectMode ? (
@@ -1175,7 +1234,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
               </thead>
               <tbody>
                 {filtered.length === 0 && (
-                  <tr><td colSpan={8} style={{ padding: '52px 0', textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>No published documents yet.</td></tr>
+                  <tr><td colSpan={8} style={{ padding: '52px 0', textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>No documents found.</td></tr>
                 )}
                 {filtered.map(doc => {
                   const isDraft = !doc.workflowStatus || doc.workflowStatus === WORKFLOW_STATUS.DRAFT;
