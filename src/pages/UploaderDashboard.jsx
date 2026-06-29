@@ -704,48 +704,12 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     onAuditLog?.(`Uploaded ${docsWithWorkflow.length} document(s): ${docsWithWorkflow.map(d => d.title).join(', ')}`);
   }
 
-  // ── Step 1: upload files to get file_refs ──────────────────────────────────
-  async function handleUploadFile() {
-    if (files.length === 0) return;
-    const hasToken = !!localStorage.getItem('token');
-    setUploadStep('uploading');
-    setUploadError('');
-    const refs = [];
-    for (const f of files) {
-      if (!hasToken) {
-        // Demo mode: no real upload, placeholder so form can show
-        refs.push({ fileName: f.name, fileRef: null, originalFilename: f.name, fileSize: f.size });
-        continue;
-      }
-      try {
-        const fd = new FormData();
-        fd.append('file', f);
-        const res = await uploadPdfFile(fd);
-        refs.push({
-          fileName:         f.name,
-          fileRef:          res.data.file_ref,
-          originalFilename: res.data.original_filename ?? f.name,
-          fileSize:         res.data.file_size ?? f.size,
-        });
-      } catch (err) {
-        const detail = err.response?.data?.detail;
-        setUploadError(typeof detail === 'string' ? detail : `Upload failed for "${f.name}"`);
-        setUploadStep('error');
-        return;
-      }
-    }
-    setFileRefs(refs);
-    setUploadStep('ready');
-  }
-
-  // ── Upload + save in one go (called on form submit) ────────────────────────
+  // ── Upload file + save metadata in one go (called on form submit) ──────────
   async function handleSubmit(e) {
     e.preventDefault();
     if (files.length === 0) return;
 
     setUploadError('');
-    setUploadStep('saving');
-
     const hasToken  = !!localStorage.getItem('token');
     const typeObj   = typesData.find(d => d.name === form.type);
     const newDocs   = [];
@@ -790,18 +754,27 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     for (const f of files) {
       let apiDoc = null;
 
-      // Use file_ref obtained in Step 1; skip API when no token (demo mode)
       if (hasToken) {
+        // Step 1: upload the file to get a file_ref
+        let fileRef = null;
+        setUploadStep('uploading');
         try {
-          const refEntry = fileRefs.find(r => r.fileName === f.name);
-          if (!refEntry || !refEntry.fileRef) {
-            setUploadError(`"${f.name}" has not been uploaded yet. Please click Upload File first.`);
-            setUploadStep('error');
-            return;
-          }
+          const fd = new FormData();
+          fd.append('file', f);
+          const res = await uploadPdfFile(fd);
+          fileRef = res.data.file_ref;
+        } catch (err) {
+          const detail = err.response?.data?.detail;
+          setUploadError(typeof detail === 'string' ? detail : `Upload failed for "${f.name}"`);
+          setUploadStep('error');
+          return;
+        }
 
+        // Step 2: save metadata
+        setUploadStep('saving');
+        try {
           const payload = {
-            file_ref:              refEntry.fileRef,
+            file_ref:              fileRef,
             document_type_id:      typeObj?.id ?? null,
             document_name:         form.act || f.name.replace(/\.(pdf|zip)$/i, ''),
             issue_date:            form.enactmentDate || null,
@@ -873,7 +846,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     }
 
     setUploadStep('done');
-    setTimeout(() => { setUploadStep(null); setFileRefs([]); }, 2000);
+    setTimeout(() => { setUploadStep(null); }, 2000);
 
     const conflict = newDocs.find(d =>
       documents.some(ex => ex.title.toLowerCase() === d.title.toLowerCase() && ex.status !== 'rejected')
@@ -1426,55 +1399,12 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                   <Plus size={12} /> Add more files
                 </button>
 
-                {/* Step indicator */}
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: 14 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <div style={{ width: 22, height: 22, borderRadius: '50%', background: fileRefs.length > 0 ? '#16a34a' : 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: 'white', flexShrink: 0 }}>
-                      {fileRefs.length > 0 ? <CheckCircle size={11} /> : '1'}
-                    </div>
-                    <span style={{ fontSize: 11.5, fontWeight: 600, color: fileRefs.length > 0 ? '#16a34a' : 'var(--primary)' }}>Upload File</span>
-                  </div>
-                  <div style={{ flex: 1, height: 2, background: fileRefs.length > 0 ? '#16a34a' : 'var(--surface-border)', margin: '0 10px' }} />
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <div style={{ width: 22, height: 22, borderRadius: '50%', background: fileRefs.length > 0 ? 'var(--primary)' : 'var(--surface-200)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: fileRefs.length > 0 ? 'white' : '#94a3b8', flexShrink: 0 }}>2</div>
-                    <span style={{ fontSize: 11.5, fontWeight: 600, color: fileRefs.length > 0 ? 'var(--text-heading)' : 'var(--text-color-secondary)' }}>Fill & Submit</span>
-                  </div>
-                </div>
-
-                {/* Upload File button */}
-                {fileRefs.length === 0 && (
-                  <>
-                    {uploadError && uploadStep === 'error' && (
-                      <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 8, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <AlertCircle size={13} color="#ef4444" style={{ flexShrink: 0 }} />
-                        <span style={{ fontSize: 12, color: '#dc2626', flex: 1 }}>{uploadError}</span>
-                        <button type="button" onClick={() => { setUploadError(''); setUploadStep(null); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444', display: 'flex' }}><X size={11} /></button>
-                      </div>
-                    )}
-                    <button type="button" onClick={handleUploadFile}
-                      disabled={uploadStep === 'uploading'}
-                      style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                        width: '100%', padding: '10px 0', borderRadius: 8, border: 'none',
-                        background: uploadStep === 'uploading' ? 'var(--surface-200)' : 'var(--primary)',
-                        color: uploadStep === 'uploading' ? '#94a3b8' : 'white',
-                        fontSize: 13, fontWeight: 700, cursor: uploadStep === 'uploading' ? 'not-allowed' : 'pointer',
-                        fontFamily: 'var(--font)', transition: 'all .2s',
-                        boxShadow: uploadStep === 'uploading' ? 'none' : '0 2px 8px rgba(26,86,219,.25)',
-                      }}>
-                      {uploadStep === 'uploading' ? <><Clock size={14} /> Uploading…</> : <><Upload size={14} /> Upload File</>}
-                    </button>
-                  </>
-                )}
-
-                {/* Replace files (after upload) */}
-                {fileRefs.length > 0 && (
-                  <button type="button"
-                    onClick={() => { setFiles([]); setFileRefs([]); setUploadStep(null); setUploadError(''); }}
-                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', padding: '7px 0', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                    <RotateCcw size={12} /> Replace Files
-                  </button>
-                )}
+                {/* Replace / clear files */}
+                <button type="button"
+                  onClick={() => { setFiles([]); setFileRefs([]); setUploadStep(null); setUploadError(''); }}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', padding: '7px 0', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                  <RotateCcw size={12} /> Replace Files
+                </button>
               </>
             )}
           </Card>
@@ -1499,18 +1429,8 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 <Upload size={22} color={TYPE_CARD_COLORS[form.type]?.accent || 'var(--text-color-secondary)'} strokeWidth={1.5} />
               </div>
               <div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 6 }}>Upload a {form.type} file</div>
-                <div style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>Drop a PDF or ZIP on the left, then click Upload File to continue</div>
-              </div>
-            </div>
-          ) : fileRefs.length === 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 460, textAlign: 'center', gap: 14 }}>
-              <div style={{ width: 52, height: 52, borderRadius: 14, background: 'rgba(26,86,219,.08)', border: '1px solid rgba(26,86,219,.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Upload size={22} color="var(--primary)" strokeWidth={1.5} />
-              </div>
-              <div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 6 }}>File ready — click Upload File</div>
-                <div style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>The file will be sent to the server before you fill in the details</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 6 }}>Drop a {form.type} file</div>
+                <div style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>Select a PDF or ZIP file on the left to fill in document details</div>
               </div>
             </div>
           ) : (
@@ -1927,15 +1847,15 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 background: uploadStep === 'done' ? '#16a34a' : files.length > 0 && !uploadStep ? 'var(--primary)' : uploadStep === 'error' ? 'var(--primary)' : 'var(--surface-200)',
                 color: uploadStep === 'done' || (files.length > 0 && (!uploadStep || uploadStep === 'error')) ? 'white' : '#94a3b8',
                 border: 'none', padding: '10px 28px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700,
-                cursor: files.length > 0 && !uploadStep ? 'pointer' : 'not-allowed',
+                cursor: files.length > 0 && (!uploadStep || uploadStep === 'error') ? 'pointer' : 'not-allowed',
                 display: 'flex', alignItems: 'center', gap: 8,
-                boxShadow: files.length > 0 && !uploadStep ? '0 2px 8px rgba(26,86,219,.2)' : 'none',
+                boxShadow: files.length > 0 && (!uploadStep || uploadStep === 'error') ? '0 2px 8px rgba(26,86,219,.2)' : 'none',
                 transition: 'all .2s',
               }}>
               {uploadStep === 'uploading' && <><Clock size={14} /> Uploading file…</>}
               {uploadStep === 'saving'    && <><Clock size={14} /> Saving details…</>}
               {uploadStep === 'done'      && <><CheckCircle size={14} /> Submitted!</>}
-              {(!uploadStep || uploadStep === 'ready' || uploadStep === 'error') && <><CheckCircle size={14} /> Submit for Approval</>}
+              {(!uploadStep || uploadStep === 'error') && <><CheckCircle size={14} /> Submit for Approval</>}
             </button>
           </div>
         </form>
