@@ -13,7 +13,7 @@ import Badge from '../components/ui/Badge';
 import SelectField from '../components/ui/SelectField';
 import { useAuth } from '../hooks/useAuth';
 import { getDepartments, getDocumentTypes } from '../services/departments';
-import { uploadPdfFile, uploadPdfMetadata, getMyDocuments } from '../services/pdf';
+import { uploadPdfFile, uploadPdfMetadata, getMyDocuments, searchDocuments } from '../services/pdf';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -588,6 +588,9 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   const [showAuthDrop, setShowAuthDrop] = useState(null);     // legal authority act dropdown
   const [showSectionDrop, setShowSectionDrop] = useState(null); // legal authority section dropdown
   const [showHierActDrop, setShowHierActDrop] = useState(false); // hierarchy drawer act dropdown
+  const [actSuggestions, setActSuggestions]   = useState([]);
+  const [actSearching,   setActSearching]     = useState(false);
+  const actSearchTimer = useRef(null);
   const [showHierSecDrop, setShowHierSecDrop] = useState(false); // hierarchy drawer section dropdown
   const [showRelDrop, setShowRelDrop] = useState(false);
   const [relSection, setRelSection] = useState('');            // section of the linked document
@@ -674,6 +677,18 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     setFileRefs(r => r.filter(x => x.fileName !== name));
   }
   function handleDrop(e) { e.preventDefault(); setDragOver(false); addFiles(e.dataTransfer.files); }
+
+  function fetchDocSuggestions(documentType, text) {
+    clearTimeout(actSearchTimer.current);
+    if (!text || text.length < 1) { setActSuggestions([]); return; }
+    actSearchTimer.current = setTimeout(() => {
+      setActSearching(true);
+      searchDocuments(documentType, text, 10)
+        .then(res => setActSuggestions(res.data.results || []))
+        .catch(() => setActSuggestions([]))
+        .finally(() => setActSearching(false));
+    }, 280);
+  }
 
   function addRelation() {
     if (!relTarget) return;
@@ -1976,10 +1991,29 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                       <div style={{ ...LABEL, marginBottom: 6 }}>
                         {form.type === 'Amendment' ? 'Parent Act Name' : 'Act Name'}
                       </div>
-                      <input value={drawerHierarchy.act}
-                        onChange={e => setDrawerHierarchy(v => ({ ...v, act: e.target.value }))}
-                        placeholder="e.g. Haryana Municipal Act 1973" style={{ ...INPUT_BASE, width: '100%' }}
-                        onFocus={focusStyle} onBlur={blurStyle} />
+                      <div style={{ position: 'relative' }}>
+                        <input value={drawerHierarchy.act}
+                          onChange={e => { setDrawerHierarchy(v => ({ ...v, act: e.target.value })); fetchDocSuggestions('Act', e.target.value); }}
+                          onFocus={e => { focusStyle(e); if (drawerHierarchy.act) fetchDocSuggestions('Act', drawerHierarchy.act); setShowHierActDrop(true); }}
+                          onBlur={e => { blurStyle(e); setTimeout(() => setShowHierActDrop(false), 180); }}
+                          placeholder="Type to search Acts…" style={{ ...INPUT_BASE, width: '100%' }}
+                        />
+                        {actSearching && <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 10, color: 'var(--text-color-secondary)' }}>…</div>}
+                        {showHierActDrop && actSuggestions.length > 0 && (
+                          <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 400, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 8, boxShadow: '0 6px 20px rgba(0,0,0,.13)', maxHeight: 220, overflow: 'auto', marginTop: 3 }}>
+                            {actSuggestions.map(a => (
+                              <div key={a.id}
+                                onMouseDown={() => { setDrawerHierarchy(v => ({ ...v, act: a.document_name })); setActSuggestions([]); setShowHierActDrop(false); }}
+                                style={{ padding: '9px 12px', cursor: 'pointer', borderBottom: '1px solid var(--surface-border)' }}
+                                onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.document_name}</div>
+                                {a.reference_number && <div style={{ fontSize: 10.5, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', marginTop: 2 }}>{a.reference_number}</div>}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
 
@@ -2083,25 +2117,26 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
 
                   {/* Act / Rules & Regulations: Act name + Chapter/Section/Sub-section with dropdowns */}
                   {!['Circular', 'Notification', 'Policy', 'Order / Gazette', 'Amendment'].includes(form.type) && (<>
-                    {/* Act Name — dropdown of existing documents */}
+                    {/* Act Name — search-acts API */}
                     <div>
                       <div style={{ ...LABEL, marginBottom: 6 }}>Act / Rule Name</div>
                       <div style={{ position: 'relative' }}>
                         <input value={drawerHierarchy.act}
-                          onChange={e => setDrawerHierarchy(v => ({ ...v, act: e.target.value, section: '', chapter: '' }))}
-                          onFocus={e => { focusStyle(e); setShowHierActDrop(true); }}
+                          onChange={e => { setDrawerHierarchy(v => ({ ...v, act: e.target.value, section: '', chapter: '' })); fetchDocSuggestions('Act', e.target.value); }}
+                          onFocus={e => { focusStyle(e); if (drawerHierarchy.act) fetchDocSuggestions('Act', drawerHierarchy.act); setShowHierActDrop(true); }}
                           onBlur={e => { blurStyle(e); setTimeout(() => setShowHierActDrop(false), 180); }}
-                          placeholder="Type to search existing documents…" style={{ ...INPUT_BASE, width: '100%' }} />
-                        {showHierActDrop && approvedDocs.filter(d => !drawerHierarchy.act || d.title.toLowerCase().includes(drawerHierarchy.act.toLowerCase())).slice(0, 8).length > 0 && (
-                          <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 300, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 8, boxShadow: '0 6px 20px rgba(0,0,0,.13)', maxHeight: 220, overflow: 'auto', marginTop: 3 }}>
-                            {approvedDocs.filter(d => !drawerHierarchy.act || d.title.toLowerCase().includes(drawerHierarchy.act.toLowerCase())).slice(0, 8).map(d => (
-                              <div key={d.uid || d.id}
-                                onMouseDown={() => { setDrawerHierarchy(v => ({ ...v, act: d.title, section: '', chapter: '', subsection: '' })); setShowHierActDrop(false); }}
+                          placeholder="Type to search Acts…" style={{ ...INPUT_BASE, width: '100%' }} />
+                        {actSearching && <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 10, color: 'var(--text-color-secondary)' }}>…</div>}
+                        {showHierActDrop && actSuggestions.length > 0 && (
+                          <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 400, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 8, boxShadow: '0 6px 20px rgba(0,0,0,.13)', maxHeight: 220, overflow: 'auto', marginTop: 3 }}>
+                            {actSuggestions.map(a => (
+                              <div key={a.id}
+                                onMouseDown={() => { setDrawerHierarchy(v => ({ ...v, act: a.document_name, section: '', chapter: '', subsection: '' })); setActSuggestions([]); setShowHierActDrop(false); }}
                                 style={{ padding: '9px 12px', cursor: 'pointer', borderBottom: '1px solid var(--surface-border)' }}
                                 onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
                                 onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                                <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.title}</div>
-                                <div style={{ fontSize: 10.5, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', marginTop: 2 }}>{d.type} · {d.dept} · {d.year}</div>
+                                <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.document_name}</div>
+                                {a.reference_number && <div style={{ fontSize: 10.5, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', marginTop: 2 }}>{a.reference_number}</div>}
                               </div>
                             ))}
                           </div>

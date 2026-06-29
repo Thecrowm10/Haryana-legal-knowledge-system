@@ -2,14 +2,14 @@
 import {
   CheckCircle, XCircle, FileText, ChevronDown, Search, Clock,
   Check, X, Eye, AlignLeft, Cpu, Link, AlertTriangle, ChevronRight,
-  ZoomIn, ZoomOut, RotateCw,
+  ZoomIn, ZoomOut, RotateCw, ExternalLink,
 } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl;
-import { DOCUMENTS } from '../data/mockData';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
+import { getApproverDocuments, getPdfFile } from '../services/pdf';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -241,7 +241,7 @@ function PageNav({ currentPage, totalPages, onPageChange }) {
 // ─── PDF Viewer Panel ─────────────────────────────────────────────────────────
 // Renders real PDFs as stacked canvases (pdfjs-dist) so scroll can be detected
 // and synced with OcrTextPanel. Mock docs use the styled layout fallback.
-function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, rotation, onRotate }) {
+function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, rotation, onRotate, blobUrl, onTotalPagesChange }) {
   const [zoom, setZoom]     = useState(100);
   const containerRef        = useRef(null);
   const canvasRefs          = useRef([]);
@@ -257,7 +257,12 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
     let cancelled = false;
     setPdfDoc(null);
     pdfjsLib.getDocument({ url: encodeURI(doc.fileUrl) }).promise
-      .then(pdf => { if (!cancelled) setPdfDoc(pdf); })
+      .then(pdf => {
+        if (!cancelled) {
+          setPdfDoc(pdf);
+          onTotalPagesChange?.(pdf.numPages);
+        }
+      })
       .catch(e => console.error('PDF load:', e));
     return () => { cancelled = true; };
   }, [doc.fileUrl]);
@@ -311,6 +316,12 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
       <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surface-50)', flexShrink: 0 }}>
         <Eye size={13} color="var(--primary)" />
         <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-heading)', flex: 1 }}>Original PDF</span>
+        {blobUrl && (
+          <a href={blobUrl} target="_blank" rel="noreferrer" title="Open in new tab"
+            style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 9px', borderRadius: 5, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)', textDecoration: 'none', fontSize: 11, fontWeight: 600, fontFamily: 'var(--font)' }}>
+            <ExternalLink size={11} /> Open
+          </a>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <button onClick={onRotate} title="Rotate 90°"
             style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 5, width: 24, height: 24, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-color-secondary)' }}>
@@ -732,11 +743,29 @@ function DocumentDetailsPanel({ doc }) {
 // ─── 2-Panel Review View ──────────────────────────────────────────────────────
 // PDF on the left, uploader-filled document details on the right.
 function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, activePage }) {
-  const [currentPage, setCurrentPage] = useState(1);
-  const [rotation, setRotation]       = useState(0);
+  const [currentPage, setCurrentPage]   = useState(1);
+  const [rotation, setRotation]         = useState(0);
+  const [blobUrl, setBlobUrl]           = useState(null);
+  const [pdfTotalPages, setPdfTotalPages] = useState(null);
 
   const mockOcr    = useMemo(() => getMockOcrData(doc), [doc.id]);
-  const totalPages = mockOcr.pageCount;
+  const totalPages = pdfTotalPages || mockOcr.pageCount;
+
+  useEffect(() => {
+    if (!doc.id || !localStorage.getItem('token')) return;
+    let url = null;
+    setBlobUrl(null);
+    getPdfFile(doc.id)
+      .then(res => {
+        const blob = new Blob([res.data], { type: 'application/pdf' });
+        url = URL.createObjectURL(blob);
+        setBlobUrl(url);
+      })
+      .catch(() => {});
+    return () => { if (url) URL.revokeObjectURL(url); };
+  }, [doc.id]);
+
+  const docWithUrl = blobUrl ? { ...doc, fileUrl: blobUrl } : doc;
 
   return (
     <div style={{ borderTop: '1px solid var(--surface-border)' }}>
@@ -747,9 +776,10 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, activePage 
         {/* Panel 1 — Original PDF */}
         <div style={{ borderRight: '1px solid var(--surface-border)', overflow: 'hidden' }}>
           <PdfViewerPanel
-            doc={doc} ocrData={mockOcr}
+            doc={docWithUrl} ocrData={mockOcr}
             currentPage={currentPage} onPageChange={setCurrentPage} totalPages={totalPages}
             rotation={rotation} onRotate={() => setRotation(r => (r + 90) % 360)}
+            blobUrl={blobUrl} onTotalPagesChange={setPdfTotalPages}
           />
         </div>
 
@@ -817,26 +847,63 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, activePage 
   );
 }
 // ─── Main ApproverDashboard ───────────────────────────────────────────────────
+function mapApiDoc(d) {
+  return {
+    id:              d.id,
+    uid:             `approver-${d.id}`,
+    title:           d.document_name || d.original_filename || `Document #${d.id}`,
+    type:            d.document_type_name || 'Act',
+    dept:            d.department_name || '—',
+    year:            d.issue_date
+                       ? new Date(d.issue_date).getFullYear()
+                       : new Date(d.created_at).getFullYear(),
+    status:          d.status || 'pending',
+    version:         d.version_no || '1.0',
+    fileName:        d.original_filename,
+    fileSize:        d.file_size,
+    desc:            d.description || '',
+    uploadedAt:      d.created_at?.split('T')[0] || '',
+    enactmentDate:   d.issue_date || '',
+    effectiveFrom:   d.effective_from || '',
+    referenceNumber: d.reference_number || '',
+    shortTitle:      d.short_title || '',
+    gazette:         d.gazette_reference || '',
+    authority:       d.legal_authority || '',
+    remarks:         d.latest_approval?.comments || '',
+    fileUrl:         null,
+  };
+}
+
 export default function ApproverDashboard({ activePage, onAuditLog, documents, onApprove }) {
-  const [docs, setDocs]       = useState(documents || DOCUMENTS);
-  const [remarks, setRemarks] = useState({});
-  const [expanded, setExpanded] = useState(null);
-  const [filter, setFilter]   = useState('');
-  const [searchQ, setSearchQ] = useState('');
-  const [cardFilter, setCardFilter] = useState(null); // 'pending'|'approved'|'rejected'|'all'|null
-  const tableRef = useRef(null);
+  const [docs, setDocs]           = useState([]);
+  const [loading, setLoading]     = useState(false);
+  const [apiError, setApiError]   = useState('');
+  const [remarks, setRemarks]     = useState({});
+  const [expanded, setExpanded]   = useState(null);
+  const [filter, setFilter]       = useState('');
+  const [searchQ, setSearchQ]     = useState('');
+  const [cardFilter, setCardFilter] = useState(null);
+  const tableRef  = useRef(null);
+  const expandedRef = useRef(null);
+
+  function fetchDocs() {
+    if (!localStorage.getItem('token')) return;
+    setLoading(true);
+    setApiError('');
+    getApproverDocuments()
+      .then(res => setDocs((res.data.documents || []).map(mapApiDoc)))
+      .catch(err => setApiError(err.response?.data?.detail || 'Failed to load documents'))
+      .finally(() => setLoading(false));
+  }
+
+  useEffect(() => { fetchDocs(); }, [activePage]);
 
   // Scroll expanded card into view
-  const expandedRef = useRef(null);
   useEffect(() => {
     if (expanded !== null && expandedRef.current) {
       expandedRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   }, [expanded]);
-
-  useEffect(() => {
-    if (documents) setDocs(documents);
-  }, [documents]);
 
   const pending  = docs.filter(d => d.status === 'pending');
   const reviewed = docs.filter(d => d.status !== 'pending');
@@ -867,16 +934,34 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
     return mType && mF && mS;
   });
 
-  // Pending tab: show last 5 by default; show all when filter/search active
   const isFiltered = filter || searchQ || cardFilter;
-  const list = (activePage === 'pending' && !isFiltered)
-    ? allFiltered.slice(0, 5)
-    : allFiltered;
+  const list = allFiltered;
 
   const allTypes = Object.keys(TYPE_COLORS);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
+
+      {/* Loading skeleton */}
+      {loading && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {[1, 2, 3].map(i => (
+            <div key={i} style={{ height: 72, borderRadius: 12, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', opacity: 1 - i * 0.2, animation: 'pulse 1.4s ease-in-out infinite' }} />
+          ))}
+        </div>
+      )}
+
+      {/* API error */}
+      {apiError && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderRadius: 10, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', color: '#dc2626' }}>
+          <XCircle size={15} style={{ flexShrink: 0 }} />
+          <span style={{ fontSize: 13, flex: 1 }}>{apiError}</span>
+          <button onClick={fetchDocs}
+            style={{ padding: '5px 14px', borderRadius: 7, border: '1px solid rgba(239,68,68,.3)', background: 'transparent', color: '#dc2626', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+            Retry
+          </button>
+        </div>
+      )}
 
       {/* Summary strip — only on Reviewed tab */}
       {activePage !== 'pending' && (
@@ -921,7 +1006,7 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
             </div>
           )}
           <span style={{ marginLeft: 'auto', fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '2px 9px', borderRadius: 20 }}>
-            {isFiltered ? `${list.length} docs` : activePage === 'pending' ? `Last 5 of ${allFiltered.length} pending` : `${list.length} docs`}
+            {`${list.length} document${list.length !== 1 ? 's' : ''}`}
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
