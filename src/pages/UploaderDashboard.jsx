@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  Upload, FileText, CheckCircle, X, TrendingUp, Archive, Download,
+  Upload, FileText, CheckCircle, XCircle, X, TrendingUp, Archive, Download,
   RotateCcw, AlertCircle, Eye, GitBranch, Plus, Cpu, Link, Clock,
   Layers, ChevronRight, AlertTriangle, Users, CheckSquare, Square,
   Edit3, Tag, Search,
@@ -529,7 +529,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
       dept:            d.department_name,
       year:            d.issue_date ? new Date(d.issue_date).getFullYear() : new Date(d.created_at).getFullYear(),
       status:          d.status || 'pending',
-      workflowStatus:  d.status === 'approved' ? WORKFLOW_STATUS.PUBLISHED : WORKFLOW_STATUS.PENDING,
+      workflowStatus:  d.status === 'approved' ? WORKFLOW_STATUS.PUBLISHED : d.status === 'rejected' ? WORKFLOW_STATUS.DRAFT : WORKFLOW_STATUS.PENDING,
       version:         d.version_no || '1.0',
       fileName:        d.original_filename,
       fileSize:        d.file_size,
@@ -980,6 +980,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   if (activePage === 'myuploads') {
     const approved  = uploads.filter(d => d.status === 'approved').length;
     const pending   = uploads.filter(d => d.status === 'pending').length;
+    const rejected  = uploads.filter(d => d.status === 'rejected').length;
     const published = uploads.filter(d => d.workflowStatus === WORKFLOW_STATUS.PUBLISHED).length;
 
     return (
@@ -1034,11 +1035,12 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         )}
 
         {/* Stats row */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
           {[
             { label: 'Total Uploads',  value: uploads.length, bg: 'rgba(26,86,219,.12)',  color: 'var(--primary)', icon: FileText,    filter: 'all' },
             { label: 'Approved',       value: approved,        bg: 'rgba(34,197,94,.12)',  color: '#22c55e',        icon: CheckCircle, filter: 'approved' },
             { label: 'Pending Review', value: pending,         bg: 'rgba(245,158,11,.12)', color: '#f59e0b',        icon: TrendingUp,  filter: 'pending' },
+            { label: 'Rejected',       value: rejected,        bg: 'rgba(239,68,68,.12)',  color: '#ef4444',        icon: XCircle,     filter: 'rejected' },
           ].map(s => {
             const isActive = filterStatus === s.filter;
             return (
@@ -1124,7 +1126,8 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
           const SORT_KEY = { 'title': d => d.title, 'type': d => d.type, 'dept': d => d.dept,
             'year': d => d.year, 'uploadedAt': d => d.uploadedAt, 'status': d => d.status };
           const baseList = filterStatus === 'approved' ? uploads.filter(d => d.status === 'approved')
-                         : filterStatus === 'pending'  ? uploads.filter(d => d.workflowStatus === WORKFLOW_STATUS.PENDING || d.status === 'pending')
+                         : filterStatus === 'pending'  ? uploads.filter(d => d.status === 'pending')
+                         : filterStatus === 'rejected' ? uploads.filter(d => d.status === 'rejected')
                          : uploads;
           const allFiltered = baseList
             .filter(d => !tableSearch || d.title.toLowerCase().includes(tableSearch.toLowerCase()))
@@ -1190,7 +1193,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
               </div>
               {filterStatus && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px 5px 12px', borderRadius: 20, background: 'rgba(34,197,94,.1)', border: '1px solid rgba(34,197,94,.3)', fontSize: 12.5, fontWeight: 600, color: '#16a34a', whiteSpace: 'nowrap' }}>
-                  {{ all: 'All Uploads', approved: 'Approved', pending: 'Pending Review' }[filterStatus]}
+                  {{ all: 'All Uploads', approved: 'Approved', pending: 'Pending Review', rejected: 'Rejected' }[filterStatus]}
                   <button onClick={() => setFilterStatus('')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#16a34a', display: 'flex', padding: 0, marginLeft: 2 }}><X size={11} /></button>
                 </div>
               )}
