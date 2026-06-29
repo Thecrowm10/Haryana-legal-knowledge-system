@@ -1304,244 +1304,233 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         </Card>
       )}
 
-      {rejected.length > 0 && (
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 18px', borderRadius: 10, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', color: '#dc2626', marginBottom: 14 }}>
-          <AlertCircle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
-          <div>
-            <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 2 }}>Unsupported file type rejected:</div>
-            <div style={{ fontSize: 12, fontFamily: 'var(--mono)' }}>{rejected.join(', ')}</div>
-          </div>
-          <button onClick={() => setRejected([])} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626' }}><X size={14} /></button>
-        </div>
-      )}
+      {/* ── Unified single-page upload layout ─────────────────────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '330px 1fr', gap: 20, alignItems: 'start' }}>
 
-      {/* ── Hidden file input — always present ─────────────────────────────── */}
-      <input ref={inputRef} type="file" accept=".pdf,.zip" multiple style={{ display: 'none' }}
-        onChange={e => { addFiles(e.target.files); e.target.value = ''; }} />
+        {/* ── LEFT: Type selector + File drop zone ── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-      {/* ── State 1a: Type selector (no type, no file) ─────────────────────── */}
-      {files.length === 0 && !form.type && (
-        <div style={{ position: 'relative', minHeight: 'calc(100vh - 220px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          {/* Blurred drop zone behind */}
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', filter: 'blur(5px)', opacity: 0.3, pointerEvents: 'none' }}>
-            <div style={{ width: '100%', maxWidth: 640, border: '2px dashed var(--surface-border)', borderRadius: 24, padding: '80px 56px', textAlign: 'center', background: 'var(--surface-card)' }}>
-              <div style={{ width: 80, height: 80, borderRadius: 20, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 22px' }}>
-                <Upload size={36} color="var(--text-color-secondary)" strokeWidth={1.6} />
+          {/* Hidden file input */}
+          <input ref={inputRef} type="file" accept=".pdf,.zip" multiple style={{ display: 'none' }}
+            onChange={e => { addFiles(e.target.files); e.target.value = ''; }} />
+
+          {/* Rejected files alert */}
+          {rejected.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px', borderRadius: 10, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', color: '#dc2626' }}>
+              <AlertCircle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 1 }}>Unsupported file type rejected:</div>
+                <div style={{ fontSize: 11.5, fontFamily: 'var(--mono)' }}>{rejected.join(', ')}</div>
               </div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 10 }}>Drop files here or click to browse</div>
-              <div style={{ fontSize: 14, color: 'var(--text-color-secondary)' }}>Select multiple PDFs or a ZIP archive — up to 50 MB per file</div>
+              <button onClick={() => setRejected([])} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', display: 'flex' }}><X size={13} /></button>
             </div>
-          </div>
+          )}
 
-          {/* Type selector cards */}
-          <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 720, padding: '0 8px' }}>
-            <div style={{ textAlign: 'center', marginBottom: 28 }}>
-              <div style={{ fontSize: 21, fontWeight: 800, color: 'var(--text-heading)', marginBottom: 8 }}>Select Document Type</div>
-              <div style={{ fontSize: 13.5, color: 'var(--text-color-secondary)' }}>Choose first — fields will adapt to your selection before upload</div>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+          {/* Document Type card */}
+          <Card>
+            <div style={{ ...LABEL, marginBottom: 10 }}>Document Type <span style={{ color: '#ef4444' }}>*</span></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               {TYPES.map(type => {
                 const c = TYPE_CARD_COLORS[type] || { bg: 'rgba(148,163,184,.08)', accent: '#94a3b8', text: '#64748b' };
+                const active = form.type === type;
                 return (
                   <button key={type} type="button"
                     onClick={() => { fmt('type', type); setTypeFields({}); setLegalAuthorities([{ act: '', sections: [''] }]); setAmendChanges([{ chapter: '', section: '', subsection: '', changeType: 'Amended', description: '' }]); setHierarchy({ act: '', chapter: '', section: '', subsection: '' }); setRelations([]); }}
-                    style={{ padding: '18px 14px 16px', borderRadius: 14, border: `1.5px solid ${c.accent}25`, background: 'var(--surface-card)', cursor: 'pointer', textAlign: 'center', transition: 'all .2s', fontFamily: 'var(--font)', boxShadow: 'var(--card-shadow)' }}
-                    onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.background = c.bg; e.currentTarget.style.borderColor = c.accent + '55'; e.currentTarget.style.boxShadow = `0 8px 24px ${c.accent}22`; }}
-                    onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.background = 'var(--surface-card)'; e.currentTarget.style.borderColor = c.accent + '25'; e.currentTarget.style.boxShadow = 'var(--card-shadow)'; }}>
-                    <div style={{ width: 38, height: 38, borderRadius: 10, background: c.bg, border: `1px solid ${c.accent}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px' }}>
-                      <FileText size={17} color={c.accent} strokeWidth={1.8} />
+                    style={{
+                      padding: '10px 10px 9px', borderRadius: 10, textAlign: 'left',
+                      border: active ? `2px solid ${c.accent}` : `1.5px solid ${c.accent}30`,
+                      background: active ? c.bg : 'var(--surface-card)',
+                      cursor: 'pointer', transition: 'all .15s', fontFamily: 'var(--font)',
+                      boxShadow: active ? `0 0 0 3px ${c.accent}15` : 'none',
+                    }}
+                    onMouseEnter={e => { if (!active) { e.currentTarget.style.background = c.bg; e.currentTarget.style.borderColor = c.accent + '55'; }}}
+                    onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'var(--surface-card)'; e.currentTarget.style.borderColor = c.accent + '30'; }}}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
+                      <div style={{ width: 22, height: 22, borderRadius: 6, background: c.bg, border: `1px solid ${c.accent}30`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <FileText size={11} color={c.accent} />
+                      </div>
+                      {active && <CheckCircle size={12} color={c.accent} />}
                     </div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: c.text, marginBottom: 5, lineHeight: 1.3 }}>{type}</div>
-                    <div style={{ fontSize: 10.5, color: 'var(--text-color-secondary)', lineHeight: 1.45 }}>{TYPE_CARD_DESC[type] || ''}</div>
+                    <div style={{ fontSize: 11.5, fontWeight: 700, color: active ? c.text : 'var(--text-heading)', lineHeight: 1.3 }}>{type}</div>
                   </button>
                 );
               })}
             </div>
-          </div>
-        </div>
-      )}
+          </Card>
 
-      {/* ── State 1b: Drop zone (type selected, no file yet) ─────────────────── */}
-      {files.length === 0 && form.type && (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 'calc(100vh - 220px)', gap: 16 }}>
-          {/* Type chip */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px 7px 10px', borderRadius: 40, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', boxShadow: 'var(--card-shadow)' }}>
-            <div style={{ width: 26, height: 26, borderRadius: 7, background: TYPE_CARD_COLORS[form.type]?.bg || 'rgba(148,163,184,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <FileText size={13} color={TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'} />
-            </div>
-            <span style={{ fontSize: 13, fontWeight: 700, color: TYPE_CARD_COLORS[form.type]?.text || 'var(--text-heading)' }}>{form.type}</span>
-            <span style={{ width: 1, height: 14, background: 'var(--surface-border)' }} />
-            <button type="button" onClick={() => { fmt('type', ''); setTypeFields({}); }}
-              style={{ fontSize: 12, color: 'var(--text-color-secondary)', background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'var(--font)', padding: 0, display: 'flex', alignItems: 'center', gap: 4 }}>
-              <X size={12} /> Change
-            </button>
-          </div>
-          {/* Bigger drop zone */}
-          <div
-            onClick={() => inputRef.current?.click()}
-            onDrop={handleDrop}
-            onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-            onDragLeave={() => setDragOver(false)}
-            style={{
-              width: '100%', maxWidth: 680,
-              border: `2px dashed ${dragOver ? (TYPE_CARD_COLORS[form.type]?.accent || 'var(--primary)') : 'var(--surface-border)'}`,
-              borderRadius: 24, padding: '80px 56px', textAlign: 'center', cursor: 'pointer',
-              background: dragOver ? (TYPE_CARD_COLORS[form.type]?.bg || 'rgba(26,86,219,.05)') : 'var(--surface-card)',
-              transition: 'all .25s',
-              boxShadow: dragOver ? `0 0 0 6px ${TYPE_CARD_COLORS[form.type]?.accent || '#1a56db'}18` : 'var(--card-shadow)',
-            }}>
-            <div style={{ width: 80, height: 80, borderRadius: 20, background: dragOver ? (TYPE_CARD_COLORS[form.type]?.bg || 'rgba(26,86,219,.12)') : 'var(--surface-ground)', border: `1px solid ${dragOver ? (TYPE_CARD_COLORS[form.type]?.accent || 'var(--primary)') + '40' : 'var(--surface-border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 22px', transition: 'all .25s' }}>
-              <Upload size={36} color={dragOver ? (TYPE_CARD_COLORS[form.type]?.accent || 'var(--primary)') : 'var(--text-color-secondary)'} strokeWidth={1.6} />
-            </div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 10 }}>Drop files here or click to browse</div>
-            <div style={{ fontSize: 14, color: 'var(--text-color-secondary)', marginBottom: 22 }}>Select multiple PDFs or a ZIP archive — up to 50 MB per file</div>
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--primary)', background: 'rgba(26,86,219,.08)', border: '1px solid rgba(26,86,219,.2)', padding: '4px 14px', borderRadius: 20 }}>.PDF</span>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: '#f59e0b', background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.3)', padding: '4px 14px', borderRadius: 20 }}>.ZIP</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── State 2: Document details form (file selected / uploading) ───────── */}
-      {files.length > 0 && <Card>
-        {/* Card header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, paddingBottom: 12, borderBottom: '1px solid var(--surface-border)' }}>
-          <FileText size={15} color="var(--primary)" />
-          <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>Document Details</span>
-          {files.length > 1 && <span style={{ fontSize: 11, fontWeight: 600, background: 'rgba(59,130,246,.1)', color: '#3b82f6', padding: '2px 9px', borderRadius: 20 }}>Applied to all {files.length} files</span>}
-          {autoFillLoading && <span style={{ marginLeft: 4, fontSize: 11, fontFamily: 'var(--mono)', color: '#3b82f6', fontWeight: 700 }}>⚡ AUTO-FILLING…</span>}
-        </div>
-
-        {/* File info banner — full width, prominent */}
-        <div style={{ marginBottom: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {files.slice(0, 2).map(f => {
-            const uploaded = fileRefs.some(r => r.fileName === f.name);
-            const isUploading = uploadStep === 'uploading' && !uploaded;
-            return (
-              <div key={f.name} style={{
-                display: 'flex', alignItems: 'center', gap: 14,
-                padding: '10px 14px', borderRadius: 10,
-                background: uploaded ? 'rgba(22,163,74,.05)' : isUploading ? 'rgba(59,130,246,.05)' : 'var(--surface-ground)',
-                border: `1.5px solid ${uploaded ? 'rgba(22,163,74,.25)' : isUploading ? 'rgba(59,130,246,.2)' : 'var(--surface-border)'}`,
-                transition: 'all .3s',
-              }}>
-                {/* File icon */}
-                <div style={{ width: 36, height: 36, borderRadius: 8, background: uploaded ? 'rgba(22,163,74,.1)' : 'rgba(26,86,219,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  {fileIcon(f)}
+          {/* File upload card */}
+          <Card>
+            {files.length === 0 ? (
+              <div
+                onClick={() => inputRef.current?.click()}
+                onDrop={handleDrop}
+                onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                style={{
+                  border: `2px dashed ${dragOver ? (TYPE_CARD_COLORS[form.type]?.accent || 'var(--primary)') : 'var(--surface-border)'}`,
+                  borderRadius: 12, padding: '32px 16px', textAlign: 'center', cursor: 'pointer',
+                  background: dragOver ? (TYPE_CARD_COLORS[form.type]?.bg || 'rgba(26,86,219,.05)') : 'var(--surface-ground)',
+                  transition: 'all .25s',
+                  boxShadow: dragOver ? `0 0 0 4px ${TYPE_CARD_COLORS[form.type]?.accent || '#1a56db'}15` : 'none',
+                }}>
+                <div style={{ width: 48, height: 48, borderRadius: 12, background: dragOver ? (TYPE_CARD_COLORS[form.type]?.bg || 'rgba(26,86,219,.12)') : 'var(--surface-card)', border: `1px solid ${dragOver ? (TYPE_CARD_COLORS[form.type]?.accent || 'var(--primary)') + '40' : 'var(--surface-border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', transition: 'all .25s' }}>
+                  <Upload size={22} color={dragOver ? (TYPE_CARD_COLORS[form.type]?.accent || 'var(--primary)') : 'var(--text-color-secondary)'} strokeWidth={1.6} />
                 </div>
-                {/* Name + size + type badge */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</div>
-                    {form.type && (
-                      <div style={{ position: 'relative', flexShrink: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '2px 10px 2px 7px', borderRadius: 20, background: TYPE_CARD_COLORS[form.type]?.bg || 'rgba(148,163,184,.1)', border: `1px solid ${TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'}30`, cursor: 'pointer' }}
-                          onClick={e => { e.stopPropagation(); setShowTypeChanger(v => !v); }}>
-                          <FileText size={10} color={TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'} />
-                          <span style={{ fontSize: 11, fontWeight: 700, color: TYPE_CARD_COLORS[form.type]?.text || '#64748b', fontFamily: 'var(--mono)' }}>{form.type}</span>
-                          <ChevronRight size={10} color={TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'} style={{ transform: showTypeChanger ? 'rotate(90deg)' : 'none', transition: 'transform .15s' }} />
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 5 }}>Drop files here</div>
+                <div style={{ fontSize: 12, color: 'var(--text-color-secondary)', marginBottom: 14 }}>or click to browse · PDF or ZIP · up to 50 MB</div>
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 10.5, color: 'var(--primary)', background: 'rgba(26,86,219,.08)', border: '1px solid rgba(26,86,219,.2)', padding: '3px 10px', borderRadius: 20 }}>.PDF</span>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 10.5, color: '#f59e0b', background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.3)', padding: '3px 10px', borderRadius: 20 }}>.ZIP</span>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* File list */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                  {files.slice(0, 4).map(f => {
+                    const uploaded = fileRefs.some(r => r.fileName === f.name);
+                    const isUploading = uploadStep === 'uploading' && !uploaded;
+                    return (
+                      <div key={f.name} style={{
+                        display: 'flex', alignItems: 'center', gap: 10,
+                        padding: '8px 10px', borderRadius: 8,
+                        background: uploaded ? 'rgba(22,163,74,.05)' : isUploading ? 'rgba(59,130,246,.05)' : 'var(--surface-ground)',
+                        border: `1.5px solid ${uploaded ? 'rgba(22,163,74,.25)' : isUploading ? 'rgba(59,130,246,.2)' : 'var(--surface-border)'}`,
+                        transition: 'all .3s',
+                      }}>
+                        <div style={{ width: 30, height: 30, borderRadius: 7, background: uploaded ? 'rgba(22,163,74,.1)' : 'rgba(26,86,219,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          {fileIcon(f)}
                         </div>
-                        {showTypeChanger && (
-                          <div onClick={e => e.stopPropagation()} style={{ position: 'absolute', top: '110%', left: 0, zIndex: 100, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,.15)', minWidth: 180, overflow: 'hidden' }}>
-                            {Object.keys(TYPE_CARD_COLORS).map(t => (
-                              <button key={t} type="button"
-                                onClick={() => { fmt('type', t); setTypeFields({}); setShowTypeChanger(false); }}
-                                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px', background: t === form.type ? (TYPE_CARD_COLORS[t]?.bg || 'rgba(148,163,184,.1)') : 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 12.5, fontWeight: t === form.type ? 700 : 500, color: t === form.type ? (TYPE_CARD_COLORS[t]?.text || '#64748b') : 'var(--text-color)', textAlign: 'left' }}>
-                                <div style={{ width: 8, height: 8, borderRadius: '50%', background: TYPE_CARD_COLORS[t]?.accent || '#94a3b8', flexShrink: 0 }} />
-                                {t}
-                                {t === form.type && <CheckCircle size={11} color={TYPE_CARD_COLORS[t]?.accent} style={{ marginLeft: 'auto' }} />}
-                              </button>
-                            ))}
-                          </div>
-                        )}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</div>
+                          <div style={{ fontSize: 10.5, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>{formatSize(f.size)}</div>
+                        </div>
+                        {uploaded && <CheckCircle size={13} color="#16a34a" style={{ flexShrink: 0 }} />}
+                        {isUploading && <Clock size={12} color="#3b82f6" style={{ flexShrink: 0 }} />}
+                        <button type="button"
+                          onClick={() => { removeFile(f.name); if (files.length <= 1) { setFileRefs([]); setUploadStep(null); setUploadError(''); } }}
+                          style={{ width: 22, height: 22, borderRadius: 5, border: '1px solid var(--surface-border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <X size={10} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                  {files.length > 4 && (
+                    <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', fontWeight: 600, paddingLeft: 4 }}>+{files.length - 4} more files</div>
+                  )}
+                </div>
+
+                {/* Add more files */}
+                <button type="button" onClick={() => inputRef.current?.click()}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', padding: '7px 0', borderRadius: 8, border: '1px dashed var(--surface-border)', background: 'transparent', color: 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', marginBottom: 14 }}>
+                  <Plus size={12} /> Add more files
+                </button>
+
+                {/* Step indicator */}
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ width: 22, height: 22, borderRadius: '50%', background: fileRefs.length > 0 ? '#16a34a' : 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: 'white', flexShrink: 0 }}>
+                      {fileRefs.length > 0 ? <CheckCircle size={11} /> : '1'}
+                    </div>
+                    <span style={{ fontSize: 11.5, fontWeight: 600, color: fileRefs.length > 0 ? '#16a34a' : 'var(--primary)' }}>Upload File</span>
+                  </div>
+                  <div style={{ flex: 1, height: 2, background: fileRefs.length > 0 ? '#16a34a' : 'var(--surface-border)', margin: '0 10px' }} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ width: 22, height: 22, borderRadius: '50%', background: fileRefs.length > 0 ? 'var(--primary)' : 'var(--surface-200)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: fileRefs.length > 0 ? 'white' : '#94a3b8', flexShrink: 0 }}>2</div>
+                    <span style={{ fontSize: 11.5, fontWeight: 600, color: fileRefs.length > 0 ? 'var(--text-heading)' : 'var(--text-color-secondary)' }}>Fill & Submit</span>
+                  </div>
+                </div>
+
+                {/* Upload File button */}
+                {fileRefs.length === 0 && (
+                  <>
+                    {uploadError && uploadStep === 'error' && (
+                      <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 8, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <AlertCircle size={13} color="#ef4444" style={{ flexShrink: 0 }} />
+                        <span style={{ fontSize: 12, color: '#dc2626', flex: 1 }}>{uploadError}</span>
+                        <button type="button" onClick={() => { setUploadError(''); setUploadStep(null); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444', display: 'flex' }}><X size={11} /></button>
                       </div>
                     )}
-                  </div>
-                  <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>{formatSize(f.size)}</div>
-                </div>
-                {/* Status badge */}
-                {isUploading && (
-                  <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: '#3b82f6', fontWeight: 700, background: 'rgba(59,130,246,.1)', padding: '3px 10px', borderRadius: 20, whiteSpace: 'nowrap' }}>UPLOADING…</span>
+                    <button type="button" onClick={handleUploadFile}
+                      disabled={uploadStep === 'uploading'}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                        width: '100%', padding: '10px 0', borderRadius: 8, border: 'none',
+                        background: uploadStep === 'uploading' ? 'var(--surface-200)' : 'var(--primary)',
+                        color: uploadStep === 'uploading' ? '#94a3b8' : 'white',
+                        fontSize: 13, fontWeight: 700, cursor: uploadStep === 'uploading' ? 'not-allowed' : 'pointer',
+                        fontFamily: 'var(--font)', transition: 'all .2s',
+                        boxShadow: uploadStep === 'uploading' ? 'none' : '0 2px 8px rgba(26,86,219,.25)',
+                      }}>
+                      {uploadStep === 'uploading' ? <><Clock size={14} /> Uploading…</> : <><Upload size={14} /> Upload File</>}
+                    </button>
+                  </>
                 )}
-                {uploaded && (
-                  <span style={{ fontSize: 11, fontWeight: 700, color: '#16a34a', background: 'rgba(22,163,74,.1)', padding: '3px 10px', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' }}>
-                    <CheckCircle size={11} /> Uploaded
-                  </span>
+
+                {/* Replace files (after upload) */}
+                {fileRefs.length > 0 && (
+                  <button type="button"
+                    onClick={() => { setFiles([]); setFileRefs([]); setUploadStep(null); setUploadError(''); }}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', padding: '7px 0', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                    <RotateCcw size={12} /> Replace Files
+                  </button>
                 )}
-                {/* Replace button */}
-                <button type="button"
-                  onClick={() => { setFiles([]); setFileRefs([]); setUploadStep(null); setUploadError(''); setTimeout(() => inputRef.current?.click(), 50); }}
-                  style={{ fontSize: 12, fontWeight: 600, color: 'var(--primary)', background: 'rgba(26,86,219,.08)', border: '1px solid rgba(26,86,219,.2)', borderRadius: 7, padding: '5px 14px', cursor: 'pointer', fontFamily: 'var(--font)', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                  Replace
-                </button>
-                {/* Remove button */}
-                <button type="button"
-                  onClick={() => { removeFile(f.name); if (files.length <= 1) { setFileRefs([]); setUploadStep(null); setUploadError(''); } }}
-                  style={{ width: 28, height: 28, borderRadius: 7, border: '1px solid var(--surface-border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <X size={13} />
-                </button>
-              </div>
-            );
-          })}
-          {files.length > 2 && (
-            <div style={{ fontSize: 12, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', fontWeight: 600, paddingLeft: 4 }}>+{files.length - 2} more files</div>
-          )}
-        </div>
-
-        {/* ── Step indicator ── */}
-        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 18, padding: '8px 0' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ width: 26, height: 26, borderRadius: '50%', background: fileRefs.length > 0 ? '#16a34a' : 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'white', flexShrink: 0 }}>
-              {fileRefs.length > 0 ? <CheckCircle size={13} /> : '1'}
-            </div>
-            <span style={{ fontSize: 12.5, fontWeight: 600, color: fileRefs.length > 0 ? '#16a34a' : 'var(--primary)', whiteSpace: 'nowrap' }}>Upload File</span>
-          </div>
-          <div style={{ flex: 1, height: 2, background: fileRefs.length > 0 ? '#16a34a' : 'var(--surface-border)', margin: '0 14px', minWidth: 24 }} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ width: 26, height: 26, borderRadius: '50%', background: fileRefs.length > 0 ? 'var(--primary)' : 'var(--surface-200)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: fileRefs.length > 0 ? 'white' : '#94a3b8', flexShrink: 0 }}>2</div>
-            <span style={{ fontSize: 12.5, fontWeight: 600, color: fileRefs.length > 0 ? 'var(--text-heading)' : 'var(--text-color-secondary)', whiteSpace: 'nowrap' }}>Fill Details & Submit</span>
-          </div>
-        </div>
-
-        {/* ── Step 1: Upload File button ── */}
-        {fileRefs.length === 0 && (
-          <>
-            {uploadError && uploadStep === 'error' && (
-              <div style={{ marginBottom: 14, padding: '10px 14px', borderRadius: 8, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                <AlertCircle size={14} color="#ef4444" style={{ flexShrink: 0 }} />
-                <span style={{ fontSize: 12.5, color: '#dc2626', flex: 1 }}>{uploadError}</span>
-                <button type="button" onClick={() => { setUploadError(''); setUploadStep(null); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444' }}><X size={12} /></button>
-              </div>
+              </>
             )}
-            <button type="button" onClick={handleUploadFile}
-              disabled={uploadStep === 'uploading'}
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9,
-                width: '100%', padding: '12px 0', borderRadius: 9, border: 'none',
-                background: uploadStep === 'uploading' ? 'var(--surface-200)' : 'var(--primary)',
-                color: uploadStep === 'uploading' ? '#94a3b8' : 'white',
-                fontSize: 14, fontWeight: 700, cursor: uploadStep === 'uploading' ? 'not-allowed' : 'pointer',
-                fontFamily: 'var(--font)', transition: 'all .2s',
-                boxShadow: uploadStep === 'uploading' ? 'none' : '0 2px 10px rgba(26,86,219,.28)',
-              }}>
-              {uploadStep === 'uploading'
-                ? <><Clock size={15} /> Uploading…</>
-                : <><Upload size={15} /> Upload File</>}
-            </button>
-          </>
-        )}
+          </Card>
 
-        {/* ── Step 2: Metadata form (only after Step 1 succeeds) ── */}
-        {fileRefs.length > 0 && <>
-        {uploadError && uploadStep === 'error' && (
-          <div style={{ marginBottom: 14, padding: '10px 14px', borderRadius: 8, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <AlertCircle size={14} color="#ef4444" style={{ flexShrink: 0 }} />
-            <span style={{ fontSize: 12.5, color: '#dc2626', flex: 1 }}>{uploadError}</span>
-            <button type="button" onClick={() => { setUploadError(''); setUploadStep(null); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444' }}><X size={12} /></button>
-          </div>
-        )}
+        </div>
 
+        {/* ── RIGHT: Document Details form ───────────────────────────────────── */}
+        <Card>
+          {!form.type ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 460, textAlign: 'center', gap: 14 }}>
+              <div style={{ width: 52, height: 52, borderRadius: 14, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <FileText size={22} color="var(--text-color-secondary)" strokeWidth={1.5} />
+              </div>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 6 }}>Select a Document Type</div>
+                <div style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>Choose the document type on the left to see the relevant form fields</div>
+              </div>
+            </div>
+          ) : files.length === 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 460, textAlign: 'center', gap: 14 }}>
+              <div style={{ width: 52, height: 52, borderRadius: 14, background: TYPE_CARD_COLORS[form.type]?.bg || 'var(--surface-ground)', border: `1px solid ${TYPE_CARD_COLORS[form.type]?.accent || 'var(--surface-border)'}30`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Upload size={22} color={TYPE_CARD_COLORS[form.type]?.accent || 'var(--text-color-secondary)'} strokeWidth={1.5} />
+              </div>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 6 }}>Upload a {form.type} file</div>
+                <div style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>Drop a PDF or ZIP on the left, then click Upload File to continue</div>
+              </div>
+            </div>
+          ) : fileRefs.length === 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 460, textAlign: 'center', gap: 14 }}>
+              <div style={{ width: 52, height: 52, borderRadius: 14, background: 'rgba(26,86,219,.08)', border: '1px solid rgba(26,86,219,.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Upload size={22} color="var(--primary)" strokeWidth={1.5} />
+              </div>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 6 }}>File ready — click Upload File</div>
+                <div style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>The file will be sent to the server before you fill in the details</div>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Form header */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18, paddingBottom: 14, borderBottom: '1px solid var(--surface-border)' }}>
+                <div style={{ width: 28, height: 28, borderRadius: 7, background: TYPE_CARD_COLORS[form.type]?.bg || 'var(--surface-ground)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <FileText size={13} color={TYPE_CARD_COLORS[form.type]?.accent || 'var(--primary)'} />
+                </div>
+                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>Document Details</span>
+                {autoFillLoading && <span style={{ marginLeft: 4, fontSize: 11, fontFamily: 'var(--mono)', color: '#3b82f6', fontWeight: 700 }}>⚡ AUTO-FILLING…</span>}
+                {files.length > 1 && <span style={{ fontSize: 11, fontWeight: 600, background: 'rgba(59,130,246,.1)', color: '#3b82f6', padding: '2px 9px', borderRadius: 20 }}>Applied to all {files.length} files</span>}
+              </div>
+              {uploadError && uploadStep === 'error' && (
+                <div style={{ marginBottom: 14, padding: '10px 14px', borderRadius: 8, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <AlertCircle size={14} color="#ef4444" style={{ flexShrink: 0 }} />
+                  <span style={{ fontSize: 12.5, color: '#dc2626', flex: 1 }}>{uploadError}</span>
+                  <button type="button" onClick={() => { setUploadError(''); setUploadStep(null); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444', display: 'flex' }}><X size={12} /></button>
+                </div>
+              )}
         <form onSubmit={handleSubmit}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
 
@@ -1950,8 +1939,11 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
             </button>
           </div>
         </form>
-        </>}
-      </Card>}
+            </>
+          )}
+        </Card>
+
+      </div>
 
       {/* ── Drawer: Hierarchical Tags / Relationship ── */}
       {drawerType && (
