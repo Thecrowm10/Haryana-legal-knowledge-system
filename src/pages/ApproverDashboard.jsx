@@ -635,6 +635,36 @@ function DocumentDetailsPanel({ doc }) {
           </div>
         )}
 
+        {/* ── Parent Act (Amendment only) ── */}
+        {doc.type === 'Amendment' && (() => {
+          const parent = doc.relationships?.find(r => r.type === 'parent_act' || r.type === 'amends');
+          if (!parent) return null;
+          return (
+            <div>
+              <div style={{ ...LABEL, marginBottom: 8 }}>Parent Hierarchy</div>
+              <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(26,86,219,.04)', border: '1px solid rgba(26,86,219,.2)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 9.5, fontFamily: 'var(--mono)', fontWeight: 700, letterSpacing: '.07em', color: '#1a56db', background: 'rgba(26,86,219,.12)', padding: '2px 7px', borderRadius: 10, flexShrink: 0 }}>
+                    {parent.type === 'parent_act' ? 'PARENT ACT' : 'AMENDS'}
+                  </span>
+                  <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {parent.document_name || `Document #${parent.pdf_id}`}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 2 }}>
+                  <ChevronRight size={11} color="#94a3b8" style={{ flexShrink: 0 }} />
+                  <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--primary)', fontFamily: 'var(--mono)' }}>
+                    {doc.title}
+                  </span>
+                  <span style={{ fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '1px 6px', borderRadius: 8 }}>
+                    Amendment
+                  </span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* ── Description ── */}
         {doc.desc && (
           <div>
@@ -871,6 +901,7 @@ function mapApiDoc(d) {
     authority:       d.legal_authority || '',
     remarks:         d.latest_approval?.comments || '',
     fileUrl:         null,
+    relationships:   d.relationships || [],
   };
 }
 

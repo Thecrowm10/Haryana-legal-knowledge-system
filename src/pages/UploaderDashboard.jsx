@@ -566,7 +566,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   const [form, setForm]             = useState({ act: '', dept: user?.dept || '', type: '', version: '1.0', desc: '', enactmentDate: '', parentAct: '', changeTypes: [] });
   const [amendmentProvisions, setAmendmentProvisions] = useState([]);
   const [typeFields, setTypeFields]  = useState({});
-  const [hierarchy, setHierarchy]   = useState({ act: '', chapter: '', section: '', subsection: '' });
+  const [hierarchy, setHierarchy]   = useState({ act: '', actId: null, chapter: '', section: '', subsection: '' });
   const [rejected, setRejected]     = useState([]);
   const [versionModal, setVersionModal] = useState(null);
   const [conflictModal, setConflictModal] = useState(null); // { existingDoc, pendingDocs, pendingRelations }
@@ -598,7 +598,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   const [parentActSearch, setParentActSearch] = useState('');
   const [showParentActDrop, setShowParentActDrop] = useState(false);
   const [drawerType,      setDrawerType]      = useState(null); // null | 'hierarchy' | 'relationship'
-  const [drawerHierarchy, setDrawerHierarchy] = useState({ act: '', chapter: '', section: '', subsection: '' });
+  const [drawerHierarchy, setDrawerHierarchy] = useState({ act: '', actId: null, chapter: '', section: '', subsection: '' });
 
   // AI analysis state
   const [analysisResults, setAnalysisResults] = useState([]);
@@ -721,7 +721,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
 
     setFiles([]); setFileRefs([]); setRelations([]);
     setForm({ act:'',dept:user?.dept||'',type:'',version:'1.0',desc:'',enactmentDate:'',parentAct:'',changeTypes:[] });
-    setHierarchy({ act:'',chapter:'',section:'',subsection:'' });
+    setHierarchy({ act:'', actId: null, chapter:'',section:'',subsection:'' });
     setAmendmentProvisions([]); setParentActSearch(''); setTypeFields({});
     setTimeout(async () => {
       const allDocsNow = [...documents, ...docsWithWorkflow.map(d => ({ ...d, uid: `upload-${d.id}` }))];
@@ -796,7 +796,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
       .join('; ') || '';
 
     // relationships: map local relation objects to API shape
-    const relationshipsPayload = relations
+    const explicitRels = relations
       .filter(r => !r.isPending && r.targetId)
       .map(r => {
         const doc = documents.find(d => d.uid === r.targetId);
@@ -806,6 +806,14 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         };
       })
       .filter(r => r.pdf_id !== null);
+
+    // For Amendment: auto-include hierarchy Act as parent_act if selected from API search
+    const hierarchyRel = (form.type === 'Amendment' && hierarchy.actId &&
+      !explicitRels.some(r => r.pdf_id === hierarchy.actId))
+      ? [{ pdf_id: hierarchy.actId, type: 'parent_act' }]
+      : [];
+
+    const relationshipsPayload = [...explicitRels, ...hierarchyRel];
 
     for (const f of files) {
       let apiDoc = null;
@@ -1993,7 +2001,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                       </div>
                       <div style={{ position: 'relative' }}>
                         <input value={drawerHierarchy.act}
-                          onChange={e => { setDrawerHierarchy(v => ({ ...v, act: e.target.value })); fetchDocSuggestions('Act', e.target.value); }}
+                          onChange={e => { setDrawerHierarchy(v => ({ ...v, act: e.target.value, actId: null })); fetchDocSuggestions('Act', e.target.value); }}
                           onFocus={e => { focusStyle(e); if (drawerHierarchy.act) fetchDocSuggestions('Act', drawerHierarchy.act); setShowHierActDrop(true); }}
                           onBlur={e => { blurStyle(e); setTimeout(() => setShowHierActDrop(false), 180); }}
                           placeholder="Type to search Acts…" style={{ ...INPUT_BASE, width: '100%' }}
@@ -2003,7 +2011,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                           <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 400, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 8, boxShadow: '0 6px 20px rgba(0,0,0,.13)', maxHeight: 220, overflow: 'auto', marginTop: 3 }}>
                             {actSuggestions.map(a => (
                               <div key={a.id}
-                                onMouseDown={() => { setDrawerHierarchy(v => ({ ...v, act: a.document_name })); setActSuggestions([]); setShowHierActDrop(false); }}
+                                onMouseDown={() => { setDrawerHierarchy(v => ({ ...v, act: a.document_name, actId: a.id })); setActSuggestions([]); setShowHierActDrop(false); }}
                                 style={{ padding: '9px 12px', cursor: 'pointer', borderBottom: '1px solid var(--surface-border)' }}
                                 onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
                                 onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
@@ -2122,7 +2130,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                       <div style={{ ...LABEL, marginBottom: 6 }}>Act / Rule Name</div>
                       <div style={{ position: 'relative' }}>
                         <input value={drawerHierarchy.act}
-                          onChange={e => { setDrawerHierarchy(v => ({ ...v, act: e.target.value, section: '', chapter: '' })); fetchDocSuggestions('Act', e.target.value); }}
+                          onChange={e => { setDrawerHierarchy(v => ({ ...v, act: e.target.value, actId: null, section: '', chapter: '' })); fetchDocSuggestions('Act', e.target.value); }}
                           onFocus={e => { focusStyle(e); if (drawerHierarchy.act) fetchDocSuggestions('Act', drawerHierarchy.act); setShowHierActDrop(true); }}
                           onBlur={e => { blurStyle(e); setTimeout(() => setShowHierActDrop(false), 180); }}
                           placeholder="Type to search Acts…" style={{ ...INPUT_BASE, width: '100%' }} />
@@ -2131,7 +2139,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                           <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 400, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 8, boxShadow: '0 6px 20px rgba(0,0,0,.13)', maxHeight: 220, overflow: 'auto', marginTop: 3 }}>
                             {actSuggestions.map(a => (
                               <div key={a.id}
-                                onMouseDown={() => { setDrawerHierarchy(v => ({ ...v, act: a.document_name, section: '', chapter: '', subsection: '' })); setActSuggestions([]); setShowHierActDrop(false); }}
+                                onMouseDown={() => { setDrawerHierarchy(v => ({ ...v, act: a.document_name, actId: a.id, section: '', chapter: '', subsection: '' })); setActSuggestions([]); setShowHierActDrop(false); }}
                                 style={{ padding: '9px 12px', cursor: 'pointer', borderBottom: '1px solid var(--surface-border)' }}
                                 onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
                                 onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
