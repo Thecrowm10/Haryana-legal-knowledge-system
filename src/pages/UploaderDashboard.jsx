@@ -707,10 +707,16 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   // ── Step 1: upload files to get file_refs ──────────────────────────────────
   async function handleUploadFile() {
     if (files.length === 0) return;
+    const hasToken = !!localStorage.getItem('token');
     setUploadStep('uploading');
     setUploadError('');
     const refs = [];
     for (const f of files) {
+      if (!hasToken) {
+        // Demo mode: no real upload, placeholder so form can show
+        refs.push({ fileName: f.name, fileRef: null, originalFilename: f.name, fileSize: f.size });
+        continue;
+      }
       try {
         const fd = new FormData();
         fd.append('file', f);
@@ -738,47 +744,89 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     if (files.length === 0) return;
 
     setUploadError('');
-    setUploadStep('uploading');
+    setUploadStep('saving');
 
     const hasToken  = !!localStorage.getItem('token');
-    const deptObj   = deptsData.find(d => d.name === form.dept);
     const typeObj   = typesData.find(d => d.name === form.type);
     const newDocs   = [];
+
+    // Derive the type-specific reference number from typeFields
+    const REFERENCE_NUMBER_KEY = {
+      'Act':               'actNumber',
+      'Amendment':         'amendmentNumber',
+      'Circular':          'circularNumber',
+      'Notification':      'notificationNumber',
+      'Order / Gazette':   'orderNumber',
+      'Policy':            'policyNumber',
+      'Rules & Regulations': 'ruleNumber',
+    };
+    const refNumKey = REFERENCE_NUMBER_KEY[form.type];
+    const referenceNumber = refNumKey ? (typeFields[refNumKey] || '') : '';
+
+    // effective_from: different typeFields key per type
+    const effectiveFrom = typeFields.commencementDate || typeFields.effectiveFrom || null;
+
+    // legal_authority: join legalAuthorities entries that have an act set
+    const legalAuthStr = legalAuthorities
+      .filter(a => a.act)
+      .map(a => {
+        const sections = a.sections.filter(Boolean);
+        return sections.length > 0 ? `${a.act} (${sections.join(', ')})` : a.act;
+      })
+      .join('; ') || '';
+
+    // relationships: map local relation objects to API shape
+    const relationshipsPayload = relations
+      .filter(r => !r.isPending && r.targetId)
+      .map(r => {
+        const doc = documents.find(d => d.uid === r.targetId);
+        return {
+          pdf_id: typeof doc?.id === 'number' ? doc.id : null,
+          type:   r.label?.toLowerCase().replace(/\s+/g, '_') || 'related',
+        };
+      })
+      .filter(r => r.pdf_id !== null);
 
     for (const f of files) {
       let apiDoc = null;
 
-      // Try API path only when a real token exists
+      // Use file_ref obtained in Step 1; skip API when no token (demo mode)
       if (hasToken) {
         try {
-          const fd = new FormData();
-          fd.append('file', f);
-          const res = await uploadPdfFile(fd);
-          const refEntry = {
-            fileName:         f.name,
-            fileRef:          res.data.file_ref,
-            originalFilename: res.data.original_filename ?? f.name,
-            fileSize:         res.data.file_size ?? f.size,
-          };
-          setFileRefs(prev => [...prev, refEntry]);
-          setUploadStep('saving');
+          const refEntry = fileRefs.find(r => r.fileName === f.name);
+          if (!refEntry || !refEntry.fileRef) {
+            setUploadError(`"${f.name}" has not been uploaded yet. Please click Upload File first.`);
+            setUploadStep('error');
+            return;
+          }
 
           const payload = {
-            file_ref:          refEntry.fileRef,
-            act_name:          form.act || f.name.replace(/\.(pdf|zip)$/i, ''),
-            gazette_reference: '',
-            issuing_authority: deptObj?.name || form.dept || '',
-            enactment_date:    form.enactmentDate || null,
-            version_no:        form.version || '1.0',
-            department_id:     deptObj?.id ?? null,
-            document_type_id:  typeObj?.id ?? null,
-            tag_ids:           [],
-            description:       form.desc || '',
+            file_ref:              refEntry.fileRef,
+            document_type_id:      typeObj?.id ?? null,
+            document_name:         form.act || f.name.replace(/\.(pdf|zip)$/i, ''),
+            issue_date:            form.enactmentDate || null,
+            reference_number:      referenceNumber,
+            effective_from:        effectiveFrom,
+            gazette_reference:     typeFields.gazetteRef || '',
+            legal_authority:       legalAuthStr,
+            version_no:            form.version || '1.0',
+            short_title:           typeFields.shortTitle || '',
+            valid_until:           typeFields.validity || null,
+            sector_domain:         typeFields.sector || '',
+            implementing_agency:   typeFields.implementingAgency || '',
+            next_review_date:      typeFields.reviewDate || null,
+            rule_making_authority: typeFields.ruleAuthority || '',
+            tag_ids:               [],
+            relationships:         relationshipsPayload,
+            description:           form.desc || '',
           };
           const res2 = await uploadPdfMetadata(payload);
           apiDoc = res2.data;
-        } catch {
-          // API unavailable — fall through to local/demo path below
+        } catch (err) {
+          const detail = err.response?.data?.detail;
+          setUploadError(typeof detail === 'string' ? detail : `Failed to save metadata for "${f.name}"`);
+          setUploadStep('error');
+          return;
         }
       }
 
@@ -789,14 +837,14 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
 
       newDocs.push({
         id:            apiDoc?.id ?? (Date.now() + Math.random()),
-        title:         apiDoc?.act_name || form.act || f.name.replace(/\.(pdf|zip)$/i, ''),
+        title:         apiDoc?.document_name || form.act || f.name.replace(/\.(pdf|zip)$/i, ''),
         type:          typeObj?.name || form.type || 'Act',
-        dept:          deptObj?.name || form.dept || 'General Administration',
+        dept:          user?.dept || form.dept || 'General Administration',
         year:          form.enactmentDate ? new Date(form.enactmentDate).getFullYear() : new Date().getFullYear(),
         status:        'pending',
         legalStatus:   'active',
         pages:         f.name.endsWith('.zip') ? null : (numPages || 1),
-        uploader:      user?.name || 'Priya Sharma',
+        uploader:      user?.name || 'Uploader',
         uploadedAt:    new Date().toISOString().split('T')[0],
         section:       '1', paragraph: '1',
         version:       apiDoc?.version_no || form.version || '1.0',
@@ -806,9 +854,12 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         isZip:         f.name.endsWith('.zip'),
         fileUrl:       f.name.endsWith('.pdf') ? URL.createObjectURL(f) : null,
         hierarchy,
-        gazette:           '',
-        authority:         deptObj?.name || form.dept || '',
-        enactmentDate:     apiDoc?.enactment_date || form.enactmentDate || '',
+        gazette:           apiDoc?.gazette_reference || typeFields.gazetteRef || '',
+        authority:         apiDoc?.legal_authority   || legalAuthStr || '',
+        enactmentDate:     apiDoc?.issue_date        || form.enactmentDate || '',
+        effectiveFrom:     apiDoc?.effective_from    || effectiveFrom || '',
+        referenceNumber:   apiDoc?.reference_number  || referenceNumber || '',
+        shortTitle:        apiDoc?.short_title       || typeFields.shortTitle || '',
         amendmentProvisions: form.type === 'Amendment' ? amendmentProvisions.filter(p => p.section) : [],
         typeFields:        { ...typeFields },
         legalAuthorities:  legalAuthorities.filter(a => a.act),
@@ -1438,6 +1489,51 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
           )}
         </div>
 
+        {/* ── Step indicator ── */}
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 18, padding: '8px 0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 26, height: 26, borderRadius: '50%', background: fileRefs.length > 0 ? '#16a34a' : 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'white', flexShrink: 0 }}>
+              {fileRefs.length > 0 ? <CheckCircle size={13} /> : '1'}
+            </div>
+            <span style={{ fontSize: 12.5, fontWeight: 600, color: fileRefs.length > 0 ? '#16a34a' : 'var(--primary)', whiteSpace: 'nowrap' }}>Upload File</span>
+          </div>
+          <div style={{ flex: 1, height: 2, background: fileRefs.length > 0 ? '#16a34a' : 'var(--surface-border)', margin: '0 14px', minWidth: 24 }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 26, height: 26, borderRadius: '50%', background: fileRefs.length > 0 ? 'var(--primary)' : 'var(--surface-200)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: fileRefs.length > 0 ? 'white' : '#94a3b8', flexShrink: 0 }}>2</div>
+            <span style={{ fontSize: 12.5, fontWeight: 600, color: fileRefs.length > 0 ? 'var(--text-heading)' : 'var(--text-color-secondary)', whiteSpace: 'nowrap' }}>Fill Details & Submit</span>
+          </div>
+        </div>
+
+        {/* ── Step 1: Upload File button ── */}
+        {fileRefs.length === 0 && (
+          <>
+            {uploadError && uploadStep === 'error' && (
+              <div style={{ marginBottom: 14, padding: '10px 14px', borderRadius: 8, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <AlertCircle size={14} color="#ef4444" style={{ flexShrink: 0 }} />
+                <span style={{ fontSize: 12.5, color: '#dc2626', flex: 1 }}>{uploadError}</span>
+                <button type="button" onClick={() => { setUploadError(''); setUploadStep(null); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444' }}><X size={12} /></button>
+              </div>
+            )}
+            <button type="button" onClick={handleUploadFile}
+              disabled={uploadStep === 'uploading'}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 9,
+                width: '100%', padding: '12px 0', borderRadius: 9, border: 'none',
+                background: uploadStep === 'uploading' ? 'var(--surface-200)' : 'var(--primary)',
+                color: uploadStep === 'uploading' ? '#94a3b8' : 'white',
+                fontSize: 14, fontWeight: 700, cursor: uploadStep === 'uploading' ? 'not-allowed' : 'pointer',
+                fontFamily: 'var(--font)', transition: 'all .2s',
+                boxShadow: uploadStep === 'uploading' ? 'none' : '0 2px 10px rgba(26,86,219,.28)',
+              }}>
+              {uploadStep === 'uploading'
+                ? <><Clock size={15} /> Uploading…</>
+                : <><Upload size={15} /> Upload File</>}
+            </button>
+          </>
+        )}
+
+        {/* ── Step 2: Metadata form (only after Step 1 succeeds) ── */}
+        {fileRefs.length > 0 && <>
         {uploadError && uploadStep === 'error' && (
           <div style={{ marginBottom: 14, padding: '10px 14px', borderRadius: 8, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', display: 'flex', alignItems: 'center', gap: 8 }}>
             <AlertCircle size={14} color="#ef4444" style={{ flexShrink: 0 }} />
@@ -1854,6 +1950,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
             </button>
           </div>
         </form>
+        </>}
       </Card>}
 
       {/* ── Drawer: Hierarchical Tags / Relationship ── */}
