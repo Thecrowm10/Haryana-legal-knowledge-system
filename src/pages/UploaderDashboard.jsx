@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+﻿import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Upload, FileText, CheckCircle, X, TrendingUp, Archive, Download,
   RotateCcw, AlertCircle, Eye, GitBranch, Plus, Cpu, Link, Clock,
@@ -501,10 +501,20 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   const DEPTS = deptsData.length > 0 ? deptsData.map(d => d.name) : DEFAULT_DEPTS;
   const TYPES = typesData.length > 0 ? typesData.map(d => d.name) : DEFAULT_TYPES;
 
+  const [showTypeChanger, setShowTypeChanger] = useState(false);
+
   useEffect(() => {
+    if (!localStorage.getItem('token')) return;
     getDepartments().then(res => setDeptsData(res.data)).catch(() => {});
     getDocumentTypes().then(res => setTypesData(res.data)).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!showTypeChanger) return;
+    const close = () => setShowTypeChanger(false);
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, [showTypeChanger]);
 
   const [uploads, setUploads] = useState(
     documents.filter(d => d.uploader === 'Priya Sharma')
@@ -534,7 +544,13 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   const [relNote, setRelNote]         = useState('');
   const [amendChanges, setAmendChanges] = useState([{ chapter: '', section: '', subsection: '', changeType: 'Amended', description: '' }]);
   const [legalAuthorities, setLegalAuthorities] = useState([{ act: '', sections: [''] }]);
+  const [showAuthDrop, setShowAuthDrop] = useState(null);     // legal authority act dropdown
+  const [showSectionDrop, setShowSectionDrop] = useState(null); // legal authority section dropdown
+  const [showHierActDrop, setShowHierActDrop] = useState(false); // hierarchy drawer act dropdown
+  const [showHierSecDrop, setShowHierSecDrop] = useState(false); // hierarchy drawer section dropdown
   const [showRelDrop, setShowRelDrop] = useState(false);
+  const [relSection, setRelSection] = useState('');            // section of the linked document
+  const [showRelSecDrop, setShowRelSecDrop] = useState(false); // relationship section dropdown
   const [parentActSearch, setParentActSearch] = useState('');
   const [showParentActDrop, setShowParentActDrop] = useState(false);
   const [drawerType,      setDrawerType]      = useState(null); // null | 'hierarchy' | 'relationship'
@@ -563,6 +579,19 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   const fmt      = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const approvedDocs = documents.filter(d => d.status === 'approved');
+
+  // Extract all "Section X" mentions from a document's description + section field
+  function getSectionsFromDoc(actTitle) {
+    const doc = approvedDocs.find(d => d.title === actTitle);
+    if (!doc) return [];
+    const found = new Set();
+    if (doc.section) found.add(`Section ${doc.section}`);
+    if (doc.desc) {
+      for (const m of doc.desc.matchAll(/Section\s+(\d+[A-Za-z]?(?:\([a-z0-9]+\))?)/gi))
+        found.add(`Section ${m[1]}`);
+    }
+    return [...found];
+  }
   const relFiltered  = approvedDocs
     .filter(d =>
       d.title.toLowerCase().includes(relSearch.toLowerCase()) &&
@@ -609,13 +638,13 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     if (!relTarget) return;
     if (relTarget.startsWith('__pending__:')) {
       const pendingName = relTarget.replace('__pending__:', '');
-      setRelations(r => [...r, { targetId: null, targetTitle: pendingName, targetType: relDocType, label: relType, note: relNote.trim(), isPending: true }]);
+      setRelations(r => [...r, { targetId: null, targetTitle: pendingName, targetType: relDocType, label: relType, note: relNote.trim(), section: relSection.trim(), isPending: true }]);
     } else {
       const doc = documents.find(d => d.uid === relTarget);
       if (!doc || relations.find(r => r.targetId === relTarget && r.label === relType)) return;
-      setRelations(r => [...r, { targetId: relTarget, targetTitle: doc.title, targetType: doc.type || relDocType, label: relType, note: relNote.trim(), isPending: false }]);
+      setRelations(r => [...r, { targetId: relTarget, targetTitle: doc.title, targetType: doc.type || relDocType, label: relType, note: relNote.trim(), section: relSection.trim(), isPending: false }]);
     }
-    setRelTarget(''); setRelSearch(''); setRelNote(''); setRelDocType('');
+    setRelTarget(''); setRelSearch(''); setRelNote(''); setRelDocType(''); setRelSection('');
   }
   function removeRelation(idx) { setRelations(r => r.filter((_, i) => i !== idx)); }
 
@@ -703,96 +732,88 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     setUploadStep('ready');
   }
 
-  // ── Upload + save in one go (called on form submit) ───────────────────────
+  // ── Upload + save in one go (called on form submit) ────────────────────────
   async function handleSubmit(e) {
     e.preventDefault();
     if (files.length === 0) return;
 
     setUploadError('');
-
-    // Step 1: upload files → collect refs locally
     setUploadStep('uploading');
-    const refs = [];
-    for (const f of files) {
-      try {
-        const fd = new FormData();
-        fd.append('file', f);
-        const res = await uploadPdfFile(fd);
-        refs.push({
-          fileName:         f.name,
-          fileRef:          res.data.file_ref,
-          originalFilename: res.data.original_filename ?? f.name,
-          fileSize:         res.data.file_size ?? f.size,
-        });
-      } catch (err) {
-        const detail = err.response?.data?.detail;
-        setUploadError(typeof detail === 'string' ? detail : `Upload failed for "${f.name}"`);
-        setUploadStep('error');
-        return;
-      }
-    }
-    setFileRefs(refs);
 
-    // Step 2: save metadata
-    setUploadStep('saving');
-
-    const deptObj = deptsData.find(d => d.name === form.dept);
-    const typeObj = typesData.find(d => d.name === form.type);
-    const newDocs = [];
+    const hasToken  = !!localStorage.getItem('token');
+    const deptObj   = deptsData.find(d => d.name === form.dept);
+    const typeObj   = typesData.find(d => d.name === form.type);
+    const newDocs   = [];
 
     for (const f of files) {
-      const refEntry = refs.find(r => r.fileName === f.name);
-      if (!refEntry) continue;
+      let apiDoc = null;
 
-      let apiDoc;
-      try {
-        const payload = {
-          file_ref:          refEntry.fileRef,
-          act_name:          form.act || f.name.replace(/\.(pdf|zip)$/i, ''),
-          gazette_reference: '',
-          issuing_authority: deptObj?.name || form.dept || '',
-          enactment_date:    form.enactmentDate || null,
-          version_no:        form.version || '1.0',
-          department_id:     deptObj?.id ?? null,
-          document_type_id:  typeObj?.id ?? null,
-          tag_ids:           [],
-          description:       form.desc || '',
-        };
-        const res2 = await uploadPdfMetadata(payload);
-        apiDoc = res2.data;
-      } catch (err) {
-        const detail = err.response?.data?.detail;
-        setUploadError(typeof detail === 'string' ? detail : `Metadata save failed for "${f.name}"`);
-        setUploadStep('error');
-        return;
+      // Try API path only when a real token exists
+      if (hasToken) {
+        try {
+          const fd = new FormData();
+          fd.append('file', f);
+          const res = await uploadPdfFile(fd);
+          const refEntry = {
+            fileName:         f.name,
+            fileRef:          res.data.file_ref,
+            originalFilename: res.data.original_filename ?? f.name,
+            fileSize:         res.data.file_size ?? f.size,
+          };
+          setFileRefs(prev => [...prev, refEntry]);
+          setUploadStep('saving');
+
+          const payload = {
+            file_ref:          refEntry.fileRef,
+            act_name:          form.act || f.name.replace(/\.(pdf|zip)$/i, ''),
+            gazette_reference: '',
+            issuing_authority: deptObj?.name || form.dept || '',
+            enactment_date:    form.enactmentDate || null,
+            version_no:        form.version || '1.0',
+            department_id:     deptObj?.id ?? null,
+            document_type_id:  typeObj?.id ?? null,
+            tag_ids:           [],
+            description:       form.desc || '',
+          };
+          const res2 = await uploadPdfMetadata(payload);
+          apiDoc = res2.data;
+        } catch {
+          // API unavailable — fall through to local/demo path below
+        }
       }
 
+      // Extract text from PDF regardless of API availability
       const { text: extractedText, numPages, pageTexts, pageWords } = f.name.endsWith('.pdf')
         ? await extractPdfText(f)
         : { text: '', numPages: null, pageTexts: [], pageWords: [] };
 
       newDocs.push({
-        id:            apiDoc.id ?? (Date.now() + Math.random()),
-        title:         apiDoc.act_name || form.act || f.name.replace(/\.(pdf|zip)$/i, ''),
+        id:            apiDoc?.id ?? (Date.now() + Math.random()),
+        title:         apiDoc?.act_name || form.act || f.name.replace(/\.(pdf|zip)$/i, ''),
         type:          typeObj?.name || form.type || 'Act',
-        dept:          deptObj?.name || form.dept || 'General',
+        dept:          deptObj?.name || form.dept || 'General Administration',
         year:          form.enactmentDate ? new Date(form.enactmentDate).getFullYear() : new Date().getFullYear(),
         status:        'pending',
         legalStatus:   'active',
         pages:         f.name.endsWith('.zip') ? null : (numPages || 1),
-        uploader:      'Priya Sharma',
+        uploader:      user?.name || 'Priya Sharma',
         uploadedAt:    new Date().toISOString().split('T')[0],
         section:       '1', paragraph: '1',
-        version:       apiDoc.version_no || form.version || '1.0',
+        version:       apiDoc?.version_no || form.version || '1.0',
+        desc:          form.desc || '',
         ocrStatus:     f.name.endsWith('.zip') ? 'queued' : 'processing',
-        fileName:      refEntry.originalFilename,
+        fileName:      f.name,
         isZip:         f.name.endsWith('.zip'),
         fileUrl:       f.name.endsWith('.pdf') ? URL.createObjectURL(f) : null,
         hierarchy,
         gazette:           '',
         authority:         deptObj?.name || form.dept || '',
-        enactmentDate:     apiDoc.enactment_date || form.enactmentDate || '',
+        enactmentDate:     apiDoc?.enactment_date || form.enactmentDate || '',
         amendmentProvisions: form.type === 'Amendment' ? amendmentProvisions.filter(p => p.section) : [],
+        typeFields:        { ...typeFields },
+        legalAuthorities:  legalAuthorities.filter(a => a.act),
+        docRelations:      relations.map(r => ({ ...r })),
+        parentAct:         form.parentAct || '',
         extractedText:  extractedText || '',
         extractedPages: pageTexts.length > 0 ? pageTexts : null,
         extractedWords: pageWords.length  > 0 ? pageWords : null,
@@ -819,7 +840,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
       finalizeUpload(newDocs, relations);
     }
   }
-
   // Called when user clicks "Upload as vX.X" in the conflict modal
   function handleConflictResolve(newVersion) {
     const { pendingDocs, pendingRelations } = conflictModal;
@@ -1124,16 +1144,14 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                   <th style={{ padding: '10px 14px', textAlign: 'left' }}><SortBtn col="type" label="Type" /></th>
                   <th style={{ padding: '10px 14px', textAlign: 'left' }}><SortBtn col="dept" label="Department" /></th>
                   <th style={{ padding: '10px 14px', textAlign: 'left' }}><SortBtn col="year" label="Year" /></th>
-                  <th style={{ ...LABEL, padding: '10px 14px', textAlign: 'left' }}>Workflow</th>
                   <th style={{ padding: '10px 14px', textAlign: 'left' }}><SortBtn col="status" label="Status" /></th>
                   <th style={{ padding: '10px 14px', textAlign: 'left' }}><SortBtn col="uploadedAt" label="Uploaded On" /></th>
-                  <th style={{ ...LABEL, padding: '10px 14px', textAlign: 'left' }}>OCR</th>
                   <th style={{ ...LABEL, padding: '10px 14px', textAlign: 'left' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 && (
-                  <tr><td colSpan={10} style={{ padding: '52px 0', textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>No published documents yet.</td></tr>
+                  <tr><td colSpan={8} style={{ padding: '52px 0', textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>No published documents yet.</td></tr>
                 )}
                 {filtered.map(doc => {
                   const isDraft = !doc.workflowStatus || doc.workflowStatus === WORKFLOW_STATUS.DRAFT;
@@ -1170,15 +1188,8 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                     <td style={{ padding: '12px 14px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)' }}>{doc.type}</td>
                     <td style={{ padding: '12px 14px', fontSize: 12, color: 'var(--text-color-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.dept}</td>
                     <td style={{ padding: '12px 14px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)' }}>{doc.year}</td>
-                    <td style={{ padding: '12px 14px' }}><WorkflowBadge status={doc.workflowStatus || WORKFLOW_STATUS.DRAFT} /></td>
                     <td style={{ padding: '12px 14px' }}><Badge label={doc.status} variant={doc.status} /></td>
                     <td style={{ padding: '12px 14px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)' }}>{doc.uploadedAt}</td>
-                    <td style={{ padding: '12px 14px' }}>
-                      <span style={{ fontSize: 10.5, fontWeight: 700, fontFamily: 'var(--mono)', padding: '2px 8px', borderRadius: 20,
-                        background: doc.ocrStatus === 'completed' ? 'rgba(34,197,94,.1)' : doc.ocrStatus === 'processing' ? 'rgba(59,130,246,.1)' : 'rgba(245,158,11,.1)',
-                        color:      doc.ocrStatus === 'completed' ? '#16a34a' : doc.ocrStatus === 'processing' ? '#3b82f6' : '#d97706',
-                      }}>{(doc.ocrStatus || 'completed').toUpperCase()}</span>
-                    </td>
                     <td style={{ padding: '12px 14px' }}>
                       <button onClick={() => setVersionModal(doc)}
                         style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 6, border: '1px solid var(--surface-border)', background: 'transparent', color: 'var(--text-color-secondary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
@@ -1373,15 +1384,26 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</div>
                     {form.type && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0, padding: '2px 10px 2px 7px', borderRadius: 20, background: TYPE_CARD_COLORS[form.type]?.bg || 'rgba(148,163,184,.1)', border: `1px solid ${TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'}30` }}>
-                        <FileText size={10} color={TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'} />
-                        <span style={{ fontSize: 11, fontWeight: 700, color: TYPE_CARD_COLORS[form.type]?.text || '#64748b', fontFamily: 'var(--mono)' }}>{form.type}</span>
-                        <button type="button"
-                          onClick={() => { fmt('type', ''); setTypeFields({}); setFiles([]); setFileRefs([]); setUploadStep(null); setUploadError(''); }}
-                          style={{ marginLeft: 3, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', padding: 0, lineHeight: 1 }}
-                          title="Change type">
-                          <X size={10} />
-                        </button>
+                      <div style={{ position: 'relative', flexShrink: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '2px 10px 2px 7px', borderRadius: 20, background: TYPE_CARD_COLORS[form.type]?.bg || 'rgba(148,163,184,.1)', border: `1px solid ${TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'}30`, cursor: 'pointer' }}
+                          onClick={e => { e.stopPropagation(); setShowTypeChanger(v => !v); }}>
+                          <FileText size={10} color={TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'} />
+                          <span style={{ fontSize: 11, fontWeight: 700, color: TYPE_CARD_COLORS[form.type]?.text || '#64748b', fontFamily: 'var(--mono)' }}>{form.type}</span>
+                          <ChevronRight size={10} color={TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'} style={{ transform: showTypeChanger ? 'rotate(90deg)' : 'none', transition: 'transform .15s' }} />
+                        </div>
+                        {showTypeChanger && (
+                          <div onClick={e => e.stopPropagation()} style={{ position: 'absolute', top: '110%', left: 0, zIndex: 100, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,.15)', minWidth: 180, overflow: 'hidden' }}>
+                            {Object.keys(TYPE_CARD_COLORS).map(t => (
+                              <button key={t} type="button"
+                                onClick={() => { fmt('type', t); setTypeFields({}); setShowTypeChanger(false); }}
+                                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px', background: t === form.type ? (TYPE_CARD_COLORS[t]?.bg || 'rgba(148,163,184,.1)') : 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 12.5, fontWeight: t === form.type ? 700 : 500, color: t === form.type ? (TYPE_CARD_COLORS[t]?.text || '#64748b') : 'var(--text-color)', textAlign: 'left' }}>
+                                <div style={{ width: 8, height: 8, borderRadius: '50%', background: TYPE_CARD_COLORS[t]?.accent || '#94a3b8', flexShrink: 0 }} />
+                                {t}
+                                {t === form.type && <CheckCircle size={11} color={TYPE_CARD_COLORS[t]?.accent} style={{ marginLeft: 'auto' }} />}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1529,16 +1551,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 </div>
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Document Type</div>
-                <div style={{ ...INPUT_BASE, display: 'flex', alignItems: 'center', gap: 8, userSelect: 'none', cursor: 'default' }}>
-                  <div style={{ width: 22, height: 22, borderRadius: 6, background: TYPE_CARD_COLORS[form.type]?.bg || 'rgba(148,163,184,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <FileText size={11} color={TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'} />
-                  </div>
-                  <span style={{ fontWeight: 600, color: TYPE_CARD_COLORS[form.type]?.text || 'var(--text-color)', flex: 1 }}>{form.type}</span>
-                  <span style={{ fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: 0.6 }}>LOCKED</span>
-                </div>
-              </div>
-              <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>Hierarchical Tags</div>
                 <HierarchyTag hierarchy={hierarchy} onOpen={() => { setDrawerHierarchy({ ...hierarchy }); setDrawerType('hierarchy'); }} isRef={false} />
               </div>
@@ -1558,7 +1570,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>Valid Until</div>
-                <input value={typeFields.validity || ''} onChange={e => setTypeFields(f => ({ ...f, validity: e.target.value }))}
+                <input type="date" value={typeFields.validity || ''} onChange={e => setTypeFields(f => ({ ...f, validity: e.target.value }))}
                   placeholder="e.g. 31 March 2025 / Until further orders" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
@@ -1566,16 +1578,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 <div style={{ ...INPUT_BASE, color: 'var(--text-color)', opacity: 0.8, userSelect: 'none', display: 'flex', alignItems: 'center', gap: 7 }}>
                   <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0, opacity: 0.7 }} />
                   {user?.dept || form.dept || '—'}
-                </div>
-              </div>
-              <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Document Type</div>
-                <div style={{ ...INPUT_BASE, display: 'flex', alignItems: 'center', gap: 8, userSelect: 'none', cursor: 'default' }}>
-                  <div style={{ width: 22, height: 22, borderRadius: 6, background: TYPE_CARD_COLORS[form.type]?.bg || 'rgba(148,163,184,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <FileText size={11} color={TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'} />
-                  </div>
-                  <span style={{ fontWeight: 600, color: TYPE_CARD_COLORS[form.type]?.text || 'var(--text-color)', flex: 1 }}>{form.type}</span>
-                  <span style={{ fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: 0.6 }}>LOCKED</span>
                 </div>
               </div>
               <div>
@@ -1623,16 +1625,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 </div>
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Document Type</div>
-                <div style={{ ...INPUT_BASE, display: 'flex', alignItems: 'center', gap: 8, userSelect: 'none', cursor: 'default' }}>
-                  <div style={{ width: 22, height: 22, borderRadius: 6, background: TYPE_CARD_COLORS[form.type]?.bg || 'rgba(148,163,184,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <FileText size={11} color={TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'} />
-                  </div>
-                  <span style={{ fontWeight: 600, color: TYPE_CARD_COLORS[form.type]?.text || 'var(--text-color)', flex: 1 }}>{form.type}</span>
-                  <span style={{ fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: 0.6 }}>LOCKED</span>
-                </div>
-              </div>
-              <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>Legal Authority</div>
                 <HierarchyTag hierarchy={hierarchy} onOpen={() => setDrawerType('hierarchy')} isRef={true} legalAuthorities={legalAuthorities} />
               </div>
@@ -1669,16 +1661,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 <div style={{ ...INPUT_BASE, color: 'var(--text-color)', opacity: 0.8, userSelect: 'none', display: 'flex', alignItems: 'center', gap: 7 }}>
                   <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0, opacity: 0.7 }} />
                   {user?.dept || form.dept || '—'}
-                </div>
-              </div>
-              <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Document Type</div>
-                <div style={{ ...INPUT_BASE, display: 'flex', alignItems: 'center', gap: 8, userSelect: 'none', cursor: 'default' }}>
-                  <div style={{ width: 22, height: 22, borderRadius: 6, background: TYPE_CARD_COLORS[form.type]?.bg || 'rgba(148,163,184,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <FileText size={11} color={TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'} />
-                  </div>
-                  <span style={{ fontWeight: 600, color: TYPE_CARD_COLORS[form.type]?.text || 'var(--text-color)', flex: 1 }}>{form.type}</span>
-                  <span style={{ fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: 0.6 }}>LOCKED</span>
                 </div>
               </div>
               <div>
@@ -1736,16 +1718,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 </div>
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Document Type</div>
-                <div style={{ ...INPUT_BASE, display: 'flex', alignItems: 'center', gap: 8, userSelect: 'none', cursor: 'default' }}>
-                  <div style={{ width: 22, height: 22, borderRadius: 6, background: TYPE_CARD_COLORS[form.type]?.bg || 'rgba(148,163,184,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <FileText size={11} color={TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'} />
-                  </div>
-                  <span style={{ fontWeight: 600, color: TYPE_CARD_COLORS[form.type]?.text || 'var(--text-color)', flex: 1 }}>{form.type}</span>
-                  <span style={{ fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: 0.6 }}>LOCKED</span>
-                </div>
-              </div>
-              <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>Legal Authority</div>
                 <HierarchyTag hierarchy={hierarchy} onOpen={() => setDrawerType('hierarchy')} isRef={true} legalAuthorities={legalAuthorities} />
               </div>
@@ -1795,16 +1767,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 </div>
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Document Type</div>
-                <div style={{ ...INPUT_BASE, display: 'flex', alignItems: 'center', gap: 8, userSelect: 'none', cursor: 'default' }}>
-                  <div style={{ width: 22, height: 22, borderRadius: 6, background: TYPE_CARD_COLORS[form.type]?.bg || 'rgba(148,163,184,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <FileText size={11} color={TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'} />
-                  </div>
-                  <span style={{ fontWeight: 600, color: TYPE_CARD_COLORS[form.type]?.text || 'var(--text-color)', flex: 1 }}>{form.type}</span>
-                  <span style={{ fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: 0.6 }}>LOCKED</span>
-                </div>
-              </div>
-              <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>Act Reference</div>
                 <HierarchyTag hierarchy={hierarchy} onOpen={() => { setDrawerHierarchy({ ...hierarchy }); setDrawerType('hierarchy'); }} isRef={true} />
               </div>
@@ -1825,16 +1787,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 <div style={{ ...LABEL, marginBottom: 6 }}>Issue Date <span style={{ color: '#ef4444' }}>*</span></div>
                 <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
                   style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
-              </div>
-              <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Document Type</div>
-                <div style={{ ...INPUT_BASE, display: 'flex', alignItems: 'center', gap: 8, userSelect: 'none', cursor: 'default' }}>
-                  <div style={{ width: 22, height: 22, borderRadius: 6, background: TYPE_CARD_COLORS[form.type]?.bg || 'rgba(148,163,184,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <FileText size={11} color={TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'} />
-                  </div>
-                  <span style={{ fontWeight: 600, color: TYPE_CARD_COLORS[form.type]?.text || 'var(--text-color)', flex: 1 }}>{form.type || '—'}</span>
-                  <span style={{ fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: 0.6 }}>LOCKED</span>
-                </div>
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>Department</div>
@@ -1986,10 +1938,27 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                         </div>
                         <div>
                           <div style={{ ...LABEL, marginBottom: 5 }}>Act / Rule Name</div>
-                          <input value={auth.act}
-                            onChange={e => setLegalAuthorities(p => p.map((r, idx) => idx === i ? { ...r, act: e.target.value } : r))}
-                            placeholder="e.g. Haryana GST Act, 2017" style={{ ...INPUT_BASE, fontSize: 12 }}
-                            onFocus={focusStyle} onBlur={blurStyle} />
+                          <div style={{ position: 'relative' }}>
+                            <input value={auth.act}
+                              onChange={e => setLegalAuthorities(p => p.map((r, idx) => idx === i ? { ...r, act: e.target.value } : r))}
+                              onFocus={e => { focusStyle(e); setShowAuthDrop(i); }}
+                              onBlur={e => { blurStyle(e); setTimeout(() => setShowAuthDrop(null), 180); }}
+                              placeholder="Type to search existing documents…" style={{ ...INPUT_BASE, fontSize: 12 }} />
+                            {showAuthDrop === i && approvedDocs.filter(d => !auth.act || d.title.toLowerCase().includes(auth.act.toLowerCase())).slice(0, 8).length > 0 && (
+                              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 8, boxShadow: '0 6px 20px rgba(0,0,0,.13)', maxHeight: 220, overflow: 'auto', marginTop: 3 }}>
+                                {approvedDocs.filter(d => !auth.act || d.title.toLowerCase().includes(auth.act.toLowerCase())).slice(0, 8).map(d => (
+                                  <div key={d.uid || d.id}
+                                    onMouseDown={() => { setLegalAuthorities(p => p.map((r, idx) => idx === i ? { ...r, act: d.title } : r)); setShowAuthDrop(null); }}
+                                    style={{ padding: '9px 12px', cursor: 'pointer', borderBottom: '1px solid var(--surface-border)' }}
+                                    onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                    <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.title}</div>
+                                    <div style={{ fontSize: 10.5, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', marginTop: 2 }}>{d.type} · {d.dept} · {d.year}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         </div>
                         <div>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
@@ -2001,12 +1970,33 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                             </button>
                           </div>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                            {(auth.sections || ['']).map((sec, si) => (
+                            {(auth.sections || ['']).map((sec, si) => {
+                              const secOptions = getSectionsFromDoc(auth.act).filter(s => !sec || s.toLowerCase().includes(sec.toLowerCase()));
+                              const dropKey = `${i}-${si}`;
+                              const dropOpen = showSectionDrop === dropKey;
+                              return (
                               <div key={si} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                <div style={{ position: 'relative', flex: 1 }}>
                                 <input value={sec}
                                   onChange={e => setLegalAuthorities(p => p.map((r, idx) => idx === i ? { ...r, sections: (r.sections || ['']).map((s, sIdx) => sIdx === si ? e.target.value : s) } : r))}
-                                  placeholder={`e.g. Section ${si === 0 ? '4' : '17'}`} style={{ ...INPUT_BASE, fontSize: 12, flex: 1 }}
-                                  onFocus={focusStyle} onBlur={blurStyle} />
+                                  onFocus={e => { focusStyle(e); setShowSectionDrop(dropKey); }}
+                                  onBlur={e => { blurStyle(e); setTimeout(() => setShowSectionDrop(null), 180); }}
+                                  placeholder={auth.act ? `Type or pick a section…` : `e.g. Section ${si === 0 ? '4' : '17'}`}
+                                  style={{ ...INPUT_BASE, fontSize: 12, width: '100%' }} />
+                                {dropOpen && secOptions.length > 0 && (
+                                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 300, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 8, boxShadow: '0 6px 20px rgba(0,0,0,.13)', maxHeight: 180, overflow: 'auto', marginTop: 3 }}>
+                                    {secOptions.map(s => (
+                                      <div key={s}
+                                        onMouseDown={() => { setLegalAuthorities(p => p.map((r, idx) => idx === i ? { ...r, sections: (r.sections || ['']).map((sv, sIdx) => sIdx === si ? s : sv) } : r)); setShowSectionDrop(null); }}
+                                        style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: 'var(--text-heading)', borderBottom: '1px solid var(--surface-border)' }}
+                                        onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                        {s}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                </div>
                                 {(auth.sections || ['']).length > 1 && (
                                   <button type="button"
                                     onClick={() => setLegalAuthorities(p => p.map((r, idx) => idx === i ? { ...r, sections: (r.sections || ['']).filter((_, sIdx) => sIdx !== si) } : r))}
@@ -2015,7 +2005,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                                   </button>
                                 )}
                               </div>
-                            ))}
+                            ); })}
                           </div>
                         </div>
                       </div>
@@ -2023,20 +2013,78 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                   </>)}
 
 
-                  {/* Rules & Regulations: full Chapter/Section/Sub-section */}
-                  {!['Circular', 'Notification', 'Policy', 'Order / Gazette', 'Amendment'].includes(form.type) && [
-                    { label: 'Chapter', key: 'chapter', ph: 'e.g. Chapter III — Taxation' },
-                    { label: 'Section', key: 'section', ph: 'e.g. Section 45 — Property Tax' },
-                    { label: 'Sub-section', key: 'subsection', ph: 'e.g. (2)(a)' },
-                  ].map(({ label, key, ph }) => (
-                    <div key={key}>
-                      <div style={{ ...LABEL, marginBottom: 6 }}>{label}</div>
-                      <input value={drawerHierarchy[key]}
-                        onChange={e => setDrawerHierarchy(v => ({ ...v, [key]: e.target.value }))}
-                        placeholder={ph} style={{ ...INPUT_BASE, width: '100%' }}
+                  {/* Act / Rules & Regulations: Act name + Chapter/Section/Sub-section with dropdowns */}
+                  {!['Circular', 'Notification', 'Policy', 'Order / Gazette', 'Amendment'].includes(form.type) && (<>
+                    {/* Act Name — dropdown of existing documents */}
+                    <div>
+                      <div style={{ ...LABEL, marginBottom: 6 }}>Act / Rule Name</div>
+                      <div style={{ position: 'relative' }}>
+                        <input value={drawerHierarchy.act}
+                          onChange={e => setDrawerHierarchy(v => ({ ...v, act: e.target.value, section: '', chapter: '' }))}
+                          onFocus={e => { focusStyle(e); setShowHierActDrop(true); }}
+                          onBlur={e => { blurStyle(e); setTimeout(() => setShowHierActDrop(false), 180); }}
+                          placeholder="Type to search existing documents…" style={{ ...INPUT_BASE, width: '100%' }} />
+                        {showHierActDrop && approvedDocs.filter(d => !drawerHierarchy.act || d.title.toLowerCase().includes(drawerHierarchy.act.toLowerCase())).slice(0, 8).length > 0 && (
+                          <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 300, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 8, boxShadow: '0 6px 20px rgba(0,0,0,.13)', maxHeight: 220, overflow: 'auto', marginTop: 3 }}>
+                            {approvedDocs.filter(d => !drawerHierarchy.act || d.title.toLowerCase().includes(drawerHierarchy.act.toLowerCase())).slice(0, 8).map(d => (
+                              <div key={d.uid || d.id}
+                                onMouseDown={() => { setDrawerHierarchy(v => ({ ...v, act: d.title, section: '', chapter: '', subsection: '' })); setShowHierActDrop(false); }}
+                                style={{ padding: '9px 12px', cursor: 'pointer', borderBottom: '1px solid var(--surface-border)' }}
+                                onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.title}</div>
+                                <div style={{ fontSize: 10.5, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', marginTop: 2 }}>{d.type} · {d.dept} · {d.year}</div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Chapter — plain input */}
+                    <div>
+                      <div style={{ ...LABEL, marginBottom: 6 }}>Chapter</div>
+                      <input value={drawerHierarchy.chapter}
+                        onChange={e => setDrawerHierarchy(v => ({ ...v, chapter: e.target.value }))}
+                        placeholder="e.g. Chapter III — Taxation" style={{ ...INPUT_BASE, width: '100%' }}
                         onFocus={focusStyle} onBlur={blurStyle} />
                     </div>
-                  ))}
+
+                    {/* Section — dropdown from selected act */}
+                    <div>
+                      <div style={{ ...LABEL, marginBottom: 6 }}>Section</div>
+                      <div style={{ position: 'relative' }}>
+                        <input value={drawerHierarchy.section}
+                          onChange={e => setDrawerHierarchy(v => ({ ...v, section: e.target.value }))}
+                          onFocus={e => { focusStyle(e); setShowHierSecDrop(true); }}
+                          onBlur={e => { blurStyle(e); setTimeout(() => setShowHierSecDrop(false), 180); }}
+                          placeholder={drawerHierarchy.act ? 'Type or pick a section…' : 'e.g. Section 45 — Property Tax'}
+                          style={{ ...INPUT_BASE, width: '100%' }} />
+                        {showHierSecDrop && getSectionsFromDoc(drawerHierarchy.act).filter(s => !drawerHierarchy.section || s.toLowerCase().includes(drawerHierarchy.section.toLowerCase())).length > 0 && (
+                          <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 300, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 8, boxShadow: '0 6px 20px rgba(0,0,0,.13)', maxHeight: 200, overflow: 'auto', marginTop: 3 }}>
+                            {getSectionsFromDoc(drawerHierarchy.act).filter(s => !drawerHierarchy.section || s.toLowerCase().includes(drawerHierarchy.section.toLowerCase())).map(s => (
+                              <div key={s}
+                                onMouseDown={() => { setDrawerHierarchy(v => ({ ...v, section: s })); setShowHierSecDrop(false); }}
+                                style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: 'var(--text-heading)', borderBottom: '1px solid var(--surface-border)' }}
+                                onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                {s}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Sub-section — plain input */}
+                    <div>
+                      <div style={{ ...LABEL, marginBottom: 6 }}>Sub-section</div>
+                      <input value={drawerHierarchy.subsection}
+                        onChange={e => setDrawerHierarchy(v => ({ ...v, subsection: e.target.value }))}
+                        placeholder="e.g. (2)(a)" style={{ ...INPUT_BASE, width: '100%' }}
+                        onFocus={focusStyle} onBlur={blurStyle} />
+                    </div>
+                  </>)}
 
                   {/* Amendment: dynamic change entries */}
                   {form.type === 'Amendment' && (
@@ -2148,6 +2196,33 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                         )}
                       </div>
                     </div>
+                    {/* Section of linked document — shows only when a document is selected */}
+                    {relTarget && !relTarget.startsWith('__pending__:') && (
+                      <div>
+                        <div style={{ ...LABEL, marginBottom: 6 }}>Section / Provision <span style={{ color: 'var(--text-color-secondary)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span></div>
+                        <div style={{ position: 'relative' }}>
+                          <input value={relSection}
+                            onChange={e => setRelSection(e.target.value)}
+                            onFocus={e => { focusStyle(e); setShowRelSecDrop(true); }}
+                            onBlur={e => { blurStyle(e); setTimeout(() => setShowRelSecDrop(false), 180); }}
+                            placeholder="Pick or type a section from the linked document…"
+                            style={{ ...INPUT_BASE, width: '100%' }} />
+                          {showRelSecDrop && getSectionsFromDoc(documents.find(d => d.uid === relTarget)?.title).filter(s => !relSection || s.toLowerCase().includes(relSection.toLowerCase())).length > 0 && (
+                            <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 300, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 8, boxShadow: '0 6px 20px rgba(0,0,0,.13)', maxHeight: 180, overflow: 'auto', marginTop: 3 }}>
+                              {getSectionsFromDoc(documents.find(d => d.uid === relTarget)?.title).filter(s => !relSection || s.toLowerCase().includes(relSection.toLowerCase())).map(s => (
+                                <div key={s}
+                                  onMouseDown={() => { setRelSection(s); setShowRelSecDrop(false); }}
+                                  style={{ padding: '8px 12px', cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: 'var(--text-heading)', borderBottom: '1px solid var(--surface-border)' }}
+                                  onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                  {s}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                     <div>
                       <div style={{ ...LABEL, marginBottom: 6 }}>How are these related? <span style={{ color: 'var(--text-color-secondary)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span></div>
                       <textarea
@@ -2175,7 +2250,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                             <span style={{ fontSize: 12, fontWeight: 700, color: r.isPending ? '#f59e0b' : 'var(--primary)', fontFamily: 'var(--mono)' }}>{r.label}</span>
                             {r.targetType && <span style={{ fontSize: 10.5, fontWeight: 600, color: TYPE_CARD_COLORS[r.targetType]?.text || 'var(--text-color-secondary)', background: TYPE_CARD_COLORS[r.targetType]?.bg || 'rgba(148,163,184,.1)', padding: '1px 7px', borderRadius: 20, flexShrink: 0 }}>{r.targetType}</span>}
                             {r.isPending && <span style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', background: 'rgba(245,158,11,.1)', border: '1px solid rgba(245,158,11,.3)', borderRadius: 20, padding: '1px 8px', fontFamily: 'var(--mono)', flexShrink: 0 }}>PENDING</span>}
-                            <span style={{ fontSize: 12.5, color: 'var(--text-heading)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>→ {r.targetTitle}</span>
+                            <span style={{ fontSize: 12.5, color: 'var(--text-heading)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>→ {r.targetTitle}{r.section ? ` · ${r.section}` : ''}</span>
                             <button type="button" onClick={() => removeRelation(i)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', flexShrink: 0 }}><X size={12} /></button>
                           </div>
                           {r.note && (

@@ -66,6 +66,7 @@ body {
 
 /* ── DBIM / GIGW compliance — enable in production ────────────────
 @keyframes fadeSlideInUp { from { opacity: 0; transform: translateY(100%); } to { opacity: 1; transform: translateY(0); } }
+@keyframes spin          { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
 .skip-nav {
   position: absolute; left: -9999px; top: auto;

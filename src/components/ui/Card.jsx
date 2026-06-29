@@ -1,6 +1,6 @@
-export default function Card({ children, style = {}, className = '', padding = '20px 22px' }) {
+export default function Card({ children, style = {}, className = '', padding = '20px 22px', onClick }) {
   return (
-    <div style={{
+    <div onClick={onClick} style={{
       background: 'var(--surface-card)',
       border: '1px solid var(--surface-border)',
       borderRadius: 'var(--radius)',
