@@ -660,6 +660,35 @@ function DocumentDetailsPanel({ doc }) {
                     Amendment
                   </span>
                 </div>
+
+                {/* Changes made per section */}
+                {doc.amendmentProvisions?.length > 0 && (
+                  <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ fontSize: 9.5, fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', letterSpacing: '.07em' }}>CHANGES MADE</div>
+                    {doc.amendmentProvisions.map((p, i) => {
+                      const CHANGE_COLORS = { Amended: '#f59e0b', Substituted: '#3b82f6', Inserted: '#22c55e', Deleted: '#ef4444', Expanded: '#8b5cf6' };
+                      const color = CHANGE_COLORS[p.changeType] || '#94a3b8';
+                      return (
+                        <div key={i} style={{ padding: '8px 10px', borderRadius: 7, background: 'var(--surface-ground)', border: `1px solid ${color}33` }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: p.description ? 5 : 0 }}>
+                            <span style={{ fontSize: 10, fontWeight: 700, fontFamily: 'var(--mono)', color, background: `${color}18`, padding: '1px 7px', borderRadius: 8 }}>
+                              {p.changeType || 'Amended'}
+                            </span>
+                            {[p.chapter, p.section, p.subsection].filter(Boolean).map((v, j, arr) => (
+                              <span key={j} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                {j > 0 && <ChevronRight size={10} color="#94a3b8" />}
+                                <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-heading)', fontFamily: 'var(--mono)' }}>{v}</span>
+                              </span>
+                            ))}
+                          </div>
+                          {p.description && (
+                            <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', lineHeight: 1.5 }}>{p.description}</div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -902,6 +931,16 @@ function mapApiDoc(d) {
     remarks:         d.latest_approval?.comments || '',
     fileUrl:         null,
     relationships:   d.relationships || [],
+    ...(() => {
+      const raw = d.description || '';
+      const match = raw.match(/\n?__PROVISIONS__:(.+)$/s);
+      let amendmentProvisions = [];
+      if (match) { try { amendmentProvisions = JSON.parse(match[1]); } catch {} }
+      return {
+        desc: raw.replace(/\n?__PROVISIONS__:.+$/s, '').trim(),
+        amendmentProvisions,
+      };
+    })(),
   };
 }
 

@@ -656,17 +656,17 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
       return [...prev, ...accepted.filter(f => !names.has(f.name))];
     });
 
-    // Auto-extract metadata from the first PDF
+    // Auto-extract metadata from the first PDF — always re-run so replacing a file updates the name
     const firstPdf = accepted.find(f => f.name.endsWith('.pdf'));
-    if (firstPdf && !form.act) {
+    if (firstPdf) {
       setAutoFillLoading(true);
       const { text } = await extractPdfText(firstPdf);
       const meta = autoExtractMetadata(text || firstPdf.name, firstPdf.name);
       setForm(f => ({
         ...f,
-        act:  f.act  || meta.title,
-        type: f.type || meta.type,
-        dept: f.dept || meta.dept,
+        act:  meta.title,           // always sync to the new file
+        type: f.type || meta.type,  // preserve manual pick
+        dept: f.dept || meta.dept,  // preserve manual pick
       }));
       setAutoFillLoading(false);
     }
@@ -855,7 +855,15 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
             rule_making_authority: typeFields.ruleAuthority || '',
             tag_ids:               [],
             relationships:         relationshipsPayload,
-            description:           form.desc || '',
+            description:           (() => {
+              const provisions = form.type === 'Amendment'
+                ? amendChanges.filter(c => c.section || c.chapter)
+                : [];
+              const suffix = provisions.length > 0
+                ? '\n__PROVISIONS__:' + JSON.stringify(provisions)
+                : '';
+              return (form.desc || '') + suffix;
+            })(),
           };
           const res2 = await uploadPdfMetadata(payload);
           apiDoc = res2.data;
@@ -1478,18 +1486,18 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                   )}
                 </div>
 
-                {/* Add more files */}
-                <button type="button" onClick={() => inputRef.current?.click()}
+                {/* Add more files — disabled (single-file upload only) */}
+                {/* <button type="button" onClick={() => inputRef.current?.click()}
                   style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', padding: '7px 0', borderRadius: 8, border: '1px dashed var(--surface-border)', background: 'transparent', color: 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', marginBottom: 14 }}>
                   <Plus size={12} /> Add more files
-                </button>
+                </button> */}
 
-                {/* Replace / clear files */}
-                <button type="button"
+                {/* Replace / clear files — disabled (single-file upload only) */}
+                {/* <button type="button"
                   onClick={() => { setFiles([]); setFileRefs([]); setUploadStep(null); setUploadError(''); }}
                   style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', padding: '7px 0', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                   <RotateCcw size={12} /> Replace Files
-                </button>
+                </button> */}
               </>
             )}
           </Card>
