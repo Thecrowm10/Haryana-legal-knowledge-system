@@ -34,6 +34,15 @@ Rule 4. Disposal — The State Public Information Officer shall dispose of a req
 Rule 5. Appeal — Any person aggrieved by the decision of the State Public Information Officer may prefer an appeal within thirty days to the First Appellate Authority, who shall decide the appeal within thirty days of receipt.` },
   { id: 11, title: 'CIC Transparency Guidelines 2019',     type: 'Circular', dept: 'General Administration', year: 2019, status: 'approved', legalStatus: 'active', pages: 8,  uploader: 'Priya Sharma', uploadedAt: '2024-01-20', section: '2', paragraph: '1',
     desc: 'Guidelines issued by the Central Information Commission under Right to Information Act 2005 to ensure proactive disclosure by public authorities. Para 2: Every public authority shall publish suo motu on its website, all information as prescribed under Section 4(1)(b) of the RTI Act 2005, and update the same at regular intervals of every three months.' },
+  { id: 13, title: 'The Haryana Clerical (Recruitment and Conditions of Service) Act, 2026', type: 'Act', dept: 'General Administration', year: 2026, status: 'pending', legalStatus: 'active', pages: 22, uploader: 'Priya Sharma', uploadedAt: '2026-06-20',
+    fileUrl: '/docs/The Haryana Clerical (Recruitment and Conditions of Service) Act, 2026.pdf',
+    desc: 'An Act to regulate the recruitment and conditions of service of clerical staff in Government of Haryana departments.' },
+  { id: 14, title: 'The States Reorganisation Act 1956', type: 'Act', dept: 'General Administration', year: 1956, status: 'pending', legalStatus: 'active', pages: 48, uploader: 'Priya Sharma', uploadedAt: '2026-06-22',
+    fileUrl: '/docs/The States Reorganisation Act 1956.pdf',
+    desc: 'An Act to provide for the reorganisation of the States of India and for matters connected therewith.' },
+  { id: 15, title: 'The Haryana Salaries and Allowances of Minister Act, 1970', type: 'Act', dept: 'Finance Department', year: 1970, status: 'pending', legalStatus: 'active', pages: 10, uploader: 'Priya Sharma', uploadedAt: '2026-06-25',
+    fileUrl: '/docs/The haryana salaries and allowance of minister act,1970.pdf',
+    desc: 'An Act to provide for the salaries and allowances payable to Ministers in the State of Haryana.' },
   { id: 12, title: 'Right to Information (Amendment) Act 2026', type: 'Act', dept: 'General Administration', year: 2026, status: 'approved', legalStatus: 'active', pages: 18, uploader: 'Priya Sharma', uploadedAt: '2026-03-01', section: '3', paragraph: '2',
     desc: `The Right to Information (Amendment) Act 2026 was established on 15 February 2026 and came into force with effect from 1 April 2026, amending the principal Right to Information Act 2005.
 
