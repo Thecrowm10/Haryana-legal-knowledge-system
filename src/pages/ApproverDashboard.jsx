@@ -9,7 +9,7 @@ import pdfjsWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl;
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
-import { getApproverDocuments, getPdfFile } from '../services/pdf';
+import { getApproverDocuments, getPdfFile, reviewDocument } from '../services/pdf';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -772,7 +772,7 @@ function DocumentDetailsPanel({ doc }) {
 
 // ─── 2-Panel Review View ──────────────────────────────────────────────────────
 // PDF on the left, uploader-filled document details on the right.
-function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, activePage }) {
+function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, activePage, deciding }) {
   const [currentPage, setCurrentPage]   = useState(1);
   const [rotation, setRotation]         = useState(0);
   const [blobUrl, setBlobUrl]           = useState(null);
@@ -837,17 +837,17 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, activePage 
                 onBlur={e => e.target.style.borderColor = 'var(--surface-border)'} />
             </div>
             <div style={{ display: 'flex', gap: 10, flexShrink: 0, paddingBottom: 1 }}>
-              <button onClick={() => onDecide('rejected')}
-                style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.3)', color: '#b91c1c', padding: '9px 18px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,.15)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'rgba(239,68,68,.08)'}>
-                <X size={14} /> Reject
+              <button onClick={() => onDecide('rejected')} disabled={!!deciding}
+                style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.3)', color: '#b91c1c', padding: '9px 18px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 600, cursor: deciding ? 'not-allowed' : 'pointer', opacity: deciding && deciding !== 'rejected' ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
+                onMouseEnter={e => { if (!deciding) e.currentTarget.style.background = 'rgba(239,68,68,.15)'; }}
+                onMouseLeave={e => { if (!deciding) e.currentTarget.style.background = 'rgba(239,68,68,.08)'; }}>
+                <X size={14} /> {deciding === 'rejected' ? 'Rejecting…' : 'Reject'}
               </button>
-              <button onClick={() => onDecide('approved')}
-                style={{ background: 'rgba(34,197,94,.1)', border: '1px solid rgba(34,197,94,.3)', color: '#1e40af', padding: '9px 20px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(34,197,94,.18)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'rgba(34,197,94,.1)'}>
-                <Check size={14} /> Approve
+              <button onClick={() => onDecide('approved')} disabled={!!deciding}
+                style={{ background: 'rgba(34,197,94,.1)', border: '1px solid rgba(34,197,94,.3)', color: '#1e40af', padding: '9px 20px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700, cursor: deciding ? 'not-allowed' : 'pointer', opacity: deciding && deciding !== 'approved' ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
+                onMouseEnter={e => { if (!deciding) e.currentTarget.style.background = 'rgba(34,197,94,.18)'; }}
+                onMouseLeave={e => { if (!deciding) e.currentTarget.style.background = 'rgba(34,197,94,.1)'; }}>
+                <Check size={14} /> {deciding === 'approved' ? 'Approving…' : 'Approve'}
               </button>
             </div>
           </div>
@@ -910,6 +910,7 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
   const [loading, setLoading]     = useState(false);
   const [apiError, setApiError]   = useState('');
   const [remarks, setRemarks]     = useState({});
+  const [deciding, setDeciding]   = useState(null); // { id, action } while API call is in-flight
   const [expanded, setExpanded]   = useState(null);
   const [filter, setFilter]       = useState('');
   const [searchQ, setSearchQ]     = useState('');
@@ -942,14 +943,22 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
   function decide(id, decision) {
     const doc    = docs.find(d => d.id === id);
     const remark = remarks[id] || '';
-    // Persist remarks on the doc so they're visible when the card is re-expanded
-    setDocs(ds => ds.map(d => d.id === id
-      ? { ...d, status: decision, ...(remark ? { remarks: remark } : {}) }
-      : d
-    ));
-    if (decision === 'approved') onApprove?.(id);
-    onAuditLog?.(`${decision === 'approved' ? 'Approved' : 'Rejected'} document: ${doc?.title}${remark ? ` — "${remark}"` : ''}`);
-    if (expanded === id) setExpanded(null);
+    setDeciding({ id, action: decision });
+    reviewDocument(id, decision, remark || undefined)
+      .then(() => {
+        setDocs(ds => ds.map(d => d.id === id
+          ? { ...d, status: decision, ...(remark ? { remarks: remark } : {}) }
+          : d
+        ));
+        if (decision === 'approved') onApprove?.(id);
+        onAuditLog?.(`${decision === 'approved' ? 'Approved' : 'Rejected'} document: ${doc?.title}${remark ? ` — "${remark}"` : ''}`);
+        if (expanded === id) setExpanded(null);
+      })
+      .catch(err => {
+        const detail = err.response?.data?.detail || 'Action failed. Please try again.';
+        setApiError(detail);
+      })
+      .finally(() => setDeciding(null));
   }
 
   const validTypes = new Set(Object.keys(TYPE_COLORS));
@@ -1152,6 +1161,7 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
                   onRemarksChange={val => setRemarks(r => ({ ...r, [doc.id]: val }))}
                   onDecide={decision => decide(doc.id, decision)}
                   activePage={activePage}
+                  deciding={deciding?.id === doc.id ? deciding.action : null}
                 />
               )}
             </Card>
