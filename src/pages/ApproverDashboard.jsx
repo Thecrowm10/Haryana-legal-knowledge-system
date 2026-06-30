@@ -10,8 +10,9 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl;
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import { getApproverDocuments, getPdfFile, reviewDocument } from '../services/pdf';
+import { createNotification } from '../services/notifications';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// Constants
 
 const TYPE_COLORS = {
   'Act':                 { accent: '#1a56db', bg: 'rgba(26,86,219,.08)',  text: '#1e40af' },
@@ -28,7 +29,7 @@ const LABEL = {
   letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)',
 };
 
-// ─── Word confidence helpers ──────────────────────────────────────────────────
+// Word confidence helpers
 function _hashStr(s) {
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
@@ -122,7 +123,7 @@ function confBg(conf) {
   return 'rgba(239,68,68,.4)';
 }
 
-// ─── OCR data ─────────────────────────────────────────────────────────────────
+// OCR data
 // Confidence is derived deterministically from doc.id so it doesn't flicker on re-render.
 function getMockOcrData(doc) {
   const idNum     = typeof doc.id === 'number' ? doc.id : parseInt(String(doc.id), 10) || 0;
@@ -178,7 +179,7 @@ function getMockOcrData(doc) {
   };
 }
 
-// ─── AI analysis ──────────────────────────────────────────────────────────────
+// AI analysis
 // Prefers real doc.hierarchy and doc.citations from the uploader when available,
 // falls back to mock data for demo documents.
 function getMockAiAnalysis(doc) {
@@ -217,7 +218,7 @@ function getMockAiAnalysis(doc) {
   };
 }
 
-// ─── Shared page navigation ───────────────────────────────────────────────────
+// Shared page navigation
 // Both PDF and OCR panels share the same currentPage state (lifted to ThreePanelReview)
 // so they scroll together.
 function PageNav({ currentPage, totalPages, onPageChange }) {
@@ -238,7 +239,7 @@ function PageNav({ currentPage, totalPages, onPageChange }) {
   );
 }
 
-// ─── PDF Viewer Panel ─────────────────────────────────────────────────────────
+// PDF Viewer Panel
 // Renders real PDFs as stacked canvases (pdfjs-dist) so scroll can be detected
 // and synced with OcrTextPanel. Mock docs use the styled layout fallback.
 function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, rotation, onRotate, blobUrl, onTotalPagesChange }) {
@@ -384,7 +385,7 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
   );
 }
 
-// ─── Word-edit popover ────────────────────────────────────────────────────────
+// Word-edit popover
 function WordEditPopover({ editingWord, isSuspicious, onSave, onMarkCorrect, onCancel }) {
   const [text, setText] = useState(editingWord.text);
   useEffect(() => {
@@ -434,7 +435,7 @@ function WordEditPopover({ editingWord, isSuspicious, onSave, onMarkCorrect, onC
   );
 }
 
-// ─── OCR Text Panel ───────────────────────────────────────────────────────────
+// OCR Text Panel
 // Shows ALL pages stacked. Scrolls to currentPage when PDF panel drives the page.
 // Each word is clickable for confidence-based editing.
 function OcrTextPanel({ ocrData, currentPage, wordEdits, onWordEdit, isScanned = false }) {
@@ -569,7 +570,7 @@ function OcrTextPanel({ ocrData, currentPage, wordEdits, onWordEdit, isScanned =
   );
 }
 
-// ─── Document Details Panel ──────────────────────────────────────────────────
+// Document Details Panel
 // Shows every field the uploader filled in: metadata, description, hierarchy,
 // type-specific fields, legal authorities, relationships, amendment provisions.
 function DocumentDetailsPanel({ doc }) {
@@ -799,7 +800,7 @@ function DocumentDetailsPanel({ doc }) {
   );
 }
 
-// ─── 2-Panel Review View ──────────────────────────────────────────────────────
+// 2-Panel Review View
 // PDF on the left, uploader-filled document details on the right.
 function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, activePage, deciding }) {
   const [currentPage, setCurrentPage]   = useState(1);
@@ -905,7 +906,7 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, activePage,
     </div>
   );
 }
-// ─── Main ApproverDashboard ───────────────────────────────────────────────────
+// Main ApproverDashboard
 function mapApiDoc(d) {
   return {
     id:              d.id,
@@ -991,6 +992,17 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
         ));
         if (decision === 'approved') onApprove?.(id);
         onAuditLog?.(`${decision === 'approved' ? 'Approved' : 'Rejected'} document: ${doc?.title}${remark ? ` — "${remark}"` : ''}`);
+        createNotification({
+          toRole:   'uploader',
+          type:     decision === 'approved' ? 'document_approved' : 'document_rejected',
+          title:    decision === 'approved' ? 'Document Approved' : 'Document Rejected',
+          message:  decision === 'approved'
+            ? `"${doc?.title}" has been approved by the approver`
+            : `"${doc?.title}" has been rejected by the approver`,
+          remark:   remark || null,
+          docId:    id,
+          docTitle: doc?.title,
+        });
         if (expanded === id) setExpanded(null);
       })
       .catch(err => {

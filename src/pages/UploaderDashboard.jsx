@@ -14,8 +14,9 @@ import SelectField from '../components/ui/SelectField';
 import { useAuth } from '../hooks/useAuth';
 import { getDepartments, getDocumentTypes } from '../services/departments';
 import { uploadPdfFile, uploadPdfMetadata, getMyDocuments, searchDocuments } from '../services/pdf';
+import { createNotification } from '../services/notifications';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// Constants
 
 const DEFAULT_DEPTS = [
   'Urban Local Bodies','Revenue & Disaster Mgmt.','Home Department',
@@ -56,7 +57,7 @@ const AMEND_CHANGE_TYPES = ['Amended', 'Substituted', 'Inserted', 'Deleted', 'Ex
 const AMEND_CHANGE_COLORS = { Amended: '#f59e0b', Substituted: '#3b82f6', Inserted: '#22c55e', Deleted: '#ef4444', Expanded: '#8b5cf6' };
 const EMPTY_PROVISION = () => ({ section: '', chapter: '', subsection: '', page: '', changeType: 'Substituted', before: '', after: '' });
 
-// ─── Type selector card colours & descriptions ────────────────────────────────
+// Type card colours and descriptions
 const TYPE_CARD_COLORS = {
   'Act':                 { bg: 'rgba(26,86,219,.08)',  accent: '#1a56db', text: '#1e40af' },
   'Amendment':           { bg: 'rgba(245,158,11,.08)', accent: '#f59e0b', text: '#d97706' },
@@ -76,7 +77,7 @@ const TYPE_CARD_DESC = {
   'Order / Gazette':     'Executive order or gazette notification',
 };
 
-// ─── Per-type dynamic metadata fields ─────────────────────────────────────────
+// Per-type metadata fields
 const TYPE_FIELDS = {
   'Act': [], // handled inline in form
   'Amendment': [], // handled inline
@@ -115,7 +116,7 @@ const MOCK_VERSIONS = {
   2: [{ v: '1.2', date: '2024-02-10', note: 'Current' },{ v: '1.1', date: '2023-09-01', note: 'Minor edits' },{ v: '1.0', date: '2022-03-15', note: 'Initial upload' }],
 };
 
-// ─── Word-level confidence scoring ────────────────────────────────────────────
+// Word-level confidence scoring
 // Deterministic (hash-based) so scores don't change on re-render.
 function _hashStr(s) {
   let h = 0;
@@ -305,7 +306,7 @@ function detectCrossDeptNotifications(citations, uploaderDept) {
   return [...notifyDepts];
 }
 
-// ─── Helper utilities ──────────────────────────────────────────────────────────
+// Helper utilities
 
 function fileIcon(f) {
   if (f.name.endsWith('.zip')) return <Archive size={15} color="#f59e0b" />;
@@ -420,7 +421,7 @@ function CrossDeptBanner({ notifications, onDismiss }) {
   );
 }
 
-// ─── Analysis result card ──────────────────────────────────────────────────────
+// Analysis result card
 // Only shows LINKED citations — unresolved ones are hidden, count shown in header only.
 function AnalysisCard({ docTitle, citations, analyzing }) {
   const linked     = citations.filter(c => c.status === 'linked');
@@ -493,7 +494,7 @@ function WorkflowBadge({ status }) {
   );
 }
 
-// ─── Main component ────────────────────────────────────────────────────────────
+// Main component
 export default function UploaderDashboard({ activePage, onAuditLog, documents = [], onAddDocument, taxonomy = [] }) {
   const { user } = useAuth();
   const [deptsData, setDeptsData] = useState([]);
@@ -626,15 +627,44 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
 
   // Extract all "Section X" mentions from a document's description + section field
   function getSectionsFromDoc(actTitle) {
-    const doc = approvedDocs.find(d => d.title === actTitle);
+    const doc = documents.find(d => d.title === actTitle) || approvedDocs.find(d => d.title === actTitle);
     if (!doc) return [];
+
+    // if the document has a pre-defined sections array, use it directly
+    if (doc.sections?.length) return doc.sections;
+
     const found = new Set();
-    if (doc.section) found.add(`Section ${doc.section}`);
+
+    // from hierarchy
+    if (doc.hierarchy?.section) found.add(`Section ${doc.hierarchy.section}`);
+    if (doc.hierarchy?.chapter) found.add(`Chapter ${doc.hierarchy.chapter}`);
+
+    // from legalAuthorities sections entered during upload
+    (doc.legalAuthorities || []).forEach(auth => {
+      (auth.sections || []).filter(Boolean).forEach(s => found.add(s));
+    });
+
+    // from amendmentProvisions
+    (doc.amendmentProvisions || []).forEach(p => {
+      if (p.section) found.add(`Section ${p.section}`);
+      if (p.chapter) found.add(`Chapter ${p.chapter}`);
+      if (p.subsection) found.add(`Section ${p.section}(${p.subsection})`);
+    });
+
+    // from description text
     if (doc.desc) {
-      for (const m of doc.desc.matchAll(/Section\s+(\d+[A-Za-z]?(?:\([a-z0-9]+\))?)/gi))
+      for (const m of doc.desc.matchAll(/Section\s+(\d+[A-Za-z]?(?:\([a-z0-9]+\))*)/gi))
+        found.add(`Section ${m[1]}`);
+      for (const m of doc.desc.matchAll(/Chapter\s+([IVXivx]+|\d+[A-Za-z]?)/gi))
+        found.add(`Chapter ${m[1].toUpperCase()}`);
+    }
+
+    if (doc.authority) {
+      for (const m of doc.authority.matchAll(/Section\s+(\d+[A-Za-z]?(?:\([a-z0-9]+\))*)/gi))
         found.add(`Section ${m[1]}`);
     }
-    return [...found];
+
+    return [...found].sort();
   }
   const relFiltered  = approvedDocs
     .filter(d =>
@@ -704,7 +734,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   }
   function removeRelation(idx) { setRelations(r => r.filter((_, i) => i !== idx)); }
 
-  // ── Finalize upload (called after conflict check passes) ───────────────────
+  // Finalize upload after conflict check
   async function finalizeUpload(newDocs, finalRelations) {
     const docsWithWorkflow = newDocs.map(d => ({ ...d, workflowStatus: WORKFLOW_STATUS.DRAFT }));
 
@@ -760,7 +790,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     onAuditLog?.(`Uploaded ${docsWithWorkflow.length} document(s): ${docsWithWorkflow.map(d => d.title).join(', ')}`);
   }
 
-  // ── Upload file + save metadata in one go (called on form submit) ──────────
+  // Upload file and save metadata
   async function handleSubmit(e) {
     e.preventDefault();
     if (files.length === 0) return;
@@ -867,6 +897,15 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
           };
           const res2 = await uploadPdfMetadata(payload);
           apiDoc = res2.data;
+          createNotification({
+            toRole:       'approver',
+            type:         'new_upload',
+            title:        'New Document Submitted',
+            message:      `"${form.act || f.name}" uploaded by ${user?.name || user?.username || 'Uploader'} — awaiting your review`,
+            docId:        apiDoc?.id,
+            docTitle:     form.act || f.name,
+            uploaderName: user?.name || user?.username,
+          });
         } catch (err) {
           const detail = err.response?.data?.detail;
           setUploadError(typeof detail === 'string' ? detail : `Failed to save metadata for "${f.name}"`);
@@ -984,7 +1023,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     URL.revokeObjectURL(url);
   }
 
-  // ── My Uploads page ────────────────────────────────────────────────────────
+  // My Uploads page
   if (activePage === 'myuploads') {
     const approved  = uploads.filter(d => d.status === 'approved').length;
     const pending   = uploads.filter(d => d.status === 'pending').length;
@@ -1130,7 +1169,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
 
         {/* Uploads table */}
         {(() => {
-          // ── compute filtered + sorted list ──────────────────────────────
+          // Compute filtered and sorted list
           const SORT_KEY = { 'title': d => d.title, 'type': d => d.type, 'dept': d => d.dept,
             'year': d => d.year, 'uploadedAt': d => d.uploadedAt, 'status': d => d.status };
           const baseList = filterStatus === 'approved' ? uploads.filter(d => d.status === 'approved')
@@ -1242,9 +1281,13 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
             <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
               <colgroup>
                 {bulkSelectMode && <col style={{ width: '3%' }} />}
-                <col style={{ width: bulkSelectMode ? '22%' : '25%' }} /><col style={{ width: '9%' }} /><col style={{ width: '13%' }} />
-                <col style={{ width: '6%' }} /><col style={{ width: '10%' }} /><col style={{ width: '10%' }} />
-                <col style={{ width: '9%' }} /><col style={{ width: '10%' }} /><col style={{ width: '8%'  }} />
+                <col style={{ width: bulkSelectMode ? '32%' : '36%' }} />
+                <col style={{ width: '10%' }} />
+                <col style={{ width: '16%' }} />
+                <col style={{ width: '7%' }} />
+                <col style={{ width: '12%' }} />
+                <col style={{ width: '11%' }} />
+                <col style={{ width: bulkSelectMode ? '9%' : '8%' }} />
               </colgroup>
               <thead>
                 <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
@@ -1327,7 +1370,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     );
   }
 
-  // ── Upload page ────────────────────────────────────────────────────────────
+  // Upload page
   return (
     <div style={{ animation: 'fadeSlideIn .3s ease' }}>
       {conflictModal && (

@@ -50,7 +50,7 @@ export function useAuth() {
       return;
     }
 0
-    // DEV BYPASS — SQL server nahi hai toh mock users use karo
+    // DEV BYPASS — uncomment below to use mock users when backend is unavailable
     // if (username === 'dept.uploader' && password === 'upload123') { setUser(DEV_UPLOADER); return; }
     // if (username === 'dept.approver' && password === 'approve123') { setUser(DEV_APPROVER); return; }
 
