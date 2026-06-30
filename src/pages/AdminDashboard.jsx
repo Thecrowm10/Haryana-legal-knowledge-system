@@ -322,7 +322,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
           <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             onClick={e => { if (e.target === e.currentTarget) setAddingUser(false); }}>
             <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.45)', backdropFilter: 'blur(4px)' }} />
-            <div style={{ position: 'relative', zIndex: 1, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 16, width: 'clamp(320px, 90vw, 540px)', boxShadow: '0 24px 64px rgba(0,0,0,.25)', overflow: 'hidden' }}>
+            <div style={{ position: 'relative', zIndex: 1, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 16, width: 'clamp(320px, 90vw, 540px)', boxShadow: '0 24px 64px rgba(0,0,0,.25)' }}>
 
               {/* Header */}
               <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -450,7 +450,6 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
               borderRadius: 16,
               width: 'clamp(320px, 90vw, 520px)',
               boxShadow: '0 24px 64px rgba(0,0,0,.25)',
-              overflow: 'hidden',
             }}>
               {/* Modal header */}
               <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

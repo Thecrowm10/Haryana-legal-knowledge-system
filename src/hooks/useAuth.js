@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
 
-const CITIZEN_PROFILE  = { username: 'citizen',       role: 'citizen',  name: 'Guest Citizen',      dept: '' };
-const DEV_UPLOADER     = { username: 'dept.uploader', role: 'uploader', name: 'Dev Uploader (Mock)', dept: 'Urban Local Bodies' };
+const CITIZEN_PROFILE  = { username: 'citizen',       role: 'citizen',  name: 'Guest Citizen',       dept: '' };
+// const DEV_UPLOADER     = { username: 'dept.uploader', role: 'uploader', name: 'Dev Uploader (Mock)',  dept: 'Urban Local Bodies' };
+// const DEV_APPROVER     = { username: 'dept.approver', role: 'approver', name: 'Dev Approver (Mock)',  dept: 'Urban Local Bodies' };
 
 function decodeJwt(token) {
   try {
@@ -48,6 +49,10 @@ export function useAuth() {
       setUser(CITIZEN_PROFILE);
       return;
     }
+0
+    // DEV BYPASS — uncomment below to use mock users when backend is unavailable
+    // if (username === 'dept.uploader' && password === 'upload123') { setUser(DEV_UPLOADER); return; }
+    // if (username === 'dept.approver' && password === 'approve123') { setUser(DEV_APPROVER); return; }
 
     // DEV BYPASS — SQL server nahi hai toh mock uploader use karo
     if (username === 'dept.uploader' && password === 'upload123') {
