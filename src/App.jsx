@@ -95,7 +95,7 @@ export default function App() {
   }
 
   if (!user) return <Login onLogin={loginAsRole} loading={loading} authError={authError} />;
-  if (user.mustChangePassword) return <ChangePasswordScreen user={user} onPasswordChanged={changePass} onLogout={logout} />;
+  if (user.mustChangePassword) return <ChangePasswordScreen user={user} onPasswordChanged={changePass} onLogout={logout} reason={user.passwordExpired ? 'expired' : 'first_login'} />;
   if (activePage === null) return null;
 
   function renderDashboard() {

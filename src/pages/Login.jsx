@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { Search, Eye, EyeOff, Shield, Lock, User, ArrowRight } from 'lucide-react';
 import haryanaLogo from '../assets/haryana-logo.png';
 import bannerBg from '../assets/banner-1-768x217.png';
+import ForgotPasswordScreen from './ForgotPasswordScreen';
 
 export default function Login({ onLogin, loading, authError }) {
-  const [screen, setScreen]       = useState('portal'); // 'portal' | 'login'
+  const [screen, setScreen]       = useState('portal'); // 'portal' | 'login' | 'forgot'
   const [username, setUsername]   = useState('');
   const [password, setPassword]   = useState('');
   const [showPass, setShowPass]   = useState(false);
@@ -26,6 +27,8 @@ export default function Login({ onLogin, loading, authError }) {
     if (!password)        { setFormError('Password is required.'); return; }
     onLogin({ username: username.trim(), password });
   };
+
+  if (screen === 'forgot') return <ForgotPasswordScreen onBack={() => setScreen('login')} />;
 
   // ── Portal Selection Screen ──────────────────────────────────────────────
   if (screen === 'portal') return (
@@ -315,6 +318,17 @@ export default function Login({ onLogin, loading, authError }) {
                 : <>Login &nbsp;→</>
               }
             </button>
+
+            {/* Forgot password */}
+            <div style={{ textAlign:'right', marginBottom:10, marginTop:-4 }}>
+              <button
+                type="button"
+                onClick={() => setScreen('forgot')}
+                style={{ background:'none', border:'none', color:'rgba(255,255,255,.38)', fontSize:12, cursor:'pointer', fontFamily:'Plus Jakarta Sans,sans-serif', textDecoration:'underline', padding:0 }}
+              >
+                Forgot Password?
+              </button>
+            </div>
 
             {/* Caution */}
             <div style={{ padding:'9px 11px', background:'rgba(253,230,138,.08)', border:'1px solid rgba(253,230,138,.2)', borderRadius:10, display:'flex', gap:8, alignItems:'flex-start', marginBottom:12 }}>
