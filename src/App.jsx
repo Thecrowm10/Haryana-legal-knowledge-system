@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from './hooks/useAuth';
 import Login from './pages/Login';
+import ChangePasswordScreen from './pages/ChangePasswordScreen';
 import Layout from './components/layout/Layout';
 import CitizenDashboard from './pages/CitizenDashboard';
 import UploaderDashboard from './pages/UploaderDashboard';
@@ -33,7 +34,7 @@ const INITIAL_TAXONOMY = [
 ];
 
 export default function App() {
-  const { user, loading, error: authError, loginAsRole, logout } = useAuth();
+  const { user, loading, error: authError, loginAsRole, changePass, logout } = useAuth();
   const [activePage, setActivePage]       = useState(null);
   const [auditLog, setAuditLog]           = useState([]);
   const [documents, setDocuments]         = useState(
@@ -94,6 +95,7 @@ export default function App() {
   }
 
   if (!user) return <Login onLogin={loginAsRole} loading={loading} authError={authError} />;
+  if (user.mustChangePassword) return <ChangePasswordScreen user={user} onPasswordChanged={changePass} onLogout={logout} />;
   if (activePage === null) return null;
 
   function renderDashboard() {
