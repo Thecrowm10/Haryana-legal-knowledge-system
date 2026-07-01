@@ -17,13 +17,14 @@ function decodeJwt(token) {
 
 function userFromPayload(payload) {
   return {
-    username:          payload.username,
-    role:              payload.role,
-    name:              payload.username,
-    email:             payload.email,
-    dept:              payload.department ?? '',
-    isActive:          payload.is_active,
+    username:           payload.username,
+    role:               payload.role,
+    name:               payload.username,
+    email:              payload.email,
+    dept:               payload.department ?? '',
+    isActive:           payload.is_active,
     mustChangePassword: payload.must_change_password ?? false,
+    passwordExpired:    payload.password_expired ?? false,
   };
 }
 

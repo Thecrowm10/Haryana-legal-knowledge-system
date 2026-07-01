@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Lock, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 
-export default function ChangePasswordScreen({ user, onPasswordChanged, onLogout }) {
+export default function ChangePasswordScreen({ user, onPasswordChanged, onLogout, reason = 'first_login' }) {
   const [form, setForm]       = useState({ current: '', next: '', confirm: '' });
   const [show, setShow]       = useState({ current: false, next: false, confirm: false });
   const [error, setError]     = useState('');
@@ -66,11 +66,13 @@ export default function ChangePasswordScreen({ user, onPasswordChanged, onLogout
             <Lock size={28} color="#1a56db" />
           </div>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: '#343a40', margin: '0 0 8px' }}>
-            Password Change Required
+            {reason === 'expired' ? 'Password Expired' : 'Password Change Required'}
           </h1>
           <p style={{ fontSize: 14, color: '#6c757d', margin: 0, lineHeight: 1.5 }}>
-            Welcome, <strong>{user?.name || user?.username}</strong>. You must set a new
-            password before you can continue.
+            {reason === 'expired'
+              ? <>Your password has expired (6-month policy). Please set a new password to continue, <strong>{user?.name || user?.username}</strong>.</>
+              : <>Welcome, <strong>{user?.name || user?.username}</strong>. You must set a new password before you can continue.</>
+            }
           </p>
         </div>
 
