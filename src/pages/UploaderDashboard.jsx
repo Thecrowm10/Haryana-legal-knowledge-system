@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  Upload, FileText, CheckCircle, X, TrendingUp, Archive, Download,
+  Upload, FileText, CheckCircle, XCircle, X, TrendingUp, Archive, Download,
   RotateCcw, AlertCircle, Eye, GitBranch, Plus, Cpu, Link, Clock,
   Layers, ChevronRight, AlertTriangle, Users, CheckSquare, Square,
   Edit3, Tag, Search,
@@ -13,9 +13,10 @@ import Badge from '../components/ui/Badge';
 import SelectField from '../components/ui/SelectField';
 import { useAuth } from '../hooks/useAuth';
 import { getDepartments, getDocumentTypes } from '../services/departments';
-import { uploadPdfFile, uploadPdfMetadata } from '../services/pdf';
+import { uploadPdfFile, uploadPdfMetadata, getMyDocuments, searchDocuments } from '../services/pdf';
+import { createNotification } from '../services/notifications';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// Constants
 
 const DEFAULT_DEPTS = [
   'Urban Local Bodies','Revenue & Disaster Mgmt.','Home Department',
@@ -56,7 +57,7 @@ const AMEND_CHANGE_TYPES = ['Amended', 'Substituted', 'Inserted', 'Deleted', 'Ex
 const AMEND_CHANGE_COLORS = { Amended: '#f59e0b', Substituted: '#3b82f6', Inserted: '#22c55e', Deleted: '#ef4444', Expanded: '#8b5cf6' };
 const EMPTY_PROVISION = () => ({ section: '', chapter: '', subsection: '', page: '', changeType: 'Substituted', before: '', after: '' });
 
-// ─── Type selector card colours & descriptions ────────────────────────────────
+// Type card colours and descriptions
 const TYPE_CARD_COLORS = {
   'Act':                 { bg: 'rgba(26,86,219,.08)',  accent: '#1a56db', text: '#1e40af' },
   'Amendment':           { bg: 'rgba(245,158,11,.08)', accent: '#f59e0b', text: '#d97706' },
@@ -76,7 +77,7 @@ const TYPE_CARD_DESC = {
   'Order / Gazette':     'Executive order or gazette notification',
 };
 
-// ─── Per-type dynamic metadata fields ─────────────────────────────────────────
+// Per-type metadata fields
 const TYPE_FIELDS = {
   'Act': [], // handled inline in form
   'Amendment': [], // handled inline
@@ -115,7 +116,7 @@ const MOCK_VERSIONS = {
   2: [{ v: '1.2', date: '2024-02-10', note: 'Current' },{ v: '1.1', date: '2023-09-01', note: 'Minor edits' },{ v: '1.0', date: '2022-03-15', note: 'Initial upload' }],
 };
 
-// ─── Word-level confidence scoring ────────────────────────────────────────────
+// Word-level confidence scoring
 // Deterministic (hash-based) so scores don't change on re-render.
 function _hashStr(s) {
   let h = 0;
@@ -305,7 +306,7 @@ function detectCrossDeptNotifications(citations, uploaderDept) {
   return [...notifyDepts];
 }
 
-// ─── Helper utilities ──────────────────────────────────────────────────────────
+// Helper utilities
 
 function fileIcon(f) {
   if (f.name.endsWith('.zip')) return <Archive size={15} color="#f59e0b" />;
@@ -420,7 +421,7 @@ function CrossDeptBanner({ notifications, onDismiss }) {
   );
 }
 
-// ─── Analysis result card ──────────────────────────────────────────────────────
+// Analysis result card
 // Only shows LINKED citations — unresolved ones are hidden, count shown in header only.
 function AnalysisCard({ docTitle, citations, analyzing }) {
   const linked     = citations.filter(c => c.status === 'linked');
@@ -493,7 +494,7 @@ function WorkflowBadge({ status }) {
   );
 }
 
-// ─── Main component ────────────────────────────────────────────────────────────
+// Main component
 export default function UploaderDashboard({ activePage, onAuditLog, documents = [], onAddDocument, taxonomy = [] }) {
   const { user } = useAuth();
   const [deptsData, setDeptsData] = useState([]);
@@ -516,16 +517,57 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     return () => document.removeEventListener('click', close);
   }, [showTypeChanger]);
 
-  const [uploads, setUploads] = useState(
-    documents.filter(d => d.uploader === 'Priya Sharma')
-      .map(d => ({ ...d, version: d.version || '1.0', ocrStatus: d.ocrStatus || 'completed', workflowStatus: d.workflowStatus || WORKFLOW_STATUS.PUBLISHED }))
-  );
+  const [uploads, setUploads] = useState([]);
+  const [myDocsLoading, setMyDocsLoading] = useState(false);
+  const [myDocsError,   setMyDocsError]   = useState('');
+
+  function mapApiDoc(d) {
+    return {
+      id:              d.id,
+      uid:             `api-${d.id}`,
+      title:           d.document_name,
+      type:            d.document_type_name,
+      dept:            d.department_name,
+      year:            d.issue_date ? new Date(d.issue_date).getFullYear() : new Date(d.created_at).getFullYear(),
+      status:          d.status || 'pending',
+      workflowStatus:  d.status === 'approved' ? WORKFLOW_STATUS.PUBLISHED : d.status === 'rejected' ? WORKFLOW_STATUS.DRAFT : WORKFLOW_STATUS.PENDING,
+      version:         d.version_no || '1.0',
+      fileName:        d.original_filename,
+      fileSize:        d.file_size,
+      desc:            d.description || '',
+      uploadedAt:      d.created_at?.split('T')[0] || '',
+      ocrStatus:       'completed',
+      gazette:         d.gazette_reference || '',
+      authority:       d.legal_authority || '',
+      enactmentDate:   d.issue_date || '',
+      effectiveFrom:   d.effective_from || '',
+      referenceNumber: d.reference_number || '',
+      shortTitle:      d.short_title || '',
+      tags:            d.tags || [],
+      relationships:   d.relationships || [],
+    };
+  }
+
+  useEffect(() => {
+    if (activePage !== 'myuploads') return;
+    if (!localStorage.getItem('token')) return;
+    setMyDocsLoading(true);
+    setMyDocsError('');
+    getMyDocuments()
+      .then(res => setUploads((res.data.documents || []).map(mapApiDoc)))
+      .catch(err => {
+        const detail = err.response?.data?.detail;
+        setMyDocsError(typeof detail === 'string' ? detail : 'Failed to load your documents');
+      })
+      .finally(() => setMyDocsLoading(false));
+  }, [activePage]);
+
   const [files, setFiles]           = useState([]);
   const [dragOver, setDragOver]     = useState(false);
   const [form, setForm]             = useState({ act: '', dept: user?.dept || '', type: '', version: '1.0', desc: '', enactmentDate: '', parentAct: '', changeTypes: [] });
   const [amendmentProvisions, setAmendmentProvisions] = useState([]);
   const [typeFields, setTypeFields]  = useState({});
-  const [hierarchy, setHierarchy]   = useState({ act: '', chapter: '', section: '', subsection: '' });
+  const [hierarchy, setHierarchy]   = useState({ act: '', actId: null, chapter: '', section: '', subsection: '' });
   const [rejected, setRejected]     = useState([]);
   const [versionModal, setVersionModal] = useState(null);
   const [conflictModal, setConflictModal] = useState(null); // { existingDoc, pendingDocs, pendingRelations }
@@ -547,6 +589,9 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   const [showAuthDrop, setShowAuthDrop] = useState(null);     // legal authority act dropdown
   const [showSectionDrop, setShowSectionDrop] = useState(null); // legal authority section dropdown
   const [showHierActDrop, setShowHierActDrop] = useState(false); // hierarchy drawer act dropdown
+  const [actSuggestions, setActSuggestions]   = useState([]);
+  const [actSearching,   setActSearching]     = useState(false);
+  const actSearchTimer = useRef(null);
   const [showHierSecDrop, setShowHierSecDrop] = useState(false); // hierarchy drawer section dropdown
   const [showRelDrop, setShowRelDrop] = useState(false);
   const [relSection, setRelSection] = useState('');            // section of the linked document
@@ -554,7 +599,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   const [parentActSearch, setParentActSearch] = useState('');
   const [showParentActDrop, setShowParentActDrop] = useState(false);
   const [drawerType,      setDrawerType]      = useState(null); // null | 'hierarchy' | 'relationship'
-  const [drawerHierarchy, setDrawerHierarchy] = useState({ act: '', chapter: '', section: '', subsection: '' });
+  const [drawerHierarchy, setDrawerHierarchy] = useState({ act: '', actId: null, chapter: '', section: '', subsection: '' });
 
   // AI analysis state
   const [analysisResults, setAnalysisResults] = useState([]);
@@ -582,15 +627,44 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
 
   // Extract all "Section X" mentions from a document's description + section field
   function getSectionsFromDoc(actTitle) {
-    const doc = approvedDocs.find(d => d.title === actTitle);
+    const doc = documents.find(d => d.title === actTitle) || approvedDocs.find(d => d.title === actTitle);
     if (!doc) return [];
+
+    // if the document has a pre-defined sections array, use it directly
+    if (doc.sections?.length) return doc.sections;
+
     const found = new Set();
-    if (doc.section) found.add(`Section ${doc.section}`);
+
+    // from hierarchy
+    if (doc.hierarchy?.section) found.add(`Section ${doc.hierarchy.section}`);
+    if (doc.hierarchy?.chapter) found.add(`Chapter ${doc.hierarchy.chapter}`);
+
+    // from legalAuthorities sections entered during upload
+    (doc.legalAuthorities || []).forEach(auth => {
+      (auth.sections || []).filter(Boolean).forEach(s => found.add(s));
+    });
+
+    // from amendmentProvisions
+    (doc.amendmentProvisions || []).forEach(p => {
+      if (p.section) found.add(`Section ${p.section}`);
+      if (p.chapter) found.add(`Chapter ${p.chapter}`);
+      if (p.subsection) found.add(`Section ${p.section}(${p.subsection})`);
+    });
+
+    // from description text
     if (doc.desc) {
-      for (const m of doc.desc.matchAll(/Section\s+(\d+[A-Za-z]?(?:\([a-z0-9]+\))?)/gi))
+      for (const m of doc.desc.matchAll(/Section\s+(\d+[A-Za-z]?(?:\([a-z0-9]+\))*)/gi))
+        found.add(`Section ${m[1]}`);
+      for (const m of doc.desc.matchAll(/Chapter\s+([IVXivx]+|\d+[A-Za-z]?)/gi))
+        found.add(`Chapter ${m[1].toUpperCase()}`);
+    }
+
+    if (doc.authority) {
+      for (const m of doc.authority.matchAll(/Section\s+(\d+[A-Za-z]?(?:\([a-z0-9]+\))*)/gi))
         found.add(`Section ${m[1]}`);
     }
-    return [...found];
+
+    return [...found].sort();
   }
   const relFiltered  = approvedDocs
     .filter(d =>
@@ -612,17 +686,17 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
       return [...prev, ...accepted.filter(f => !names.has(f.name))];
     });
 
-    // Auto-extract metadata from the first PDF
+    // Auto-extract metadata from the first PDF — always re-run so replacing a file updates the name
     const firstPdf = accepted.find(f => f.name.endsWith('.pdf'));
-    if (firstPdf && !form.act) {
+    if (firstPdf) {
       setAutoFillLoading(true);
       const { text } = await extractPdfText(firstPdf);
       const meta = autoExtractMetadata(text || firstPdf.name, firstPdf.name);
       setForm(f => ({
         ...f,
-        act:  f.act  || meta.title,
-        type: f.type || meta.type,
-        dept: f.dept || meta.dept,
+        act:  meta.title,           // always sync to the new file
+        type: f.type || meta.type,  // preserve manual pick
+        dept: f.dept || meta.dept,  // preserve manual pick
       }));
       setAutoFillLoading(false);
     }
@@ -633,6 +707,18 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     setFileRefs(r => r.filter(x => x.fileName !== name));
   }
   function handleDrop(e) { e.preventDefault(); setDragOver(false); addFiles(e.dataTransfer.files); }
+
+  function fetchDocSuggestions(documentType, text) {
+    clearTimeout(actSearchTimer.current);
+    if (!text || text.length < 1) { setActSuggestions([]); return; }
+    actSearchTimer.current = setTimeout(() => {
+      setActSearching(true);
+      searchDocuments(documentType, text, 10)
+        .then(res => setActSuggestions(res.data.results || []))
+        .catch(() => setActSuggestions([]))
+        .finally(() => setActSearching(false));
+    }, 280);
+  }
 
   function addRelation() {
     if (!relTarget) return;
@@ -648,7 +734,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   }
   function removeRelation(idx) { setRelations(r => r.filter((_, i) => i !== idx)); }
 
-  // ── Finalize upload (called after conflict check passes) ───────────────────
+  // Finalize upload after conflict check
   async function finalizeUpload(newDocs, finalRelations) {
     const docsWithWorkflow = newDocs.map(d => ({ ...d, workflowStatus: WORKFLOW_STATUS.DRAFT }));
 
@@ -665,7 +751,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
 
     setFiles([]); setFileRefs([]); setRelations([]);
     setForm({ act:'',dept:user?.dept||'',type:'',version:'1.0',desc:'',enactmentDate:'',parentAct:'',changeTypes:[] });
-    setHierarchy({ act:'',chapter:'',section:'',subsection:'' });
+    setHierarchy({ act:'', actId: null, chapter:'',section:'',subsection:'' });
     setAmendmentProvisions([]); setParentActSearch(''); setTypeFields({});
     setTimeout(async () => {
       const allDocsNow = [...documents, ...docsWithWorkflow.map(d => ({ ...d, uid: `upload-${d.id}` }))];
@@ -704,81 +790,127 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     onAuditLog?.(`Uploaded ${docsWithWorkflow.length} document(s): ${docsWithWorkflow.map(d => d.title).join(', ')}`);
   }
 
-  // ── Step 1: upload files to get file_refs ──────────────────────────────────
-  async function handleUploadFile() {
-    if (files.length === 0) return;
-    setUploadStep('uploading');
-    setUploadError('');
-    const refs = [];
-    for (const f of files) {
-      try {
-        const fd = new FormData();
-        fd.append('file', f);
-        const res = await uploadPdfFile(fd);
-        refs.push({
-          fileName:         f.name,
-          fileRef:          res.data.file_ref,
-          originalFilename: res.data.original_filename ?? f.name,
-          fileSize:         res.data.file_size ?? f.size,
-        });
-      } catch (err) {
-        const detail = err.response?.data?.detail;
-        setUploadError(typeof detail === 'string' ? detail : `Upload failed for "${f.name}"`);
-        setUploadStep('error');
-        return;
-      }
-    }
-    setFileRefs(refs);
-    setUploadStep('ready');
-  }
-
-  // ── Upload + save in one go (called on form submit) ────────────────────────
+  // Upload file and save metadata
   async function handleSubmit(e) {
     e.preventDefault();
     if (files.length === 0) return;
 
     setUploadError('');
-    setUploadStep('uploading');
-
     const hasToken  = !!localStorage.getItem('token');
-    const deptObj   = deptsData.find(d => d.name === form.dept);
     const typeObj   = typesData.find(d => d.name === form.type);
     const newDocs   = [];
+
+    // Derive the type-specific reference number from typeFields
+    const REFERENCE_NUMBER_KEY = {
+      'Act':               'actNumber',
+      'Amendment':         'amendmentNumber',
+      'Circular':          'circularNumber',
+      'Notification':      'notificationNumber',
+      'Order / Gazette':   'orderNumber',
+      'Policy':            'policyNumber',
+      'Rules & Regulations': 'ruleNumber',
+    };
+    const refNumKey = REFERENCE_NUMBER_KEY[form.type];
+    const referenceNumber = refNumKey ? (typeFields[refNumKey] || '') : '';
+
+    // effective_from: different typeFields key per type
+    const effectiveFrom = typeFields.commencementDate || typeFields.effectiveFrom || null;
+
+    // legal_authority: join legalAuthorities entries that have an act set
+    const legalAuthStr = legalAuthorities
+      .filter(a => a.act)
+      .map(a => {
+        const sections = a.sections.filter(Boolean);
+        return sections.length > 0 ? `${a.act} (${sections.join(', ')})` : a.act;
+      })
+      .join('; ') || '';
+
+    // relationships: map local relation objects to API shape
+    const explicitRels = relations
+      .filter(r => !r.isPending && r.targetId)
+      .map(r => {
+        const doc = documents.find(d => d.uid === r.targetId);
+        return {
+          pdf_id: typeof doc?.id === 'number' ? doc.id : null,
+          type:   r.label?.toLowerCase().replace(/\s+/g, '_') || 'related',
+        };
+      })
+      .filter(r => r.pdf_id !== null);
+
+    // For Amendment: auto-include hierarchy Act as parent_act if selected from API search
+    const hierarchyRel = (form.type === 'Amendment' && hierarchy.actId &&
+      !explicitRels.some(r => r.pdf_id === hierarchy.actId))
+      ? [{ pdf_id: hierarchy.actId, type: 'parent_act' }]
+      : [];
+
+    const relationshipsPayload = [...explicitRels, ...hierarchyRel];
 
     for (const f of files) {
       let apiDoc = null;
 
-      // Try API path only when a real token exists
       if (hasToken) {
+        // Step 1: upload the file to get a file_ref
+        let fileRef = null;
+        setUploadStep('uploading');
         try {
           const fd = new FormData();
           fd.append('file', f);
           const res = await uploadPdfFile(fd);
-          const refEntry = {
-            fileName:         f.name,
-            fileRef:          res.data.file_ref,
-            originalFilename: res.data.original_filename ?? f.name,
-            fileSize:         res.data.file_size ?? f.size,
-          };
-          setFileRefs(prev => [...prev, refEntry]);
-          setUploadStep('saving');
+          fileRef = res.data.file_ref;
+        } catch (err) {
+          const detail = err.response?.data?.detail;
+          setUploadError(typeof detail === 'string' ? detail : `Upload failed for "${f.name}"`);
+          setUploadStep('error');
+          return;
+        }
 
+        // Step 2: save metadata
+        setUploadStep('saving');
+        try {
           const payload = {
-            file_ref:          refEntry.fileRef,
-            act_name:          form.act || f.name.replace(/\.(pdf|zip)$/i, ''),
-            gazette_reference: '',
-            issuing_authority: deptObj?.name || form.dept || '',
-            enactment_date:    form.enactmentDate || null,
-            version_no:        form.version || '1.0',
-            department_id:     deptObj?.id ?? null,
-            document_type_id:  typeObj?.id ?? null,
-            tag_ids:           [],
-            description:       form.desc || '',
+            file_ref:              fileRef,
+            document_type_id:      typeObj?.id ?? null,
+            document_name:         form.act || f.name.replace(/\.(pdf|zip)$/i, ''),
+            issue_date:            form.enactmentDate || null,
+            reference_number:      referenceNumber,
+            effective_from:        effectiveFrom,
+            gazette_reference:     typeFields.gazetteRef || '',
+            legal_authority:       legalAuthStr,
+            version_no:            form.version || '1.0',
+            short_title:           typeFields.shortTitle || '',
+            valid_until:           typeFields.validity || null,
+            sector_domain:         typeFields.sector || '',
+            implementing_agency:   typeFields.implementingAgency || '',
+            next_review_date:      typeFields.reviewDate || null,
+            rule_making_authority: typeFields.ruleAuthority || '',
+            tag_ids:               [],
+            relationships:         relationshipsPayload,
+            description:           (() => {
+              const provisions = form.type === 'Amendment'
+                ? amendChanges.filter(c => c.section || c.chapter)
+                : [];
+              const suffix = provisions.length > 0
+                ? '\n__PROVISIONS__:' + JSON.stringify(provisions)
+                : '';
+              return (form.desc || '') + suffix;
+            })(),
           };
           const res2 = await uploadPdfMetadata(payload);
           apiDoc = res2.data;
-        } catch {
-          // API unavailable — fall through to local/demo path below
+          createNotification({
+            toRole:       'approver',
+            type:         'new_upload',
+            title:        'New Document Submitted',
+            message:      `"${form.act || f.name}" uploaded by ${user?.name || user?.username || 'Uploader'} — awaiting your review`,
+            docId:        apiDoc?.id,
+            docTitle:     form.act || f.name,
+            uploaderName: user?.name || user?.username,
+          });
+        } catch (err) {
+          const detail = err.response?.data?.detail;
+          setUploadError(typeof detail === 'string' ? detail : `Failed to save metadata for "${f.name}"`);
+          setUploadStep('error');
+          return;
         }
       }
 
@@ -789,14 +921,14 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
 
       newDocs.push({
         id:            apiDoc?.id ?? (Date.now() + Math.random()),
-        title:         apiDoc?.act_name || form.act || f.name.replace(/\.(pdf|zip)$/i, ''),
+        title:         apiDoc?.document_name || form.act || f.name.replace(/\.(pdf|zip)$/i, ''),
         type:          typeObj?.name || form.type || 'Act',
-        dept:          deptObj?.name || form.dept || 'General Administration',
+        dept:          user?.dept || form.dept || 'General Administration',
         year:          form.enactmentDate ? new Date(form.enactmentDate).getFullYear() : new Date().getFullYear(),
         status:        'pending',
         legalStatus:   'active',
         pages:         f.name.endsWith('.zip') ? null : (numPages || 1),
-        uploader:      user?.name || 'Priya Sharma',
+        uploader:      user?.name || 'Uploader',
         uploadedAt:    new Date().toISOString().split('T')[0],
         section:       '1', paragraph: '1',
         version:       apiDoc?.version_no || form.version || '1.0',
@@ -806,9 +938,12 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         isZip:         f.name.endsWith('.zip'),
         fileUrl:       f.name.endsWith('.pdf') ? URL.createObjectURL(f) : null,
         hierarchy,
-        gazette:           '',
-        authority:         deptObj?.name || form.dept || '',
-        enactmentDate:     apiDoc?.enactment_date || form.enactmentDate || '',
+        gazette:           apiDoc?.gazette_reference || typeFields.gazetteRef || '',
+        authority:         apiDoc?.legal_authority   || legalAuthStr || '',
+        enactmentDate:     apiDoc?.issue_date        || form.enactmentDate || '',
+        effectiveFrom:     apiDoc?.effective_from    || effectiveFrom || '',
+        referenceNumber:   apiDoc?.reference_number  || referenceNumber || '',
+        shortTitle:        apiDoc?.short_title       || typeFields.shortTitle || '',
         amendmentProvisions: form.type === 'Amendment' ? amendmentProvisions.filter(p => p.section) : [],
         typeFields:        { ...typeFields },
         legalAuthorities:  legalAuthorities.filter(a => a.act),
@@ -822,7 +957,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     }
 
     setUploadStep('done');
-    setTimeout(() => { setUploadStep(null); setFileRefs([]); }, 2000);
+    setTimeout(() => { setUploadStep(null); }, 2000);
 
     const conflict = newDocs.find(d =>
       documents.some(ex => ex.title.toLowerCase() === d.title.toLowerCase() && ex.status !== 'rejected')
@@ -888,10 +1023,11 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     URL.revokeObjectURL(url);
   }
 
-  // ── My Uploads page ────────────────────────────────────────────────────────
+  // My Uploads page
   if (activePage === 'myuploads') {
     const approved  = uploads.filter(d => d.status === 'approved').length;
     const pending   = uploads.filter(d => d.status === 'pending').length;
+    const rejected  = uploads.filter(d => d.status === 'rejected').length;
     const published = uploads.filter(d => d.workflowStatus === WORKFLOW_STATUS.PUBLISHED).length;
 
     return (
@@ -926,12 +1062,32 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
           </div>
         )}
 
+        {/* API loading / error */}
+        {myDocsLoading && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {[1, 2, 3].map(i => (
+              <div key={i} style={{ height: 52, borderRadius: 10, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', animation: 'pulse 1.4s ease-in-out infinite', opacity: 1 - i * 0.15 }} />
+            ))}
+          </div>
+        )}
+        {myDocsError && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderRadius: 10, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', color: '#dc2626' }}>
+            <AlertCircle size={15} style={{ flexShrink: 0 }} />
+            <span style={{ fontSize: 13 }}>{myDocsError}</span>
+            <button onClick={() => { setMyDocsError(''); setMyDocsLoading(true); getMyDocuments().then(r => setUploads((r.data.documents||[]).map(mapApiDoc))).catch(e => setMyDocsError(e.response?.data?.detail || 'Failed to load')).finally(() => setMyDocsLoading(false)); }}
+              style={{ marginLeft: 'auto', padding: '5px 14px', borderRadius: 7, border: '1px solid rgba(239,68,68,.3)', background: 'transparent', color: '#dc2626', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+              Retry
+            </button>
+          </div>
+        )}
+
         {/* Stats row */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
           {[
             { label: 'Total Uploads',  value: uploads.length, bg: 'rgba(26,86,219,.12)',  color: 'var(--primary)', icon: FileText,    filter: 'all' },
             { label: 'Approved',       value: approved,        bg: 'rgba(34,197,94,.12)',  color: '#22c55e',        icon: CheckCircle, filter: 'approved' },
             { label: 'Pending Review', value: pending,         bg: 'rgba(245,158,11,.12)', color: '#f59e0b',        icon: TrendingUp,  filter: 'pending' },
+            { label: 'Rejected',       value: rejected,        bg: 'rgba(239,68,68,.12)',  color: '#ef4444',        icon: XCircle,     filter: 'rejected' },
           ].map(s => {
             const isActive = filterStatus === s.filter;
             return (
@@ -1013,13 +1169,13 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
 
         {/* Uploads table */}
         {(() => {
-          // ── compute filtered + sorted list ──────────────────────────────
+          // Compute filtered and sorted list
           const SORT_KEY = { 'title': d => d.title, 'type': d => d.type, 'dept': d => d.dept,
             'year': d => d.year, 'uploadedAt': d => d.uploadedAt, 'status': d => d.status };
-          const baseList = filterStatus === 'all'      ? uploads
-                         : filterStatus === 'approved' ? uploads.filter(d => d.status === 'approved')
-                         : filterStatus === 'pending'  ? uploads.filter(d => d.workflowStatus === WORKFLOW_STATUS.PENDING || d.status === 'pending')
-                         : uploads.filter(d => d.workflowStatus === WORKFLOW_STATUS.PUBLISHED);
+          const baseList = filterStatus === 'approved' ? uploads.filter(d => d.status === 'approved')
+                         : filterStatus === 'pending'  ? uploads.filter(d => d.status === 'pending')
+                         : filterStatus === 'rejected' ? uploads.filter(d => d.status === 'rejected')
+                         : uploads;
           const allFiltered = baseList
             .filter(d => !tableSearch || d.title.toLowerCase().includes(tableSearch.toLowerCase()))
             .filter(d => !filterType  || d.type === filterType)
@@ -1028,7 +1184,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
               const kb = SORT_KEY[sortCol]?.(b) ?? '';
               return sortDir === 'asc' ? (ka > kb ? 1 : -1) : (ka < kb ? 1 : -1);
             });
-          const filtered = filterStatus ? allFiltered : allFiltered.slice(0, 5);
+          const filtered = allFiltered;
 
           function toggleSort(col) {
             if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -1052,7 +1208,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
           <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>My Uploads</div>
             <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '2px 9px', borderRadius: 20 }}>
-              {filterStatus ? `${filtered.length} docs` : `Last 5 of ${allFiltered.length} published`}
+              {`${filtered.length} document${filtered.length !== 1 ? 's' : ''}`}
             </span>
             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
               {bulkSelectMode ? (
@@ -1084,7 +1240,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
               </div>
               {filterStatus && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px 5px 12px', borderRadius: 20, background: 'rgba(34,197,94,.1)', border: '1px solid rgba(34,197,94,.3)', fontSize: 12.5, fontWeight: 600, color: '#16a34a', whiteSpace: 'nowrap' }}>
-                  {{ all: 'All Uploads', approved: 'Approved', pending: 'Pending Review' }[filterStatus]}
+                  {{ all: 'All Uploads', approved: 'Approved', pending: 'Pending Review', rejected: 'Rejected' }[filterStatus]}
                   <button onClick={() => setFilterStatus('')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#16a34a', display: 'flex', padding: 0, marginLeft: 2 }}><X size={11} /></button>
                 </div>
               )}
@@ -1125,9 +1281,13 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
             <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
               <colgroup>
                 {bulkSelectMode && <col style={{ width: '3%' }} />}
-                <col style={{ width: bulkSelectMode ? '22%' : '25%' }} /><col style={{ width: '9%' }} /><col style={{ width: '13%' }} />
-                <col style={{ width: '6%' }} /><col style={{ width: '10%' }} /><col style={{ width: '10%' }} />
-                <col style={{ width: '9%' }} /><col style={{ width: '10%' }} /><col style={{ width: '8%'  }} />
+                <col style={{ width: bulkSelectMode ? '32%' : '36%' }} />
+                <col style={{ width: '10%' }} />
+                <col style={{ width: '16%' }} />
+                <col style={{ width: '7%' }} />
+                <col style={{ width: '12%' }} />
+                <col style={{ width: '11%' }} />
+                <col style={{ width: bulkSelectMode ? '9%' : '8%' }} />
               </colgroup>
               <thead>
                 <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
@@ -1151,7 +1311,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
               </thead>
               <tbody>
                 {filtered.length === 0 && (
-                  <tr><td colSpan={8} style={{ padding: '52px 0', textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>No published documents yet.</td></tr>
+                  <tr><td colSpan={8} style={{ padding: '52px 0', textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>No documents found.</td></tr>
                 )}
                 {filtered.map(doc => {
                   const isDraft = !doc.workflowStatus || doc.workflowStatus === WORKFLOW_STATUS.DRAFT;
@@ -1210,7 +1370,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     );
   }
 
-  // ── Upload page ────────────────────────────────────────────────────────────
+  // Upload page
   return (
     <div style={{ animation: 'fadeSlideIn .3s ease' }}>
       {conflictModal && (
@@ -1253,199 +1413,180 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         </Card>
       )}
 
-      {rejected.length > 0 && (
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 18px', borderRadius: 10, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', color: '#dc2626', marginBottom: 14 }}>
-          <AlertCircle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
-          <div>
-            <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 2 }}>Unsupported file type rejected:</div>
-            <div style={{ fontSize: 12, fontFamily: 'var(--mono)' }}>{rejected.join(', ')}</div>
-          </div>
-          <button onClick={() => setRejected([])} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626' }}><X size={14} /></button>
-        </div>
-      )}
+      {/* ── Unified single-page upload layout ─────────────────────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '330px 1fr', gap: 20, alignItems: 'start' }}>
 
-      {/* ── Hidden file input — always present ─────────────────────────────── */}
-      <input ref={inputRef} type="file" accept=".pdf,.zip" multiple style={{ display: 'none' }}
-        onChange={e => { addFiles(e.target.files); e.target.value = ''; }} />
+        {/* ── LEFT: Type selector + File drop zone ── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-      {/* ── State 1a: Type selector (no type, no file) ─────────────────────── */}
-      {files.length === 0 && !form.type && (
-        <div style={{ position: 'relative', minHeight: 'calc(100vh - 220px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          {/* Blurred drop zone behind */}
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', filter: 'blur(5px)', opacity: 0.3, pointerEvents: 'none' }}>
-            <div style={{ width: '100%', maxWidth: 640, border: '2px dashed var(--surface-border)', borderRadius: 24, padding: '80px 56px', textAlign: 'center', background: 'var(--surface-card)' }}>
-              <div style={{ width: 80, height: 80, borderRadius: 20, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 22px' }}>
-                <Upload size={36} color="var(--text-color-secondary)" strokeWidth={1.6} />
+          {/* Hidden file input */}
+          <input ref={inputRef} type="file" accept=".pdf,.zip" multiple style={{ display: 'none' }}
+            onChange={e => { addFiles(e.target.files); e.target.value = ''; }} />
+
+          {/* Rejected files alert */}
+          {rejected.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px', borderRadius: 10, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', color: '#dc2626' }}>
+              <AlertCircle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 1 }}>Unsupported file type rejected:</div>
+                <div style={{ fontSize: 11.5, fontFamily: 'var(--mono)' }}>{rejected.join(', ')}</div>
               </div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 10 }}>Drop files here or click to browse</div>
-              <div style={{ fontSize: 14, color: 'var(--text-color-secondary)' }}>Select multiple PDFs or a ZIP archive — up to 50 MB per file</div>
+              <button onClick={() => setRejected([])} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', display: 'flex' }}><X size={13} /></button>
             </div>
-          </div>
+          )}
 
-          {/* Type selector cards */}
-          <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 720, padding: '0 8px' }}>
-            <div style={{ textAlign: 'center', marginBottom: 28 }}>
-              <div style={{ fontSize: 21, fontWeight: 800, color: 'var(--text-heading)', marginBottom: 8 }}>Select Document Type</div>
-              <div style={{ fontSize: 13.5, color: 'var(--text-color-secondary)' }}>Choose first — fields will adapt to your selection before upload</div>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+          {/* Document Type card */}
+          <Card>
+            <div style={{ ...LABEL, marginBottom: 10 }}>Document Type <span style={{ color: '#ef4444' }}>*</span></div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               {TYPES.map(type => {
                 const c = TYPE_CARD_COLORS[type] || { bg: 'rgba(148,163,184,.08)', accent: '#94a3b8', text: '#64748b' };
+                const active = form.type === type;
                 return (
                   <button key={type} type="button"
                     onClick={() => { fmt('type', type); setTypeFields({}); setLegalAuthorities([{ act: '', sections: [''] }]); setAmendChanges([{ chapter: '', section: '', subsection: '', changeType: 'Amended', description: '' }]); setHierarchy({ act: '', chapter: '', section: '', subsection: '' }); setRelations([]); }}
-                    style={{ padding: '18px 14px 16px', borderRadius: 14, border: `1.5px solid ${c.accent}25`, background: 'var(--surface-card)', cursor: 'pointer', textAlign: 'center', transition: 'all .2s', fontFamily: 'var(--font)', boxShadow: 'var(--card-shadow)' }}
-                    onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.background = c.bg; e.currentTarget.style.borderColor = c.accent + '55'; e.currentTarget.style.boxShadow = `0 8px 24px ${c.accent}22`; }}
-                    onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.background = 'var(--surface-card)'; e.currentTarget.style.borderColor = c.accent + '25'; e.currentTarget.style.boxShadow = 'var(--card-shadow)'; }}>
-                    <div style={{ width: 38, height: 38, borderRadius: 10, background: c.bg, border: `1px solid ${c.accent}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px' }}>
-                      <FileText size={17} color={c.accent} strokeWidth={1.8} />
+                    style={{
+                      padding: '10px 10px 9px', borderRadius: 10, textAlign: 'left',
+                      border: active ? `2px solid ${c.accent}` : `1.5px solid ${c.accent}30`,
+                      background: active ? c.bg : 'var(--surface-card)',
+                      cursor: 'pointer', transition: 'all .15s', fontFamily: 'var(--font)',
+                      boxShadow: active ? `0 0 0 3px ${c.accent}15` : 'none',
+                    }}
+                    onMouseEnter={e => { if (!active) { e.currentTarget.style.background = c.bg; e.currentTarget.style.borderColor = c.accent + '55'; }}}
+                    onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'var(--surface-card)'; e.currentTarget.style.borderColor = c.accent + '30'; }}}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
+                      <div style={{ width: 22, height: 22, borderRadius: 6, background: c.bg, border: `1px solid ${c.accent}30`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <FileText size={11} color={c.accent} />
+                      </div>
+                      {active && <CheckCircle size={12} color={c.accent} />}
                     </div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: c.text, marginBottom: 5, lineHeight: 1.3 }}>{type}</div>
-                    <div style={{ fontSize: 10.5, color: 'var(--text-color-secondary)', lineHeight: 1.45 }}>{TYPE_CARD_DESC[type] || ''}</div>
+                    <div style={{ fontSize: 11.5, fontWeight: 700, color: active ? c.text : 'var(--text-heading)', lineHeight: 1.3 }}>{type}</div>
                   </button>
                 );
               })}
             </div>
-          </div>
-        </div>
-      )}
+          </Card>
 
-      {/* ── State 1b: Drop zone (type selected, no file yet) ─────────────────── */}
-      {files.length === 0 && form.type && (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 'calc(100vh - 220px)', gap: 16 }}>
-          {/* Type chip */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px 7px 10px', borderRadius: 40, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', boxShadow: 'var(--card-shadow)' }}>
-            <div style={{ width: 26, height: 26, borderRadius: 7, background: TYPE_CARD_COLORS[form.type]?.bg || 'rgba(148,163,184,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <FileText size={13} color={TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'} />
-            </div>
-            <span style={{ fontSize: 13, fontWeight: 700, color: TYPE_CARD_COLORS[form.type]?.text || 'var(--text-heading)' }}>{form.type}</span>
-            <span style={{ width: 1, height: 14, background: 'var(--surface-border)' }} />
-            <button type="button" onClick={() => { fmt('type', ''); setTypeFields({}); }}
-              style={{ fontSize: 12, color: 'var(--text-color-secondary)', background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'var(--font)', padding: 0, display: 'flex', alignItems: 'center', gap: 4 }}>
-              <X size={12} /> Change
-            </button>
-          </div>
-          {/* Bigger drop zone */}
-          <div
-            onClick={() => inputRef.current?.click()}
-            onDrop={handleDrop}
-            onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-            onDragLeave={() => setDragOver(false)}
-            style={{
-              width: '100%', maxWidth: 680,
-              border: `2px dashed ${dragOver ? (TYPE_CARD_COLORS[form.type]?.accent || 'var(--primary)') : 'var(--surface-border)'}`,
-              borderRadius: 24, padding: '80px 56px', textAlign: 'center', cursor: 'pointer',
-              background: dragOver ? (TYPE_CARD_COLORS[form.type]?.bg || 'rgba(26,86,219,.05)') : 'var(--surface-card)',
-              transition: 'all .25s',
-              boxShadow: dragOver ? `0 0 0 6px ${TYPE_CARD_COLORS[form.type]?.accent || '#1a56db'}18` : 'var(--card-shadow)',
-            }}>
-            <div style={{ width: 80, height: 80, borderRadius: 20, background: dragOver ? (TYPE_CARD_COLORS[form.type]?.bg || 'rgba(26,86,219,.12)') : 'var(--surface-ground)', border: `1px solid ${dragOver ? (TYPE_CARD_COLORS[form.type]?.accent || 'var(--primary)') + '40' : 'var(--surface-border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 22px', transition: 'all .25s' }}>
-              <Upload size={36} color={dragOver ? (TYPE_CARD_COLORS[form.type]?.accent || 'var(--primary)') : 'var(--text-color-secondary)'} strokeWidth={1.6} />
-            </div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 10 }}>Drop files here or click to browse</div>
-            <div style={{ fontSize: 14, color: 'var(--text-color-secondary)', marginBottom: 22 }}>Select multiple PDFs or a ZIP archive — up to 50 MB per file</div>
-            <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--primary)', background: 'rgba(26,86,219,.08)', border: '1px solid rgba(26,86,219,.2)', padding: '4px 14px', borderRadius: 20 }}>.PDF</span>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: '#f59e0b', background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.3)', padding: '4px 14px', borderRadius: 20 }}>.ZIP</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── State 2: Document details form (file selected / uploading) ───────── */}
-      {files.length > 0 && <Card>
-        {/* Card header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, paddingBottom: 12, borderBottom: '1px solid var(--surface-border)' }}>
-          <FileText size={15} color="var(--primary)" />
-          <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>Document Details</span>
-          {files.length > 1 && <span style={{ fontSize: 11, fontWeight: 600, background: 'rgba(59,130,246,.1)', color: '#3b82f6', padding: '2px 9px', borderRadius: 20 }}>Applied to all {files.length} files</span>}
-          {autoFillLoading && <span style={{ marginLeft: 4, fontSize: 11, fontFamily: 'var(--mono)', color: '#3b82f6', fontWeight: 700 }}>⚡ AUTO-FILLING…</span>}
-        </div>
-
-        {/* File info banner — full width, prominent */}
-        <div style={{ marginBottom: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {files.slice(0, 2).map(f => {
-            const uploaded = fileRefs.some(r => r.fileName === f.name);
-            const isUploading = uploadStep === 'uploading' && !uploaded;
-            return (
-              <div key={f.name} style={{
-                display: 'flex', alignItems: 'center', gap: 14,
-                padding: '10px 14px', borderRadius: 10,
-                background: uploaded ? 'rgba(22,163,74,.05)' : isUploading ? 'rgba(59,130,246,.05)' : 'var(--surface-ground)',
-                border: `1.5px solid ${uploaded ? 'rgba(22,163,74,.25)' : isUploading ? 'rgba(59,130,246,.2)' : 'var(--surface-border)'}`,
-                transition: 'all .3s',
-              }}>
-                {/* File icon */}
-                <div style={{ width: 36, height: 36, borderRadius: 8, background: uploaded ? 'rgba(22,163,74,.1)' : 'rgba(26,86,219,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  {fileIcon(f)}
+          {/* File upload card */}
+          <Card>
+            {files.length === 0 ? (
+              <div
+                onClick={() => inputRef.current?.click()}
+                onDrop={handleDrop}
+                onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                style={{
+                  border: `2px dashed ${dragOver ? (TYPE_CARD_COLORS[form.type]?.accent || 'var(--primary)') : 'var(--surface-border)'}`,
+                  borderRadius: 12, padding: '32px 16px', textAlign: 'center', cursor: 'pointer',
+                  background: dragOver ? (TYPE_CARD_COLORS[form.type]?.bg || 'rgba(26,86,219,.05)') : 'var(--surface-ground)',
+                  transition: 'all .25s',
+                  boxShadow: dragOver ? `0 0 0 4px ${TYPE_CARD_COLORS[form.type]?.accent || '#1a56db'}15` : 'none',
+                }}>
+                <div style={{ width: 48, height: 48, borderRadius: 12, background: dragOver ? (TYPE_CARD_COLORS[form.type]?.bg || 'rgba(26,86,219,.12)') : 'var(--surface-card)', border: `1px solid ${dragOver ? (TYPE_CARD_COLORS[form.type]?.accent || 'var(--primary)') + '40' : 'var(--surface-border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', transition: 'all .25s' }}>
+                  <Upload size={22} color={dragOver ? (TYPE_CARD_COLORS[form.type]?.accent || 'var(--primary)') : 'var(--text-color-secondary)'} strokeWidth={1.6} />
                 </div>
-                {/* Name + size + type badge */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</div>
-                    {form.type && (
-                      <div style={{ position: 'relative', flexShrink: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '2px 10px 2px 7px', borderRadius: 20, background: TYPE_CARD_COLORS[form.type]?.bg || 'rgba(148,163,184,.1)', border: `1px solid ${TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'}30`, cursor: 'pointer' }}
-                          onClick={e => { e.stopPropagation(); setShowTypeChanger(v => !v); }}>
-                          <FileText size={10} color={TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'} />
-                          <span style={{ fontSize: 11, fontWeight: 700, color: TYPE_CARD_COLORS[form.type]?.text || '#64748b', fontFamily: 'var(--mono)' }}>{form.type}</span>
-                          <ChevronRight size={10} color={TYPE_CARD_COLORS[form.type]?.accent || '#94a3b8'} style={{ transform: showTypeChanger ? 'rotate(90deg)' : 'none', transition: 'transform .15s' }} />
-                        </div>
-                        {showTypeChanger && (
-                          <div onClick={e => e.stopPropagation()} style={{ position: 'absolute', top: '110%', left: 0, zIndex: 100, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,.15)', minWidth: 180, overflow: 'hidden' }}>
-                            {Object.keys(TYPE_CARD_COLORS).map(t => (
-                              <button key={t} type="button"
-                                onClick={() => { fmt('type', t); setTypeFields({}); setShowTypeChanger(false); }}
-                                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px', background: t === form.type ? (TYPE_CARD_COLORS[t]?.bg || 'rgba(148,163,184,.1)') : 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 12.5, fontWeight: t === form.type ? 700 : 500, color: t === form.type ? (TYPE_CARD_COLORS[t]?.text || '#64748b') : 'var(--text-color)', textAlign: 'left' }}>
-                                <div style={{ width: 8, height: 8, borderRadius: '50%', background: TYPE_CARD_COLORS[t]?.accent || '#94a3b8', flexShrink: 0 }} />
-                                {t}
-                                {t === form.type && <CheckCircle size={11} color={TYPE_CARD_COLORS[t]?.accent} style={{ marginLeft: 'auto' }} />}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>{formatSize(f.size)}</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 5 }}>Drop files here</div>
+                <div style={{ fontSize: 12, color: 'var(--text-color-secondary)', marginBottom: 14 }}>or click to browse · PDF or ZIP · up to 50 MB</div>
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 10.5, color: 'var(--primary)', background: 'rgba(26,86,219,.08)', border: '1px solid rgba(26,86,219,.2)', padding: '3px 10px', borderRadius: 20 }}>.PDF</span>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 10.5, color: '#f59e0b', background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.3)', padding: '3px 10px', borderRadius: 20 }}>.ZIP</span>
                 </div>
-                {/* Status badge */}
-                {isUploading && (
-                  <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: '#3b82f6', fontWeight: 700, background: 'rgba(59,130,246,.1)', padding: '3px 10px', borderRadius: 20, whiteSpace: 'nowrap' }}>UPLOADING…</span>
-                )}
-                {uploaded && (
-                  <span style={{ fontSize: 11, fontWeight: 700, color: '#16a34a', background: 'rgba(22,163,74,.1)', padding: '3px 10px', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap' }}>
-                    <CheckCircle size={11} /> Uploaded
-                  </span>
-                )}
-                {/* Replace button */}
-                <button type="button"
-                  onClick={() => { setFiles([]); setFileRefs([]); setUploadStep(null); setUploadError(''); setTimeout(() => inputRef.current?.click(), 50); }}
-                  style={{ fontSize: 12, fontWeight: 600, color: 'var(--primary)', background: 'rgba(26,86,219,.08)', border: '1px solid rgba(26,86,219,.2)', borderRadius: 7, padding: '5px 14px', cursor: 'pointer', fontFamily: 'var(--font)', whiteSpace: 'nowrap', flexShrink: 0 }}>
-                  Replace
-                </button>
-                {/* Remove button */}
-                <button type="button"
-                  onClick={() => { removeFile(f.name); if (files.length <= 1) { setFileRefs([]); setUploadStep(null); setUploadError(''); } }}
-                  style={{ width: 28, height: 28, borderRadius: 7, border: '1px solid var(--surface-border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <X size={13} />
-                </button>
               </div>
-            );
-          })}
-          {files.length > 2 && (
-            <div style={{ fontSize: 12, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', fontWeight: 600, paddingLeft: 4 }}>+{files.length - 2} more files</div>
-          )}
+            ) : (
+              <>
+                {/* File list */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                  {files.slice(0, 4).map(f => {
+                    const uploaded = fileRefs.some(r => r.fileName === f.name);
+                    const isUploading = uploadStep === 'uploading' && !uploaded;
+                    return (
+                      <div key={f.name} style={{
+                        display: 'flex', alignItems: 'center', gap: 10,
+                        padding: '8px 10px', borderRadius: 8,
+                        background: uploaded ? 'rgba(22,163,74,.05)' : isUploading ? 'rgba(59,130,246,.05)' : 'var(--surface-ground)',
+                        border: `1.5px solid ${uploaded ? 'rgba(22,163,74,.25)' : isUploading ? 'rgba(59,130,246,.2)' : 'var(--surface-border)'}`,
+                        transition: 'all .3s',
+                      }}>
+                        <div style={{ width: 30, height: 30, borderRadius: 7, background: uploaded ? 'rgba(22,163,74,.1)' : 'rgba(26,86,219,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          {fileIcon(f)}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</div>
+                          <div style={{ fontSize: 10.5, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>{formatSize(f.size)}</div>
+                        </div>
+                        {uploaded && <CheckCircle size={13} color="#16a34a" style={{ flexShrink: 0 }} />}
+                        {isUploading && <Clock size={12} color="#3b82f6" style={{ flexShrink: 0 }} />}
+                        <button type="button"
+                          onClick={() => { removeFile(f.name); if (files.length <= 1) { setFileRefs([]); setUploadStep(null); setUploadError(''); } }}
+                          style={{ width: 22, height: 22, borderRadius: 5, border: '1px solid var(--surface-border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <X size={10} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                  {files.length > 4 && (
+                    <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', fontWeight: 600, paddingLeft: 4 }}>+{files.length - 4} more files</div>
+                  )}
+                </div>
+
+                {/* Add more files — disabled (single-file upload only) */}
+                {/* <button type="button" onClick={() => inputRef.current?.click()}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', padding: '7px 0', borderRadius: 8, border: '1px dashed var(--surface-border)', background: 'transparent', color: 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', marginBottom: 14 }}>
+                  <Plus size={12} /> Add more files
+                </button> */}
+
+                {/* Replace / clear files — disabled (single-file upload only) */}
+                {/* <button type="button"
+                  onClick={() => { setFiles([]); setFileRefs([]); setUploadStep(null); setUploadError(''); }}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', padding: '7px 0', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                  <RotateCcw size={12} /> Replace Files
+                </button> */}
+              </>
+            )}
+          </Card>
+
         </div>
 
-        {uploadError && uploadStep === 'error' && (
-          <div style={{ marginBottom: 14, padding: '10px 14px', borderRadius: 8, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <AlertCircle size={14} color="#ef4444" style={{ flexShrink: 0 }} />
-            <span style={{ fontSize: 12.5, color: '#dc2626', flex: 1 }}>{uploadError}</span>
-            <button type="button" onClick={() => { setUploadError(''); setUploadStep(null); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444' }}><X size={12} /></button>
-          </div>
-        )}
-
+        {/* ── RIGHT: Document Details form ───────────────────────────────────── */}
+        <Card>
+          {!form.type ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 460, textAlign: 'center', gap: 14 }}>
+              <div style={{ width: 52, height: 52, borderRadius: 14, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <FileText size={22} color="var(--text-color-secondary)" strokeWidth={1.5} />
+              </div>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 6 }}>Select a Document Type</div>
+                <div style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>Choose the document type on the left to see the relevant form fields</div>
+              </div>
+            </div>
+          ) : files.length === 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 460, textAlign: 'center', gap: 14 }}>
+              <div style={{ width: 52, height: 52, borderRadius: 14, background: TYPE_CARD_COLORS[form.type]?.bg || 'var(--surface-ground)', border: `1px solid ${TYPE_CARD_COLORS[form.type]?.accent || 'var(--surface-border)'}30`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Upload size={22} color={TYPE_CARD_COLORS[form.type]?.accent || 'var(--text-color-secondary)'} strokeWidth={1.5} />
+              </div>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 6 }}>Drop a {form.type} file</div>
+                <div style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>Select a PDF or ZIP file on the left to fill in document details</div>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Form header */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18, paddingBottom: 14, borderBottom: '1px solid var(--surface-border)' }}>
+                <div style={{ width: 28, height: 28, borderRadius: 7, background: TYPE_CARD_COLORS[form.type]?.bg || 'var(--surface-ground)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <FileText size={13} color={TYPE_CARD_COLORS[form.type]?.accent || 'var(--primary)'} />
+                </div>
+                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>Document Details</span>
+                {autoFillLoading && <span style={{ marginLeft: 4, fontSize: 11, fontFamily: 'var(--mono)', color: '#3b82f6', fontWeight: 700 }}>⚡ AUTO-FILLING…</span>}
+                {files.length > 1 && <span style={{ fontSize: 11, fontWeight: 600, background: 'rgba(59,130,246,.1)', color: '#3b82f6', padding: '2px 9px', borderRadius: 20 }}>Applied to all {files.length} files</span>}
+              </div>
+              {uploadError && uploadStep === 'error' && (
+                <div style={{ marginBottom: 14, padding: '10px 14px', borderRadius: 8, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <AlertCircle size={14} color="#ef4444" style={{ flexShrink: 0 }} />
+                  <span style={{ fontSize: 12.5, color: '#dc2626', flex: 1 }}>{uploadError}</span>
+                  <button type="button" onClick={() => { setUploadError(''); setUploadStep(null); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444', display: 'flex' }}><X size={12} /></button>
+                </div>
+              )}
         <form onSubmit={handleSubmit}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
 
@@ -1842,19 +1983,23 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 background: uploadStep === 'done' ? '#16a34a' : files.length > 0 && !uploadStep ? 'var(--primary)' : uploadStep === 'error' ? 'var(--primary)' : 'var(--surface-200)',
                 color: uploadStep === 'done' || (files.length > 0 && (!uploadStep || uploadStep === 'error')) ? 'white' : '#94a3b8',
                 border: 'none', padding: '10px 28px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700,
-                cursor: files.length > 0 && !uploadStep ? 'pointer' : 'not-allowed',
+                cursor: files.length > 0 && (!uploadStep || uploadStep === 'error') ? 'pointer' : 'not-allowed',
                 display: 'flex', alignItems: 'center', gap: 8,
-                boxShadow: files.length > 0 && !uploadStep ? '0 2px 8px rgba(26,86,219,.2)' : 'none',
+                boxShadow: files.length > 0 && (!uploadStep || uploadStep === 'error') ? '0 2px 8px rgba(26,86,219,.2)' : 'none',
                 transition: 'all .2s',
               }}>
               {uploadStep === 'uploading' && <><Clock size={14} /> Uploading file…</>}
               {uploadStep === 'saving'    && <><Clock size={14} /> Saving details…</>}
               {uploadStep === 'done'      && <><CheckCircle size={14} /> Submitted!</>}
-              {(!uploadStep || uploadStep === 'ready' || uploadStep === 'error') && <><CheckCircle size={14} /> Submit for Approval</>}
+              {(!uploadStep || uploadStep === 'error') && <><CheckCircle size={14} /> Submit for Approval</>}
             </button>
           </div>
         </form>
-      </Card>}
+            </>
+          )}
+        </Card>
+
+      </div>
 
       {/* ── Drawer: Hierarchical Tags / Relationship ── */}
       {drawerType && (
@@ -1908,10 +2053,29 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                       <div style={{ ...LABEL, marginBottom: 6 }}>
                         {form.type === 'Amendment' ? 'Parent Act Name' : 'Act Name'}
                       </div>
-                      <input value={drawerHierarchy.act}
-                        onChange={e => setDrawerHierarchy(v => ({ ...v, act: e.target.value }))}
-                        placeholder="e.g. Haryana Municipal Act 1973" style={{ ...INPUT_BASE, width: '100%' }}
-                        onFocus={focusStyle} onBlur={blurStyle} />
+                      <div style={{ position: 'relative' }}>
+                        <input value={drawerHierarchy.act}
+                          onChange={e => { setDrawerHierarchy(v => ({ ...v, act: e.target.value, actId: null })); fetchDocSuggestions('Act', e.target.value); }}
+                          onFocus={e => { focusStyle(e); if (drawerHierarchy.act) fetchDocSuggestions('Act', drawerHierarchy.act); setShowHierActDrop(true); }}
+                          onBlur={e => { blurStyle(e); setTimeout(() => setShowHierActDrop(false), 180); }}
+                          placeholder="Type to search Acts…" style={{ ...INPUT_BASE, width: '100%' }}
+                        />
+                        {actSearching && <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 10, color: 'var(--text-color-secondary)' }}>…</div>}
+                        {showHierActDrop && actSuggestions.length > 0 && (
+                          <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 400, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 8, boxShadow: '0 6px 20px rgba(0,0,0,.13)', maxHeight: 220, overflow: 'auto', marginTop: 3 }}>
+                            {actSuggestions.map(a => (
+                              <div key={a.id}
+                                onMouseDown={() => { setDrawerHierarchy(v => ({ ...v, act: a.document_name, actId: a.id })); setActSuggestions([]); setShowHierActDrop(false); }}
+                                style={{ padding: '9px 12px', cursor: 'pointer', borderBottom: '1px solid var(--surface-border)' }}
+                                onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.document_name}</div>
+                                {a.reference_number && <div style={{ fontSize: 10.5, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', marginTop: 2 }}>{a.reference_number}</div>}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
 
@@ -2015,25 +2179,26 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
 
                   {/* Act / Rules & Regulations: Act name + Chapter/Section/Sub-section with dropdowns */}
                   {!['Circular', 'Notification', 'Policy', 'Order / Gazette', 'Amendment'].includes(form.type) && (<>
-                    {/* Act Name — dropdown of existing documents */}
+                    {/* Act Name — search-acts API */}
                     <div>
                       <div style={{ ...LABEL, marginBottom: 6 }}>Act / Rule Name</div>
                       <div style={{ position: 'relative' }}>
                         <input value={drawerHierarchy.act}
-                          onChange={e => setDrawerHierarchy(v => ({ ...v, act: e.target.value, section: '', chapter: '' }))}
-                          onFocus={e => { focusStyle(e); setShowHierActDrop(true); }}
+                          onChange={e => { setDrawerHierarchy(v => ({ ...v, act: e.target.value, actId: null, section: '', chapter: '' })); fetchDocSuggestions('Act', e.target.value); }}
+                          onFocus={e => { focusStyle(e); if (drawerHierarchy.act) fetchDocSuggestions('Act', drawerHierarchy.act); setShowHierActDrop(true); }}
                           onBlur={e => { blurStyle(e); setTimeout(() => setShowHierActDrop(false), 180); }}
-                          placeholder="Type to search existing documents…" style={{ ...INPUT_BASE, width: '100%' }} />
-                        {showHierActDrop && approvedDocs.filter(d => !drawerHierarchy.act || d.title.toLowerCase().includes(drawerHierarchy.act.toLowerCase())).slice(0, 8).length > 0 && (
-                          <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 300, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 8, boxShadow: '0 6px 20px rgba(0,0,0,.13)', maxHeight: 220, overflow: 'auto', marginTop: 3 }}>
-                            {approvedDocs.filter(d => !drawerHierarchy.act || d.title.toLowerCase().includes(drawerHierarchy.act.toLowerCase())).slice(0, 8).map(d => (
-                              <div key={d.uid || d.id}
-                                onMouseDown={() => { setDrawerHierarchy(v => ({ ...v, act: d.title, section: '', chapter: '', subsection: '' })); setShowHierActDrop(false); }}
+                          placeholder="Type to search Acts…" style={{ ...INPUT_BASE, width: '100%' }} />
+                        {actSearching && <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 10, color: 'var(--text-color-secondary)' }}>…</div>}
+                        {showHierActDrop && actSuggestions.length > 0 && (
+                          <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 400, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 8, boxShadow: '0 6px 20px rgba(0,0,0,.13)', maxHeight: 220, overflow: 'auto', marginTop: 3 }}>
+                            {actSuggestions.map(a => (
+                              <div key={a.id}
+                                onMouseDown={() => { setDrawerHierarchy(v => ({ ...v, act: a.document_name, actId: a.id, section: '', chapter: '', subsection: '' })); setActSuggestions([]); setShowHierActDrop(false); }}
                                 style={{ padding: '9px 12px', cursor: 'pointer', borderBottom: '1px solid var(--surface-border)' }}
                                 onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
                                 onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                                <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.title}</div>
-                                <div style={{ fontSize: 10.5, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', marginTop: 2 }}>{d.type} · {d.dept} · {d.year}</div>
+                                <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.document_name}</div>
+                                {a.reference_number && <div style={{ fontSize: 10.5, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', marginTop: 2 }}>{a.reference_number}</div>}
                               </div>
                             ))}
                           </div>

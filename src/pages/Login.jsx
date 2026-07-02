@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Search, Eye, EyeOff, Shield, Lock, User, ArrowRight } from 'lucide-react';
 import haryanaLogo from '../assets/haryana-logo.png';
+import bannerBg from '../assets/banner-1-768x217.png';
 
 export default function Login({ onLogin, loading, authError }) {
   const [screen, setScreen]       = useState('portal'); // 'portal' | 'login'
@@ -36,14 +37,13 @@ export default function Login({ onLogin, loading, authError }) {
         @keyframes fadeUp    { from{opacity:0;transform:translateY(20px)}  to{opacity:1;transform:none} }
         @keyframes pulse     { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.8)} }
         .lk-left { animation: fadeLeft .65s cubic-bezier(.22,1,.36,1) both; }
-        .lk-portal-card { animation: fadeUp .55s cubic-bezier(.22,1,.36,1) both; transition: all .22s ease; }
-        .lk-portal-card:hover { transform:translateY(-6px) !important; box-shadow:0 28px 64px rgba(0,0,0,.45) !important; }
+        .lk-portal-card { animation: fadeUp .55s cubic-bezier(.22,1,.36,1) both; transition: all .25s ease; }
+        .lk-portal-card:hover { transform:translateY(-5px) scale(1.01) !important; box-shadow:0 24px 56px rgba(0,0,0,.25), 0 0 0 1px rgba(255,255,255,.22) !important; }
       `}</style>
       <div className="lk" style={{ width:'100vw', height:'100vh', position:'relative', overflow:'hidden', display:'flex', alignItems:'center' }}>
-        <img src="https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=1800&q=85&fit=crop&crop=center" alt=""
-          style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', zIndex:0 }}
-          onError={e=>{ e.target.src='https://images.unsplash.com/photo-1589578527966-fdac0f44566c?w=1800&q=85&fit=crop'; }} />
-        <div style={{ position:'absolute', inset:0, zIndex:1, background:'linear-gradient(110deg,rgba(2,10,5,.85) 0%,rgba(2,10,5,.65) 50%,rgba(2,10,5,.45) 100%)' }}/>
+        <img src={bannerBg} alt=""
+          style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', zIndex:0, filter:'blur(2px)', transform:'scale(1.02)' }} />
+        <div style={{ position:'absolute', inset:0, zIndex:1, background:'linear-gradient(110deg,rgba(2,10,5,.82) 0%,rgba(2,10,5,.62) 45%,rgba(2,10,5,.42) 100%)' }}/>
 
         <div style={{ position:'relative', zIndex:2, width:'100%', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'40px 6%', gap:48 }}>
 
@@ -53,13 +53,13 @@ export default function Login({ onLogin, loading, authError }) {
               <img src={haryanaLogo} alt="Haryana" style={{ width:52, height:52, objectFit:'contain' }} />
               <div style={{ textAlign:'left' }}>
                 <div style={{ fontSize:16, fontWeight:700, color:'#fff' }}>Government of Haryana</div>
-                <div style={{ fontSize:11.5, color:'rgba(255,255,255,.4)' }}>Legal Knowledge System</div>
+                <div style={{ fontSize:11.5, color:'rgba(255,255,255,.7)' }}>Legal Knowledge System</div>
               </div>
             </div>
             <h1 style={{ fontSize:'clamp(26px,3.5vw,46px)', fontWeight:800, color:'#fff', lineHeight:1.15, letterSpacing:'-.02em', marginBottom:12 }}>
               How would you like to<br/><span style={{ color:'#4ade80' }}>access the portal?</span>
             </h1>
-            <p style={{ fontSize:14, color:'rgba(255,255,255,.4)', maxWidth:440, margin:'0 auto' }}>
+            <p style={{ fontSize:14, color:'rgba(255,255,255,.72)', maxWidth:440, margin:'0 auto' }}>
               Choose your access type to continue. Citizens can search legal documents without logging in.
             </p>
           </div>
@@ -70,9 +70,9 @@ export default function Login({ onLogin, loading, authError }) {
             {/* Public Access */}
             <div className="lk-portal-card" onClick={() => onLogin({ role: 'citizen' })} style={{
               width: 280, padding:'32px 28px', borderRadius:20, cursor:'pointer',
-              background:'rgba(255,255,255,.08)', backdropFilter:'blur(28px)',
-              border:'1px solid rgba(255,255,255,.16)', borderTop:'1px solid rgba(255,255,255,.24)',
-              boxShadow:'0 16px 48px rgba(0,0,0,.3)',
+              background:'rgba(255,255,255,.05)', backdropFilter:'blur(32px) saturate(160%)', WebkitBackdropFilter:'blur(32px) saturate(160%)',
+              border:'1px solid rgba(255,255,255,.14)', borderTop:'1px solid rgba(255,255,255,.28)',
+              boxShadow:'0 8px 32px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.12)',
               display:'flex', flexDirection:'column', alignItems:'center', textAlign:'center', gap:16,
               animationDelay:'.1s',
             }}>
@@ -81,22 +81,22 @@ export default function Login({ onLogin, loading, authError }) {
               </div>
               <div>
                 <div style={{ fontSize:18, fontWeight:800, color:'#fff', marginBottom:8 }}>Public Access</div>
-                <div style={{ fontSize:13, color:'rgba(255,255,255,.45)', lineHeight:1.65 }}>
+                <div style={{ fontSize:13, color:'rgba(255,255,255,.75)', lineHeight:1.65 }}>
                   Search and browse legal documents, acts, notifications without logging in.
                 </div>
               </div>
               <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:4, padding:'9px 20px', borderRadius:50, background:'rgba(74,222,128,.15)', border:'1px solid rgba(74,222,128,.28)', color:'#4ade80', fontSize:13, fontWeight:700 }}>
                 Continue as Citizen <ArrowRight size={14}/>
               </div>
-              <div style={{ fontSize:11, color:'rgba(255,255,255,.25)', marginTop:-6 }}>No login required</div>
+              <div style={{ fontSize:11, color:'rgba(255,255,255,.6)', marginTop:-6 }}>No login required</div>
             </div>
 
             {/* Official Access */}
             <div className="lk-portal-card" onClick={() => setScreen('login')} style={{
               width: 280, padding:'32px 28px', borderRadius:20, cursor:'pointer',
-              background:'rgba(255,255,255,.08)', backdropFilter:'blur(28px)',
-              border:'1px solid rgba(255,255,255,.16)', borderTop:'1px solid rgba(255,255,255,.24)',
-              boxShadow:'0 16px 48px rgba(0,0,0,.3)',
+              background:'rgba(255,255,255,.05)', backdropFilter:'blur(32px) saturate(160%)', WebkitBackdropFilter:'blur(32px) saturate(160%)',
+              border:'1px solid rgba(255,255,255,.14)', borderTop:'1px solid rgba(255,255,255,.28)',
+              boxShadow:'0 8px 32px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.12)',
               display:'flex', flexDirection:'column', alignItems:'center', textAlign:'center', gap:16,
               animationDelay:'.2s',
             }}>
@@ -105,14 +105,14 @@ export default function Login({ onLogin, loading, authError }) {
               </div>
               <div>
                 <div style={{ fontSize:18, fontWeight:800, color:'#fff', marginBottom:8 }}>Official Access</div>
-                <div style={{ fontSize:13, color:'rgba(255,255,255,.45)', lineHeight:1.65 }}>
+                <div style={{ fontSize:13, color:'rgba(255,255,255,.75)', lineHeight:1.65 }}>
                   For department uploaders, approvers, CS Office and system administrators.
                 </div>
               </div>
               <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:4, padding:'9px 20px', borderRadius:50, background:'rgba(99,102,241,.15)', border:'1px solid rgba(99,102,241,.3)', color:'#818cf8', fontSize:13, fontWeight:700 }}>
                 Login with Credentials <ArrowRight size={14}/>
               </div>
-              <div style={{ fontSize:11, color:'rgba(255,255,255,.25)', marginTop:-6 }}>Password / SSO required</div>
+              <div style={{ fontSize:11, color:'rgba(255,255,255,.6)', marginTop:-6 }}>Password / SSO required</div>
             </div>
 
           </div>
@@ -170,10 +170,9 @@ export default function Login({ onLogin, loading, authError }) {
 
         {/* BG */}
         <img
-          src="https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=1800&q=85&fit=crop&crop=center"
+          src={bannerBg}
           alt=""
-          style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', zIndex:0 }}
-          onError={e=>{ e.target.src='https://images.unsplash.com/photo-1589578527966-fdac0f44566c?w=1800&q=85&fit=crop'; }}
+          style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', zIndex:0, filter:'blur(2px)', transform:'scale(1.02)' }}
         />
         <div style={{ position:'absolute', inset:0, zIndex:1, background:'linear-gradient(110deg, rgba(2,10,5,.82) 0%, rgba(2,10,5,.62) 45%, rgba(2,10,5,.42) 100%)' }}/>
 

@@ -43,9 +43,20 @@ export default function App() {
   const [taxonomy, setTaxonomy]           = useState(INITIAL_TAXONOMY);
 
   useEffect(() => {
-    if (user && activePage === null) setActivePage(DEFAULT_PAGE[user.role]);
-    if (!user) setActivePage(null);
+    if (user && activePage === null) {
+      const saved = localStorage.getItem('activePage');
+      setActivePage(saved || DEFAULT_PAGE[user.role]);
+    }
+    if (!user) {
+      setActivePage(null);
+      localStorage.removeItem('activePage');
+    }
   }, [user]);
+
+  function navigate(page) {
+    setActivePage(page);
+    localStorage.setItem('activePage', page);
+  }
 
   function addAuditLog(msg) { setAuditLog(l => [msg, ...l]); }
 
@@ -134,7 +145,7 @@ export default function App() {
   }
 
   return (
-    <Layout user={user} activePage={activePage} onNavigate={setActivePage} onLogout={logout}>
+    <Layout user={user} activePage={activePage} onNavigate={navigate} onLogout={logout}>
       {renderDashboard()}
     </Layout>
   );

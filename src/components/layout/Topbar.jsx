@@ -1,5 +1,6 @@
 ﻿import { useState } from 'react';
-import { Menu, Bell, ChevronDown, LogOut, User, Settings } from 'lucide-react';
+import { Menu, ChevronDown, LogOut, User, Settings } from 'lucide-react';
+import NotificationBell from '../NotificationBell';
 
 const ROLE_META = {
   citizen:  { label: 'Citizen',         color: '#1a56db', bg: 'rgba(26,86,219,.1)' },
@@ -58,19 +59,9 @@ export default function Topbar({ user, activePage, onLogout, onToggleSidebar }) 
       </div>
 
       {/* Bell */}
-      <button style={{
-        background: 'transparent', border: 'none', cursor: 'pointer',
-        width: 36, height: 36, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        color: 'var(--text-color-secondary)', position: 'relative', transition: 'background .15s',
-      }}
-        onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
-        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-        <Bell size={17} />
-        <span style={{
-          position: 'absolute', top: 7, right: 7, width: 7, height: 7,
-          borderRadius: '50%', background: 'var(--red)', border: '2px solid white',
-        }} />
-      </button>
+      {(user.role === 'approver' || user.role === 'uploader') && (
+        <NotificationBell role={user.role} />
+      )}
 
       {/* Profile dropdown */}
       <div style={{ position: 'relative' }}>
