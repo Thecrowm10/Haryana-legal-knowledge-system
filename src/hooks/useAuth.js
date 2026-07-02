@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
+import { changePassword as changePasswordApi } from '../services/pdf';
 
-const CITIZEN_PROFILE  = { username: 'citizen',       role: 'citizen',  name: 'Guest Citizen',       dept: '' };
-// const DEV_UPLOADER     = { username: 'dept.uploader', role: 'uploader', name: 'Dev Uploader (Mock)',  dept: 'Urban Local Bodies' };
-// const DEV_APPROVER     = { username: 'dept.approver', role: 'approver', name: 'Dev Approver (Mock)',  dept: 'Urban Local Bodies' };
+const CITIZEN_PROFILE  = { username: 'citizen', role: 'citizen', name: 'Guest Citizen', dept: '', mustChangePassword: false };
+// const DEV_UPLOADER     = { username: 'dept.uploader', role: 'uploader', name: 'Dev Uploader (Mock)',  dept: 'Urban Local Bodies', mustChangePassword: false };
+// const DEV_APPROVER     = { username: 'dept.approver', role: 'approver', name: 'Dev Approver (Mock)',  dept: 'Urban Local Bodies', mustChangePassword: false };
 
 function decodeJwt(token) {
   try {
@@ -12,6 +13,19 @@ function decodeJwt(token) {
   } catch {
     return null;
   }
+}
+
+function userFromPayload(payload) {
+  return {
+    username:           payload.username,
+    role:               payload.role,
+    name:               payload.username,
+    email:              payload.email,
+    dept:               payload.department ?? '',
+    isActive:           payload.is_active,
+    mustChangePassword: payload.must_change_password ?? false,
+    passwordExpired:    payload.password_expired ?? false,
+  };
 }
 
 function restoreUserFromToken() {
@@ -23,18 +37,11 @@ function restoreUserFromToken() {
     localStorage.removeItem('token');
     return null;
   }
-  return {
-    username: payload.username,
-    role:     payload.role,
-    name:     payload.username,
-    email:    payload.email,
-    dept:     payload.department ?? '',
-    isActive: payload.is_active,
-  };
+  return userFromPayload(payload);
 }
 
 export function useAuth() {
-  const [user, setUser] = useState(restoreUserFromToken);
+  const [user, setUser]       = useState(restoreUserFromToken);
   const [error, setError]     = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -49,7 +56,6 @@ export function useAuth() {
       setUser(CITIZEN_PROFILE);
       return;
     }
-0
     // DEV BYPASS — uncomment below to use mock users when backend is unavailable
     // if (username === 'dept.uploader' && password === 'upload123') { setUser(DEV_UPLOADER); return; }
     // if (username === 'dept.approver' && password === 'approve123') { setUser(DEV_APPROVER); return; }
@@ -70,14 +76,7 @@ export function useAuth() {
       const payload = decodeJwt(token);
       if (!payload) throw new Error('Invalid token received');
 
-      setUser({
-        username:  payload.username,
-        role:      payload.role,
-        name:      payload.username,
-        email:     payload.email,
-        dept:      payload.department ?? '',
-        isActive:  payload.is_active,
-      });
+      setUser(userFromPayload(payload));
     } catch (err) {
       localStorage.removeItem('token');
       const detail = err.response?.data?.detail;
@@ -85,6 +84,14 @@ export function useAuth() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function changePass(currentPassword, newPassword) {
+    const res = await changePasswordApi(currentPassword, newPassword);
+    const token = res.data.access_token;
+    localStorage.setItem('token', token);
+    const payload = decodeJwt(token);
+    if (payload) setUser(userFromPayload(payload));
   }
 
   function logout() {
@@ -98,5 +105,5 @@ export function useAuth() {
     }
   }
 
-  return { user, error, loading, loginAsRole, logout };
+  return { user, error, loading, loginAsRole, changePass, logout };
 }
