@@ -575,21 +575,33 @@ function OcrTextPanel({ ocrData, currentPage, wordEdits, onWordEdit, isScanned =
 // type-specific fields, legal authorities, relationships, amendment provisions.
 function DocumentDetailsPanel({ doc }) {
   const meta = [
-    ['Title',          doc.title],
-    ['Type',           doc.type],
-    ['Department',     doc.dept],
-    ['Year',           doc.year ? String(doc.year) : null],
-    ['Version',        doc.version || '1.0'],
-    ['Uploader',       doc.uploader || null],
-    ['Upload Date',    doc.uploadedAt || null],
-    ['Enactment Date', doc.enactmentDate || null],
-    ['Pages',          doc.pages ? `${doc.pages} pages` : null],
-    ['Legal Status',   doc.legalStatus || 'active'],
-    ['File Name',      doc.fileName || null],
+    ['Title',           doc.title],
+    ['Type',            doc.type],
+    ['Department',      doc.dept],
+    ['Year',            doc.year ? String(doc.year) : null],
+    ['Version',         doc.version || '1.0'],
+    ['Reference No.',   doc.referenceNumber || null],
+    ['Issue Date',      doc.enactmentDate || null],
+    ['Effective From',  doc.effectiveFrom || null],
+    ['Gazette Ref.',    doc.gazette || null],
+    ['Legal Authority', doc.authority || null],
+    ['Uploader',        doc.uploader || null],
+    ['Upload Date',     doc.uploadedAt || null],
+    ['Pages',           doc.pages ? `${doc.pages} pages` : null],
+    ['Legal Status',    doc.legalStatus || 'active'],
+    ['File Name',       doc.fileName || null],
   ].filter(([, v]) => v);
 
-  // Type-specific extra fields
-  const typeExtra = doc.typeFields ? Object.entries(doc.typeFields).filter(([, v]) => v) : [];
+  // Fields already shown in meta — exclude from typeExtra to avoid duplication
+  const TYPEEXTRA_SKIP = new Set([
+    'effectiveFrom', 'commencementDate',
+    'gazetteRef',
+    'actNumber', 'amendmentNumber', 'circularNumber',
+    'notificationNumber', 'orderNumber', 'policyNumber', 'ruleNumber',
+  ]);
+  const typeExtra = doc.typeFields
+    ? Object.entries(doc.typeFields).filter(([k, v]) => v && !TYPEEXTRA_SKIP.has(k))
+    : [];
 
   // Map camelCase keys to readable labels
   const fieldLabel = k => k.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase()).trim();
@@ -932,6 +944,24 @@ function mapApiDoc(d) {
     remarks:         d.latest_approval?.comments || '',
     fileUrl:         null,
     relationships:   d.relationships || [],
+    docRelations:    (d.relationships || [])
+      .filter(r => r.type !== 'parent_act')
+      .map(r => ({
+        label:       (r.type || 'references').replace(/_/g, ' '),
+        targetId:    r.pdf_id ? `api-${r.pdf_id}` : null,
+        targetTitle: r.document_name || `Document #${r.pdf_id}`,
+        targetType:  r.document_type_name || '',
+        note:        '',
+        section:     '',
+        isPending:   false,
+      })),
+    typeFields: {
+      ...(d.valid_until            ? { validity:            d.valid_until }            : {}),
+      ...(d.sector_domain          ? { sector:              d.sector_domain }          : {}),
+      ...(d.implementing_agency    ? { implementingAgency:  d.implementing_agency }    : {}),
+      ...(d.next_review_date       ? { reviewDate:          d.next_review_date }       : {}),
+      ...(d.rule_making_authority  ? { ruleAuthority:       d.rule_making_authority }  : {}),
+    },
     ...(() => {
       const raw = d.description || '';
       const match = raw.match(/\n?__PROVISIONS__:(.+)$/s);
@@ -958,8 +988,12 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
   const tableRef  = useRef(null);
   const expandedRef = useRef(null);
 
-  function fetchDocs() {
-    if (!localStorage.getItem('token')) return;
+  function fetchDocs(propDocs) {
+    if (!localStorage.getItem('token')) {
+      // Demo mode — use documents prop directly
+      if (propDocs?.length > 0) setDocs(propDocs);
+      return;
+    }
     setLoading(true);
     setApiError('');
     getApproverDocuments()
@@ -968,7 +1002,7 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
       .finally(() => setLoading(false));
   }
 
-  useEffect(() => { fetchDocs(); }, [activePage]);
+  useEffect(() => { fetchDocs(documents); }, [activePage, documents]);
 
   // Scroll expanded card into view
   useEffect(() => {
@@ -981,30 +1015,40 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
   const reviewed = docs.filter(d => d.status !== 'pending');
 
   function decide(id, decision) {
-    const doc    = docs.find(d => d.id === id);
-    const remark = remarks[id] || '';
+    const doc      = docs.find(d => d.id === id);
+    const remark   = remarks[id] || '';
+    const hasToken = !!localStorage.getItem('token');
     setDeciding({ id, action: decision });
+
+    function apply() {
+      setDocs(ds => ds.map(d => d.id === id
+        ? { ...d, status: decision, ...(remark ? { remarks: remark } : {}) }
+        : d
+      ));
+      if (decision === 'approved') onApprove?.(id);
+      onAuditLog?.(`${decision === 'approved' ? 'Approved' : 'Rejected'} document: ${doc?.title}${remark ? ` — "${remark}"` : ''}`);
+      createNotification({
+        toRole:   'uploader',
+        type:     decision === 'approved' ? 'document_approved' : 'document_rejected',
+        title:    decision === 'approved' ? 'Document Approved' : 'Document Rejected',
+        message:  decision === 'approved'
+          ? `"${doc?.title}" has been approved by the approver`
+          : `"${doc?.title}" has been rejected by the approver`,
+        remark:   remark || null,
+        docId:    id,
+        docTitle: doc?.title,
+      });
+      if (expanded === id) setExpanded(null);
+    }
+
+    if (!hasToken) {
+      apply();
+      setDeciding(null);
+      return;
+    }
+
     reviewDocument(id, decision, remark || undefined)
-      .then(() => {
-        setDocs(ds => ds.map(d => d.id === id
-          ? { ...d, status: decision, ...(remark ? { remarks: remark } : {}) }
-          : d
-        ));
-        if (decision === 'approved') onApprove?.(id);
-        onAuditLog?.(`${decision === 'approved' ? 'Approved' : 'Rejected'} document: ${doc?.title}${remark ? ` — "${remark}"` : ''}`);
-        createNotification({
-          toRole:   'uploader',
-          type:     decision === 'approved' ? 'document_approved' : 'document_rejected',
-          title:    decision === 'approved' ? 'Document Approved' : 'Document Rejected',
-          message:  decision === 'approved'
-            ? `"${doc?.title}" has been approved by the approver`
-            : `"${doc?.title}" has been rejected by the approver`,
-          remark:   remark || null,
-          docId:    id,
-          docTitle: doc?.title,
-        });
-        if (expanded === id) setExpanded(null);
-      })
+      .then(() => apply())
       .catch(err => {
         const detail = err.response?.data?.detail || 'Action failed. Please try again.';
         setApiError(detail);

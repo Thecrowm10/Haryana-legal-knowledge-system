@@ -45,7 +45,7 @@ const REL_TYPES_BY_DOCTYPE = {
 
 const REL_TARGET_TYPES = {
   'Act':                 ['Act', 'Amendment', 'Rules & Regulations', 'Notification'],
-  'Amendment':           ['Act', 'Rules & Regulations'],
+  'Amendment':           ['Act', 'Rules & Regulations', 'Amendment'],
   'Circular':            ['Circular', 'Act', 'Order / Gazette', 'Policy', 'Notification', 'Rules & Regulations'],
   'Notification':        ['Act', 'Rules & Regulations', 'Order / Gazette', 'Notification', 'Circular', 'Policy'],
   'Policy':              ['Act', 'Policy', 'Notification', 'Order / Gazette', 'Circular', 'Rules & Regulations'],
@@ -361,8 +361,10 @@ function HierarchyTag({ hierarchy, onOpen, isRef, legalAuthorities }) {
       <Layers size={13} />
       {hasValues
         ? (isRef
-            ? `${hierarchy.act || '—'} › ${hierarchy.section || '—'}`
-            : `${hierarchy.act || '—'} › ${hierarchy.chapter || '—'} › ${hierarchy.section || '—'}`)
+            ? hierarchy.section ? `${hierarchy.act || '—'} › ${hierarchy.section}` : (hierarchy.act || '—')
+            : hierarchy.chapter || hierarchy.section
+              ? `${hierarchy.act || '—'} › ${hierarchy.chapter || '—'} › ${hierarchy.section || '—'}`
+              : (hierarchy.act || '—'))
         : (isRef ? 'Set Act Reference' : 'Set Hierarchical Tags')}
       <ChevronRight size={12} />
     </button>
@@ -854,10 +856,13 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     const legalAuthStr = legalAuthorities
       .filter(a => a.act)
       .map(a => {
-        const sections = a.sections.filter(Boolean);
+        const sections = (a.sections || []).filter(Boolean);
         return sections.length > 0 ? `${a.act} (${sections.join(', ')})` : a.act;
       })
-      .join('; ') || '';
+      .join('; ')
+      || (form.type === 'Rules & Regulations' && hierarchy.act
+            ? (hierarchy.section ? `${hierarchy.act} (${hierarchy.section})` : hierarchy.act)
+            : '');
 
     // relationships: map local relation objects to API shape
     const explicitRels = relations
@@ -931,15 +936,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
           };
           const res2 = await uploadPdfMetadata(payload);
           apiDoc = res2.data;
-          createNotification({
-            toRole:       'approver',
-            type:         'new_upload',
-            title:        'New Document Submitted',
-            message:      `"${form.act || f.name}" uploaded by ${user?.name || user?.username || 'Uploader'} — awaiting your review`,
-            docId:        apiDoc?.id,
-            docTitle:     form.act || f.name,
-            uploaderName: user?.name || user?.username,
-          });
         } catch (err) {
           const detail = err.response?.data?.detail;
           setUploadError(typeof detail === 'string' ? detail : `Failed to save metadata for "${f.name}"`);
@@ -978,7 +974,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         effectiveFrom:     apiDoc?.effective_from    || effectiveFrom || '',
         referenceNumber:   apiDoc?.reference_number  || referenceNumber || '',
         shortTitle:        apiDoc?.short_title       || typeFields.shortTitle || '',
-        amendmentProvisions: form.type === 'Amendment' ? amendmentProvisions.filter(p => p.section) : [],
+        amendmentProvisions: form.type === 'Amendment' ? amendChanges.filter(p => p.section || p.chapter) : [],
         typeFields:        { ...typeFields },
         legalAuthorities:  legalAuthorities.filter(a => a.act),
         docRelations:      relations.map(r => ({ ...r })),
@@ -988,10 +984,17 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         extractedWords: pageWords.length  > 0 ? pageWords : null,
         ocrConfidence:  extractedText ? 95 : null,
       });
-    }
 
-    setUploadStep('done');
-    setTimeout(() => { setUploadStep(null); }, 2000);
+      createNotification({
+        toRole:       'approver',
+        type:         'new_upload',
+        title:        'New Document Submitted',
+        message:      `"${form.act || f.name}" uploaded by ${user?.name || user?.username || 'Uploader'} — awaiting your review`,
+        docId:        apiDoc?.id ?? null,
+        docTitle:     form.act || f.name,
+        uploaderName: user?.name || user?.username,
+      });
+    }
 
     const conflict = newDocs.find(d =>
       documents.some(ex => ex.title.toLowerCase() === d.title.toLowerCase() && ex.status !== 'rejected')
@@ -999,6 +1002,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     if (conflict) {
       const existing   = documents.find(ex => ex.title.toLowerCase() === conflict.title.toLowerCase());
       const currentVer = parseFloat(existing.version || '1.0');
+      setUploadStep(null);
       setConflictModal({
         existingDoc:      existing,
         newVersion:       (currentVer + 0.1).toFixed(1),
@@ -1006,6 +1010,8 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         pendingRelations: relations,
       });
     } else {
+      setUploadStep('done');
+      setTimeout(() => { setUploadStep(null); }, 2000);
       finalizeUpload(newDocs, relations);
     }
   }
@@ -1478,7 +1484,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 const active = form.type === type;
                 return (
                   <button key={type} type="button"
-                    onClick={() => { fmt('type', type); setTypeFields({}); setLegalAuthorities([{ act: '', sections: [''] }]); setEditingAuthIdx(0); setAmendChanges([{ chapter: '', section: '', subsection: '', changeType: 'Amended', description: '' }]); setHierarchy({ act: '', chapter: '', section: '', subsection: '' }); setRelations([]); }}
+                    onClick={() => { fmt('type', type); setTypeFields({}); setLegalAuthorities([{ act: '', sections: [''] }]); setAmendChanges([{ chapter: '', section: '', subsection: '', changeType: 'Amended', description: '' }]); setHierarchy({ act: '', chapter: '', section: '', subsection: '' }); setRelations([]); setRelType((REL_TYPES_BY_DOCTYPE[type] || REL_TYPES)[0]); setRelDocType(''); setRelTarget(''); setRelSearch(''); }}
                     style={{
                       padding: '10px 10px 9px', borderRadius: 10, textAlign: 'left',
                       border: active ? `2px solid ${c.accent}` : `1.5px solid ${c.accent}30`,
@@ -1726,8 +1732,17 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 </div>
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Hierarchical Tags</div>
-                <HierarchyTag hierarchy={hierarchy} onOpen={() => { setDrawerHierarchy({ ...hierarchy }); setDrawerType('hierarchy'); }} isRef={false} />
+                <div style={{ ...LABEL, marginBottom: 6 }}>Parent Act</div>
+                <HierarchyTag hierarchy={hierarchy} onOpen={() => { setDrawerHierarchy({ ...hierarchy }); setDrawerType('hierarchy'); }} isRef={true} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Relationships</div>
+                <button type="button" onClick={() => setDrawerType('relationship')}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: relations.length > 0 ? 'var(--primary)' : 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                  <GitBranch size={13} />
+                  {relations.length > 0 ? `${relations.length} Relationship${relations.length !== 1 ? 's' : ''} Added` : 'Add Relationship'}
+                  <ChevronRight size={12} />
+                </button>
               </div>
             </>)}
 
@@ -1830,6 +1845,11 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 <div style={{ ...LABEL, marginBottom: 6 }}>Effective From</div>
                 <input type="date" value={typeFields.commencementDate || ''} onChange={e => setTypeFields(f => ({ ...f, commencementDate: e.target.value }))}
                   style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Gazette Reference</div>
+                <input value={typeFields.gazetteRef || ''} onChange={e => setTypeFields(f => ({ ...f, gazetteRef: e.target.value }))}
+                  placeholder="e.g. Haryana Gazette Extra., Part I, No. 28, 15 Mar 2022" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>Department</div>
@@ -2061,11 +2081,17 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)' }}>
                   {drawerType === 'hierarchy'
-  ? (['Circular', 'Notification', 'Order / Gazette'].includes(form.type) ? 'Legal Authority' : ['Policy'].includes(form.type) ? 'Act Reference' : 'Hierarchical Tags')
+  ? (form.type === 'Amendment' ? 'Parent Act & Changes Made'
+      : ['Circular', 'Notification', 'Order / Gazette'].includes(form.type) ? 'Legal Authority'
+      : ['Policy', 'Rules & Regulations'].includes(form.type) ? 'Act Reference'
+      : 'Hierarchical Tags')
   : 'Add Relationship'}
                 </div>
                 <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 1 }}>
-                  {drawerType === 'hierarchy' ? 'Tag this document within the act/chapter/section hierarchy' : (form.type === 'Amendment' ? 'Set parent act details and link related documents' : 'Link this document to an existing document')}
+                  {drawerType === 'hierarchy'
+                    ? (form.type === 'Amendment' ? 'Select the parent Act being amended and log section-level changes'
+                        : 'Tag this document within the act/chapter/section hierarchy')
+                    : (form.type === 'Amendment' ? 'Link to related Acts, continuing Amendments, or other documents' : 'Link this document to an existing document')}
                 </div>
               </div>
               <button onClick={closeDrawer}
@@ -2117,7 +2143,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <span style={{ ...LABEL }}>Legal Authorities</span>
                       <button type="button"
-                        onClick={() => { setLegalAuthorities(p => [...p, { act: '', sections: [''] }]); setEditingAuthIdx(legalAuthorities.length); }}
+                        onClick={() => setLegalAuthorities(p => [...p, { act: '', sections: [''] }])}
                         style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: 'var(--primary)', background: 'var(--primary-light)', border: '1px solid var(--primary-border)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontFamily: 'var(--font)' }}>
                         <Plus size={12} /> Add Another
                       </button>
@@ -2374,8 +2400,8 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
               {drawerType === 'relationship' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-                  {/* Other Relationships — hidden for Amendment */}
-                  {form.type !== 'Amendment' && (<>
+                  {/* Relationship add form */}
+                  {(<>
                     <div>
                       <div style={{ ...LABEL, marginBottom: 6 }}>Relationship Type</div>
                       <SelectField value={relType} onChange={e => setRelType(e.target.value)}>
