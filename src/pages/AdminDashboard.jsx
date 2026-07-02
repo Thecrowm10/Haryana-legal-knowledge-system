@@ -58,7 +58,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       .finally(() => setUsersLoading(false));
   }, [activePage]);
 
-  // ── Departments state ────────────────────────────────────────────────────
+  // Departments state
   const [depts, setDepts]               = useState([]);
   const [deptsLoading, setDeptsLoading] = useState(false);
   const [deptsError, setDeptsError]     = useState('');
@@ -126,7 +126,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     setAddState(null);
   }
 
-  //  Add User modal state 
+  // Add User modal state
   const EMPTY_ADD_FORM = { username: '', email: '', password: '', first_name: '', last_name: '', role_id: '', department_id: '' };
   const [addingUser, setAddingUser]   = useState(false);
   const [addForm, setAddForm]         = useState(EMPTY_ADD_FORM);
@@ -162,7 +162,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       .finally(() => setAddSaving(false));
   }
 
-  //  Edit modal state
+  // Edit modal state
   const [editingUser, setEditingUser] = useState(null);
   const [editForm, setEditForm]       = useState({});
   const [editSaving, setEditSaving]   = useState(false);
@@ -213,7 +213,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       .finally(() => setTogglingId(null));
   }
 
-  // User Management 
+  // User Management
   const [deptFilter, setDeptFilter] = useState('');
 
   if (activePage === 'users') {
@@ -336,7 +336,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
           )}
         </Card>
 
-        {/* ── Add User Modal ── */}
+        {/* Add User Modal */}
         {addingUser && (
           <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             onClick={e => { if (e.target === e.currentTarget) setAddingUser(false); }}>
@@ -455,7 +455,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
           </div>
         )}
 
-        {/* ── Edit User Modal ── */}
+        {/* Edit User Modal */}
         {editingUser && (
           <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             onClick={e => { if (e.target === e.currentTarget) setEditingUser(null); }}>
@@ -565,7 +565,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     );
   }
 
-  // ── Departments ──────────────────────────────────────────────────────────
+  // Departments
   if (activePage === 'departments') {
     const INP = (extra = {}) => ({
       width: '100%',
@@ -583,7 +583,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
 
-        {/* ── Stat card ── */}
+        {/* Stat card */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
           <Card>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
@@ -602,7 +602,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
 
         <div style={{ display: 'grid', gridTemplateColumns: '380px 1fr', gap: 20, alignItems: 'start' }}>
 
-          {/* ── Create form ── */}
+          {/* Create form */}
           <Card>
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 4 }}>Add Department</div>
             <div style={{ fontSize: 12, color: 'var(--text-color-secondary)', marginBottom: 18 }}>Create a new department record.</div>
@@ -660,7 +660,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
             </form>
           </Card>
 
-          {/* ── Departments list ── */}
+          {/* Departments list */}
           <Card padding="0">
             <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--surface-border)' }}>
               <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>All Departments</div>
@@ -709,7 +709,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     );
   }
 
-  // ── Roles & Permissions ──────────────────────────────────────────────────
+  // Roles & Permissions
   if (activePage === 'roles') {
     const ROLE_MATRIX = [
       { role: 'Citizen',    search: true,  view: true,  upload: false, approve: false, analytics: false, admin: false },
@@ -762,7 +762,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     );
   }
 
-  // ── Taxonomy Editor ──────────────────────────────────────────────────────
+  // Taxonomy Editor
   if (activePage === 'taxonomy') {
     const INPUT_STYLE = {
       flex: 1, border: '1px solid var(--primary)', borderRadius: 6, padding: '4px 8px',
@@ -842,7 +842,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 );
               })}
 
-              {/* ── Add new item input (non-API categories only) ── */}
+              {/* Add new item input (non-API categories only) */}
               {!isApiDriven && addState?.category === t.category && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px', borderRadius: 7, background: 'rgba(26,86,219,.04)', border: '1px solid var(--primary-border)' }}>
                   <input
@@ -865,7 +865,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     );
   }
 
-  // ── System Monitor ───────────────────────────────────────────────────────
+  // System Monitor
   if (activePage === 'monitor') {
     const stats = [
       { label: 'Total Documents', value: '1,284', sub: '+12 today' },
@@ -899,7 +899,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     );
   }
 
-  // ── Full Audit Log ───────────────────────────────────────────────────────
+  // Full Audit Log
   if (activePage === 'auditfull') {
     return (
       <div style={{ animation: 'fadeSlideIn .3s ease' }}>
