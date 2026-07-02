@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Mail, Phone, ArrowLeft, ShieldCheck, Eye, EyeOff, RotateCcw, CheckCircle2 } from 'lucide-react';
 import { requestPasswordReset, resetPasswordWithOtp } from '../services/pdf';
 import haryanaLogo from '../assets/haryana-logo.png';
+import bannerBg from '../assets/banner-1-768x217.png';
 
 export default function ForgotPasswordScreen({ onBack }) {
   const [step, setStep]         = useState(1); // 1 = request OTP, 2 = enter OTP + new password, 3 = success
@@ -103,18 +104,17 @@ export default function ForgotPasswordScreen({ onBack }) {
       <div className="fp" style={{
         width: '100vw', height: '100vh', position: 'relative',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'linear-gradient(110deg, rgba(2,10,5,.96) 0%, rgba(10,20,40,.92) 100%)',
         overflow: 'hidden',
       }}>
-        {/* subtle grid bg */}
-        <div style={{
-          position: 'absolute', inset: 0, zIndex: 0, opacity: 0.04,
-          backgroundImage: 'linear-gradient(rgba(255,255,255,.4) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.4) 1px,transparent 1px)',
-          backgroundSize: '40px 40px',
-        }}/>
+        <img
+          src={bannerBg}
+          alt=""
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0, filter: 'blur(2px)', transform: 'scale(1.02)' }}
+        />
+        <div style={{ position: 'absolute', inset: 0, zIndex: 1, background: 'linear-gradient(110deg, rgba(2,10,5,.82) 0%, rgba(2,10,5,.62) 45%, rgba(2,10,5,.42) 100%)' }}/>
 
         <div className="fp-card" style={{
-          position: 'relative', zIndex: 1,
+          position: 'relative', zIndex: 2,
           width: 'clamp(300px,90vw,420px)',
           background: 'rgba(255,255,255,.07)',
           backdropFilter: 'blur(30px) saturate(160%)',
@@ -301,7 +301,7 @@ export default function ForgotPasswordScreen({ onBack }) {
           )}
         </div>
 
-        <p style={{ position: 'absolute', bottom: 14, color: 'rgba(255,255,255,.13)', fontSize: 11 }}>
+        <p style={{ position: 'absolute', bottom: 14, zIndex: 2, color: 'rgba(255,255,255,.16)', fontSize: 11 }}>
           © 2026 Government of Haryana · HARTRON
         </p>
       </div>

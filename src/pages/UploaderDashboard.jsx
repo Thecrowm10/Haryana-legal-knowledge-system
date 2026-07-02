@@ -235,12 +235,13 @@ function detectCitationsFromText(rawText, allDocs) {
       if (seen.has(citation) || citation.length < 8) continue;
       seen.add(citation);
 
-      // Try to match against existing documents
+      
       const citWords = citation.toLowerCase().split(/[\s,]+/).filter(w => w.length > 3);
       const matched  = allDocs.find(d => {
         const dtitle = d.title.toLowerCase();
         return citWords.filter(w => dtitle.includes(w)).length >= 2;
       });
+      const isAct = matched?.type === 'Act';
 
       // Extract 80-char context window around the match for relationship type detection
       const ctxStart  = Math.max(0, match.index - 40);
@@ -249,8 +250,8 @@ function detectCitationsFromText(rawText, allDocs) {
 
       results.push({
         citation,
-        matchedDoc:  matched || null,
-        status:      matched ? 'linked' : 'unresolved',
+        matchedDoc:  isAct ? matched : null,
+        status:      isAct ? 'linked' : 'unresolved',
         relLabel,
       });
     }
@@ -289,7 +290,8 @@ function detectCitationsLegacy(textOrTitle, allDocs) {
   return detected.map(citation => {
     const citWords = citation.toLowerCase().split(' ').filter(w => w.length > 4);
     const matched  = allDocs.find(d => citWords.filter(w => d.title.toLowerCase().includes(w)).length >= 2);
-    return { citation, matchedDoc: matched || null, status: matched ? 'linked' : 'unresolved', relLabel: 'References' };
+    const isAct = matched?.type === 'Act';
+    return { citation, matchedDoc: isAct ? matched : null, status: isAct ? 'linked' : 'unresolved', relLabel: 'References' };
   });
 }
 // Given a doc's detected citations and its own dept, returns list of other depts to notify.
@@ -588,6 +590,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   const [relNote, setRelNote]         = useState('');
   const [amendChanges, setAmendChanges] = useState([{ chapter: '', section: '', subsection: '', changeType: 'Amended', description: '' }]);
   const [legalAuthorities, setLegalAuthorities] = useState([{ act: '', sections: [''] }]);
+  const [editingAuthIdx, setEditingAuthIdx] = useState(0);    // index of legal authority currently expanded for editing; null = all collapsed
   const [showAuthDrop, setShowAuthDrop] = useState(null);     // legal authority act dropdown
   const [showSectionDrop, setShowSectionDrop] = useState(null); // legal authority section dropdown
   const [showHierActDrop, setShowHierActDrop] = useState(false); // hierarchy drawer act dropdown
@@ -598,6 +601,9 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   const [showRelDrop, setShowRelDrop] = useState(false);
   const [relSection, setRelSection] = useState('');            // section of the linked document
   const [showRelSecDrop, setShowRelSecDrop] = useState(false); // relationship section dropdown
+  const [relActSuggestions, setRelActSuggestions] = useState([]); // real API results when linking to an Act
+  const [relActSearching,   setRelActSearching]   = useState(false);
+  const relActSearchTimer = useRef(null);
   const [parentActSearch, setParentActSearch] = useState('');
   const [showParentActDrop, setShowParentActDrop] = useState(false);
   const [drawerType,      setDrawerType]      = useState(null); // null | 'hierarchy' | 'relationship'
@@ -722,17 +728,45 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     }, 280);
   }
 
+  // Same real API search as fetchDocSuggestions, used for the "Link to Document" picker
+  // whenever the target document type is 'Act' — non-Act targets keep using the local document list.
+  function fetchRelActSuggestions(text) {
+    clearTimeout(relActSearchTimer.current);
+    if (!text || text.length < 1) { setRelActSuggestions([]); return; }
+    relActSearchTimer.current = setTimeout(() => {
+      setRelActSearching(true);
+      searchDocuments('Act', text, 10)
+        .then(res => setRelActSuggestions(res.data.results || []))
+        .catch(() => setRelActSuggestions([]))
+        .finally(() => setRelActSearching(false));
+    }, 280);
+  }
+
   function addRelation() {
     if (!relTarget) return;
     if (relTarget.startsWith('__pending__:')) {
       const pendingName = relTarget.replace('__pending__:', '');
       setRelations(r => [...r, { targetId: null, targetTitle: pendingName, targetType: relDocType, label: relType, note: relNote.trim(), section: relSection.trim(), isPending: true }]);
+    } else if (relTarget.startsWith('__act__:')) {
+      const [, actId, ...nameParts] = relTarget.split(':');
+      const actTitle = nameParts.join(':');
+      if (relations.find(r => r.targetId === actId && r.label === relType)) return;
+      setRelations(r => [...r, { targetId: actId, targetTitle: actTitle, targetType: 'Act', label: relType, note: relNote.trim(), section: relSection.trim(), isPending: false }]);
     } else {
       const doc = documents.find(d => d.uid === relTarget);
       if (!doc || relations.find(r => r.targetId === relTarget && r.label === relType)) return;
       setRelations(r => [...r, { targetId: relTarget, targetTitle: doc.title, targetType: doc.type || relDocType, label: relType, note: relNote.trim(), section: relSection.trim(), isPending: false }]);
     }
-    setRelTarget(''); setRelSearch(''); setRelNote(''); setRelDocType(''); setRelSection('');
+    setRelTarget(''); setRelSearch(''); setRelNote(''); setRelDocType(''); setRelSection(''); setRelActSuggestions([]);
+  }
+
+  // Clears all transient "Add Relationship" drawer fields so stale search/selection
+  // doesn't leak into the next time the drawer is opened (for this doc or a different one).
+  function closeDrawer() {
+    setDrawerType(null);
+    setRelTarget(''); setRelSearch(''); setRelType(REL_TYPES[0]); setRelDocType('');
+    setRelSection(''); setRelNote(''); setRelActSuggestions([]); setShowRelDrop(false);
+    setEditingAuthIdx(null); // collapse any legal authority left open into its saved summary card
   }
   function removeRelation(idx) { setRelations(r => r.filter((_, i) => i !== idx)); }
 
@@ -2024,9 +2058,8 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
       {/* ── Drawer: Hierarchical Tags / Relationship ── */}
       {drawerType && (
         <>
-          {/* Blurred backdrop */}
+          {/* Blurred backdrop — click does not close the drawer; use Cancel / Done / ✕ */}
           <div
-            onClick={() => setDrawerType(null)}
             style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.25)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', zIndex: 300, animation: 'drawerFadeIn .2s ease' }}
           />
 
@@ -2061,7 +2094,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                     : (form.type === 'Amendment' ? 'Link to related Acts, continuing Amendments, or other documents' : 'Link this document to an existing document')}
                 </div>
               </div>
-              <button onClick={() => setDrawerType(null)}
+              <button onClick={closeDrawer}
                 style={{ width: 30, height: 30, borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-color-secondary)', flexShrink: 0 }}>
                 <X size={14} />
               </button>
@@ -2115,12 +2148,42 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                         <Plus size={12} /> Add Another
                       </button>
                     </div>
-                    {legalAuthorities.map((auth, i) => (
+                    {legalAuthorities.map((auth, i) => {
+                      const isSaved = auth.act && editingAuthIdx !== i;
+
+                      if (isSaved) {
+                        return (
+                          <div key={i} style={{ padding: '10px 14px', borderRadius: 10, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{auth.act}</div>
+                              {(auth.sections || []).filter(Boolean).length > 0 && (
+                                <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginTop: 5 }}>
+                                  {(auth.sections || []).filter(Boolean).map((s, si) => (
+                                    <span key={si} style={{ fontSize: 10.5, fontFamily: 'var(--mono)', fontWeight: 600, color: 'var(--primary)', background: 'var(--primary-light)', border: '1px solid var(--primary-border)', borderRadius: 20, padding: '2px 8px' }}>{s}</span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            <button type="button" onClick={() => setEditingAuthIdx(i)}
+                              style={{ background: 'transparent', border: '1px solid var(--surface-border)', borderRadius: 6, cursor: 'pointer', color: 'var(--text-color-secondary)', padding: 6, display: 'flex', flexShrink: 0 }}>
+                              <Edit3 size={13} />
+                            </button>
+                            {legalAuthorities.length > 1 && (
+                              <button type="button" onClick={() => { setLegalAuthorities(p => p.filter((_, idx) => idx !== i)); setEditingAuthIdx(null); }}
+                                style={{ background: 'transparent', border: '1px solid var(--surface-border)', borderRadius: 6, cursor: 'pointer', color: 'var(--text-color-secondary)', padding: 6, display: 'flex', flexShrink: 0 }}>
+                                <X size={13} />
+                              </button>
+                            )}
+                          </div>
+                        );
+                      }
+
+                      return (
                       <div key={i} style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', display: 'flex', flexDirection: 'column', gap: 10 }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                           <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>AUTHORITY {i + 1}</span>
                           {legalAuthorities.length > 1 && (
-                            <button type="button" onClick={() => setLegalAuthorities(p => p.filter((_, idx) => idx !== i))}
+                            <button type="button" onClick={() => { setLegalAuthorities(p => p.filter((_, idx) => idx !== i)); setEditingAuthIdx(null); }}
                               style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)' }}>
                               <X size={13} />
                             </button>
@@ -2130,20 +2193,21 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                           <div style={{ ...LABEL, marginBottom: 5 }}>Act / Rule Name</div>
                           <div style={{ position: 'relative' }}>
                             <input value={auth.act}
-                              onChange={e => setLegalAuthorities(p => p.map((r, idx) => idx === i ? { ...r, act: e.target.value } : r))}
-                              onFocus={e => { focusStyle(e); setShowAuthDrop(i); }}
+                              onChange={e => { setLegalAuthorities(p => p.map((r, idx) => idx === i ? { ...r, act: e.target.value } : r)); fetchDocSuggestions('Act', e.target.value); }}
+                              onFocus={e => { focusStyle(e); setShowAuthDrop(i); if (auth.act) fetchDocSuggestions('Act', auth.act); }}
                               onBlur={e => { blurStyle(e); setTimeout(() => setShowAuthDrop(null), 180); }}
-                              placeholder="Type to search existing documents…" style={{ ...INPUT_BASE, fontSize: 12 }} />
-                            {showAuthDrop === i && approvedDocs.filter(d => !auth.act || d.title.toLowerCase().includes(auth.act.toLowerCase())).slice(0, 8).length > 0 && (
+                              placeholder="Type to search Acts…" style={{ ...INPUT_BASE, fontSize: 12 }} />
+                            {showAuthDrop === i && actSearching && <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 10, color: 'var(--text-color-secondary)' }}>…</div>}
+                            {showAuthDrop === i && actSuggestions.length > 0 && (
                               <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 8, boxShadow: '0 6px 20px rgba(0,0,0,.13)', maxHeight: 220, overflow: 'auto', marginTop: 3 }}>
-                                {approvedDocs.filter(d => !auth.act || d.title.toLowerCase().includes(auth.act.toLowerCase())).slice(0, 8).map(d => (
-                                  <div key={d.uid || d.id}
-                                    onMouseDown={() => { setLegalAuthorities(p => p.map((r, idx) => idx === i ? { ...r, act: d.title } : r)); setShowAuthDrop(null); }}
+                                {actSuggestions.map(a => (
+                                  <div key={a.id}
+                                    onMouseDown={() => { setLegalAuthorities(p => p.map((r, idx) => idx === i ? { ...r, act: a.document_name } : r)); setActSuggestions([]); setShowAuthDrop(null); }}
                                     style={{ padding: '9px 12px', cursor: 'pointer', borderBottom: '1px solid var(--surface-border)' }}
                                     onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
                                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                                    <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.title}</div>
-                                    <div style={{ fontSize: 10.5, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', marginTop: 2 }}>{d.type} · {d.dept} · {d.year}</div>
+                                    <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.document_name}</div>
+                                    {a.reference_number && <div style={{ fontSize: 10.5, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', marginTop: 2 }}>{a.reference_number}</div>}
                                   </div>
                                 ))}
                               </div>
@@ -2199,7 +2263,8 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                           </div>
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </>)}
 
 
@@ -2353,16 +2418,37 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                       <div style={{ ...LABEL, marginBottom: 6 }}>Link to Document</div>
                       <div style={{ position: 'relative' }}>
                         <input
-                          value={relSearch || (documents.find(d => d.uid === relTarget)?.title || '')}
-                          onChange={e => { setRelSearch(e.target.value); setRelTarget(''); setShowRelDrop(true); }}
-                          onFocus={() => setShowRelDrop(true)}
+                          disabled={!relDocType}
+                          value={relSearch || (relTarget.startsWith('__act__:') ? relTarget.split(':').slice(2).join(':') : (documents.find(d => d.uid === relTarget)?.title || ''))}
+                          onChange={e => {
+                            setRelSearch(e.target.value); setRelTarget(''); setShowRelDrop(true);
+                            if (relDocType === 'Act') fetchRelActSuggestions(e.target.value);
+                          }}
+                          onFocus={() => { setShowRelDrop(true); if (relDocType === 'Act' && relSearch) fetchRelActSuggestions(relSearch); }}
                           onBlur={() => setTimeout(() => setShowRelDrop(false), 150)}
-                          placeholder="Search existing document to link…"
-                          style={{ ...INPUT_BASE, width: '100%' }} onFocus={focusStyle} onBlur={blurStyle}
+                          placeholder={!relDocType ? 'Select a Target Document Type first…' : relDocType === 'Act' ? 'Search Acts…' : 'Search existing document to link…'}
+                          style={{ ...INPUT_BASE, width: '100%', ...(!relDocType ? { background: 'var(--surface-100)', cursor: 'not-allowed', color: 'var(--text-color-secondary)' } : {}) }}
+                          onFocus={focusStyle} onBlur={blurStyle}
                         />
-                        {showRelDrop && relSearch.trim() && (
+                        {relDocType === 'Act' && relActSearching && <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 10, color: 'var(--text-color-secondary)' }}>…</div>}
+                        {relDocType && showRelDrop && relSearch.trim() && (
                           <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,.15)', zIndex: 50, marginTop: 4, maxHeight: 220, overflowY: 'auto' }}>
-                            {relFiltered.length > 0 ? relFiltered.map(d => (
+                            {relDocType === 'Act' ? (
+                              relActSuggestions.length > 0 ? relActSuggestions.map(a => (
+                                <div key={a.id} onMouseDown={() => { setRelTarget(`__act__:${a.id}:${a.document_name}`); setRelSearch(''); setShowRelDrop(false); }}
+                                  style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid var(--surface-border)', fontSize: 12.5, transition: 'background .15s' }}
+                                  onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                  <div style={{ fontWeight: 600, color: 'var(--text-heading)' }}>{a.document_name}</div>
+                                  {a.reference_number && <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', marginTop: 2 }}>{a.reference_number}</div>}
+                                </div>
+                              )) : (
+                                <div style={{ padding: '10px 14px', fontSize: 12.5, color: 'var(--text-color-secondary)' }}>
+                                  {relActSearching ? 'Searching…' : 'No matching Acts found'}
+                                </div>
+                              )
+                            ) : (
+                              relFiltered.length > 0 ? relFiltered.map(d => (
                               <div key={d.uid} onMouseDown={() => { setRelTarget(d.uid); setRelSearch(''); setShowRelDrop(false); }}
                                 style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid var(--surface-border)', fontSize: 12.5, transition: 'background .15s' }}
                                 onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
@@ -2382,6 +2468,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                                 </div>
                                 <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 3 }}>Document not in system yet — save as pending, will auto-link when uploaded</div>
                               </div>
+                            )
                             )}
                           </div>
                         )}
@@ -2459,15 +2546,14 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
 
             {/* Drawer footer */}
             <div style={{ padding: '16px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-              <button type="button" onClick={() => setDrawerType(null)}
+              <button type="button" onClick={closeDrawer}
                 style={{ padding: '9px 20px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                 Cancel
               </button>
               <button type="button"
                 onClick={() => {
                   if (drawerType === 'hierarchy') setHierarchy({ ...drawerHierarchy });
-                  setDrawerType(null);
-                  if (drawerType === 'relationship') { setRelTarget(''); setRelSearch(''); }
+                  closeDrawer();
                 }}
                 style={{ padding: '9px 24px', borderRadius: 8, border: 'none', background: 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                 {drawerType === 'hierarchy' ? 'Save Tags' : 'Done'}

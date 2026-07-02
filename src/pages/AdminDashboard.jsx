@@ -58,7 +58,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       .finally(() => setUsersLoading(false));
   }, [activePage]);
 
-  // ── Departments state ────────────────────────────────────────────────────
+  // Departments state
   const [depts, setDepts]               = useState([]);
   const [deptsLoading, setDeptsLoading] = useState(false);
   const [deptsError, setDeptsError]     = useState('');
@@ -126,7 +126,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     setAddState(null);
   }
 
-  // ── Add User modal state ─────────────────────────────────────────────────
+  // Add User modal state
   const EMPTY_ADD_FORM = { username: '', email: '', password: '', first_name: '', last_name: '', role_id: '', department_id: '' };
   const [addingUser, setAddingUser]   = useState(false);
   const [addForm, setAddForm]         = useState(EMPTY_ADD_FORM);
@@ -162,7 +162,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       .finally(() => setAddSaving(false));
   }
 
-  // ── Edit modal state ─────────────────────────────────────────────────────
+  // Edit modal state
   const [editingUser, setEditingUser] = useState(null);
   const [editForm, setEditForm]       = useState({});
   const [editSaving, setEditSaving]   = useState(false);
@@ -213,10 +213,16 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       .finally(() => setTogglingId(null));
   }
 
-  // ── User Management ──────────────────────────────────────────────────────
+  // User Management
+  const [deptFilter, setDeptFilter] = useState('');
+
   if (activePage === 'users') {
     const active   = users.filter(u => u.status === 'active').length;
     const inactive = users.filter(u => u.status === 'inactive').length;
+
+    const filteredUsers = deptFilter
+      ? users.filter(u => String(u.deptId) === String(deptFilter) && u.isActive)
+      : [];
 
     const INP_STYLE = {
       width: '100%', padding: '9px 12px',
@@ -250,12 +256,20 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
         </div>
 
         <Card padding="0">
-          <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>System Users</div>
-            <button onClick={() => { setAddingUser(true); setAddError(''); setAddForm(EMPTY_ADD_FORM); setShowAddPass(false); }}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--primary)', color: 'white', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
-              <Plus size={13} /> Add User
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <SelectField value={deptFilter} onChange={e => setDeptFilter(e.target.value)} placeholder="Select Department" style={{ width: 200 }}>
+                {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </SelectField>
+              <button
+                disabled={!deptFilter}
+                title={!deptFilter ? 'Select a department first' : undefined}
+                onClick={() => { setAddingUser(true); setAddError(''); setAddForm({ ...EMPTY_ADD_FORM, department_id: deptFilter }); setShowAddPass(false); }}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--primary)', color: 'white', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 12.5, fontWeight: 600, cursor: deptFilter ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap', opacity: deptFilter ? 1 : 0.5 }}>
+                <Plus size={13} /> Add User
+              </button>
+            </div>
           </div>
           {usersLoading && (
             <div style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>
@@ -267,7 +281,12 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
               {usersError}
             </div>
           )}
-          {!usersLoading && !usersError && (
+          {!usersLoading && !usersError && filteredUsers.length === 0 && (
+            <div style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>
+              {deptFilter ? 'No users yet' : 'Select a department to view users'}
+            </div>
+          )}
+          {!usersLoading && !usersError && filteredUsers.length > 0 && (
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
@@ -277,7 +296,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
               </tr>
             </thead>
             <tbody>
-              {users.map(u => (
+              {filteredUsers.map(u => (
                 <tr key={u.id} style={{ borderBottom: '1px solid var(--surface-border)', transition: 'background .15s' }}
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
@@ -317,7 +336,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
           )}
         </Card>
 
-        {/* ── Add User Modal ── */}
+        {/* Add User Modal */}
         {addingUser && (
           <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             onClick={e => { if (e.target === e.currentTarget) setAddingUser(false); }}>
@@ -405,11 +424,9 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                   </div>
                   <div>
                     <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Department</label>
-                    <SelectField value={addForm.department_id} onChange={e => setAddForm(f => ({ ...f, department_id: e.target.value }))} placeholder="Select Department">
-                      {depts.map(d => (
-                        <option key={d.id} value={d.id}>{d.name}</option>
-                      ))}
-                    </SelectField>
+                    <div style={{ ...INP_STYLE, background: 'var(--surface-hover)', color: 'var(--text-color-secondary)', cursor: 'not-allowed' }}>
+                      {depts.find(d => String(d.id) === String(addForm.department_id))?.name ?? '—'}
+                    </div>
                   </div>
                 </div>
 
@@ -438,7 +455,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
           </div>
         )}
 
-        {/* ── Edit User Modal ── */}
+        {/* Edit User Modal */}
         {editingUser && (
           <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             onClick={e => { if (e.target === e.currentTarget) setEditingUser(null); }}>
@@ -548,7 +565,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     );
   }
 
-  // ── Departments ──────────────────────────────────────────────────────────
+  // Departments
   if (activePage === 'departments') {
     const INP = (extra = {}) => ({
       width: '100%',
@@ -566,7 +583,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
 
-        {/* ── Stat card ── */}
+        {/* Stat card */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
           <Card>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
@@ -585,7 +602,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
 
         <div style={{ display: 'grid', gridTemplateColumns: '380px 1fr', gap: 20, alignItems: 'start' }}>
 
-          {/* ── Create form ── */}
+          {/* Create form */}
           <Card>
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 4 }}>Add Department</div>
             <div style={{ fontSize: 12, color: 'var(--text-color-secondary)', marginBottom: 18 }}>Create a new department record.</div>
@@ -643,7 +660,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
             </form>
           </Card>
 
-          {/* ── Departments list ── */}
+          {/* Departments list */}
           <Card padding="0">
             <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--surface-border)' }}>
               <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>All Departments</div>
@@ -692,7 +709,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     );
   }
 
-  // ── Roles & Permissions ──────────────────────────────────────────────────
+  // Roles & Permissions
   if (activePage === 'roles') {
     const ROLE_MATRIX = [
       { role: 'Citizen',    search: true,  view: true,  upload: false, approve: false, analytics: false, admin: false },
@@ -745,7 +762,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     );
   }
 
-  // ── Taxonomy Editor ──────────────────────────────────────────────────────
+  // Taxonomy Editor
   if (activePage === 'taxonomy') {
     const INPUT_STYLE = {
       flex: 1, border: '1px solid var(--primary)', borderRadius: 6, padding: '4px 8px',
@@ -825,7 +842,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 );
               })}
 
-              {/* ── Add new item input (non-API categories only) ── */}
+              {/* Add new item input (non-API categories only) */}
               {!isApiDriven && addState?.category === t.category && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px', borderRadius: 7, background: 'rgba(26,86,219,.04)', border: '1px solid var(--primary-border)' }}>
                   <input
@@ -848,7 +865,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     );
   }
 
-  // ── System Monitor ───────────────────────────────────────────────────────
+  // System Monitor
   if (activePage === 'monitor') {
     const stats = [
       { label: 'Total Documents', value: '1,284', sub: '+12 today' },
@@ -882,7 +899,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     );
   }
 
-  // ── Full Audit Log ───────────────────────────────────────────────────────
+  // Full Audit Log
   if (activePage === 'auditfull') {
     return (
       <div style={{ animation: 'fadeSlideIn .3s ease' }}>
