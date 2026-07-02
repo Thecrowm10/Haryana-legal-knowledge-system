@@ -239,12 +239,9 @@ function PageNav({ currentPage, totalPages, onPageChange }) {
   );
 }
 
-<<<<<<< HEAD
-=======
 // PDF Viewer Panel
 // Renders real PDFs as stacked canvases (pdfjs-dist) so scroll can be detected
 // and synced with OcrTextPanel. Mock docs use the styled layout fallback.
->>>>>>> cc6a1a9fed7cae39c83304b8f7b1971a400d0ad1
 function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, rotation, onRotate, blobUrl, onTotalPagesChange }) {
   const [zoom, setZoom]     = useState(100);
   const containerRef        = useRef(null);
@@ -438,13 +435,9 @@ function WordEditPopover({ editingWord, isSuspicious, onSave, onMarkCorrect, onC
   );
 }
 
-<<<<<<< HEAD
-
-=======
 // OCR Text Panel
 // Shows ALL pages stacked. Scrolls to currentPage when PDF panel drives the page.
 // Each word is clickable for confidence-based editing.
->>>>>>> cc6a1a9fed7cae39c83304b8f7b1971a400d0ad1
 function OcrTextPanel({ ocrData, currentPage, wordEdits, onWordEdit, isScanned = false }) {
   const [editingWord, setEditingWord] = useState(null);
   const containerRef = useRef(null);
@@ -1055,30 +1048,7 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
     }
 
     reviewDocument(id, decision, remark || undefined)
-<<<<<<< HEAD
-      .then(() => {
-        setDocs(ds => ds.map(d => d.id === id
-          ? { ...d, status: decision, ...(remark ? { remarks: remark } : {}) }
-          : d
-        ));
-        if (decision === 'approved') onApprove?.(id);
-        onAuditLog?.(`${decision === 'approved' ? 'Approved' : 'Rejected'} document: ${doc?.title}${remark ? ` — "${remark}"` : ''}`);
-        createNotification({
-          toRole:   'uploader',
-          type:     decision === 'approved' ? 'document_approved' : 'document_rejected',
-          title:    decision === 'approved' ? 'Document Approved' : 'Document Rejected',
-          message:  decision === 'approved'
-            ? `"${doc?.title}" has been approved by the approver`
-            : `"${doc?.title}" has been rejected by the approver`,
-          remark:   remark || null,
-          docId:    id,
-          docTitle: doc?.title,
-        });
-        if (expanded === id) setExpanded(null);
-      })
-=======
       .then(() => apply())
->>>>>>> cc6a1a9fed7cae39c83304b8f7b1971a400d0ad1
       .catch(err => {
         const detail = err.response?.data?.detail || 'Action failed. Please try again.';
         setApiError(detail);
