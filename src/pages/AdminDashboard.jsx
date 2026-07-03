@@ -3,6 +3,7 @@ import { Users, ShieldCheck, Settings, Activity, ClipboardList, Trash2, Edit2, P
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import SelectField from '../components/ui/SelectField';
+import DocViewModal from '../components/DocViewModal';
 import { getUsers, getRoles, updateUser, registerUser } from '../services/users';
 import { getDepartments, createDepartment, getDocumentTypes, createDocumentType } from '../services/departments';
 import { getAllDocumentsAdmin } from '../services/pdf';
@@ -115,6 +116,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   const [uploadsFilterDept, setUploadsFilterDept]     = useState('');
   const [uploadsFilterUploader, setUploadsFilterUploader] = useState('');
   const [uploadsFilterApprover, setUploadsFilterApprover] = useState('');
+  const [viewDoc, setViewDoc]                             = useState(null);
 
   useEffect(() => {
     if (activePage !== 'alluploads') return;
@@ -1133,15 +1135,37 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       return true;
     });
 
+    function mapDocForViewer(d) {
+      return {
+        id:              d.id,
+        title:           d.document_name || d.original_filename || 'Untitled',
+        type:            d.document_type_name || 'Unclassified',
+        dept:            d.department_name || 'Unassigned',
+        year:            d.issue_date ? new Date(d.issue_date).getFullYear() : (d.created_at ? new Date(d.created_at).getFullYear() : '—'),
+        version:         d.version_no || '1.0',
+        status:          d.status || 'pending',
+        desc:            d.description || '',
+        fileName:        d.original_filename,
+        uploadedAt:      d.created_at?.split('T')[0] || '',
+        referenceNumber: d.reference_number || null,
+        enactmentDate:   d.issue_date?.split('T')[0] || null,
+        effectiveFrom:   d.effective_from?.split('T')[0] || null,
+        gazette:         d.gazette_reference || null,
+        authority:       d.legal_authority || null,
+        approval:        d.latest_approval || null,
+      };
+    }
+
     const SC = {
       approved: { color: '#16a34a', bg: 'rgba(34,197,94,.1)',   label: 'Approved' },
       pending:  { color: '#f59e0b', bg: 'rgba(245,158,11,.1)',  label: 'Pending'  },
       rejected: { color: '#ef4444', bg: 'rgba(239,68,68,.1)',   label: 'Rejected' },
     };
-    const cols = '4px 1fr 180px 160px 120px';
+    const cols = '4px 1fr 175px 155px 155px 90px';
     const anyFilter = uploadsSearch || uploadsFilterStatus || uploadsFilterDept || uploadsFilterUploader || uploadsFilterApprover;
 
     return (
+      <>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
         {/* Stats */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
@@ -1175,7 +1199,6 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
         {/* Filter bar + table */}
         <Card padding="0">
           <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            {/* Search */}
             <div style={{ position: 'relative', flex: '1 1 200px', minWidth: 180 }}>
               <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-color-secondary)', pointerEvents: 'none' }} />
               <input
@@ -1229,7 +1252,8 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 <div style={{ ...LABEL, padding: '10px 16px 10px 68px' }}>Document</div>
                 <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Uploader</div>
                 <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Status</div>
-                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Uploaded On</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Dates</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Actions</div>
               </div>
 
               {filteredDocs.length === 0 ? (
@@ -1242,9 +1266,10 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 const approverName = doc.latest_approval
                   ? ([doc.latest_approval.approver_first_name, doc.latest_approval.approver_last_name].filter(Boolean).join(' ') || doc.latest_approval.approver_username)
                   : null;
-                const uploadedDate = doc.created_at ? doc.created_at.split('T')[0] : '—';
+                const uploadedDate  = doc.created_at ? doc.created_at.split('T')[0] : '—';
+                const lastActionDate = doc.latest_approval?.acted_at ? doc.latest_approval.acted_at.split('T')[0] : null;
                 return (
-                  <div key={doc.id} style={{ display: 'grid', gridTemplateColumns: cols, borderBottom: '1px solid var(--surface-border)', alignItems: 'stretch', minHeight: 60, transition: 'background .15s' }}
+                  <div key={doc.id} style={{ display: 'grid', gridTemplateColumns: cols, borderBottom: '1px solid var(--surface-border)', alignItems: 'stretch', minHeight: 62, transition: 'background .15s' }}
                     onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                     {/* Status strip */}
@@ -1255,7 +1280,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                         <FileText size={16} color={sc.color} strokeWidth={1.8} />
                       </div>
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 340 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 320 }}>
                           {doc.document_name || doc.original_filename}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3, flexWrap: 'wrap' }}>
@@ -1289,9 +1314,29 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                         </div>
                       )}
                     </div>
-                    {/* Date */}
-                    <div style={{ padding: '10px 14px', borderLeft: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', fontFamily: 'var(--mono)', fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
-                      {uploadedDate}
+                    {/* Dates */}
+                    <div style={{ padding: '10px 14px', borderLeft: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 5 }}>
+                      <div>
+                        <div style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--text-color-secondary)', textTransform: 'uppercase', letterSpacing: '.05em', fontFamily: 'var(--mono)', marginBottom: 2 }}>Uploaded</div>
+                        <div style={{ fontFamily: 'var(--mono)', fontSize: 11.5, color: 'var(--text-color)' }}>{uploadedDate}</div>
+                      </div>
+                      {lastActionDate && (
+                        <div>
+                          <div style={{ fontSize: 9.5, fontWeight: 700, color: sc.color, textTransform: 'uppercase', letterSpacing: '.05em', fontFamily: 'var(--mono)', marginBottom: 2 }}>
+                            {doc.status === 'approved' ? 'Approved' : doc.status === 'rejected' ? 'Rejected' : 'Reviewed'}
+                          </div>
+                          <div style={{ fontFamily: 'var(--mono)', fontSize: 11.5, color: sc.color }}>{lastActionDate}</div>
+                        </div>
+                      )}
+                    </div>
+                    {/* Actions */}
+                    <div style={{ padding: '10px 14px', borderLeft: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <button onClick={() => setViewDoc(mapDocForViewer(doc))}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 7, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'background .15s' }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(26,86,219,.14)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'rgba(26,86,219,.07)'}>
+                        <Eye size={12} /> View
+                      </button>
                     </div>
                   </div>
                 );
@@ -1300,6 +1345,9 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
           )}
         </Card>
       </div>
+
+      {viewDoc && <DocViewModal doc={viewDoc} onClose={() => setViewDoc(null)} />}
+      </>
     );
   }
 
