@@ -1058,7 +1058,7 @@ export default function CSODashboard({ activePage, auditLog, documents = [], rel
     return <GraphTab documents={documents} relationships={relationships} />;
   }
 
-  /* ── Audit Log tab ── */
+  /* ── MIS Report tab ── */
   return (
     <div style={{ animation: 'fadeSlideIn .3s ease' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>

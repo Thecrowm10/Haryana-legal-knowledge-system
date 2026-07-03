@@ -15,10 +15,14 @@ function decodeJwt(token) {
   }
 }
 
+function normalizeRole(role) {
+  return role?.trim().toLowerCase().replace(/\s+/g, '_');
+}
+
 function userFromPayload(payload) {
   return {
     username:           payload.username,
-    role:               payload.role,
+    role:               normalizeRole(payload.role),
     name:               payload.username,
     email:              payload.email,
     dept:               payload.department ?? '',

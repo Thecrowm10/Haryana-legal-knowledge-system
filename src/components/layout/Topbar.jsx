@@ -9,6 +9,7 @@ const ROLE_META = {
   approver: { label: 'Dept. Approver',  color: '#f59e0b', bg: 'rgba(245,158,11,.1)' },
   csoffice: { label: 'CS Office',       color: '#22c55e', bg: 'rgba(34,197,94,.1)' },
   admin:    { label: 'IT Admin',        color: '#8b5cf6', bg: 'rgba(139,92,246,.1)' },
+  nodal_officer: { label: 'Nodal Officer', color: '#0ea5e9', bg: 'rgba(14,165,233,.1)' },
   auditor:  { label: 'Auditor',         color: '#64748b', bg: 'rgba(100,116,139,.1)' },
 };
 
@@ -16,9 +17,10 @@ const BREADCRUMBS = {
   home: ['Home'], search: ['Documents', 'Search'],
   upload: ['Documents', 'Upload'], myuploads: ['Documents', 'My Uploads'],
   pending: ['Review', 'Pending Approvals'], reviewed: ['Review', 'Reviewed'],
-  analytics: ['Analytics', 'Dashboard'], graph: ['Analytics', 'Knowledge Graph'], audit: ['Analytics', 'Audit Log'],
+  analytics: ['Analytics', 'Dashboard'], graph: ['Analytics', 'Knowledge Graph'], audit: ['Analytics', 'MIS Report'],
   users: ['Admin', 'User Management'], roles: ['Admin', 'Role Matrix'], logs: ['Admin', 'System Logs'],
-  auditlog: ['Auditor', 'Audit Log'],
+  auditfull: ['Admin', 'Full MIS Report'],
+  auditlog: ['Auditor', 'MIS Report'],
 };
 
 export default function Topbar({ user, activePage, onLogout, onToggleSidebar, onChangePassword }) {

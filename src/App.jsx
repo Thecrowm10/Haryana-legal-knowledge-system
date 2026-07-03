@@ -8,6 +8,7 @@ import UploaderDashboard from './pages/UploaderDashboard';
 import ApproverDashboard from './pages/ApproverDashboard';
 import CSODashboard from './pages/CSODashboard';
 import AdminDashboard from './pages/AdminDashboard';
+import NodalOfficerDashboard from './pages/NodalOfficerDashboard';
 import AuditorDashboard from './pages/AuditorDashboard';
 import { DOCUMENTS } from './data/mockData';
 
@@ -18,6 +19,7 @@ const DEFAULT_PAGE = {
   csoffice: 'analytics',
   officer:  'analytics',
   admin:    'users',
+  nodal_officer: 'users',
   auditor:  'auditlog',
 };
 
@@ -139,6 +141,8 @@ export default function App() {
         );
       case 'admin':
         return <AdminDashboard activePage={activePage} taxonomy={taxonomy} onUpdateTaxonomy={setTaxonomy} />;
+      case 'nodal_officer':
+        return <NodalOfficerDashboard activePage={activePage} />;
       case 'auditor':
         return <AuditorDashboard activePage={activePage} />;
       default:
