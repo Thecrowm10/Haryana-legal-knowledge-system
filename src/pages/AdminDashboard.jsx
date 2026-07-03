@@ -5,7 +5,7 @@ import Badge from '../components/ui/Badge';
 import SelectField from '../components/ui/SelectField';
 import DocViewModal from '../components/DocViewModal';
 import { getUsers, getRoles, updateUser, registerUser } from '../services/users';
-import { getDepartments, createDepartment, getDocumentTypes, createDocumentType } from '../services/departments';
+import { getDepartments, createDepartment, toggleDepartment, getDocumentTypes, createDocumentType, toggleDocumentType } from '../services/departments';
 import { getAllDocumentsAdmin } from '../services/pdf';
 
 const LABEL = { fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)' };
@@ -96,6 +96,9 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   const [docTypesError, setDocTypesError]     = useState('');
   const [docTypeCreating, setDocTypeCreating]         = useState(false);
   const [docTypeCreateError, setDocTypeCreateError]   = useState('');
+  const [deptMdmCreating, setDeptMdmCreating]         = useState(false);
+  const [deptMdmCreateError, setDeptMdmCreateError]   = useState('');
+  const [mdmToggling, setMdmToggling]                 = useState(null); // { category, id }
 
   useEffect(() => {
     if (activePage !== 'taxonomy') return;
@@ -176,6 +179,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     setAddState({ category, value: '' });
     setEditState(null);
     setDocTypeCreateError('');
+    setDeptMdmCreateError('');
   }
   function saveAdd() {
     if (!addState?.value.trim()) return;
@@ -190,10 +194,37 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
         .finally(() => setDocTypeCreating(false));
       return;
     }
+    if (addState.category === 'Departments') {
+      const name = addState.value.trim();
+      if (depts.some(d => d.name === name)) return;
+      setDeptMdmCreating(true);
+      setDeptMdmCreateError('');
+      createDepartment({ name, description: '' })
+        .then(res => { setDepts(prev => [...prev, res.data]); setAddState(null); })
+        .catch(err => setDeptMdmCreateError(err.response?.data?.detail || 'Failed to create department.'))
+        .finally(() => setDeptMdmCreating(false));
+      return;
+    }
     const t = taxonomy.find(t => t.category === addState.category);
     if (t.items.includes(addState.value.trim())) return;
     updateCategory(addState.category, [...t.items, addState.value.trim()]);
     setAddState(null);
+  }
+
+  function handleMdmToggle(category, item) {
+    const id = item.id;
+    setMdmToggling({ category, id });
+    const toggleFn = category === 'Departments' ? toggleDepartment : toggleDocumentType;
+    toggleFn(id)
+      .then(res => {
+        if (category === 'Departments') {
+          setDepts(prev => prev.map(d => d.id === id ? res.data : d));
+        } else {
+          setDocTypes(prev => prev.map(dt => dt.id === id ? res.data : dt));
+        }
+      })
+      .catch(() => {})
+      .finally(() => setMdmToggling(null));
   }
 
   // Add User modal state
@@ -919,21 +950,23 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       fontSize: 12.5, outline: 'none', fontFamily: 'var(--font)', color: 'var(--text-color)',
       background: 'var(--surface-card)',
     };
-    const BTN = (color, label, onClick) => (
-      <button onClick={onClick} style={{
-        background: 'transparent', border: 'none', cursor: 'pointer',
-        color, padding: '2px 4px', fontSize: 11, fontWeight: 600, fontFamily: 'var(--font)',
+    const BTN = (color, label, onClick, disabled = false) => (
+      <button onClick={onClick} disabled={disabled} style={{
+        background: 'transparent', border: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
+        color: disabled ? 'var(--text-color-secondary)' : color, padding: '2px 4px', fontSize: 11, fontWeight: 600, fontFamily: 'var(--font)',
       }}>{label}</button>
     );
     return (
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
         {taxonomy.map(t => {
           const isApiDriven  = t.category === 'Departments' || t.category === 'Document Types';
-        
-          const canCreateApi = t.category === 'Document Types';
+          const canCreateApi = t.category === 'Document Types' || t.category === 'Departments';
           const apiItems     = t.category === 'Departments' ? depts : t.category === 'Document Types' ? docTypes : [];
           const apiLoading   = t.category === 'Departments' ? deptsLoading : docTypesLoading;
-          const displayItems = isApiDriven ? apiItems.map(d => d.name) : t.items;
+          const displayItems = isApiDriven ? apiItems : t.items;
+          const addCreating  = t.category === 'Document Types' ? docTypeCreating : t.category === 'Departments' ? deptMdmCreating : false;
+          const addError     = t.category === 'Document Types' ? docTypeCreateError : t.category === 'Departments' ? deptMdmCreateError : '';
+          const activeCount  = isApiDriven ? apiItems.filter(d => d.is_active !== false).length : t.items.length;
 
           return (
           <Card key={t.category}>
@@ -942,7 +975,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)' }}>{t.category}</div>
                 <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 2 }}>
                   {isApiDriven
-                    ? (apiLoading ? 'Loading…' : `${apiItems.length} items`)
+                    ? (apiLoading ? 'Loading…' : `${activeCount} active · ${apiItems.length} total`)
                     : `${t.items.length} items`
                   }
                 </div>
@@ -954,11 +987,20 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
               )}
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
               {displayItems.map((item, idx) => {
-                const isEditing = !isApiDriven && editState?.category === t.category && editState?.index === idx;
+                const isApiItem  = isApiDriven;
+                const itemName   = isApiItem ? item.name : item;
+                const isActive   = isApiItem ? item.is_active !== false : true;
+                const isToggling = isApiItem && mdmToggling?.category === t.category && mdmToggling?.id === item.id;
+                const isEditing  = !isApiDriven && editState?.category === t.category && editState?.index === idx;
+
                 return (
-                  <div key={item + idx} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px', borderRadius: 7, background: isEditing ? 'rgba(26,86,219,.04)' : 'var(--surface-ground)', border: `1px solid ${isEditing ? 'var(--primary-border)' : 'var(--surface-border)'}` }}>
+                  <div key={isApiItem ? item.id : item + idx} style={{
+                    display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px', borderRadius: 7,
+                    background: isEditing ? 'rgba(26,86,219,.04)' : 'var(--surface-ground)',
+                    border: `1px solid ${isEditing ? 'var(--primary-border)' : 'var(--surface-border)'}`,
+                  }}>
                     {isEditing ? (
                       <>
                         <input
@@ -973,7 +1015,19 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                       </>
                     ) : (
                       <>
-                        <span style={{ fontSize: 12.5, color: 'var(--text-color)', flex: 1 }}>{item}</span>
+                        <span style={{ fontSize: 12.5, color: 'var(--text-color)', flex: 1 }}>{itemName}</span>
+                        {isApiItem && (
+                          <button
+                            onClick={() => handleMdmToggle(t.category, item)}
+                            disabled={isToggling}
+                            title={isActive ? 'Deactivate' : 'Activate'}
+                            style={{ background: 'transparent', border: 'none', cursor: isToggling ? 'not-allowed' : 'pointer', color: isActive ? '#ef4444' : '#22c55e', padding: 2, display: 'flex' }}>
+                            {isToggling
+                              ? <div style={{ width: 10, height: 10, border: '2px solid currentColor', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin .6s linear infinite' }} />
+                              : isActive ? <Trash2 size={11} /> : <Check size={11} />
+                            }
+                          </button>
+                        )}
                         {!isApiDriven && (
                           <>
                             <button onClick={() => startEdit(t.category, idx, item)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', padding: 2, display: 'flex' }} title="Edit">
@@ -990,24 +1044,23 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 );
               })}
 
-              
               {(!isApiDriven || canCreateApi) && addState?.category === t.category && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: 4 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px', borderRadius: 7, background: 'rgba(26,86,219,.04)', border: '1px solid var(--primary-border)' }}>
                     <input
                       autoFocus
                       placeholder={`New ${t.category.replace(/s$/, '').toLowerCase()}…`}
                       value={addState.value}
-                      disabled={canCreateApi && docTypeCreating}
+                      disabled={addCreating}
                       onChange={e => setAddState(s => ({ ...s, value: e.target.value }))}
                       onKeyDown={e => { if (e.key === 'Enter') saveAdd(); if (e.key === 'Escape') setAddState(null); }}
                       style={INPUT_STYLE}
                     />
-                    {BTN('var(--primary)', canCreateApi && docTypeCreating ? 'Adding…' : 'Add', saveAdd)}
+                    {BTN('var(--primary)', addCreating ? 'Adding…' : 'Add', saveAdd, addCreating)}
                     {BTN('var(--text-color-secondary)', 'Cancel', () => setAddState(null))}
                   </div>
-                  {canCreateApi && docTypeCreateError && (
-                    <div style={{ fontSize: 11, color: '#ef4444', padding: '0 4px' }}>{docTypeCreateError}</div>
+                  {addError && (
+                    <div style={{ fontSize: 11, color: '#ef4444', padding: '0 4px' }}>{addError}</div>
                   )}
                 </div>
               )}
