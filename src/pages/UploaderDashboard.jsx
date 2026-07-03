@@ -810,7 +810,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     setFiles(f => f.filter(x => x.name !== name));
     setFileRefs(r => r.filter(x => x.fileName !== name));
   }
-  function handleDrop(e) { e.preventDefault(); setDragOver(false); addFiles(e.dataTransfer.files); }
+  function handleDrop(e) { e.preventDefault(); setDragOver(false); if (!form.type) return; addFiles(e.dataTransfer.files); }
 
   function fetchDocSuggestions(documentType, text) {
     clearTimeout(actSearchTimer.current);
@@ -1722,26 +1722,38 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
           <Card>
             {files.length === 0 ? (
               <div
-                onClick={() => inputRef.current?.click()}
+                onClick={() => { if (!form.type) return; inputRef.current?.click(); }}
                 onDrop={handleDrop}
-                onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                onDragOver={e => { e.preventDefault(); if (form.type) setDragOver(true); }}
                 onDragLeave={() => setDragOver(false)}
                 style={{
-                  border: `2px dashed ${dragOver ? (TYPE_CARD_COLORS[form.type]?.accent || 'var(--primary)') : 'var(--surface-border)'}`,
-                  borderRadius: 12, padding: '32px 16px', textAlign: 'center', cursor: 'pointer',
-                  background: dragOver ? (TYPE_CARD_COLORS[form.type]?.bg || 'rgba(26,86,219,.05)') : 'var(--surface-ground)',
+                  border: `2px dashed ${!form.type ? 'var(--surface-border)' : dragOver ? (TYPE_CARD_COLORS[form.type]?.accent || 'var(--primary)') : 'var(--surface-border)'}`,
+                  borderRadius: 10, padding: '14px 16px',
+                  cursor: form.type ? 'pointer' : 'not-allowed',
+                  display: 'flex', alignItems: 'center', gap: 14,
+                  background: !form.type ? 'var(--surface-ground)' : dragOver ? (TYPE_CARD_COLORS[form.type]?.bg || 'rgba(26,86,219,.05)') : 'var(--surface-ground)',
+                  opacity: form.type ? 1 : 0.55,
                   transition: 'all .25s',
-                  boxShadow: dragOver ? `0 0 0 4px ${TYPE_CARD_COLORS[form.type]?.accent || '#1a56db'}15` : 'none',
+                  boxShadow: dragOver ? `0 0 0 3px ${TYPE_CARD_COLORS[form.type]?.accent || '#1a56db'}18` : 'none',
                 }}>
-                <div style={{ width: 48, height: 48, borderRadius: 12, background: dragOver ? (TYPE_CARD_COLORS[form.type]?.bg || 'rgba(26,86,219,.12)') : 'var(--surface-card)', border: `1px solid ${dragOver ? (TYPE_CARD_COLORS[form.type]?.accent || 'var(--primary)') + '40' : 'var(--surface-border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', transition: 'all .25s' }}>
-                  <Upload size={22} color={dragOver ? (TYPE_CARD_COLORS[form.type]?.accent || 'var(--primary)') : 'var(--text-color-secondary)'} strokeWidth={1.6} />
+                <div style={{ width: 36, height: 36, borderRadius: 9, flexShrink: 0, background: dragOver ? (TYPE_CARD_COLORS[form.type]?.bg || 'rgba(26,86,219,.12)') : 'var(--surface-card)', border: `1px solid ${dragOver ? (TYPE_CARD_COLORS[form.type]?.accent || 'var(--primary)') + '40' : 'var(--surface-border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .25s' }}>
+                  <Upload size={16} color={dragOver ? (TYPE_CARD_COLORS[form.type]?.accent || 'var(--primary)') : 'var(--text-color-secondary)'} strokeWidth={1.6} />
                 </div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 5 }}>Drop files here</div>
-                <div style={{ fontSize: 12, color: 'var(--text-color-secondary)', marginBottom: 14 }}>or click to browse · PDF or Word · up to 50 MB</div>
-                <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: 10.5, color: 'var(--primary)', background: 'rgba(26,86,219,.08)', border: '1px solid rgba(26,86,219,.2)', padding: '3px 10px', borderRadius: 20 }}>.PDF</span>
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: 10.5, color: '#2b579a', background: 'rgba(43,87,154,.08)', border: '1px solid rgba(43,87,154,.3)', padding: '3px 10px', borderRadius: 20 }}>.DOC</span>
-                </div>
+                {!form.type ? (
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 2 }}>Select a document type first</div>
+                    <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)' }}>Choose a type above to enable file upload</div>
+                  </div>
+                ) : (
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 2 }}>Drop files here or <span style={{ color: 'var(--primary)' }}>click to browse</span></div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)' }}>PDF or Word · up to 50 MB</span>
+                      <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--primary)', background: 'rgba(26,86,219,.08)', border: '1px solid rgba(26,86,219,.2)', padding: '2px 7px', borderRadius: 20 }}>.PDF</span>
+                      <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: '#2b579a', background: 'rgba(43,87,154,.08)', border: '1px solid rgba(43,87,154,.3)', padding: '2px 7px', borderRadius: 20 }}>.DOC</span>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <>
