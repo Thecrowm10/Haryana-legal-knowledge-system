@@ -2,58 +2,60 @@ import { useState } from 'react';
 import { Phone, ArrowLeft, ShieldCheck, RotateCcw, ShieldAlert } from 'lucide-react';
 import haryanaLogo from '../assets/haryana-logo.png';
 import bannerBg from '../assets/banner-1-768x217.png';
-
-// swap this with a real OTP generator in production 
-function generateOtp() {
-  return String(Math.floor(100000 + Math.random() * 900000));
-}
+import { requestAdminOtp, verifyAdminOtp } from '../services/pdf';
 
 export default function AdminOtpLogin({ onBack, onLogin }) {
-  const [step, setStep]       = useState(1); // 1 = enter mobile, 2 = enter OTP
-  const [mobile, setMobile]   = useState('');
-  const [otp, setOtp]         = useState('');
-  const [sentOtp, setSentOtp] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState('');
+  const [step, setStep]           = useState(1);
+  const [mobile, setMobile]       = useState('');
+  const [otp, setOtp]             = useState('');
+  const [loading, setLoading]     = useState(false);
+  const [error, setError]         = useState('');
   const [resendMsg, setResendMsg] = useState('');
 
-  function sendOtp() {
-    const code = generateOtp();
-    setSentOtp(code);
-    return code;
-  }
-
-  // ── Step 1: send OTP to mobile ────────────────────────────
-  function handleSendOtp(e) {
+  // ── Step 1: request OTP ───────────────────────────────────
+  async function handleSendOtp(e) {
     e?.preventDefault();
-    if (!/^[6-9]\d{9}$/.test(mobile.trim())) {
-      setError('Enter a valid 10-digit registered admin mobile number.');
-      return;
-    }
-    setLoading(true); setError('');
-    setTimeout(() => {
-      sendOtp();
-      setLoading(false);
+    const cleaned = mobile.replace(/\D/g, '');
+    if (cleaned.length < 10) { setError('Enter a valid 10-digit mobile number.'); return; }
+    setLoading(true); setError(''); setResendMsg('');
+    try {
+      await requestAdminOtp(cleaned);
+      setMobile(cleaned);
       setStep(2);
-    }, 500);
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      setError(typeof detail === 'string' ? detail : 'Could not send OTP. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   // ── Step 2: verify OTP ────────────────────────────────────
-  function handleVerify(e) {
+  async function handleVerify(e) {
     e?.preventDefault();
-    if (otp.length !== 6) { setError('OTP must be 6 digits.'); return; }
-    if (otp !== sentOtp)  { setError('Invalid or expired OTP.'); return; }
-    onLogin({ role: 'admin', mobile: mobile.trim() });
+    if (otp.length !== 6) { setError('Enter the 6-digit OTP.'); return; }
+    setLoading(true); setError('');
+    try {
+      const res = await verifyAdminOtp(mobile, otp);
+      onLogin({ token: res.data.access_token });
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      setError(typeof detail === 'string' ? detail : 'Invalid or expired OTP.');
+    } finally {
+      setLoading(false);
+    }
   }
 
-  function handleResend() {
-    setError(''); setOtp(''); setResendMsg('');
-    setLoading(true);
-    setTimeout(() => {
-      sendOtp();
+  async function handleResend() {
+    setOtp(''); setError(''); setResendMsg(''); setLoading(true);
+    try {
+      await requestAdminOtp(mobile);
+      setResendMsg('A new OTP has been sent.');
+    } catch {
+      setError('Could not resend OTP. Please try again.');
+    } finally {
       setLoading(false);
-      setResendMsg('A new OTP has been generated.');
-    }, 400);
+    }
   }
 
   return (
@@ -121,7 +123,7 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
               </button>
               <h2 style={{ fontSize: 21, fontWeight: 800, color: '#fff', letterSpacing: '-.02em', marginBottom: 4 }}>Admin Access</h2>
               <p style={{ fontSize: 12.5, color: 'rgba(255,255,255,.42)', marginBottom: 20 }}>
-                System Administrator sign-in — enter your registered mobile number to receive a 6-digit OTP.
+                Enter your registered mobile number. A 6-digit OTP will be sent via SMS.
               </p>
 
               <label style={labelStyle}>
@@ -134,7 +136,7 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
                 maxLength={10}
                 value={mobile}
                 onChange={e => { setMobile(e.target.value.replace(/\D/g, '')); setError(''); }}
-                placeholder="9876543210"
+                placeholder="10-digit mobile number"
                 autoComplete="tel"
                 style={{
                   width: '100%', padding: '11px 13px',
@@ -167,16 +169,11 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
                 <ArrowLeft size={12} /> Back
               </button>
               <h2 style={{ fontSize: 21, fontWeight: 800, color: '#fff', letterSpacing: '-.02em', marginBottom: 4 }}>Enter OTP</h2>
-              <p style={{ fontSize: 12.5, color: 'rgba(255,255,255,.42)', marginBottom: 16 }}>
-                A 6-digit OTP was sent to +91 {mobile}. Valid for 10 minutes.
+              <p style={{ fontSize: 12.5, color: 'rgba(255,255,255,.42)', marginBottom: 20 }}>
+                OTP sent to <strong style={{ color: 'rgba(255,255,255,.7)' }}>+91 {mobile.slice(0,3)}****{mobile.slice(-3)}</strong>. Valid for 10 minutes.
               </p>
 
-              {/* Demo-mode banner — no real SMS gateway wired up */}
-              <div style={{ marginBottom: 16, padding: '9px 12px', background: 'rgba(74,222,128,.1)', border: '1px solid rgba(74,222,128,.28)', borderRadius: 9, fontSize: 12, color: '#bbf7d0' }}>
-                Demo mode — OTP: <strong style={{ fontFamily: 'monospace', letterSpacing: '2px' }}>{sentOtp}</strong>
-              </div>
-
-              <label style={labelStyle}>OTP (6 digits)</label>
+              <label style={labelStyle}>6-Digit OTP</label>
               <input
                 className="aol-inp aol-otp-inp"
                 type="text"
@@ -185,6 +182,7 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
                 value={otp}
                 onChange={e => { setOtp(e.target.value.replace(/\D/g, '')); setError(''); }}
                 placeholder="------"
+                autoFocus
                 style={{
                   width: '100%', padding: '12px 13px',
                   background: 'rgba(255,255,255,.10)',

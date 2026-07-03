@@ -2,10 +2,9 @@ import { useState, useEffect } from 'react';
 import api from '../services/api';
 import { changePassword as changePasswordApi } from '../services/pdf';
 
-const CITIZEN_PROFILE  = { username: 'citizen', role: 'citizen', name: 'Guest', dept: '', mustChangePassword: false };
-const ADMIN_PROFILE    = { username: 'sys.admin', role: 'admin', name: 'Vikram Rao', dept: '', mustChangePassword: false };
-// const DEV_UPLOADER     = { username: 'dept.uploader', role: 'uploader', name: 'Dev Uploader (Mock)',  dept: 'Urban Local Bodies', mustChangePassword: false };
-// const DEV_APPROVER     = { username: 'dept.approver', role: 'approver', name: 'Dev Approver (Mock)',  dept: 'Urban Local Bodies', mustChangePassword: false };
+const CITIZEN_PROFILE = { username: 'citizen', role: 'citizen', name: 'Guest', dept: '', mustChangePassword: false };
+// const DEV_UPLOADER  = { username: 'dept.uploader', role: 'uploader', name: 'Dev Uploader (Mock)', dept: 'Urban Local Bodies', mustChangePassword: false };
+// const DEV_APPROVER  = { username: 'dept.approver', role: 'approver', name: 'Dev Approver (Mock)', dept: 'Urban Local Bodies', mustChangePassword: false };
 
 function decodeJwt(token) {
   try {
@@ -52,17 +51,10 @@ export function useAuth() {
     return () => window.removeEventListener('hlks:session-expired', handler);
   }, []);
 
-  async function loginAsRole({ username, password, role }) {
-    if (role === 'citizen') {
-      setUser(CITIZEN_PROFILE);
-      return;
-    }
-    // Admin never goes through the username/password form — only the OTP flow
-    // (AdminOtpLogin) calls this with role:'admin' after OTP verification.
-    if (role === 'admin') {
-      setUser(ADMIN_PROFILE);
-      return;
-    }
+  async function loginAsRole({ username, password, role, token } = {}) {
+    if (role === 'citizen') { setUser(CITIZEN_PROFILE); return; }
+    // Admin OTP flow: after verify-otp the component passes the raw token directly.
+    if (token) { loginWithToken(token); return; }
 
     setLoading(true);
     setError('');
@@ -72,9 +64,8 @@ export function useAuth() {
       const payload = decodeJwt(token);
       if (!payload) throw new Error('Invalid token received');
 
-      // Admin credentials must not work through the officer login form —
-      // block them here even if the backend would otherwise accept them.
-      if (payload.role === 'admin') {
+      // Admin/super_admin must log in via the OTP flow, not username/password.
+      if (payload.role === 'admin' || payload.role === 'super_admin') {
         setError('Admin accounts must sign in via Admin Access (OTP) on the portal selection screen.');
         return;
       }
@@ -88,6 +79,13 @@ export function useAuth() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function loginWithToken(token) {
+    const payload = decodeJwt(token);
+    if (!payload) return;
+    localStorage.setItem('token', token);
+    setUser(userFromPayload(payload));
   }
 
   async function changePass(currentPassword, newPassword) {
@@ -109,5 +107,5 @@ export function useAuth() {
     }
   }
 
-  return { user, error, loading, loginAsRole, changePass, logout };
+  return { user, error, loading, loginAsRole, loginWithToken, changePass, logout };
 }
