@@ -564,6 +564,41 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     onAuditLog?.(`Uploaded ${docsWithWorkflow.length} document(s): ${docsWithWorkflow.map(d => d.title).join(', ')}`);
   }
 
+  // Runs the OCR eligibility check (POST /pdf/upload-file) for any files not yet checked.
+  // A file that passes gets a file_ref (reused later so handleSubmit doesn't re-upload it)
+  // and the API's summary auto-fills the description field — the user can still edit it.
+  async function checkFiles() {
+    if (files.length === 0) return;
+    const hasToken = !!localStorage.getItem('token');
+    setUploadError('');
+    setUploadStep('uploading');
+
+    for (const f of files) {
+      if (fileRefs.some(r => r.fileName === f.name)) continue;
+
+      if (!hasToken) {
+        setFileRefs(prev => [...prev, { fileName: f.name, fileRef: null, originalFilename: f.name, fileSize: f.size, summary: '' }]);
+        continue;
+      }
+
+      try {
+        const fd = new FormData();
+        fd.append('file', f);
+        const res = await uploadPdfFile(fd);
+        const { file_ref, original_filename, file_size, summary } = res.data;
+        setFileRefs(prev => [...prev, { fileName: f.name, fileRef: file_ref, originalFilename: original_filename, fileSize: file_size, summary }]);
+        if (summary) setForm(prevForm => (prevForm.desc ? prevForm : { ...prevForm, desc: summary }));
+      } catch (err) {
+        const detail = err.response?.data?.detail;
+        setUploadError(typeof detail === 'string' ? detail : `Document check failed for "${f.name}". Please verify the file and try again.`);
+        setUploadStep('error');
+        return;
+      }
+    }
+
+    setUploadStep('ready');
+  }
+
   // Upload file and save metadata
   async function handleSubmit(e) {
     e.preventDefault();
@@ -628,19 +663,22 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
       let apiDoc = null;
 
       if (hasToken) {
-        // Step 1: upload the file to get a file_ref
-        let fileRef = null;
-        setUploadStep('uploading');
-        try {
-          const fd = new FormData();
-          fd.append('file', f);
-          const res = await uploadPdfFile(fd);
-          fileRef = res.data.file_ref;
-        } catch (err) {
-          const detail = err.response?.data?.detail;
-          setUploadError(typeof detail === 'string' ? detail : `Upload failed for "${f.name}"`);
-          setUploadStep('error');
-          return;
+        // Step 1: get the file_ref — reuse the one obtained during the "Upload & Check" step,
+        // falling back to a fresh upload if it's somehow missing (e.g. the pre-check was skipped).
+        let fileRef = fileRefs.find(r => r.fileName === f.name)?.fileRef ?? null;
+        if (!fileRef) {
+          setUploadStep('uploading');
+          try {
+            const fd = new FormData();
+            fd.append('file', f);
+            const res = await uploadPdfFile(fd);
+            fileRef = res.data.file_ref;
+          } catch (err) {
+            const detail = err.response?.data?.detail;
+            setUploadError(typeof detail === 'string' ? detail : `Upload failed for "${f.name}"`);
+            setUploadStep('error');
+            return;
+          }
         }
 
         // Step 2: save metadata
@@ -1160,6 +1198,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   }
 
   // Upload page
+  const allFilesChecked = files.length > 0 && files.every(f => fileRefs.some(r => r.fileName === f.name));
   return (
     <div style={{ animation: 'fadeSlideIn .3s ease' }}>
       {conflictModal && (
@@ -1286,6 +1325,36 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                   )}
                 </div>
 
+                {/* Upload & OCR-eligibility check */}
+                {!allFilesChecked && uploadStep === 'error' ? (
+                  <>
+                    <div style={{ marginBottom: 10, padding: '10px 12px', borderRadius: 8, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                      <AlertCircle size={14} color="#ef4444" style={{ flexShrink: 0, marginTop: 1 }} />
+                      <span style={{ fontSize: 12, color: '#dc2626', flex: 1, lineHeight: 1.5 }}>{uploadError}</span>
+                    </div>
+                    <button type="button" onClick={checkFiles}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', padding: '9px 0', borderRadius: 8, border: 'none', background: 'var(--primary)', color: 'white', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                      <RotateCcw size={13} /> Try Again
+                    </button>
+                  </>
+                ) : !allFilesChecked ? (
+                  <button type="button" onClick={checkFiles} disabled={uploadStep === 'uploading'}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%',
+                      padding: '9px 0', borderRadius: 8, border: 'none',
+                      background: uploadStep === 'uploading' ? 'var(--surface-200)' : 'var(--primary)',
+                      color: uploadStep === 'uploading' ? '#94a3b8' : 'white',
+                      fontSize: 12.5, fontWeight: 700, fontFamily: 'var(--font)',
+                      cursor: uploadStep === 'uploading' ? 'not-allowed' : 'pointer',
+                    }}>
+                    {uploadStep === 'uploading' ? <><Clock size={13} /> Checking document…</> : <><Upload size={13} /> Upload &amp; Check Document</>}
+                  </button>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 2px 4px', fontSize: 12, fontWeight: 600, color: '#16a34a' }}>
+                    <CheckCircle size={13} /> Eligibility check passed — details ready
+                  </div>
+                )}
+
                 {/* Add more files — disabled (single-file upload only) */}
                 {/* <button type="button" onClick={() => inputRef.current?.click()}
                   style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', padding: '7px 0', borderRadius: 8, border: '1px dashed var(--surface-border)', background: 'transparent', color: 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', marginBottom: 14 }}>
@@ -1306,7 +1375,40 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
 
         {/* ── RIGHT: Document Details form ───────────────────────────────────── */}
         <Card>
-          {!form.type ? (
+          {files.length > 0 && !allFilesChecked && uploadStep === 'uploading' ? (
+            /* Skeleton — mimics the Document Details form while the OCR eligibility check runs.
+               Shown regardless of whether a document type / file-drop placeholder would otherwise
+               render, so the user always sees that the check is actually in progress. */
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18, paddingBottom: 14, borderBottom: '1px solid var(--surface-border)' }}>
+                <div style={{ width: 28, height: 28, borderRadius: 7, background: 'var(--surface-hover)', border: '1px solid var(--surface-border)', animation: 'pulse2 1.4s ease-in-out infinite' }} />
+                <div style={{ width: 150, height: 15, borderRadius: 4, background: 'var(--surface-hover)', border: '1px solid var(--surface-border)', animation: 'pulse2 1.4s ease-in-out infinite' }} />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
+                <div style={{ width: 130, height: 9, borderRadius: 3, background: 'var(--surface-hover)', border: '1px solid var(--surface-border)', animation: 'pulse2 1.4s ease-in-out infinite' }} />
+                <div style={{ height: 38, borderRadius: 8, background: 'var(--surface-hover)', border: '1px solid var(--surface-border)', animation: 'pulse2 1.4s ease-in-out infinite' }} />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginBottom: 14 }}>
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ width: '55%', height: 9, borderRadius: 3, background: 'var(--surface-hover)', border: '1px solid var(--surface-border)', animation: 'pulse2 1.4s ease-in-out infinite', animationDelay: `${i * 0.07}s` }} />
+                    <div style={{ height: 38, borderRadius: 8, background: 'var(--surface-hover)', border: '1px solid var(--surface-border)', animation: 'pulse2 1.4s ease-in-out infinite', animationDelay: `${i * 0.07}s` }} />
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 20 }}>
+                <div style={{ width: 170, height: 9, borderRadius: 3, background: 'var(--surface-hover)', border: '1px solid var(--surface-border)', animation: 'pulse2 1.4s ease-in-out infinite' }} />
+                <div style={{ height: 150, borderRadius: 8, background: 'var(--surface-hover)', border: '1px solid var(--surface-border)', animation: 'pulse2 1.4s ease-in-out infinite' }} />
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 12.5, color: 'var(--text-color-secondary)' }}>
+                <Clock size={13} /> Verifying OCR eligibility — this only takes a moment…
+              </div>
+            </div>
+          ) : !form.type ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 460, textAlign: 'center', gap: 14 }}>
               <div style={{ width: 52, height: 52, borderRadius: 14, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <FileText size={22} color="var(--text-color-secondary)" strokeWidth={1.5} />
@@ -1324,6 +1426,24 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
               <div>
                 <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 6 }}>Drop a {form.type} file</div>
                 <div style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>Select a PDF or Word file on the left to fill in document details</div>
+              </div>
+            </div>
+          ) : !allFilesChecked ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 460, textAlign: 'center', gap: 14 }}>
+              <div style={{ width: 52, height: 52, borderRadius: 14, background: uploadStep === 'error' ? 'rgba(239,68,68,.08)' : TYPE_CARD_COLORS[form.type]?.bg || 'var(--surface-ground)', border: `1px solid ${uploadStep === 'error' ? 'rgba(239,68,68,.3)' : (TYPE_CARD_COLORS[form.type]?.accent || 'var(--surface-border)') + '30'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {uploadStep === 'error'
+                  ? <XCircle size={22} color="#ef4444" strokeWidth={1.5} />
+                  : <Upload size={22} color={TYPE_CARD_COLORS[form.type]?.accent || 'var(--text-color-secondary)'} strokeWidth={1.5} />}
+              </div>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 6 }}>
+                  {uploadStep === 'error' ? 'Document check failed' : 'Ready to check'}
+                </div>
+                <div style={{ fontSize: 13, color: 'var(--text-color-secondary)', maxWidth: 320 }}>
+                  {uploadStep === 'error'
+                    ? (uploadError || 'The document failed the eligibility check.')
+                    : 'Click "Upload & Check Document" on the left to verify OCR eligibility before entering document details.'}
+                </div>
               </div>
             </div>
           ) : (
@@ -1814,10 +1934,15 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
 
             {/* Always: Description */}
             <div style={{ gridColumn: '1 / -1' }}>
-              <div style={{ ...LABEL, marginBottom: 6 }}>Description / Remarks</div>
-              <textarea value={form.desc} onChange={e => fmt('desc', e.target.value)} rows={2}
+              <div style={{ ...LABEL, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                Description / Remarks
+                {fileRefs.some(r => r.fileName === files[0]?.name && r.summary) && (
+                  <span style={{ fontSize: 10, fontWeight: 600, color: '#16a34a', textTransform: 'none', letterSpacing: 0 }}>· auto-filled from document summary, you can edit it</span>
+                )}
+              </div>
+              <textarea value={form.desc} onChange={e => fmt('desc', e.target.value)} rows={7}
                 placeholder="Brief description or upload remarks…"
-                style={{ ...INPUT_BASE, resize: 'vertical', lineHeight: 1.6 }}
+                style={{ ...INPUT_BASE, resize: 'vertical', lineHeight: 1.6, minHeight: 150 }}
                 onFocus={focusStyle} onBlur={blurStyle} />
             </div>
           </div>

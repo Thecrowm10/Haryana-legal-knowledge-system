@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect, useRef } from 'react';
-import { Users, ShieldCheck, Settings, Activity, ClipboardList, Trash2, Edit2, Plus, CheckCircle, XCircle, Building2, X, Eye, EyeOff, ChevronDown, Check } from 'lucide-react';
+import { Users, ShieldCheck, Settings, Activity, ClipboardList, Trash2, Edit2, Plus, CheckCircle, XCircle, Building2, X, Eye, EyeOff, ChevronDown, Check, Download } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import SelectField from '../components/ui/SelectField';
@@ -19,8 +19,8 @@ function normalizeUser(u) {
     role:      u.role?.name ?? '—',
     roleId:    u.role?.id ?? null,
     dept:      u.departments?.length > 0 ? u.departments.map(d => d.name).join(', ') : (u.department?.name ?? '—'),
-    deptId:    u.department?.id ?? null,
-    deptIds:   u.departments?.map(d => d.id) ?? [],
+    deptId:    u.department?.id ?? u.departments?.[0]?.id ?? null,
+    deptIds:   u.departments?.length > 0 ? u.departments.map(d => d.id) : (u.department ? [u.department.id] : []),
     deptRaw:   u.departments?.length > 0 ? u.departments.map(d => String(d.id)).join(',') : null,
     status:    u.is_active ? 'active' : 'inactive',
     isActive:  u.is_active,
@@ -273,15 +273,16 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   }
 
   // User Management
-  const [deptFilter, setDeptFilter] = useState('');
+  const [deptFilter, setDeptFilter]     = useState('');
+  const [statusFilter, setStatusFilter] = useState(null); // null | 'active' | 'inactive'
 
   if (activePage === 'users') {
     const active   = users.filter(u => u.status === 'active').length;
     const inactive = users.filter(u => u.status === 'inactive').length;
 
-    const filteredUsers = deptFilter
-      ? users.filter(u => String(u.deptId) === String(deptFilter))
-      : users;
+    const filteredUsers = users
+      .filter(u => !deptFilter || u.deptIds.map(String).includes(String(deptFilter)))
+      .filter(u => !statusFilter || u.status === statusFilter);
 
     const INP_STYLE = {
       width: '100%', padding: '9px 12px',
@@ -296,27 +297,38 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
           {[
-            { label: 'Total Users',    value: users.length, color: 'var(--primary)',  bg: 'rgba(26,86,219,.12)',  icon: Users },
-            { label: 'Active',         value: active,       color: '#22c55e',         bg: 'rgba(34,197,94,.12)',  icon: CheckCircle },
-            { label: 'Inactive',       value: inactive,     color: '#f59e0b',         bg: 'rgba(245,158,11,.12)', icon: XCircle },
-          ].map(s => (
-            <Card key={s.label}>
+            { label: 'Total Users',    value: users.length, color: 'var(--primary)',  bg: 'rgba(26,86,219,.12)',  icon: Users,       key: null },
+            { label: 'Active',         value: active,       color: '#22c55e',         bg: 'rgba(34,197,94,.12)',  icon: CheckCircle, key: 'active' },
+            { label: 'Inactive',       value: inactive,     color: '#f59e0b',         bg: 'rgba(245,158,11,.12)', icon: XCircle,     key: 'inactive' },
+          ].map(s => {
+            const isActive = statusFilter === s.key;
+            return (
+            <Card key={s.label} onClick={() => setStatusFilter(f => (s.key === null ? null : f === s.key ? null : s.key))}
+              style={{ cursor: 'pointer', outline: isActive ? `2px solid ${s.color}` : '2px solid transparent', transition: 'all .2s' }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
                 <div>
-                  <div style={{ ...LABEL, marginBottom: 8 }}>{s.label}</div>
-                  <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--text-heading)', fontFamily: 'var(--mono)', lineHeight: 1 }}>{s.value}</div>
+                  <div style={{ ...LABEL, marginBottom: 8, color: isActive ? s.color : undefined }}>{s.label}</div>
+                  <div style={{ fontSize: 28, fontWeight: 700, color: isActive ? s.color : 'var(--text-heading)', fontFamily: 'var(--mono)', lineHeight: 1 }}>{s.value}</div>
                 </div>
-                <div style={{ width: 44, height: 44, borderRadius: 11, background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: 44, height: 44, borderRadius: 11, background: isActive ? s.color + '22' : s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background .2s' }}>
                   <s.icon size={20} color={s.color} strokeWidth={1.8} />
                 </div>
               </div>
             </Card>
-          ))}
+          );})}
         </div>
 
         <Card padding="0">
           <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>System Users</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>System Users</div>
+              {statusFilter && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px 4px 10px', borderRadius: 20, background: statusFilter === 'active' ? 'rgba(34,197,94,.1)' : 'rgba(245,158,11,.1)', border: `1px solid ${statusFilter === 'active' ? 'rgba(34,197,94,.3)' : 'rgba(245,158,11,.3)'}`, fontSize: 11.5, fontWeight: 600, color: statusFilter === 'active' ? '#16a34a' : '#b45309', whiteSpace: 'nowrap' }}>
+                  {statusFilter === 'active' ? 'Active' : 'Inactive'}
+                  <button onClick={() => setStatusFilter(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'inherit', display: 'flex', padding: 0 }}><X size={11} /></button>
+                </div>
+              )}
+            </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <SelectField value={deptFilter} onChange={e => setDeptFilter(e.target.value)} placeholder="All Departments" style={{ width: 200 }}>
                 <option value="">All Departments</option>
@@ -872,60 +884,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     );
   }
 
-  // Roles & Permissions
-  if (activePage === 'roles') {
-    const ROLE_MATRIX = [
-      { role: 'Guest',      search: true,  view: true,  upload: false, approve: false, analytics: false, admin: false },
-      { role: 'Uploader',  search: true,  view: true,  upload: true,  approve: false, analytics: false, admin: false },
-      { role: 'Approver',  search: true,  view: true,  upload: false, approve: true,  analytics: false, admin: false },
-      { role: 'CS Office', search: true,  view: true,  upload: false, approve: false, analytics: true,  admin: false },
-      { role: 'Auditor',   search: false, view: true,  upload: false, approve: false, analytics: false, admin: false },
-      { role: 'Admin',     search: true,  view: true,  upload: true,  approve: true,  analytics: true,  admin: true  },
-    ];
-    const perms = ['search', 'view', 'upload', 'approve', 'analytics', 'admin'];
-    return (
-      <div style={{ animation: 'fadeSlideIn .3s ease' }}>
-        <Card padding="0">
-          <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--surface-border)' }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>Role Permission Matrix</div>
-            <div style={{ fontSize: 12, color: 'var(--text-color-secondary)', marginTop: 3 }}>Read-only view. Contact HARTRON to modify role permissions.</div>
-          </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
-            <colgroup>
-              <col style={{ width: '180px' }} />
-              {perms.map(p => <col key={p} style={{ width: `${(100 - 20) / perms.length}%` }} />)}
-            </colgroup>
-            <thead>
-              <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
-                <th style={{ ...LABEL, padding: '12px 20px', textAlign: 'left' }}>Role</th>
-                {perms.map(p => <th key={p} style={{ ...LABEL, padding: '12px 8px', textAlign: 'center' }}>{p}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {ROLE_MATRIX.map(row => (
-                <tr key={row.role} style={{ borderBottom: '1px solid var(--surface-border)', transition: 'background .15s' }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                  <td style={{ padding: '14px 20px', fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>{row.role}</td>
-                  {perms.map(p => (
-                    <td key={p} style={{ padding: '14px 8px', textAlign: 'center' }}>
-                      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                        {row[p]
-                          ? <CheckCircle size={18} color="#22c55e" strokeWidth={2} />
-                          : <XCircle    size={18} color="#cbd5e1" strokeWidth={1.5} />}
-                      </div>
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
-      </div>
-    );
-  }
-
-  // Taxonomy Editor
+  // Master Data Manager
   if (activePage === 'taxonomy') {
     const INPUT_STYLE = {
       flex: 1, border: '1px solid var(--primary)', borderRadius: 6, padding: '4px 8px',
