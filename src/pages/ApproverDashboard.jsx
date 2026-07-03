@@ -22,6 +22,8 @@ const TYPE_COLORS = {
   'Policy':              { accent: '#22c55e', bg: 'rgba(34,197,94,.08)',  text: '#16a34a' },
   'Rules & Regulations': { accent: '#ef4444', bg: 'rgba(239,68,68,.08)',  text: '#dc2626' },
   'Order / Gazette':     { accent: '#eab308', bg: 'rgba(234,179,8,.08)',  text: '#a16207' },
+  'Bye Laws':            { accent: '#0ea5e9', bg: 'rgba(14,165,233,.08)', text: '#0369a1' },
+  'Miscellaneous':       { accent: '#64748b', bg: 'rgba(100,116,139,.08)',text: '#475569' },
 };
 
 const LABEL = {

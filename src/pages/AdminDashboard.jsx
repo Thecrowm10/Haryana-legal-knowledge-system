@@ -4,7 +4,7 @@ import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import SelectField from '../components/ui/SelectField';
 import { getUsers, getRoles, updateUser, registerUser } from '../services/users';
-import { getDepartments, createDepartment } from '../services/departments';
+import { getDepartments, createDepartment, getDocumentTypes, createDocumentType } from '../services/departments';
 
 const LABEL = { fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)' };
 
@@ -29,10 +29,10 @@ function normalizeUser(u) {
 const MOCK_AUDIT = [
   { time: '2026-05-25 10:42', user: 'Priya Sharma',  role: 'uploader', action: 'Uploaded document: Haryana Municipal Act 2024' },
   { time: '2026-05-25 10:18', user: 'Sunil Verma',   role: 'approver', action: 'Approved: Punjab Land Revenue Act Amendment' },
-  { time: '2026-05-25 09:55', user: 'citizen',        role: 'citizen',  action: 'Searched: "factory license renewal rules"' },
+  { time: '2026-05-25 09:55', user: 'Guest',          role: 'citizen',  action: 'Searched: "factory license renewal rules"' },
   { time: '2026-05-25 09:30', user: 'Anita Singh',   role: 'csoffice', action: 'Viewed analytics dashboard' },
   { time: '2026-05-24 17:12', user: 'Sunil Verma',   role: 'approver', action: 'Rejected: Draft Notification — missing metadata' },
-  { time: '2026-05-24 16:45', user: 'citizen',        role: 'citizen',  action: 'Searched: "land acquisition compensation"' },
+  { time: '2026-05-24 16:45', user: 'Guest',          role: 'citizen',  action: 'Searched: "land acquisition compensation"' },
   { time: '2026-05-24 15:30', user: 'Deepa Nair',    role: 'auditor',  action: 'Exported audit log (CSV)' },
   { time: '2026-05-24 14:10', user: 'Harish Gupta',  role: 'approver', action: 'Approved: Excise Policy Circular 2026' },
 ];
@@ -66,6 +66,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   const [creating, setCreating]         = useState(false);
   const [createError, setCreateError]   = useState('');
   const [createSuccess, setCreateSuccess] = useState('');
+  const [addDeptOpen, setAddDeptOpen]   = useState(false);
 
   useEffect(() => {
     if (!['departments', 'taxonomy', 'users'].includes(activePage)) return;
@@ -75,6 +76,23 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       .then(res => setDepts(res.data))
       .catch(() => setDeptsError('Failed to load departments. Please try again.'))
       .finally(() => setDeptsLoading(false));
+  }, [activePage]);
+
+  // Document Types state
+  const [docTypes, setDocTypes]               = useState([]);
+  const [docTypesLoading, setDocTypesLoading] = useState(false);
+  const [docTypesError, setDocTypesError]     = useState('');
+  const [docTypeCreating, setDocTypeCreating]         = useState(false);
+  const [docTypeCreateError, setDocTypeCreateError]   = useState('');
+
+  useEffect(() => {
+    if (activePage !== 'taxonomy') return;
+    setDocTypesLoading(true);
+    setDocTypesError('');
+    getDocumentTypes()
+      .then(res => setDocTypes(res.data))
+      .catch(() => setDocTypesError('Failed to load document types. Please try again.'))
+      .finally(() => setDocTypesLoading(false));
   }, [activePage]);
 
   function handleCreateDept(e) {
@@ -87,6 +105,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       .then(res => {
         setDepts(prev => [...prev, res.data]);
         setNewDept({ name: '', description: '' });
+        setAddDeptOpen(false);
         setCreateSuccess(`Department "${res.data.name}" created successfully.`);
         setTimeout(() => setCreateSuccess(''), 3000);
       })
@@ -117,9 +136,21 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   function startAdd(category) {
     setAddState({ category, value: '' });
     setEditState(null);
+    setDocTypeCreateError('');
   }
   function saveAdd() {
     if (!addState?.value.trim()) return;
+    if (addState.category === 'Document Types') {
+      const name = addState.value.trim();
+      if (docTypes.some(dt => dt.name === name)) return;
+      setDocTypeCreating(true);
+      setDocTypeCreateError('');
+      createDocumentType({ name, description: '' })
+        .then(res => { setDocTypes(prev => [...prev, res.data]); setAddState(null); })
+        .catch(err => setDocTypeCreateError(err.response?.data?.detail || 'Failed to create document type.'))
+        .finally(() => setDocTypeCreating(false));
+      return;
+    }
     const t = taxonomy.find(t => t.category === addState.category);
     if (t.items.includes(addState.value.trim())) return;
     updateCategory(addState.category, [...t.items, addState.value.trim()]);
@@ -336,27 +367,31 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
           )}
         </Card>
 
-        {/* Add User Modal */}
+        {/* Add User Drawer */}
         {addingUser && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            onClick={e => { if (e.target === e.currentTarget) setAddingUser(false); }}>
-            <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.45)', backdropFilter: 'blur(4px)' }} />
-            <div style={{ position: 'relative', zIndex: 1, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 16, width: 'clamp(320px, 90vw, 540px)', boxShadow: '0 24px 64px rgba(0,0,0,.25)' }}>
+          <>
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.25)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', zIndex: 300, animation: 'drawerFadeIn .2s ease' }} />
+            <div style={{
+              position: 'fixed', right: 0, top: 0, height: '100vh', width: 460,
+              background: 'var(--surface-card)', boxShadow: '-4px 0 40px rgba(0,0,0,.18)',
+              zIndex: 301, display: 'flex', flexDirection: 'column',
+              animation: 'drawerSlideIn .28s cubic-bezier(.22,1,.36,1)',
+            }}>
 
               {/* Header */}
-              <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
                   <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)' }}>Add New User</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-color-secondary)', marginTop: 2 }}>Create a new system account</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 1 }}>Create a new system account</div>
                 </div>
                 <button onClick={() => setAddingUser(false)}
-                  style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '6px', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex' }}>
+                  style={{ width: 30, height: 30, borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-color-secondary)', flexShrink: 0 }}>
                   <X size={14} />
                 </button>
               </div>
 
               {/* Body */}
-              <div style={{ padding: '22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
 
                 {/* Username + Email */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -438,7 +473,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
               </div>
 
               {/* Footer */}
-              <div style={{ padding: '14px 22px', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <div style={{ padding: '16px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
                 <button onClick={() => setAddingUser(false)}
                   style={{ padding: '9px 18px', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'var(--text-color)', fontFamily: 'var(--font)' }}>
                   Cancel
@@ -452,7 +487,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 </button>
               </div>
             </div>
-          </div>
+          </>
         )}
 
         {/* Edit User Modal */}
@@ -580,131 +615,170 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       ...extra,
     });
 
+    function closeAddDept() {
+      setAddDeptOpen(false);
+      setNewDept({ name: '', description: '' });
+      setCreateError('');
+    }
+
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
 
-        {/* Stat card */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
-          <Card>
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-              <div>
-                <div style={{ ...LABEL, marginBottom: 8 }}>Total Departments</div>
-                <div style={{ fontSize: 28, fontWeight: 700, color: 'var(--text-heading)', fontFamily: 'var(--mono)', lineHeight: 1 }}>
-                  {deptsLoading ? '—' : depts.length}
-                </div>
-              </div>
-              <div style={{ width: 44, height: 44, borderRadius: 11, background: 'rgba(26,86,219,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Card>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{ width: 44, height: 44, borderRadius: 11, background: 'rgba(26,86,219,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <Building2 size={20} color='var(--primary)' strokeWidth={1.8} />
               </div>
-            </div>
-          </Card>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '380px 1fr', gap: 20, alignItems: 'start' }}>
-
-          {/* Create form */}
-          <Card>
-            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 4 }}>Add Department</div>
-            <div style={{ fontSize: 12, color: 'var(--text-color-secondary)', marginBottom: 18 }}>Create a new department record.</div>
-
-            <form onSubmit={handleCreateDept} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
-                <label style={{ ...LABEL, display: 'block', marginBottom: 7 }}>Department Name *</label>
-                <input
-                  style={INP(createError && !newDept.name.trim() ? { borderColor: 'rgba(239,68,68,.6)' } : {})}
-                  placeholder="e.g. Revenue Department"
-                  value={newDept.name}
-                  onChange={e => { setNewDept(p => ({ ...p, name: e.target.value })); setCreateError(''); }}
-                />
-              </div>
-
-              <div>
-                <label style={{ ...LABEL, display: 'block', marginBottom: 7 }}>Description</label>
-                <textarea
-                  rows={4}
-                  style={{ ...INP(), resize: 'vertical', lineHeight: 1.55 }}
-                  placeholder="Brief description of the department's function…"
-                  value={newDept.description}
-                  onChange={e => setNewDept(p => ({ ...p, description: e.target.value }))}
-                />
-              </div>
-
-              {createError && (
-                <div style={{ padding: '9px 12px', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, fontSize: 12.5, color: '#ef4444', display: 'flex', gap: 7, alignItems: 'center' }}>
-                  <span>⚠</span> {createError}
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)' }}>Departments</div>
+                <div style={{ fontSize: 12, color: 'var(--text-color-secondary)', marginTop: 2 }}>
+                  {deptsLoading ? 'Loading…' : `${depts.length} department${depts.length !== 1 ? 's' : ''} registered`}
                 </div>
-              )}
-              {createSuccess && (
-                <div style={{ padding: '9px 12px', background: 'rgba(34,197,94,.08)', border: '1px solid rgba(34,197,94,.25)', borderRadius: 8, fontSize: 12.5, color: '#16a34a', display: 'flex', gap: 7, alignItems: 'center' }}>
-                  <CheckCircle size={13} /> {createSuccess}
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={creating}
-                style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-                  background: creating ? 'var(--surface-border)' : 'var(--primary)',
-                  color: creating ? 'var(--text-color-secondary)' : 'white',
-                  border: 'none', borderRadius: 9, padding: '10px 0',
-                  fontSize: 13.5, fontWeight: 600, cursor: creating ? 'not-allowed' : 'pointer',
-                  fontFamily: 'var(--font)', transition: 'background .15s',
-                }}
-              >
-                {creating
-                  ? <><div style={{ width: 13, height: 13, border: '2px solid rgba(0,0,0,.2)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin .7s linear infinite' }}/> Creating…</>
-                  : <><Plus size={14} /> Add Department</>
-                }
-              </button>
-            </form>
-          </Card>
-
-          {/* Departments list */}
-          <Card padding="0">
-            <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--surface-border)' }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>All Departments</div>
+              </div>
             </div>
+            <button
+              onClick={() => setAddDeptOpen(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--primary)', color: 'white', border: 'none', borderRadius: 9, padding: '10px 18px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+              <Plus size={14} /> Add Department
+            </button>
+          </div>
+        </Card>
 
-            {deptsLoading && (
-              <div style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>
-                Loading departments…
-              </div>
-            )}
-            {deptsError && (
-              <div style={{ padding: '20px 18px', fontSize: 13, color: '#ef4444' }}>{deptsError}</div>
-            )}
-            {!deptsLoading && !deptsError && depts.length === 0 && (
-              <div style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>
-                No departments yet. Add one using the form.
-              </div>
-            )}
-            {!deptsLoading && !deptsError && depts.length > 0 && (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
-                    {['#', 'Name', 'Description'].map(h => (
-                      <th key={h} style={{ ...LABEL, padding: '11px 16px', textAlign: 'left' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {depts.map((d, i) => (
-                    <tr key={d.id}
-                      style={{ borderBottom: '1px solid var(--surface-border)', transition: 'background .15s' }}
-                      onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                    >
-                      <td style={{ padding: '12px 16px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)', width: 40 }}>{i + 1}</td>
-                      <td style={{ padding: '12px 16px', fontSize: 13, fontWeight: 600, color: 'var(--text-heading)', whiteSpace: 'nowrap' }}>{d.name}</td>
-                      <td style={{ padding: '12px 16px', fontSize: 12.5, color: 'var(--text-color-secondary)', lineHeight: 1.5 }}>{d.description || '—'}</td>
-                    </tr>
+        {createSuccess && (
+          <div style={{ padding: '10px 14px', background: 'rgba(34,197,94,.08)', border: '1px solid rgba(34,197,94,.25)', borderRadius: 8, fontSize: 12.5, color: '#16a34a', display: 'flex', gap: 7, alignItems: 'center' }}>
+            <CheckCircle size={13} /> {createSuccess}
+          </div>
+        )}
+
+        {/* Departments list */}
+        <Card padding="0">
+          <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--surface-border)' }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>All Departments</div>
+          </div>
+
+          {deptsLoading && (
+            <div style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>
+              Loading departments…
+            </div>
+          )}
+          {deptsError && (
+            <div style={{ padding: '20px 18px', fontSize: 13, color: '#ef4444' }}>{deptsError}</div>
+          )}
+          {!deptsLoading && !deptsError && depts.length === 0 && (
+            <div style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>
+              No departments yet. Click "Add Department" to create one.
+            </div>
+          )}
+          {!deptsLoading && !deptsError && depts.length > 0 && (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
+                  {['#', 'Name', 'Description'].map(h => (
+                    <th key={h} style={{ ...LABEL, padding: '11px 16px', textAlign: 'left' }}>{h}</th>
                   ))}
-                </tbody>
-              </table>
-            )}
-          </Card>
-        </div>
+                </tr>
+              </thead>
+              <tbody>
+                {depts.map((d, i) => (
+                  <tr key={d.id}
+                    style={{ borderBottom: '1px solid var(--surface-border)', transition: 'background .15s' }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                  >
+                    <td style={{ padding: '12px 16px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)', width: 40 }}>{i + 1}</td>
+                    <td style={{ padding: '12px 16px', fontSize: 13, fontWeight: 600, color: 'var(--text-heading)', whiteSpace: 'nowrap' }}>{d.name}</td>
+                    <td style={{ padding: '12px 16px', fontSize: 12.5, color: 'var(--text-color-secondary)', lineHeight: 1.5 }}>{d.description || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </Card>
+
+        {/* Add Department drawer */}
+        {addDeptOpen && (
+          <>
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.25)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', zIndex: 300, animation: 'drawerFadeIn .2s ease' }} />
+            <div style={{
+              position: 'fixed', right: 0, top: 0, height: '100vh', width: 420,
+              background: 'var(--surface-card)', boxShadow: '-4px 0 40px rgba(0,0,0,.18)',
+              zIndex: 301, display: 'flex', flexDirection: 'column',
+              animation: 'drawerSlideIn .28s cubic-bezier(.22,1,.36,1)',
+            }}>
+              <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 34, height: 34, borderRadius: 9, background: 'var(--primary-light)', border: '1px solid var(--primary-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Building2 size={16} color="var(--primary)" />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)' }}>Add Department</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 1 }}>Create a new department record.</div>
+                </div>
+                <button onClick={closeAddDept}
+                  style={{ width: 30, height: 30, borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-color-secondary)', flexShrink: 0 }}>
+                  <X size={14} />
+                </button>
+              </div>
+
+              <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div>
+                  <label style={{ ...LABEL, display: 'block', marginBottom: 7 }}>Department Name *</label>
+                  <input
+                    autoFocus
+                    style={INP(createError && !newDept.name.trim() ? { borderColor: 'rgba(239,68,68,.6)' } : {})}
+                    placeholder="e.g. Revenue Department"
+                    value={newDept.name}
+                    onChange={e => { setNewDept(p => ({ ...p, name: e.target.value })); setCreateError(''); }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ ...LABEL, display: 'block', marginBottom: 7 }}>Description</label>
+                  <textarea
+                    rows={5}
+                    style={{ ...INP(), resize: 'vertical', lineHeight: 1.55 }}
+                    placeholder="Brief description of the department's function…"
+                    value={newDept.description}
+                    onChange={e => setNewDept(p => ({ ...p, description: e.target.value }))}
+                  />
+                </div>
+
+                {createError && (
+                  <div style={{ padding: '9px 12px', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, fontSize: 12.5, color: '#ef4444', display: 'flex', gap: 7, alignItems: 'center' }}>
+                    <span>⚠</span> {createError}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ padding: '16px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <button type="button" onClick={closeAddDept}
+                  style={{ padding: '9px 20px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={creating}
+                  onClick={e => {
+                    handleCreateDept(e);
+                  }}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                    background: creating ? 'var(--surface-border)' : 'var(--primary)',
+                    color: creating ? 'var(--text-color-secondary)' : 'white',
+                    border: 'none', borderRadius: 8, padding: '9px 20px',
+                    fontSize: 13, fontWeight: 700, cursor: creating ? 'not-allowed' : 'pointer',
+                    fontFamily: 'var(--font)',
+                  }}
+                >
+                  {creating
+                    ? <><div style={{ width: 13, height: 13, border: '2px solid rgba(0,0,0,.2)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin .7s linear infinite' }}/> Creating…</>
+                    : <><Plus size={14} /> Add Department</>
+                  }
+                </button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     );
   }
@@ -712,7 +786,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   // Roles & Permissions
   if (activePage === 'roles') {
     const ROLE_MATRIX = [
-      { role: 'Citizen',    search: true,  view: true,  upload: false, approve: false, analytics: false, admin: false },
+      { role: 'Guest',      search: true,  view: true,  upload: false, approve: false, analytics: false, admin: false },
       { role: 'Uploader',  search: true,  view: true,  upload: true,  approve: false, analytics: false, admin: false },
       { role: 'Approver',  search: true,  view: true,  upload: false, approve: true,  analytics: false, admin: false },
       { role: 'CS Office', search: true,  view: true,  upload: false, approve: false, analytics: true,  admin: false },
@@ -778,8 +852,12 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     return (
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
         {taxonomy.map(t => {
-          const isApiDriven = t.category === 'Departments';
-          const displayItems = isApiDriven ? depts.map(d => d.name) : t.items;
+          const isApiDriven  = t.category === 'Departments' || t.category === 'Document Types';
+        
+          const canCreateApi = t.category === 'Document Types';
+          const apiItems     = t.category === 'Departments' ? depts : t.category === 'Document Types' ? docTypes : [];
+          const apiLoading   = t.category === 'Departments' ? deptsLoading : docTypesLoading;
+          const displayItems = isApiDriven ? apiItems.map(d => d.name) : t.items;
 
           return (
           <Card key={t.category}>
@@ -788,21 +866,15 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)' }}>{t.category}</div>
                 <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 2 }}>
                   {isApiDriven
-                    ? (deptsLoading ? 'Loading…' : `${depts.length} items · synced from API`)
+                    ? (apiLoading ? 'Loading…' : `${apiItems.length} items`)
                     : `${t.items.length} items`
                   }
                 </div>
               </div>
-              {!isApiDriven && (
+              {(!isApiDriven || canCreateApi) && (
                 <button onClick={() => startAdd(t.category)} style={{ background: 'var(--primary)', color: 'white', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
                   <Plus size={11} /> Add
                 </button>
-              )}
-              {isApiDriven && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '3px 8px', borderRadius: 20, background: 'rgba(26,86,219,.08)', border: '1px solid rgba(26,86,219,.2)' }}>
-                  <Building2 size={10} color='var(--primary)' />
-                  <span style={{ fontSize: 10, fontWeight: 600, color: 'var(--primary)', whiteSpace: 'nowrap' }}>API</span>
-                </div>
               )}
             </div>
 
@@ -842,19 +914,25 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 );
               })}
 
-              {/* Add new item input (non-API categories only) */}
-              {!isApiDriven && addState?.category === t.category && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px', borderRadius: 7, background: 'rgba(26,86,219,.04)', border: '1px solid var(--primary-border)' }}>
-                  <input
-                    autoFocus
-                    placeholder={`New ${t.category.replace(/s$/, '').toLowerCase()}…`}
-                    value={addState.value}
-                    onChange={e => setAddState(s => ({ ...s, value: e.target.value }))}
-                    onKeyDown={e => { if (e.key === 'Enter') saveAdd(); if (e.key === 'Escape') setAddState(null); }}
-                    style={INPUT_STYLE}
-                  />
-                  {BTN('var(--primary)', 'Add', saveAdd)}
-                  {BTN('var(--text-color-secondary)', 'Cancel', () => setAddState(null))}
+              
+              {(!isApiDriven || canCreateApi) && addState?.category === t.category && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px', borderRadius: 7, background: 'rgba(26,86,219,.04)', border: '1px solid var(--primary-border)' }}>
+                    <input
+                      autoFocus
+                      placeholder={`New ${t.category.replace(/s$/, '').toLowerCase()}…`}
+                      value={addState.value}
+                      disabled={canCreateApi && docTypeCreating}
+                      onChange={e => setAddState(s => ({ ...s, value: e.target.value }))}
+                      onKeyDown={e => { if (e.key === 'Enter') saveAdd(); if (e.key === 'Escape') setAddState(null); }}
+                      style={INPUT_STYLE}
+                    />
+                    {BTN('var(--primary)', canCreateApi && docTypeCreating ? 'Adding…' : 'Add', saveAdd)}
+                    {BTN('var(--text-color-secondary)', 'Cancel', () => setAddState(null))}
+                  </div>
+                  {canCreateApi && docTypeCreateError && (
+                    <div style={{ fontSize: 11, color: '#ef4444', padding: '0 4px' }}>{docTypeCreateError}</div>
+                  )}
                 </div>
               )}
             </div>

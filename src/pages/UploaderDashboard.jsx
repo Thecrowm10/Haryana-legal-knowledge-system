@@ -1,8 +1,8 @@
 ﻿import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  Upload, FileText, CheckCircle, XCircle, X, TrendingUp, Archive, Download,
-  RotateCcw, AlertCircle, Eye, GitBranch, Plus, Cpu, Link, Clock,
-  Layers, ChevronRight, AlertTriangle, Users, CheckSquare, Square,
+  Upload, FileText, CheckCircle, XCircle, X, TrendingUp, FileType, Download,
+  RotateCcw, AlertCircle, Eye, GitBranch, Plus, Clock,
+  Layers, ChevronRight, AlertTriangle, CheckSquare, Square,
   Edit3, Tag, Search,
 } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -24,7 +24,7 @@ const DEFAULT_DEPTS = [
   'Health & Family Welfare','Agriculture & Farmers Welfare',
   'Panchayati Raj','General Administration',
 ];
-const DEFAULT_TYPES = ['Act','Amendment','Notification','Circular','Policy','Rules & Regulations','Order / Gazette'];
+const DEFAULT_TYPES = ['Act','Amendment','Notification','Circular','Policy','Rules & Regulations','Order / Gazette','Bye Laws','Miscellaneous'];
 const LANGS  = ['English','Hindi','Bilingual'];
 const REL_TYPES = [
   'Replaces', 'Replaced by', 'Amends', 'Amended by',
@@ -41,16 +41,20 @@ const REL_TYPES_BY_DOCTYPE = {
   'Policy':              ['Replaces', 'Replaced by', 'Implements', 'Implemented by', 'References', 'Referenced by', 'Related to'],
   'Order / Gazette':     ['Issued Under', 'Amends', 'Amended by', 'Replaces', 'Replaced by', 'In Continuation of', 'Continued by', 'Implements', 'Implemented by', 'References'],
   'Rules & Regulations': ['Amends', 'Amended by', 'Replaces', 'Replaced by', 'Issued Under', 'References', 'Referenced by'],
+  'Bye Laws':            ['Amends', 'Amended by', 'Replaces', 'Replaced by', 'Issued Under', 'References', 'Referenced by'],
+  'Miscellaneous':       ['Issued Under', 'In Continuation of', 'Continued by', 'Replaces', 'Replaced by', 'References', 'Referenced by', 'Supplemented by'],
 };
 
 const REL_TARGET_TYPES = {
-  'Act':                 ['Act', 'Amendment', 'Rules & Regulations', 'Notification'],
-  'Amendment':           ['Act', 'Rules & Regulations', 'Amendment'],
-  'Circular':            ['Circular', 'Act', 'Order / Gazette', 'Policy', 'Notification', 'Rules & Regulations'],
-  'Notification':        ['Act', 'Rules & Regulations', 'Order / Gazette', 'Notification', 'Circular', 'Policy'],
-  'Policy':              ['Act', 'Policy', 'Notification', 'Order / Gazette', 'Circular', 'Rules & Regulations'],
-  'Order / Gazette':     ['Act', 'Order / Gazette', 'Notification', 'Rules & Regulations', 'Policy'],
-  'Rules & Regulations': ['Act', 'Rules & Regulations', 'Amendment', 'Notification', 'Policy'],
+  'Act':                 ['Act', 'Amendment', 'Rules & Regulations', 'Notification', 'Bye Laws'],
+  'Amendment':           ['Act', 'Rules & Regulations', 'Amendment', 'Bye Laws'],
+  'Circular':            ['Circular', 'Act', 'Order / Gazette', 'Policy', 'Notification', 'Rules & Regulations', 'Bye Laws', 'Miscellaneous'],
+  'Notification':        ['Act', 'Rules & Regulations', 'Order / Gazette', 'Notification', 'Circular', 'Policy', 'Bye Laws', 'Miscellaneous'],
+  'Policy':              ['Act', 'Policy', 'Notification', 'Order / Gazette', 'Circular', 'Rules & Regulations', 'Bye Laws', 'Miscellaneous'],
+  'Order / Gazette':     ['Act', 'Order / Gazette', 'Notification', 'Rules & Regulations', 'Policy', 'Bye Laws', 'Miscellaneous'],
+  'Rules & Regulations': ['Act', 'Rules & Regulations', 'Amendment', 'Notification', 'Policy', 'Bye Laws'],
+  'Bye Laws':            ['Act', 'Bye Laws', 'Rules & Regulations', 'Amendment', 'Notification', 'Policy'],
+  'Miscellaneous':       ['Circular', 'Act', 'Order / Gazette', 'Policy', 'Notification', 'Rules & Regulations', 'Bye Laws', 'Miscellaneous'],
 };
 
 const AMEND_CHANGE_TYPES = ['Amended', 'Substituted', 'Inserted', 'Deleted', 'Expanded'];
@@ -66,6 +70,8 @@ const TYPE_CARD_COLORS = {
   'Policy':              { bg: 'rgba(34,197,94,.08)',  accent: '#22c55e', text: '#16a34a' },
   'Rules & Regulations': { bg: 'rgba(239,68,68,.08)',  accent: '#ef4444', text: '#dc2626' },
   'Order / Gazette':     { bg: 'rgba(234,179,8,.08)',  accent: '#eab308', text: '#a16207' },
+  'Bye Laws':            { bg: 'rgba(14,165,233,.08)', accent: '#0ea5e9', text: '#0369a1' },
+  'Miscellaneous':       { bg: 'rgba(100,116,139,.08)',accent: '#64748b', text: '#475569' },
 };
 const TYPE_CARD_DESC = {
   'Act':                 'Primary legislation enacted by legislature',
@@ -75,6 +81,8 @@ const TYPE_CARD_DESC = {
   'Policy':              'Government policy document or framework',
   'Rules & Regulations': 'Subsidiary legislation under an Act',
   'Order / Gazette':     'Executive order or gazette notification',
+  'Bye Laws':            'Local body regulations under municipal or panchayat law',
+  'Miscellaneous':       'Other official documents not covered above',
 };
 
 // Per-type metadata fields
@@ -86,19 +94,12 @@ const TYPE_FIELDS = {
   'Policy': [], // handled inline
   'Rules & Regulations': [], // handled inline
   'Order / Gazette': [], // handled inline
+  'Bye Laws': [], // handled inline
+  'Miscellaneous': [], // handled inline
 };
 
 // Workflow statuses: DRAFT → PENDING_REVIEW → PUBLISHED
 const WORKFLOW_STATUS = { DRAFT: 'draft', PENDING: 'pending', PUBLISHED: 'published' };
-
-// Department notification map — if a doc references these keywords, notify the dept
-const DEPT_KEYWORD_MAP = [
-  { keywords: ['municipal','urban local','corporation'],    dept: 'Urban Local Bodies' },
-  { keywords: ['labour','welfare fund','factories','shop'], dept: 'Labour Department' },
-  { keywords: ['revenue','land revenue','land acquisition'],dept: 'Revenue & Disaster Mgmt.' },
-  { keywords: ['panchayat','panchayati raj'],               dept: 'Panchayati Raj' },
-  { keywords: ['rti','right to information'],              dept: 'General Administration' },
-];
 
 const LABEL = {
   fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)',
@@ -171,147 +172,10 @@ async function extractPdfText(file) {
     return { text: '', numPages: 1, pageTexts: [], pageWords: [] };
   }
 }
-// Guesses title, year, doc type, and department from raw extracted text.
-function autoExtractMetadata(text, filename) {
-  const cleaned = text.slice(0, 3000); // Only scan the first ~3000 chars (header/title area)
-
-  // Title: find first non-trivial capitalised line (likely heading)
-  const titleMatch = cleaned.match(/^([A-Z][A-Z\s,&()]{10,80})$/m);
-  const title = titleMatch ? titleMatch[1].trim() : filename.replace(/\.(pdf|zip)$/i, '');
-
-  // Year: first 4-digit year between 1900 and current year
-  const yearMatch = cleaned.match(/\b(19[0-9]{2}|20[0-2][0-9])\b/);
-  const year = yearMatch ? yearMatch[1] : String(new Date().getFullYear());
-
-  // Document type: keyword scan
-  const lower = cleaned.toLowerCase();
-  let type = '';
-  if (/\bamendment\b/.test(lower))             type = 'Amendment';
-  else if (/\bnotification\b/.test(lower))     type = 'Notification';
-  else if (/\bcircular\b/.test(lower))         type = 'Circular';
-  else if (/\bpolicy\b/.test(lower))           type = 'Policy';
-  else if (/\brules?\b/.test(lower))           type = 'Rules & Regulations';
-  else if (/\border\b|\bgazette\b/.test(lower))type = 'Order / Gazette';
-  else if (/\bact\b/.test(lower))              type = 'Act';
-
-  // Department: keyword scan
-  let dept = '';
-  for (const { keywords, dept: d } of DEPT_KEYWORD_MAP) {
-    if (keywords.some(k => lower.includes(k))) { dept = d; break; }
-  }
-
-  return { title, year, type, dept };
-}
-// Uses regex patterns to find actual Act/Rules citations inside PDF text.
-// Then tries to match each detected citation against existing documents.
-const CITATION_REGEX = [
-  /(?:under|as per|in terms of)\s+([A-Z][A-Za-z\s,&()]{4,60}(?:Act|Rules|Order|Code|Regulation),?\s*\d{4})/g,
-  /(?:amends?|amending)\s+([A-Z][A-Za-z\s,&()]{4,60}(?:Act|Rules),?\s*\d{4})/g,
-  /(?:repealed?\s+by)\s+([A-Z][A-Za-z\s,&()]{4,60}(?:Act|Rules),?\s*\d{4})/g,
-  /(?:in exercise of powers?(?:\s+conferred)?\s+under)\s+([A-Z][A-Za-z\s,&()]{4,80})/g,
-  /Section\s+\d+\s+of\s+([A-Z][A-Za-z\s,&()]{4,60}(?:Act|Rules|Code),?\s*\d{4})/g,
-  /(?:pursuant to|notified under)\s+([A-Z][A-Za-z\s,&()]{4,60}(?:Act|Rules|Order),?\s*\d{4})/g,
-];
-
-// Detect relationship type from surrounding context words
-function detectRelationshipType(context) {
-  const c = context.toLowerCase();
-  if (/amends?|amending/.test(c))          return 'Amends';
-  if (/repealed?\s+by/.test(c))            return 'Amended by';
-  if (/in exercise of powers/.test(c))     return 'Is under';
-  if (/notified under|pursuant to/.test(c))return 'Notified under';
-  return 'References';
-}
-
-function detectCitationsFromText(rawText, allDocs) {
-  const results = [];
-  const seen    = new Set();
-
-  for (const pattern of CITATION_REGEX) {
-    pattern.lastIndex = 0;
-    let match;
-    while ((match = pattern.exec(rawText)) !== null) {
-      const citation = match[1].trim().replace(/\s+/g, ' ');
-      if (seen.has(citation) || citation.length < 8) continue;
-      seen.add(citation);
-
-      
-      const citWords = citation.toLowerCase().split(/[\s,]+/).filter(w => w.length > 3);
-      const matched  = allDocs.find(d => {
-        const dtitle = d.title.toLowerCase();
-        return citWords.filter(w => dtitle.includes(w)).length >= 2;
-      });
-      const isAct = matched?.type === 'Act';
-
-      // Extract 80-char context window around the match for relationship type detection
-      const ctxStart  = Math.max(0, match.index - 40);
-      const ctxEnd    = Math.min(rawText.length, match.index + 80);
-      const relLabel  = detectRelationshipType(rawText.slice(ctxStart, ctxEnd));
-
-      results.push({
-        citation,
-        matchedDoc:  isAct ? matched : null,
-        status:      isAct ? 'linked' : 'unresolved',
-        relLabel,
-      });
-    }
-  }
-
-  // Fallback: if regex found nothing, use old keyword approach
-  if (results.length === 0) {
-    const fallbackCitations = detectCitationsLegacy(rawText, allDocs);
-    return fallbackCitations;
-  }
-
-  return results;
-}
-
-// Legacy keyword-based fallback (used when PDF text extraction yields nothing)
-const CITATION_PATTERNS = [
-  { keywords: ['rti','right to information'],         citations: ['Constitution of India, Article 19','Haryana RTI Rules, 2006','Central Information Commission Regulations','Right to Service Act, 2011'] },
-  { keywords: ['haryana rti rules','rti rules'],      citations: ['Right to Information Act, 2005','State Information Commission Guidelines'] },
-  { keywords: ['land revenue','land revenue act'],    citations: ['Punjab Land Revenue Act, 1887','Haryana Panchayati Raj Act, 1994','Land Acquisition Act, 2013'] },
-  { keywords: ['municipal','urban local'],            citations: ['Haryana Municipal Act, 1973','Urban Development Notification, 2021','RERA Haryana, 2017'] },
-  { keywords: ['labour','welfare fund','factories'],  citations: ['Factories Act, 1948','Haryana Labour Welfare Fund Act','Labour Welfare Order, 2022'] },
-  { keywords: ['panchayat','panchayati raj'],         citations: ['Haryana Panchayati Raj Act, 1994','Punjab Land Revenue Act, 1887','Constitution of India, Article 243'] },
-  { keywords: ['shops','establishment'],              citations: ['Haryana Shops & Establishments Act','Labour Welfare Order, 2022'] },
-  { keywords: ['environment','clearance'],            citations: ['Environment Protection Act, 1986','National Green Tribunal Act, 2010'] },
-  { keywords: ['property tax','assessment'],          citations: ['Haryana Municipal Act, 1973','Haryana Land Revenue Act 1887'] },
-  { keywords: ['building plan','building'],           citations: ['Municipal Corporation Bye-laws 2020','RERA Haryana, 2017','Urban Development Notification, 2021'] },
-];
-
-function detectCitationsLegacy(textOrTitle, allDocs) {
-  const t = textOrTitle.toLowerCase();
-  let detected = [];
-  for (const pattern of CITATION_PATTERNS) {
-    if (pattern.keywords.some(k => t.includes(k))) { detected = pattern.citations; break; }
-  }
-  if (detected.length === 0) detected = ['Constitution of India','General Administration Guidelines, 2020'];
-  return detected.map(citation => {
-    const citWords = citation.toLowerCase().split(' ').filter(w => w.length > 4);
-    const matched  = allDocs.find(d => citWords.filter(w => d.title.toLowerCase().includes(w)).length >= 2);
-    const isAct = matched?.type === 'Act';
-    return { citation, matchedDoc: isAct ? matched : null, status: isAct ? 'linked' : 'unresolved', relLabel: 'References' };
-  });
-}
-// Given a doc's detected citations and its own dept, returns list of other depts to notify.
-function detectCrossDeptNotifications(citations, uploaderDept) {
-  const notifyDepts = new Set();
-  for (const { citation } of citations) {
-    const lower = citation.toLowerCase();
-    for (const { keywords, dept } of DEPT_KEYWORD_MAP) {
-      if (dept !== uploaderDept && keywords.some(k => lower.includes(k))) {
-        notifyDepts.add(dept);
-      }
-    }
-  }
-  return [...notifyDepts];
-}
-
 // Helper utilities
 
 function fileIcon(f) {
-  if (f.name.endsWith('.zip')) return <Archive size={15} color="#f59e0b" />;
+  if (/\.docx?$/i.test(f.name)) return <FileType size={15} color="#2b579a" />;
   return <FileText size={15} color="var(--primary)" />;
 }
 function formatSize(bytes) {
@@ -322,8 +186,9 @@ function formatSize(bytes) {
 function isAccepted(f) {
   return (
     f.type === 'application/pdf' || f.name.endsWith('.pdf') ||
-    f.name.endsWith('.zip')      || f.type === 'application/zip' ||
-    f.type === 'application/x-zip-compressed'
+    /\.docx?$/i.test(f.name) ||
+    f.type === 'application/msword' ||
+    f.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
   );
 }
 function focusStyle(e) {
@@ -337,36 +202,37 @@ function blurStyle(e) {
 
 function HierarchyTag({ hierarchy, onOpen, isRef, legalAuthorities }) {
   const hasValues = hierarchy?.act || hierarchy?.chapter || hierarchy?.section;
-  const hasAuth = legalAuthorities?.some(a => a.act);
-  const firstAuth = legalAuthorities?.find(a => a.act);
-  const extraCount = legalAuthorities ? legalAuthorities.filter(a => a.act).length - 1 : 0;
+  const authCount = legalAuthorities ? legalAuthorities.filter(a => a.act).length : 0;
 
   if (isRef && legalAuthorities !== undefined) {
-    const firstSec = firstAuth?.sections?.find(s => s);
     return (
       <button type="button" onClick={onOpen}
-        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: hasAuth ? 'var(--primary)' : 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-        <Layers size={13} />
-        {hasAuth
-          ? `${firstAuth.act}${firstSec ? ' › ' + firstSec : ''}${extraCount > 0 ? ` · +${extraCount} more` : ''}`
-          : 'Set Legal Authority'}
-        <ChevronRight size={12} />
+        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: authCount > 0 ? 'var(--primary)' : 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', width: '100%', textAlign: 'left' }}>
+        <Layers size={13} style={{ flexShrink: 0 }} />
+        <span style={{ flex: 1, minWidth: 0 }}>
+          {authCount > 0
+            ? `${authCount} Legal Authorit${authCount !== 1 ? 'ies' : 'y'} Added`
+            : 'Set Legal Authority'}
+        </span>
+        <ChevronRight size={12} style={{ flexShrink: 0 }} />
       </button>
     );
   }
 
   return (
     <button type="button" onClick={onOpen}
-      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: hasValues ? 'var(--primary)' : 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-      <Layers size={13} />
-      {hasValues
-        ? (isRef
-            ? hierarchy.section ? `${hierarchy.act || '—'} › ${hierarchy.section}` : (hierarchy.act || '—')
-            : hierarchy.chapter || hierarchy.section
-              ? `${hierarchy.act || '—'} › ${hierarchy.chapter || '—'} › ${hierarchy.section || '—'}`
-              : (hierarchy.act || '—'))
-        : (isRef ? 'Set Act Reference' : 'Set Hierarchical Tags')}
-      <ChevronRight size={12} />
+      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: hasValues ? 'var(--primary)' : 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', width: '100%', textAlign: 'left' }}>
+      <Layers size={13} style={{ flexShrink: 0 }} />
+      <span style={{ flex: 1, minWidth: 0, wordBreak: 'break-word', overflowWrap: 'break-word' }}>
+        {hasValues
+          ? (isRef
+              ? hierarchy.section ? `${hierarchy.act || '—'} › ${hierarchy.section}` : (hierarchy.act || '—')
+              : hierarchy.chapter || hierarchy.section
+                ? `${hierarchy.act || '—'} › ${hierarchy.chapter || '—'} › ${hierarchy.section || '—'}`
+                : (hierarchy.act || '—'))
+          : (isRef ? 'Set Act Reference' : 'Set Hierarchical Tags')}
+      </span>
+      <ChevronRight size={12} style={{ flexShrink: 0 }} />
     </button>
   );
 }
@@ -401,85 +267,6 @@ function VersionConflictModal({ existingDoc, newVersion, onUploadAsNew, onCancel
             Upload as v{newVersion}
           </button>
         </div>
-      </div>
-    </div>
-  );
-}
-function CrossDeptBanner({ notifications, onDismiss }) {
-  if (!notifications || notifications.length === 0) return null;
-  return (
-    <div style={{ padding: '12px 16px', borderRadius: 10, background: 'rgba(59,130,246,.06)', border: '1px solid rgba(59,130,246,.2)', display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 14 }}>
-      <Users size={15} color="#3b82f6" style={{ flexShrink: 0, marginTop: 1 }} />
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 12.5, fontWeight: 700, color: '#1d4ed8', marginBottom: 4 }}>Cross-Department Notifications Sent</div>
-        {notifications.map((n, i) => (
-          <div key={i} style={{ fontSize: 12, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', marginBottom: 2 }}>
-            → <strong>{n.dept}</strong>: new document references their legislation
-          </div>
-        ))}
-      </div>
-      <button onClick={onDismiss} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#3b82f6' }}>
-        <X size={14} />
-      </button>
-    </div>
-  );
-}
-
-// Analysis result card
-// Only shows LINKED citations — unresolved ones are hidden, count shown in header only.
-function AnalysisCard({ docTitle, citations, analyzing }) {
-  const linked     = citations.filter(c => c.status === 'linked');
-  const unresolved = citations.filter(c => c.status === 'unresolved');
-
-  return (
-    <div style={{ border: '1px solid var(--surface-border)', borderRadius: 12, overflow: 'hidden', marginBottom: 14 }}>
-      {/* Header */}
-      <div style={{ padding: '12px 16px', background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
-        <FileText size={14} color="var(--primary)" />
-        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)', flex: 1 }}>{docTitle}</span>
-        {analyzing ? (
-          <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: '#3b82f6', fontWeight: 700 }}>ANALYSING…</span>
-        ) : (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: '#16a34a', fontWeight: 700 }}>
-              ✓ {linked.length} LINKED
-            </span>
-            {unresolved.length > 0 && (
-              <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', fontWeight: 500 }}>
-                · {unresolved.length} not in system
-              </span>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Body — only linked citations shown */}
-      <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {analyzing ? (
-          [1,2,3].map(i => (
-            <div key={i} style={{ height: 36, borderRadius: 8, background: 'var(--surface-ground)', animation: 'pulse 1.4s ease-in-out infinite', opacity: 0.6 + i * 0.1 }} />
-          ))
-        ) : linked.length === 0 ? (
-          <div style={{ padding: '14px 12px', borderRadius: 8, background: 'var(--surface-ground)', fontSize: 12.5, color: 'var(--text-color-secondary)', textAlign: 'center' }}>
-            No matching documents found in the system for this upload.
-          </div>
-        ) : (
-          linked.map((c, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, background: 'rgba(34,197,94,.06)', border: '1px solid rgba(34,197,94,.2)' }}>
-              <Link size={13} color="#16a34a" style={{ flexShrink: 0 }} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', marginBottom: 2 }}>
-                  Detected citation · <span style={{ color: 'var(--primary)' }}>{c.relLabel || 'References'}</span>
-                </div>
-                <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.citation}</div>
-              </div>
-              <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                <div style={{ fontSize: 10.5, fontWeight: 700, color: '#16a34a', fontFamily: 'var(--mono)', marginBottom: 2 }}>✓ LINKED</div>
-                <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', maxWidth: 160, textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.matchedDoc?.title}</div>
-              </div>
-            </div>
-          ))
-        )}
       </div>
     </div>
   );
@@ -529,9 +316,11 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     return {
       id:              d.id,
       uid:             `api-${d.id}`,
-      title:           d.document_name,
-      type:            d.document_type_name,
-      dept:            d.department_name,
+      // Metadata (title/type/dept) can be null for drafts uploaded before the tagging step is completed —
+      // fall back to the raw filename so search/sort (which call .toLowerCase() on these) never crash on null.
+      title:           d.document_name || d.original_filename || 'Untitled Document',
+      type:            d.document_type_name || 'Unclassified',
+      dept:            d.department_name || 'Unassigned',
       year:            d.issue_date ? new Date(d.issue_date).getFullYear() : new Date(d.created_at).getFullYear(),
       status:          d.status || 'pending',
       workflowStatus:  d.status === 'approved' ? WORKFLOW_STATUS.PUBLISHED : d.status === 'rejected' ? WORKFLOW_STATUS.DRAFT : WORKFLOW_STATUS.PENDING,
@@ -579,7 +368,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   // Correction request state
   const [correctionModal, setCorrectionModal] = useState(null); // { doc }
   const [correctionReason, setCorrectionReason] = useState('');
-  const [crossDeptNotifs, setCrossDeptNotifs] = useState([]);
 
   // Relationship state
   const [relations, setRelations]     = useState([]);
@@ -601,21 +389,18 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   const [showRelDrop, setShowRelDrop] = useState(false);
   const [relSection, setRelSection] = useState('');            // section of the linked document
   const [showRelSecDrop, setShowRelSecDrop] = useState(false); // relationship section dropdown
-  const [relActSuggestions, setRelActSuggestions] = useState([]); // real API results when linking to an Act
-  const [relActSearching,   setRelActSearching]   = useState(false);
-  const relActSearchTimer = useRef(null);
+  const [relDocSuggestions, setRelDocSuggestions] = useState([]); // real API results for "Link to Document", keyed by whichever Target Document Type is selected
+  const [relDocSearching,   setRelDocSearching]   = useState(false);
+  const relDocSearchTimer = useRef(null);
   const [parentActSearch, setParentActSearch] = useState('');
   const [showParentActDrop, setShowParentActDrop] = useState(false);
   const [drawerType,      setDrawerType]      = useState(null); // null | 'hierarchy' | 'relationship'
   const [drawerHierarchy, setDrawerHierarchy] = useState({ act: '', actId: null, chapter: '', section: '', subsection: '' });
 
-  // AI analysis state
-  const [analysisResults, setAnalysisResults] = useState([]);
   const [selectedIds, setSelectedIds]   = useState(new Set());
   const [bulkSelectMode, setBulkSelectMode] = useState(false);
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
   const [bulkFields, setBulkFields]     = useState({ dept: '', type: '', year: '' });
-  const [autoFillLoading, setAutoFillLoading] = useState(false);
   const [fileRefs,    setFileRefs]    = useState([]); // [{ fileName, fileRef, originalFilename, fileSize }]
   const [uploadStep, setUploadStep]   = useState(null); // null | 'uploading' | 'ready' | 'saving' | 'done' | 'error'
   const [uploadError, setUploadError] = useState('');
@@ -674,13 +459,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
 
     return [...found].sort();
   }
-  const relFiltered  = approvedDocs
-    .filter(d =>
-      d.title.toLowerCase().includes(relSearch.toLowerCase()) &&
-      d.uid !== relTarget &&
-      (!relDocType || d.type === relDocType)
-    )
-    .slice(0, 8);
   const parentActFiltered = approvedDocs
     .filter(d => d.title.toLowerCase().includes(parentActSearch.toLowerCase()))
     .slice(0, 8);
@@ -693,21 +471,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
       const names = new Set(prev.map(f => f.name));
       return [...prev, ...accepted.filter(f => !names.has(f.name))];
     });
-
-    // Auto-extract metadata from the first PDF — always re-run so replacing a file updates the name
-    const firstPdf = accepted.find(f => f.name.endsWith('.pdf'));
-    if (firstPdf) {
-      setAutoFillLoading(true);
-      const { text } = await extractPdfText(firstPdf);
-      const meta = autoExtractMetadata(text || firstPdf.name, firstPdf.name);
-      setForm(f => ({
-        ...f,
-        act:  meta.title,           // always sync to the new file
-        type: f.type || meta.type,  // preserve manual pick
-        dept: f.dept || meta.dept,  // preserve manual pick
-      }));
-      setAutoFillLoading(false);
-    }
   }
 
   function removeFile(name) {
@@ -728,17 +491,17 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     }, 280);
   }
 
-  // Same real API search as fetchDocSuggestions, used for the "Link to Document" picker
-  // whenever the target document type is 'Act' — non-Act targets keep using the local document list.
-  function fetchRelActSuggestions(text) {
-    clearTimeout(relActSearchTimer.current);
-    if (!text || text.length < 1) { setRelActSuggestions([]); return; }
-    relActSearchTimer.current = setTimeout(() => {
-      setRelActSearching(true);
-      searchDocuments('Act', text, 10)
-        .then(res => setRelActSuggestions(res.data.results || []))
-        .catch(() => setRelActSuggestions([]))
-        .finally(() => setRelActSearching(false));
+  // Same real API search as fetchDocSuggestions, used for the "Link to Document" picker.
+  // Whichever Target Document Type is selected gets sent as document_type in the API payload.
+  function fetchRelDocSuggestions(documentType, text) {
+    clearTimeout(relDocSearchTimer.current);
+    if (!text || text.length < 1) { setRelDocSuggestions([]); return; }
+    relDocSearchTimer.current = setTimeout(() => {
+      setRelDocSearching(true);
+      searchDocuments(documentType, text, 10)
+        .then(res => setRelDocSuggestions(res.data.results || []))
+        .catch(() => setRelDocSuggestions([]))
+        .finally(() => setRelDocSearching(false));
     }, 280);
   }
 
@@ -747,17 +510,17 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     if (relTarget.startsWith('__pending__:')) {
       const pendingName = relTarget.replace('__pending__:', '');
       setRelations(r => [...r, { targetId: null, targetTitle: pendingName, targetType: relDocType, label: relType, note: relNote.trim(), section: relSection.trim(), isPending: true }]);
-    } else if (relTarget.startsWith('__act__:')) {
-      const [, actId, ...nameParts] = relTarget.split(':');
-      const actTitle = nameParts.join(':');
-      if (relations.find(r => r.targetId === actId && r.label === relType)) return;
-      setRelations(r => [...r, { targetId: actId, targetTitle: actTitle, targetType: 'Act', label: relType, note: relNote.trim(), section: relSection.trim(), isPending: false }]);
+    } else if (relTarget.startsWith('__api__:')) {
+      const [, apiId, ...nameParts] = relTarget.split(':');
+      const apiTitle = nameParts.join(':');
+      if (relations.find(r => r.targetId === apiId && r.label === relType)) return;
+      setRelations(r => [...r, { targetId: apiId, targetTitle: apiTitle, targetType: relDocType, label: relType, note: relNote.trim(), section: relSection.trim(), isPending: false }]);
     } else {
       const doc = documents.find(d => d.uid === relTarget);
       if (!doc || relations.find(r => r.targetId === relTarget && r.label === relType)) return;
       setRelations(r => [...r, { targetId: relTarget, targetTitle: doc.title, targetType: doc.type || relDocType, label: relType, note: relNote.trim(), section: relSection.trim(), isPending: false }]);
     }
-    setRelTarget(''); setRelSearch(''); setRelNote(''); setRelDocType(''); setRelSection(''); setRelActSuggestions([]);
+    setRelTarget(''); setRelSearch(''); setRelNote(''); setRelDocType(''); setRelSection(''); setRelDocSuggestions([]);
   }
 
   // Clears all transient "Add Relationship" drawer fields so stale search/selection
@@ -765,18 +528,19 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   function closeDrawer() {
     setDrawerType(null);
     setRelTarget(''); setRelSearch(''); setRelType(REL_TYPES[0]); setRelDocType('');
-    setRelSection(''); setRelNote(''); setRelActSuggestions([]); setShowRelDrop(false);
-    setEditingAuthIdx(null); // collapse any legal authority left open into its saved summary card
+    setRelSection(''); setRelNote(''); setRelDocSuggestions([]); setShowRelDrop(false);
+    setEditingAuthIdx(null);
+    // Only "Confirmed" legal authorities persist — anything typed but never ticked is discarded on close.
+    setLegalAuthorities(p => {
+      const confirmed = p.filter(a => a.confirmed);
+      return confirmed.length > 0 ? confirmed : [{ act: '', sections: [''], confirmed: false }];
+    });
   }
   function removeRelation(idx) { setRelations(r => r.filter((_, i) => i !== idx)); }
 
   // Finalize upload after conflict check
   async function finalizeUpload(newDocs, finalRelations) {
     const docsWithWorkflow = newDocs.map(d => ({ ...d, workflowStatus: WORKFLOW_STATUS.DRAFT }));
-
-    // Show skeleton analysis
-    const initResults = docsWithWorkflow.map(d => ({ docTitle: d.title, citations: [], analyzing: true }));
-    setAnalysisResults(initResults);
 
     // Add to system (status = pending, workflowStatus = DRAFT)
     docsWithWorkflow.forEach(doc => {
@@ -789,38 +553,12 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     setForm({ act:'',dept:user?.dept||'',type:'',version:'1.0',desc:'',enactmentDate:'',parentAct:'',changeTypes:[] });
     setHierarchy({ act:'', actId: null, chapter:'',section:'',subsection:'' });
     setAmendmentProvisions([]); setParentActSearch(''); setTypeFields({});
-    setTimeout(async () => {
-      const allDocsNow = [...documents, ...docsWithWorkflow.map(d => ({ ...d, uid: `upload-${d.id}` }))];
-      const allNotifs  = [];
 
-      const results = await Promise.all(docsWithWorkflow.map(async doc => {
-        // Try to get the actual file object for real text extraction
-        const fileObj = files.find(f => f.name === doc.fileName);
-        let rawText = '';
-        if (fileObj && fileObj.name.endsWith('.pdf')) {
-          ({ text: rawText } = await extractPdfText(fileObj));
-        }
-
-        const otherDocs = allDocsNow.filter(d => d.title !== doc.title);
-        const citations = rawText.length > 100
-          ? detectCitationsFromText(rawText, otherDocs)
-          : detectCitationsLegacy(doc.title, otherDocs);
-
-        // Auto-add linked relationships to graph (pass existing uid so addDocument deduplicates)
-        citations.filter(c => c.status === 'linked').forEach(c => {
-          onAddDocument?.({ ...doc, uid: `upload-${doc.id}` }, [{ targetId: c.matchedDoc.uid, targetTitle: c.matchedDoc.title, label: c.relLabel || 'References' }]);
-        });
-        const notifs = detectCrossDeptNotifications(citations, doc.dept);
-        notifs.forEach(dept => allNotifs.push({ dept, docTitle: doc.title }));
-        setUploads(u => u.map(ud =>
-          ud.id === doc.id ? { ...ud, workflowStatus: WORKFLOW_STATUS.PENDING } : ud
-        ));
-
-        return { docTitle: doc.title, citations, analyzing: false };
-      }));
-
-      setAnalysisResults(results);
-      if (allNotifs.length > 0) setCrossDeptNotifs(allNotifs);
+    // Move newly uploaded docs from DRAFT to PENDING (queued for approver review)
+    setTimeout(() => {
+      setUploads(u => u.map(ud =>
+        docsWithWorkflow.some(d => d.id === ud.id) ? { ...ud, workflowStatus: WORKFLOW_STATUS.PENDING } : ud
+      ));
     }, 1800);
 
     onAuditLog?.(`Uploaded ${docsWithWorkflow.length} document(s): ${docsWithWorkflow.map(d => d.title).join(', ')}`);
@@ -845,6 +583,8 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
       'Order / Gazette':   'orderNumber',
       'Policy':            'policyNumber',
       'Rules & Regulations': 'ruleNumber',
+      'Bye Laws':          'byeLawNumber',
+      'Miscellaneous':     'miscNumber',
     };
     const refNumKey = REFERENCE_NUMBER_KEY[form.type];
     const referenceNumber = refNumKey ? (typeFields[refNumKey] || '') : '';
@@ -860,7 +600,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         return sections.length > 0 ? `${a.act} (${sections.join(', ')})` : a.act;
       })
       .join('; ')
-      || (form.type === 'Rules & Regulations' && hierarchy.act
+      || ((form.type === 'Rules & Regulations' || form.type === 'Bye Laws') && hierarchy.act
             ? (hierarchy.section ? `${hierarchy.act} (${hierarchy.section})` : hierarchy.act)
             : '');
 
@@ -909,7 +649,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
           const payload = {
             file_ref:              fileRef,
             document_type_id:      typeObj?.id ?? null,
-            document_name:         form.act || f.name.replace(/\.(pdf|zip)$/i, ''),
+            document_name:         form.act || f.name.replace(/\.(pdf|docx?)$/i, ''),
             issue_date:            form.enactmentDate || null,
             reference_number:      referenceNumber,
             effective_from:        effectiveFrom,
@@ -960,21 +700,21 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
 
       newDocs.push({
         id:            apiDoc?.id ?? (Date.now() + Math.random()),
-        title:         apiDoc?.document_name || form.act || f.name.replace(/\.(pdf|zip)$/i, ''),
+        title:         apiDoc?.document_name || form.act || f.name.replace(/\.(pdf|docx?)$/i, ''),
         type:          typeObj?.name || form.type || 'Act',
         dept:          user?.dept || form.dept || 'General Administration',
         year:          form.enactmentDate ? new Date(form.enactmentDate).getFullYear() : new Date().getFullYear(),
         status:        'pending',
         legalStatus:   'active',
-        pages:         f.name.endsWith('.zip') ? null : (numPages || 1),
+        pages:         /\.docx?$/i.test(f.name) ? null : (numPages || 1),
         uploader:      user?.name || 'Uploader',
         uploadedAt:    new Date().toISOString().split('T')[0],
         section:       '1', paragraph: '1',
         version:       apiDoc?.version_no || form.version || '1.0',
         desc:          form.desc || '',
-        ocrStatus:     f.name.endsWith('.zip') ? 'queued' : 'processing',
+        ocrStatus:     /\.docx?$/i.test(f.name) ? 'queued' : 'processing',
         fileName:      f.name,
-        isZip:         f.name.endsWith('.zip'),
+        isWord:        /\.docx?$/i.test(f.name),
         fileUrl:       f.name.endsWith('.pdf') ? URL.createObjectURL(f) : null,
         hierarchy,
         gazette:           apiDoc?.gazette_reference || typeFields.gazetteRef || '',
@@ -1385,7 +1125,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                     )}
                     <td style={{ padding: '12px 14px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                        {doc.isZip ? <Archive size={13} color="#f59e0b" /> : <FileText size={13} color="var(--primary)" />}
+                        {doc.isWord ? <FileType size={13} color="#2b579a" /> : <FileText size={13} color="var(--primary)" />}
                         <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.title}</span>
                       </div>
                       {doc.hierarchy?.act && (
@@ -1430,38 +1170,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
           onCancel={() => setConflictModal(null)}
         />
       )}
-      <CrossDeptBanner notifications={crossDeptNotifs} onDismiss={() => setCrossDeptNotifs([])} />
-
-      {/* AI Analysis Results */}
-      {analysisResults.length > 0 && (
-        <Card style={{ marginBottom: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, paddingBottom: 14, borderBottom: '1px solid var(--surface-border)' }}>
-            <div style={{ width: 34, height: 34, borderRadius: 9, background: 'rgba(59,130,246,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Cpu size={17} color="#3b82f6" />
-            </div>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)' }}>AI Citation Analysis</div>
-              <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 1 }}>
-                Scanning OCR text for cross-references · Auto-linking to existing documents · Zero Generation compliant
-              </div>
-            </div>
-            <button onClick={() => setAnalysisResults([])}
-              style={{ marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)' }}>
-              <X size={16} />
-            </button>
-          </div>
-          {analysisResults.map((r, i) => (
-            <AnalysisCard key={i} docTitle={r.docTitle} citations={r.citations} analyzing={r.analyzing} />
-          ))}
-          {analysisResults.every(r => !r.analyzing) && (
-            <div style={{ padding: '10px 14px', borderRadius: 9, background: 'rgba(26,86,219,.06)', border: '1px solid rgba(26,86,219,.2)', fontSize: 12.5, color: '#1e40af', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <CheckCircle size={14} />
-              Analysis complete — linked documents are now visible in the Knowledge Graph.
-            </div>
-          )}
-        </Card>
-      )}
-
       {/* ── Unified single-page upload layout ─────────────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: '330px 1fr', gap: 20, alignItems: 'start' }}>
 
@@ -1469,7 +1177,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
           {/* Hidden file input */}
-          <input ref={inputRef} type="file" accept=".pdf,.zip" multiple style={{ display: 'none' }}
+          <input ref={inputRef} type="file" accept=".pdf,.doc,.docx" multiple style={{ display: 'none' }}
             onChange={e => { addFiles(e.target.files); e.target.value = ''; }} />
 
           {/* Rejected files alert */}
@@ -1535,10 +1243,10 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                   <Upload size={22} color={dragOver ? (TYPE_CARD_COLORS[form.type]?.accent || 'var(--primary)') : 'var(--text-color-secondary)'} strokeWidth={1.6} />
                 </div>
                 <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 5 }}>Drop files here</div>
-                <div style={{ fontSize: 12, color: 'var(--text-color-secondary)', marginBottom: 14 }}>or click to browse · PDF or ZIP · up to 50 MB</div>
+                <div style={{ fontSize: 12, color: 'var(--text-color-secondary)', marginBottom: 14 }}>or click to browse · PDF or Word · up to 50 MB</div>
                 <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
                   <span style={{ fontFamily: 'var(--mono)', fontSize: 10.5, color: 'var(--primary)', background: 'rgba(26,86,219,.08)', border: '1px solid rgba(26,86,219,.2)', padding: '3px 10px', borderRadius: 20 }}>.PDF</span>
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: 10.5, color: '#f59e0b', background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.3)', padding: '3px 10px', borderRadius: 20 }}>.ZIP</span>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 10.5, color: '#2b579a', background: 'rgba(43,87,154,.08)', border: '1px solid rgba(43,87,154,.3)', padding: '3px 10px', borderRadius: 20 }}>.DOC</span>
                 </div>
               </div>
             ) : (
@@ -1615,7 +1323,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
               </div>
               <div>
                 <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 6 }}>Drop a {form.type} file</div>
-                <div style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>Select a PDF or ZIP file on the left to fill in document details</div>
+                <div style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>Select a PDF or Word file on the left to fill in document details</div>
               </div>
             </div>
           ) : (
@@ -1626,7 +1334,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                   <FileText size={13} color={TYPE_CARD_COLORS[form.type]?.accent || 'var(--primary)'} />
                 </div>
                 <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>Document Details</span>
-                {autoFillLoading && <span style={{ marginLeft: 4, fontSize: 11, fontFamily: 'var(--mono)', color: '#3b82f6', fontWeight: 700 }}>⚡ AUTO-FILLING…</span>}
                 {files.length > 1 && <span style={{ fontSize: 11, fontWeight: 600, background: 'rgba(59,130,246,.1)', color: '#3b82f6', padding: '2px 9px', borderRadius: 20 }}>Applied to all {files.length} files</span>}
               </div>
               {uploadError && uploadStep === 'error' && (
@@ -1650,6 +1357,8 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                   'Policy': 'Policy Name',
                   'Rules & Regulations': 'Rules / Regulation Name',
                   'Order / Gazette': 'Order / Gazette Title',
+                  'Bye Laws': 'Bye Law Name',
+                  'Miscellaneous': 'Document Title',
                 }[form.type] || 'Document Name'}
                 {files.length <= 1 && <span style={{ color: '#ef4444' }}> *</span>}
               </div>
@@ -1662,6 +1371,8 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                   'Policy': 'e.g. Haryana Industrial Policy 2020',
                   'Rules & Regulations': 'e.g. Haryana Municipal Rules, 1975',
                   'Order / Gazette': 'e.g. Government Order No. 12/2021',
+                  'Bye Laws': 'e.g. Municipal Corporation Bye-laws, 2020',
+                  'Miscellaneous': 'e.g. Departmental Guidelines / Reference Manual',
                 }[form.type] || 'Enter document name')}
                 style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
             </div>
@@ -1699,15 +1410,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                   <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0, opacity: 0.7 }} />
                   {user?.dept || form.dept || '—'}
                 </div>
-              </div>
-              <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Relationships</div>
-                <button type="button" onClick={() => setDrawerType('relationship')}
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: relations.length > 0 ? 'var(--primary)' : 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                  <GitBranch size={13} />
-                  {relations.length > 0 ? `${relations.length} Relationship${relations.length !== 1 ? 's' : ''} Added` : 'Add Relationship'}
-                  <ChevronRight size={12} />
-                </button>
               </div>
             </>)}
 
@@ -1761,6 +1463,45 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 <div style={{ ...LABEL, marginBottom: 6 }}>Circular Number <span style={{ color: '#ef4444' }}>*</span></div>
                 <input value={typeFields.circularNumber || ''} onChange={e => setTypeFields(f => ({ ...f, circularNumber: e.target.value }))}
                   placeholder="e.g. Circular No. 7/2023" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Issue Date <span style={{ color: '#ef4444' }}>*</span></div>
+                <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
+                  style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Valid Until</div>
+                <input type="date" value={typeFields.validity || ''} onChange={e => setTypeFields(f => ({ ...f, validity: e.target.value }))}
+                  placeholder="e.g. 31 March 2025 / Until further orders" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Department</div>
+                <div style={{ ...INPUT_BASE, color: 'var(--text-color)', opacity: 0.8, userSelect: 'none', display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0, opacity: 0.7 }} />
+                  {user?.dept || form.dept || '—'}
+                </div>
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Legal Authority</div>
+                <HierarchyTag hierarchy={hierarchy} onOpen={() => setDrawerType('hierarchy')} isRef={true} legalAuthorities={legalAuthorities} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Relationships</div>
+                <button type="button" onClick={() => setDrawerType('relationship')}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: relations.length > 0 ? 'var(--primary)' : 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                  <GitBranch size={13} />
+                  {relations.length > 0 ? `${relations.length} Relationship${relations.length !== 1 ? 's' : ''} Added` : 'Add Relationship'}
+                  <ChevronRight size={12} />
+                </button>
+              </div>
+            </>)}
+
+            {/* ── Miscellaneous: mirrors Circular's field set ── */}
+            {form.type === 'Miscellaneous' && (<>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Reference Number</div>
+                <input value={typeFields.miscNumber || ''} onChange={e => setTypeFields(f => ({ ...f, miscNumber: e.target.value }))}
+                  placeholder="e.g. Ref No. 22/2024 (optional)" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>Issue Date <span style={{ color: '#ef4444' }}>*</span></div>
@@ -1985,8 +1726,57 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
               </div>
             </>)}
 
+            {/* ── Bye Laws: mirrors Rules & Regulations' field set ── */}
+            {form.type === 'Bye Laws' && (<>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Bye Law Number <span style={{ color: '#ef4444' }}>*</span></div>
+                <input value={typeFields.byeLawNumber || ''} onChange={e => setTypeFields(f => ({ ...f, byeLawNumber: e.target.value }))}
+                  placeholder="e.g. Bye-law No. 3 of 2020" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Issue Date <span style={{ color: '#ef4444' }}>*</span></div>
+                <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
+                  style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Effective From</div>
+                <input type="date" value={typeFields.effectiveFrom || ''} onChange={e => setTypeFields(f => ({ ...f, effectiveFrom: e.target.value }))}
+                  style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Gazette Reference</div>
+                <input value={typeFields.gazetteRef || ''} onChange={e => setTypeFields(f => ({ ...f, gazetteRef: e.target.value }))}
+                  placeholder="e.g. Haryana Gazette Extra., Part I, No. 8, 4 Mar 2020" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Issuing Authority</div>
+                <input value={typeFields.ruleAuthority || ''} onChange={e => setTypeFields(f => ({ ...f, ruleAuthority: e.target.value }))}
+                  placeholder="e.g. Municipal Corporation, Panchkula" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Department</div>
+                <div style={{ ...INPUT_BASE, color: 'var(--text-color)', opacity: 0.8, userSelect: 'none', display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0, opacity: 0.7 }} />
+                  {user?.dept || form.dept || '—'}
+                </div>
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Act Reference</div>
+                <HierarchyTag hierarchy={hierarchy} onOpen={() => { setDrawerHierarchy({ ...hierarchy }); setDrawerType('hierarchy'); }} isRef={true} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Relationships</div>
+                <button type="button" onClick={() => setDrawerType('relationship')}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: relations.length > 0 ? 'var(--primary)' : 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                  <GitBranch size={13} />
+                  {relations.length > 0 ? `${relations.length} Relationship${relations.length !== 1 ? 's' : ''} Added` : 'Add Relationship'}
+                  <ChevronRight size={12} />
+                </button>
+              </div>
+            </>)}
+
             {/* ── All other non-Act, non-Amendment, non-Circular, non-Notification types ── */}
-            {!['Act', 'Amendment', 'Circular', 'Notification', 'Order / Gazette', 'Policy', 'Rules & Regulations'].includes(form.type) && (<>
+            {!['Act', 'Amendment', 'Circular', 'Notification', 'Order / Gazette', 'Policy', 'Rules & Regulations', 'Bye Laws', 'Miscellaneous'].includes(form.type) && (<>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>Issue Date <span style={{ color: '#ef4444' }}>*</span></div>
                 <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
@@ -2034,7 +1824,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--surface-border)' }}>
             <button type="button"
-              onClick={() => { setForm({ act:'',dept:user?.dept||'',type:'',version:'1.0',desc:'',enactmentDate:'',parentAct:'',changeTypes:[] }); setFiles([]); setFileRefs([]); setRelations([]); setAnalysisResults([]); setHierarchy({ act:'',chapter:'',section:'',subsection:'' }); setCrossDeptNotifs([]); setAmendmentProvisions([]); setParentActSearch(''); setRelNote(''); setTypeFields({}); setUploadStep(null); setUploadError(''); }}
+              onClick={() => { setForm({ act:'',dept:user?.dept||'',type:'',version:'1.0',desc:'',enactmentDate:'',parentAct:'',changeTypes:[] }); setFiles([]); setFileRefs([]); setRelations([]); setHierarchy({ act:'',chapter:'',section:'',subsection:'' }); setAmendmentProvisions([]); setParentActSearch(''); setRelNote(''); setTypeFields({}); setUploadStep(null); setUploadError(''); }}
               style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)', padding: '9px 22px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
               onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
               onMouseLeave={e => e.currentTarget.style.background = 'var(--surface-card)'}>
@@ -2091,8 +1881,8 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)' }}>
                   {drawerType === 'hierarchy'
   ? (form.type === 'Amendment' ? 'Parent Act & Changes Made'
-      : ['Circular', 'Notification', 'Order / Gazette'].includes(form.type) ? 'Legal Authority'
-      : ['Policy', 'Rules & Regulations'].includes(form.type) ? 'Act Reference'
+      : ['Circular', 'Notification', 'Order / Gazette', 'Miscellaneous'].includes(form.type) ? 'Legal Authority'
+      : ['Policy', 'Rules & Regulations', 'Bye Laws'].includes(form.type) ? 'Act Reference'
       : 'Hierarchical Tags')
   : 'Add Relationship'}
                 </div>
@@ -2115,8 +1905,8 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
               {/* ── Hierarchy form ── */}
               {drawerType === 'hierarchy' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  {/* Act Name / Parent Act Name — hidden for Circular/Notification/Order/Policy (captured inside dynamic list) */}
-                  {!['Circular', 'Notification', 'Order / Gazette', 'Policy'].includes(form.type) && (
+                  {/* Act Name / Parent Act Name — only for Amendment; other types get their own Act/Rule Name field below (multi-legal-authority list or Act/Chapter/Section block) */}
+                  {!['Circular', 'Notification', 'Order / Gazette', 'Policy', 'Miscellaneous', 'Rules & Regulations', 'Bye Laws'].includes(form.type) && (
                     <div>
                       <div style={{ ...LABEL, marginBottom: 6 }}>
                         {form.type === 'Amendment' ? 'Parent Act Name' : 'Act Name'}
@@ -2148,17 +1938,17 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                   )}
 
                   {/* Circular / Notification / Order / Policy: dynamic multiple legal authorities */}
-                  {['Circular', 'Notification', 'Order / Gazette', 'Policy'].includes(form.type) && (<>
+                  {['Circular', 'Notification', 'Order / Gazette', 'Policy', 'Miscellaneous'].includes(form.type) && (<>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <span style={{ ...LABEL }}>Legal Authorities</span>
                       <button type="button"
-                        onClick={() => setLegalAuthorities(p => [...p, { act: '', sections: [''] }])}
+                        onClick={() => { setLegalAuthorities(p => [...p, { act: '', sections: [''], confirmed: false }]); setEditingAuthIdx(legalAuthorities.length); }}
                         style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: 'var(--primary)', background: 'var(--primary-light)', border: '1px solid var(--primary-border)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontFamily: 'var(--font)' }}>
                         <Plus size={12} /> Add Another
                       </button>
                     </div>
                     {legalAuthorities.map((auth, i) => {
-                      const isSaved = auth.act && editingAuthIdx !== i;
+                      const isSaved = auth.confirmed && editingAuthIdx !== i;
 
                       if (isSaved) {
                         return (
@@ -2202,8 +1992,8 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                           <div style={{ ...LABEL, marginBottom: 5 }}>Act / Rule Name</div>
                           <div style={{ position: 'relative' }}>
                             <input value={auth.act}
-                              onChange={e => { setLegalAuthorities(p => p.map((r, idx) => idx === i ? { ...r, act: e.target.value } : r)); fetchDocSuggestions('Act', e.target.value); }}
-                              onFocus={e => { focusStyle(e); setShowAuthDrop(i); if (auth.act) fetchDocSuggestions('Act', auth.act); }}
+                              onChange={e => { setEditingAuthIdx(i); setLegalAuthorities(p => p.map((r, idx) => idx === i ? { ...r, act: e.target.value } : r)); fetchDocSuggestions('Act', e.target.value); }}
+                              onFocus={e => { focusStyle(e); setEditingAuthIdx(i); setShowAuthDrop(i); if (auth.act) fetchDocSuggestions('Act', auth.act); }}
                               onBlur={e => { blurStyle(e); setTimeout(() => setShowAuthDrop(null), 180); }}
                               placeholder="Type to search Acts…" style={{ ...INPUT_BASE, fontSize: 12 }} />
                             {showAuthDrop === i && actSearching && <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 10, color: 'var(--text-color-secondary)' }}>…</div>}
@@ -2271,6 +2061,12 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                             ); })}
                           </div>
                         </div>
+                        <button type="button"
+                          disabled={!auth.act}
+                          onClick={() => { setLegalAuthorities(p => p.map((r, idx) => idx === i ? { ...r, confirmed: true } : r)); setEditingAuthIdx(null); }}
+                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '8px', borderRadius: 8, border: 'none', background: auth.act ? '#16a34a' : 'var(--surface-200)', color: auth.act ? '#fff' : '#94a3b8', fontSize: 12.5, fontWeight: 700, cursor: auth.act ? 'pointer' : 'not-allowed', fontFamily: 'var(--font)' }}>
+                          <CheckCircle size={14} /> Confirm Authority
+                        </button>
                       </div>
                       );
                     })}
@@ -2278,7 +2074,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
 
 
                   {/* Act / Rules & Regulations: Act name + Chapter/Section/Sub-section with dropdowns */}
-                  {!['Circular', 'Notification', 'Policy', 'Order / Gazette', 'Amendment'].includes(form.type) && (<>
+                  {!['Circular', 'Notification', 'Policy', 'Order / Gazette', 'Amendment', 'Miscellaneous'].includes(form.type) && (<>
                     {/* Act Name — search-acts API */}
                     <div>
                       <div style={{ ...LABEL, marginBottom: 6 }}>Act / Rule Name</div>
@@ -2428,44 +2224,29 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                       <div style={{ position: 'relative' }}>
                         <input
                           disabled={!relDocType}
-                          value={relSearch || (relTarget.startsWith('__act__:') ? relTarget.split(':').slice(2).join(':') : (documents.find(d => d.uid === relTarget)?.title || ''))}
+                          value={relSearch || (relTarget.startsWith('__api__:') ? relTarget.split(':').slice(2).join(':') : (documents.find(d => d.uid === relTarget)?.title || ''))}
                           onChange={e => {
                             setRelSearch(e.target.value); setRelTarget(''); setShowRelDrop(true);
-                            if (relDocType === 'Act') fetchRelActSuggestions(e.target.value);
+                            if (relDocType) fetchRelDocSuggestions(relDocType, e.target.value);
                           }}
-                          onFocus={() => { setShowRelDrop(true); if (relDocType === 'Act' && relSearch) fetchRelActSuggestions(relSearch); }}
+                          onFocus={() => { setShowRelDrop(true); if (relDocType && relSearch) fetchRelDocSuggestions(relDocType, relSearch); }}
                           onBlur={() => setTimeout(() => setShowRelDrop(false), 150)}
-                          placeholder={!relDocType ? 'Select a Target Document Type first…' : relDocType === 'Act' ? 'Search Acts…' : 'Search existing document to link…'}
+                          placeholder={!relDocType ? 'Select a Target Document Type first…' : `Search ${relDocType}…`}
                           style={{ ...INPUT_BASE, width: '100%', ...(!relDocType ? { background: 'var(--surface-100)', cursor: 'not-allowed', color: 'var(--text-color-secondary)' } : {}) }}
                           onFocus={focusStyle} onBlur={blurStyle}
                         />
-                        {relDocType === 'Act' && relActSearching && <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 10, color: 'var(--text-color-secondary)' }}>…</div>}
+                        {relDocSearching && <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 10, color: 'var(--text-color-secondary)' }}>…</div>}
                         {relDocType && showRelDrop && relSearch.trim() && (
                           <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 10, boxShadow: '0 8px 32px rgba(0,0,0,.15)', zIndex: 50, marginTop: 4, maxHeight: 220, overflowY: 'auto' }}>
-                            {relDocType === 'Act' ? (
-                              relActSuggestions.length > 0 ? relActSuggestions.map(a => (
-                                <div key={a.id} onMouseDown={() => { setRelTarget(`__act__:${a.id}:${a.document_name}`); setRelSearch(''); setShowRelDrop(false); }}
-                                  style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid var(--surface-border)', fontSize: 12.5, transition: 'background .15s' }}
-                                  onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
-                                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                                  <div style={{ fontWeight: 600, color: 'var(--text-heading)' }}>{a.document_name}</div>
-                                  {a.reference_number && <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', marginTop: 2 }}>{a.reference_number}</div>}
-                                </div>
-                              )) : (
-                                <div style={{ padding: '10px 14px', fontSize: 12.5, color: 'var(--text-color-secondary)' }}>
-                                  {relActSearching ? 'Searching…' : 'No matching Acts found'}
-                                </div>
-                              )
-                            ) : (
-                              relFiltered.length > 0 ? relFiltered.map(d => (
-                              <div key={d.uid} onMouseDown={() => { setRelTarget(d.uid); setRelSearch(''); setShowRelDrop(false); }}
+                            {relDocSuggestions.length > 0 ? relDocSuggestions.map(a => (
+                              <div key={a.id} onMouseDown={() => { setRelTarget(`__api__:${a.id}:${a.document_name}`); setRelSearch(''); setShowRelDrop(false); }}
                                 style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: '1px solid var(--surface-border)', fontSize: 12.5, transition: 'background .15s' }}
                                 onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
                                 onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                                <div style={{ fontWeight: 600, color: 'var(--text-heading)' }}>{d.title}</div>
-                                <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', marginTop: 2 }}>{d.year} · {d.dept}</div>
+                                <div style={{ fontWeight: 600, color: 'var(--text-heading)' }}>{a.document_name}</div>
+                                {a.reference_number && <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', marginTop: 2 }}>{a.reference_number}</div>}
                               </div>
-                            )) : (
+                            )) : !relDocSearching && (
                               <div
                                 onMouseDown={() => { setRelTarget('__pending__:' + relSearch.trim()); setShowRelDrop(false); }}
                                 style={{ padding: '10px 14px', cursor: 'pointer', fontSize: 12.5 }}
@@ -2477,7 +2258,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                                 </div>
                                 <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 3 }}>Document not in system yet — save as pending, will auto-link when uploaded</div>
                               </div>
-                            )
                             )}
                           </div>
                         )}

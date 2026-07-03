@@ -2,7 +2,7 @@ import { useState } from 'react';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 
-export default function Layout({ user, activePage, onNavigate, onLogout, children }) {
+export default function Layout({ user, activePage, onNavigate, onLogout, onChangePassword, children }) {
   const [collapsed, setCollapsed] = useState(false);
 
   return (
@@ -19,6 +19,7 @@ export default function Layout({ user, activePage, onNavigate, onLogout, childre
           user={user}
           activePage={activePage}
           onLogout={onLogout}
+          onChangePassword={onChangePassword}
           onToggleSidebar={() => setCollapsed(c => !c)}
         />
         <main style={{ flex: 1, overflowY: 'auto', padding: '24px 28px 48px' }}>

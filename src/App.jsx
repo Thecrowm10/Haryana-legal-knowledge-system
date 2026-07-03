@@ -28,7 +28,7 @@ const SEED_RELATIONS = [
 ];
 
 const INITIAL_TAXONOMY = [
-  { category: 'Document Types', items: ['Act', 'Amendment', 'Notification', 'Circular', 'Policy', 'Rules & Regulations', 'Order / Gazette'] },
+  { category: 'Document Types', items: ['Act', 'Amendment', 'Notification', 'Circular', 'Policy', 'Rules & Regulations', 'Order / Gazette', 'Bye Laws', 'Miscellaneous'] },
   { category: 'Departments',    items: ['Urban Local Bodies', 'Revenue & Disaster Mgmt.', 'Home Department', 'Industries & Commerce', 'Labour Department', 'Finance Department', 'Health & Family Welfare', 'Agriculture & Farmers Welfare', 'Panchayati Raj', 'General Administration'] },
   { category: 'Legal Status',   items: ['Active', 'Repealed', 'Amended', 'Under Review', 'Suspended'] },
 ];
@@ -147,7 +147,7 @@ export default function App() {
   }
 
   return (
-    <Layout user={user} activePage={activePage} onNavigate={navigate} onLogout={logout}>
+    <Layout user={user} activePage={activePage} onNavigate={navigate} onLogout={logout} onChangePassword={changePass}>
       {renderDashboard()}
     </Layout>
   );

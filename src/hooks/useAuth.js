@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import api from '../services/api';
 import { changePassword as changePasswordApi } from '../services/pdf';
 
-const CITIZEN_PROFILE  = { username: 'citizen', role: 'citizen', name: 'Guest Citizen', dept: '', mustChangePassword: false };
+const CITIZEN_PROFILE  = { username: 'citizen', role: 'citizen', name: 'Guest', dept: '', mustChangePassword: false };
+const ADMIN_PROFILE    = { username: 'sys.admin', role: 'admin', name: 'Vikram Rao', dept: '', mustChangePassword: false };
 // const DEV_UPLOADER     = { username: 'dept.uploader', role: 'uploader', name: 'Dev Uploader (Mock)',  dept: 'Urban Local Bodies', mustChangePassword: false };
 // const DEV_APPROVER     = { username: 'dept.approver', role: 'approver', name: 'Dev Approver (Mock)',  dept: 'Urban Local Bodies', mustChangePassword: false };
 
@@ -56,13 +57,10 @@ export function useAuth() {
       setUser(CITIZEN_PROFILE);
       return;
     }
-    // DEV BYPASS — uncomment below to use mock users when backend is unavailable
-    // if (username === 'dept.uploader' && password === 'upload123') { setUser(DEV_UPLOADER); return; }
-    // if (username === 'dept.approver' && password === 'approve123') { setUser(DEV_APPROVER); return; }
-
-    // DEV BYPASS — SQL server nahi hai toh mock uploader use karo
-    if (username === 'dept.uploader' && password === 'upload123') {
-      setUser(DEV_UPLOADER);
+    // Admin never goes through the username/password form — only the OTP flow
+    // (AdminOtpLogin) calls this with role:'admin' after OTP verification.
+    if (role === 'admin') {
+      setUser(ADMIN_PROFILE);
       return;
     }
 
@@ -71,11 +69,17 @@ export function useAuth() {
     try {
       const res = await api.post('/auth/login', { username, password });
       const token = res.data.access_token;
-      localStorage.setItem('token', token);
-
       const payload = decodeJwt(token);
       if (!payload) throw new Error('Invalid token received');
 
+      // Admin credentials must not work through the officer login form —
+      // block them here even if the backend would otherwise accept them.
+      if (payload.role === 'admin') {
+        setError('Admin accounts must sign in via Admin Access (OTP) on the portal selection screen.');
+        return;
+      }
+
+      localStorage.setItem('token', token);
       setUser(userFromPayload(payload));
     } catch (err) {
       localStorage.removeItem('token');

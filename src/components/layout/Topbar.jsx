@@ -1,9 +1,10 @@
 ﻿import { useState } from 'react';
-import { Menu, ChevronDown, LogOut, User, Settings } from 'lucide-react';
+import { Menu, ChevronDown, LogOut, User } from 'lucide-react';
 import NotificationBell from '../NotificationBell';
+import ProfileModal from './ProfileModal';
 
 const ROLE_META = {
-  citizen:  { label: 'Citizen',         color: '#1a56db', bg: 'rgba(26,86,219,.1)' },
+  citizen:  { label: 'Guest',           color: '#1a56db', bg: 'rgba(26,86,219,.1)' },
   uploader: { label: 'Dept. Uploader',  color: '#3b82f6', bg: 'rgba(59,130,246,.1)' },
   approver: { label: 'Dept. Approver',  color: '#f59e0b', bg: 'rgba(245,158,11,.1)' },
   csoffice: { label: 'CS Office',       color: '#22c55e', bg: 'rgba(34,197,94,.1)' },
@@ -20,12 +21,17 @@ const BREADCRUMBS = {
   auditlog: ['Auditor', 'Audit Log'],
 };
 
-export default function Topbar({ user, activePage, onLogout, onToggleSidebar }) {
-  const [profileOpen, setProfileOpen] = useState(false);
+export default function Topbar({ user, activePage, onLogout, onToggleSidebar, onChangePassword }) {
+  const [profileOpen, setProfileOpen]   = useState(false);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
   const rm = ROLE_META[user.role] || ROLE_META.citizen;
   const crumbs = BREADCRUMBS[activePage] || ['Dashboard'];
+  // Only roles with a real backend-issued session (a token) can change their password —
+  // the mock citizen/admin-OTP profiles have no real account to change it on.
+  const canChangePassword = !!localStorage.getItem('token');
 
   return (
+    <>
     <header style={{
       height: 60, background: 'var(--surface-card)',
       borderBottom: '1px solid var(--surface-border)',
@@ -93,16 +99,12 @@ export default function Topbar({ user, activePage, onLogout, onToggleSidebar }) 
             overflow: 'hidden', zIndex: 100,
             animation: 'fadeSlideIn .15s ease',
           }}>
-            {[
-              { icon: User, label: 'Profile' },
-              { icon: Settings, label: 'Settings' },
-            ].map(({ icon: Icon, label }) => (
-              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer', fontSize: 13, color: 'var(--text-color)', transition: 'background .15s' }}
-                onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                <Icon size={14} color="var(--text-color-secondary)" />{label}
-              </div>
-            ))}
+            <div onClick={() => { setProfileOpen(false); setProfileModalOpen(true); }}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer', fontSize: 13, color: 'var(--text-color)', transition: 'background .15s' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              <User size={14} color="var(--text-color-secondary)" />Profile
+            </div>
             <div style={{ height: 1, background: 'var(--surface-border)', margin: '4px 0' }} />
             <div onClick={() => { setProfileOpen(false); onLogout(); }}
               style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer', fontSize: 13, color: 'var(--red)', transition: 'background .15s' }}
@@ -114,5 +116,16 @@ export default function Topbar({ user, activePage, onLogout, onToggleSidebar }) 
         )}
       </div>
     </header>
+
+    {profileModalOpen && (
+      <ProfileModal
+        user={user}
+        roleLabel={rm.label}
+        canChangePassword={canChangePassword}
+        onChangePassword={onChangePassword}
+        onClose={() => setProfileModalOpen(false)}
+      />
+    )}
+    </>
   );
 }

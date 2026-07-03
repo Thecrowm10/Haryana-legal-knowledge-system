@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Search, Eye, EyeOff, Shield, Lock, User, ArrowRight } from 'lucide-react';
+import { Search, Eye, EyeOff, Shield, Lock, User, ArrowRight, ShieldAlert } from 'lucide-react';
 import haryanaLogo from '../assets/haryana-logo.png';
 import bannerBg from '../assets/banner-1-768x217.png';
 import ForgotPasswordScreen from './ForgotPasswordScreen';
+import AdminOtpLogin from './AdminOtpLogin';
 
 export default function Login({ onLogin, loading, authError }) {
-  const [screen, setScreen]       = useState('portal'); // 'portal' | 'login' | 'forgot'
+  const [screen, setScreen]       = useState('portal'); // 'portal' | 'login' | 'forgot' | 'admin-otp'
   const [username, setUsername]   = useState('');
   const [password, setPassword]   = useState('');
   const [showPass, setShowPass]   = useState(false);
@@ -28,7 +29,8 @@ export default function Login({ onLogin, loading, authError }) {
     onLogin({ username: username.trim(), password });
   };
 
-  if (screen === 'forgot') return <ForgotPasswordScreen onBack={() => setScreen('login')} />;
+  if (screen === 'forgot')    return <ForgotPasswordScreen onBack={() => setScreen('login')} />;
+  if (screen === 'admin-otp') return <AdminOtpLogin onBack={() => setScreen('portal')} onLogin={onLogin} />;
 
   // ── Portal Selection Screen ──────────────────────────────────────────────
   if (screen === 'portal') return (
@@ -63,7 +65,7 @@ export default function Login({ onLogin, loading, authError }) {
               How would you like to<br/><span style={{ color:'#4ade80' }}>access the portal?</span>
             </h1>
             <p style={{ fontSize:14, color:'rgba(255,255,255,.72)', maxWidth:440, margin:'0 auto' }}>
-              Choose your access type to continue. Citizens can search legal documents without logging in.
+              Choose your access type to continue. Guests can search legal documents without logging in.
             </p>
           </div>
 
@@ -89,7 +91,7 @@ export default function Login({ onLogin, loading, authError }) {
                 </div>
               </div>
               <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:4, padding:'9px 20px', borderRadius:50, background:'rgba(74,222,128,.15)', border:'1px solid rgba(74,222,128,.28)', color:'#4ade80', fontSize:13, fontWeight:700 }}>
-                Continue as Citizen <ArrowRight size={14}/>
+                Continue as Guest <ArrowRight size={14}/>
               </div>
               <div style={{ fontSize:11, color:'rgba(255,255,255,.6)', marginTop:-6 }}>No login required</div>
             </div>
@@ -109,13 +111,37 @@ export default function Login({ onLogin, loading, authError }) {
               <div>
                 <div style={{ fontSize:18, fontWeight:800, color:'#fff', marginBottom:8 }}>Official Access</div>
                 <div style={{ fontSize:13, color:'rgba(255,255,255,.75)', lineHeight:1.65 }}>
-                  For department uploaders, approvers, CS Office and system administrators.
+                  For department uploaders, approvers, CS Office and auditors.
                 </div>
               </div>
               <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:4, padding:'9px 20px', borderRadius:50, background:'rgba(99,102,241,.15)', border:'1px solid rgba(99,102,241,.3)', color:'#818cf8', fontSize:13, fontWeight:700 }}>
                 Login with Credentials <ArrowRight size={14}/>
               </div>
               <div style={{ fontSize:11, color:'rgba(255,255,255,.6)', marginTop:-6 }}>Password / SSO required</div>
+            </div>
+
+            {/* Admin Access — deliberately separate flow from Official Access, OTP-based */}
+            <div className="lk-portal-card" onClick={() => setScreen('admin-otp')} style={{
+              width: 280, padding:'32px 28px', borderRadius:20, cursor:'pointer',
+              background:'rgba(255,255,255,.05)', backdropFilter:'blur(32px) saturate(160%)', WebkitBackdropFilter:'blur(32px) saturate(160%)',
+              border:'1px solid rgba(255,255,255,.14)', borderTop:'1px solid rgba(255,255,255,.28)',
+              boxShadow:'0 8px 32px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.12)',
+              display:'flex', flexDirection:'column', alignItems:'center', textAlign:'center', gap:16,
+              animationDelay:'.3s',
+            }}>
+              <div style={{ width:64, height:64, borderRadius:18, background:'rgba(129,140,248,.15)', border:'1px solid rgba(129,140,248,.3)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                <ShieldAlert size={28} color='#a5b4fc' strokeWidth={1.8} />
+              </div>
+              <div>
+                <div style={{ fontSize:18, fontWeight:800, color:'#fff', marginBottom:8 }}>Admin Access</div>
+                <div style={{ fontSize:13, color:'rgba(255,255,255,.75)', lineHeight:1.65 }}>
+                  For system administrators. Sign in with your registered mobile number.
+                </div>
+              </div>
+              <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:4, padding:'9px 20px', borderRadius:50, background:'rgba(129,140,248,.15)', border:'1px solid rgba(129,140,248,.3)', color:'#a5b4fc', fontSize:13, fontWeight:700 }}>
+                Login with OTP <ArrowRight size={14}/>
+              </div>
+              <div style={{ fontSize:11, color:'rgba(255,255,255,.6)', marginTop:-6 }}>Mobile OTP required</div>
             </div>
 
           </div>

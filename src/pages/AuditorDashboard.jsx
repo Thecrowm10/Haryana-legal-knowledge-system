@@ -5,16 +5,19 @@ import Badge from '../components/ui/Badge';
 
 const LABEL = { fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)' };
 
+// Displayed role label — 'citizen' role id stays internal (Badge color lookup), shown as "Guest"
+const roleLabel = role => role === 'citizen' ? 'Guest' : role;
+
 const MOCK_AUDIT = [
   { time: '2026-05-25 10:42', user: 'Priya Sharma', role: 'uploader', action: 'Uploaded document: Haryana Municipal Act 2024',         aiGenerated: false },
   { time: '2026-05-25 10:18', user: 'Sunil Verma',  role: 'approver', action: 'Approved: Punjab Land Revenue Act Amendment',            aiGenerated: false },
-  { time: '2026-05-25 09:55', user: 'citizen',       role: 'citizen',  action: 'Searched: "factory license renewal rules"',             aiGenerated: false },
+  { time: '2026-05-25 09:55', user: 'Guest',         role: 'citizen',  action: 'Searched: "factory license renewal rules"',             aiGenerated: false },
   { time: '2026-05-25 09:30', user: 'Anita Singh',  role: 'csoffice', action: 'Viewed analytics dashboard',                            aiGenerated: false },
   { time: '2026-05-24 17:12', user: 'Sunil Verma',  role: 'approver', action: 'Rejected: Draft Notification — missing metadata',       aiGenerated: false },
-  { time: '2026-05-24 16:45', user: 'citizen',       role: 'citizen',  action: 'Searched: "land acquisition compensation"',             aiGenerated: false },
+  { time: '2026-05-24 16:45', user: 'Guest',         role: 'citizen',  action: 'Searched: "land acquisition compensation"',             aiGenerated: false },
   { time: '2026-05-24 15:30', user: 'Deepa Nair',   role: 'auditor',  action: 'Exported audit log (CSV)',                              aiGenerated: false },
   { time: '2026-05-24 14:10', user: 'Harish Gupta', role: 'approver', action: 'Approved: Excise Policy Circular 2026',                 aiGenerated: false },
-  { time: '2026-05-23 11:20', user: 'citizen',       role: 'citizen',  action: 'Searched: "building bye-laws Panchkula"',               aiGenerated: false },
+  { time: '2026-05-23 11:20', user: 'Guest',         role: 'citizen',  action: 'Searched: "building bye-laws Panchkula"',               aiGenerated: false },
   { time: '2026-05-23 10:05', user: 'Priya Sharma', role: 'uploader', action: 'Uploaded document: Labour Welfare Fund Rules 2025',     aiGenerated: false },
 ];
 
@@ -102,7 +105,7 @@ export default function AuditorDashboard({ activePage }) {
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                   <td style={{ padding: '12px 16px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)', whiteSpace: 'nowrap' }}>{log.time}</td>
                   <td style={{ padding: '12px 16px', fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>{log.user}</td>
-                  <td style={{ padding: '12px 16px' }}><Badge label={log.role} variant={log.role} /></td>
+                  <td style={{ padding: '12px 16px' }}><Badge label={roleLabel(log.role)} variant={log.role} /></td>
                   <td style={{ padding: '12px 16px', fontSize: 12.5, color: 'var(--text-color)' }}>{log.action}</td>
                   <td style={{ padding: '12px 16px' }}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: '#1e40af' }}>
@@ -126,7 +129,7 @@ export default function AuditorDashboard({ activePage }) {
           <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
               <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>Search Query History</div>
-              <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 2 }}>Citizens anonymised · No AI text in any response</div>
+              <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 2 }}>Guests anonymised · No AI text in any response</div>
             </div>
             <button onClick={() => exportCSV(MOCK_QUERIES, 'query-history.csv')}
               style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--surface-ground)', color: 'var(--text-color)', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '7px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
@@ -147,7 +150,7 @@ export default function AuditorDashboard({ activePage }) {
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                   <td style={{ padding: '12px 16px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)', whiteSpace: 'nowrap' }}>{q.time}</td>
-                  <td style={{ padding: '12px 16px' }}><Badge label={q.userType} variant={q.userType} /></td>
+                  <td style={{ padding: '12px 16px' }}><Badge label={roleLabel(q.userType)} variant={q.userType} /></td>
                   <td style={{ padding: '12px 16px', fontSize: 12.5, color: 'var(--text-color)', fontStyle: 'italic' }}>"{q.query}"</td>
                   <td style={{ padding: '12px 16px', fontFamily: 'var(--mono)', fontSize: 12, fontWeight: 700, color: 'var(--primary)', textAlign: 'center' }}>{q.results}</td>
                   <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>{q.pointers}</td>
