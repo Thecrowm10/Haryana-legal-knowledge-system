@@ -69,7 +69,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       .finally(() => setUsersLoading(false));
   }, [activePage]);
 
-  // Departments state
+  // Departments state — full list for add/edit selectors
   const [depts, setDepts]               = useState([]);
   const [deptsLoading, setDeptsLoading] = useState(false);
   const [deptsError, setDeptsError]     = useState('');
@@ -78,7 +78,6 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   const [createError, setCreateError]   = useState('');
   const [createSuccess, setCreateSuccess] = useState('');
   const [addDeptOpen, setAddDeptOpen]   = useState(false);
-
   useEffect(() => {
     if (!['departments', 'taxonomy', 'users'].includes(activePage)) return;
     setDeptsLoading(true);
@@ -280,7 +279,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     const inactive = users.filter(u => u.status === 'inactive').length;
 
     const filteredUsers = deptFilter
-      ? users.filter(u => String(u.deptId) === String(deptFilter))
+      ? users.filter(u => u.deptIds.map(String).includes(String(deptFilter)))
       : users;
 
     const INP_STYLE = {

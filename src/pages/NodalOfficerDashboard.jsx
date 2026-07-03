@@ -4,7 +4,7 @@ import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import SelectField from '../components/ui/SelectField';
 import { getUsers, getRoles, updateUser, registerUser } from '../services/users';
-import { getDepartments } from '../services/departments';
+import { getMyDepartments } from '../services/departments';
 
 
 const LABEL = { fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)' };
@@ -19,8 +19,10 @@ function normalizeUser(u) {
     email:     u.email ?? '',
     role:      u.role?.name ?? '—',
     roleId:    u.role?.id ?? null,
-    dept:      u.department?.name ?? '—',
+    dept:      u.departments?.length > 0 ? u.departments.map(d => d.name).join(', ') : (u.department?.name ?? '—'),
     deptId:    u.department?.id ?? null,
+    deptIds:   u.departments?.map(d => d.id) ?? [],
+    deptRaw:   u.departments?.length > 0 ? u.departments.map(d => String(d.id)).join(',') : null,
     status:    u.is_active ? 'active' : 'inactive',
     isActive:  u.is_active,
     lastLogin: u.last_login ? u.last_login.split('T')[0] : '—',
@@ -66,12 +68,12 @@ export default function NodalOfficerDashboard({ activePage }) {
       .finally(() => setUsersLoading(false));
   }, [activePage]);
 
-  // Departments — needed for the department filter and Add/Edit User dropdowns.
+  // Only the nodal officer's own departments — used for filter dropdown and add/edit selectors.
   const [depts, setDepts] = useState([]);
 
   useEffect(() => {
     if (activePage !== 'nodalusers') return;
-    getDepartments()
+    getMyDepartments()
       .then(res => setDepts(res.data))
       .catch(() => {});
   }, [activePage]);
@@ -85,9 +87,10 @@ export default function NodalOfficerDashboard({ activePage }) {
   const [showAddPass, setShowAddPass] = useState(false);
 
   function handleAddUser() {
-    if (!addForm.username.trim()) { setAddError('Username is required.'); return; }
-    if (!addForm.email.trim())    { setAddError('Email is required.'); return; }
-    if (!addForm.password)        { setAddError('Password is required.'); return; }
+    if (!addForm.username.trim())    { setAddError('Username is required.'); return; }
+    if (!addForm.email.trim())       { setAddError('Email is required.'); return; }
+    if (!addForm.password)           { setAddError('Password is required.'); return; }
+    if (!addForm.department_id)      { setAddError('Department is required.'); return; }
     setAddSaving(true);
     setAddError('');
     registerUser({
@@ -96,8 +99,8 @@ export default function NodalOfficerDashboard({ activePage }) {
       password:      addForm.password,
       first_name:    addForm.first_name.trim(),
       last_name:     addForm.last_name.trim(),
-      role_id:       addForm.role_id       ? Number(addForm.role_id)       : undefined,
-      department_id: addForm.department_id ? Number(addForm.department_id) : undefined,
+      role_id:       addForm.role_id ? Number(addForm.role_id) : undefined,
+      department_id: String(addForm.department_id),
     })
       .then(res => {
         setUsers(prev => [normalizeUser(res.data), ...prev]);
@@ -126,8 +129,7 @@ export default function NodalOfficerDashboard({ activePage }) {
       last_name:     u.lastName,
       email:         u.email,
       is_active:     u.isActive,
-      role_id:       u.roleId,
-      department_id: u.deptId,
+      department_id: String(u.deptId ?? ''),
     });
     setEditError('');
   }
@@ -135,7 +137,14 @@ export default function NodalOfficerDashboard({ activePage }) {
   function handleEditSave() {
     setEditSaving(true);
     setEditError('');
-    updateUser({ user_id: editingUser.id, ...editForm })
+    updateUser({
+      user_id:       editingUser.id,
+      first_name:    editForm.first_name,
+      last_name:     editForm.last_name,
+      email:         editForm.email,
+      is_active:     editForm.is_active,
+      department_id: editForm.department_id || undefined,
+    })
       .then(res => {
         setUsers(prev => prev.map(u => u.id === editingUser.id ? normalizeUser(res.data) : u));
         setEditingUser(null);
@@ -155,8 +164,7 @@ export default function NodalOfficerDashboard({ activePage }) {
       last_name:     u.lastName,
       email:         u.email,
       is_active:     !u.isActive,
-      role_id:       u.roleId,
-      department_id: u.deptId,
+      department_id: u.deptRaw || undefined,
     })
       .then(res => setUsers(prev => prev.map(x => x.id === u.id ? normalizeUser(res.data) : x)))
       .catch(() => {})
@@ -171,8 +179,8 @@ export default function NodalOfficerDashboard({ activePage }) {
     const inactive = users.filter(u => u.status === 'inactive').length;
 
     const filteredUsers = deptFilter
-      ? users.filter(u => String(u.deptId) === String(deptFilter) && u.isActive)
-      : [];
+      ? users.filter(u => u.deptIds.map(String).includes(String(deptFilter)) && u.isActive)
+      : users.filter(u => u.isActive);
 
     const INP_STYLE = {
       width: '100%', padding: '9px 12px',
@@ -213,10 +221,8 @@ export default function NodalOfficerDashboard({ activePage }) {
                 {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
               </SelectField>
               <button
-                disabled={!deptFilter}
-                title={!deptFilter ? 'Select a department first' : undefined}
                 onClick={() => { setAddingUser(true); setAddError(''); setAddForm({ ...EMPTY_ADD_FORM, department_id: deptFilter }); setShowAddPass(false); }}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--primary)', color: 'white', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 12.5, fontWeight: 600, cursor: deptFilter ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap', opacity: deptFilter ? 1 : 0.5 }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--primary)', color: 'white', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
                 <Plus size={13} /> Add User
               </button>
             </div>
@@ -233,7 +239,7 @@ export default function NodalOfficerDashboard({ activePage }) {
           )}
           {!usersLoading && !usersError && filteredUsers.length === 0 && (
             <div style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>
-              {deptFilter ? 'No users yet' : 'Select a department to view users'}
+              No active users found
             </div>
           )}
           {!usersLoading && !usersError && filteredUsers.length > 0 && (
@@ -377,10 +383,10 @@ export default function NodalOfficerDashboard({ activePage }) {
                     </SelectField>
                   </div>
                   <div>
-                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Department</label>
-                    <div style={{ ...INP_STYLE, background: 'var(--surface-hover)', color: 'var(--text-color-secondary)', cursor: 'not-allowed' }}>
-                      {depts.find(d => String(d.id) === String(addForm.department_id))?.name ?? '—'}
-                    </div>
+                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Department *</label>
+                    <SelectField value={addForm.department_id} onChange={e => setAddForm(f => ({ ...f, department_id: e.target.value }))} placeholder="Select Department">
+                      {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </SelectField>
                   </div>
                 </div>
 
@@ -459,15 +465,13 @@ export default function NodalOfficerDashboard({ activePage }) {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
                     <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Role</label>
-                    <SelectField value={editForm.role_id ?? ''} onChange={e => setEditForm(f => ({ ...f, role_id: e.target.value ? Number(e.target.value) : null }))} placeholder="Select Role">
-                      {roles.map(r => (
-                        <option key={r.id} value={r.id}>{r.name.charAt(0).toUpperCase() + r.name.slice(1)}</option>
-                      ))}
-                    </SelectField>
+                    <div style={{ ...INP_STYLE, background: 'var(--surface-hover)', color: 'var(--text-color-secondary)', cursor: 'not-allowed' }}>
+                      {editingUser.role.replace(/\b\w/g, c => c.toUpperCase())}
+                    </div>
                   </div>
                   <div>
                     <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Department</label>
-                    <SelectField value={editForm.department_id ?? ''} onChange={e => setEditForm(f => ({ ...f, department_id: e.target.value ? Number(e.target.value) : null }))} placeholder="No Department">
+                    <SelectField value={editForm.department_id ?? ''} onChange={e => setEditForm(f => ({ ...f, department_id: e.target.value || null }))} placeholder="Select Department">
                       {depts.map(d => (
                         <option key={d.id} value={d.id}>{d.name}</option>
                       ))}
