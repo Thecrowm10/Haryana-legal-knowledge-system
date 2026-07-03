@@ -312,7 +312,8 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
     const canvas = canvasRefs.current[currentPage - 1];
     if (!canvas || !containerRef.current) return;
     suppressRef.current = true;
-    containerRef.current.scrollTo({ top: canvas.offsetTop - 8, behavior: 'smooth' });
+    const top = canvas.parentElement?.offsetTop ?? canvas.offsetTop;
+    containerRef.current.scrollTo({ top: top - 8, behavior: 'smooth' });
     setTimeout(() => { suppressRef.current = false; }, 700);
   }, [currentPage]);
 
@@ -324,7 +325,7 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
     let best = 0, bestVis = -1;
     canvasRefs.current.forEach((canvas, i) => {
       if (!canvas) return;
-      const top = canvas.offsetTop;
+      const top = canvas.parentElement?.offsetTop ?? canvas.offsetTop;
       const vis = Math.max(0, Math.min(top + canvas.offsetHeight, st + ch) - Math.max(top, st));
       if (vis > bestVis) { bestVis = vis; best = i; }
     });
