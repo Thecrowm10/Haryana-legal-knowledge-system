@@ -158,7 +158,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   }
 
   // Add User modal state
-  const EMPTY_ADD_FORM = { username: '', email: '', password: '', first_name: '', last_name: '', role_id: '', department_id: '' };
+  const EMPTY_ADD_FORM = { username: '', email: '', mobile_number: '', password: '', first_name: '', last_name: '', role_id: '', department_id: '' };
   const [addingUser, setAddingUser]   = useState(false);
   const [addForm, setAddForm]         = useState(EMPTY_ADD_FORM);
   const [addSaving, setAddSaving]     = useState(false);
@@ -174,6 +174,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     registerUser({
       username:      addForm.username.trim(),
       email:         addForm.email.trim(),
+      mobile_number: addForm.mobile_number.trim() || undefined,
       password:      addForm.password,
       first_name:    addForm.first_name.trim(),
       last_name:     addForm.last_name.trim(),
@@ -445,6 +446,18 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                       value={addForm.last_name}
                       onChange={e => setAddForm(f => ({ ...f, last_name: e.target.value }))} />
                   </div>
+                </div>
+
+                {/* Mobile Number */}
+                <div>
+                  <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Mobile Number</label>
+                  <input style={INP_STYLE}
+                    type="tel"
+                    inputMode="numeric"
+                    maxLength={10}
+                    placeholder="10-digit mobile number (optional)"
+                    value={addForm.mobile_number}
+                    onChange={e => setAddForm(f => ({ ...f, mobile_number: e.target.value.replace(/\D/g, '') }))} />
                 </div>
 
                 {/* Role + Department */}
