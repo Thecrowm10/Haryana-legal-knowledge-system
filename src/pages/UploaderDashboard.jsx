@@ -3,7 +3,7 @@ import {
   Upload, FileText, CheckCircle, XCircle, X, TrendingUp, FileType, Download,
   RotateCcw, AlertCircle, Eye, GitBranch, Plus, Clock,
   Layers, ChevronRight, AlertTriangle, CheckSquare, Square,
-  Edit3, Tag, Search,
+  Edit3, Tag, Search, MessageSquare, ZoomIn, ZoomOut, RotateCw, ExternalLink,
 } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
@@ -13,7 +13,7 @@ import Badge from '../components/ui/Badge';
 import SelectField from '../components/ui/SelectField';
 import { useAuth } from '../hooks/useAuth';
 import { getDepartments, getDocumentTypes } from '../services/departments';
-import { uploadPdfFile, uploadPdfMetadata, getMyDocuments, searchDocuments } from '../services/pdf';
+import { uploadPdfFile, uploadPdfMetadata, getMyDocuments, searchDocuments, getPdfFile } from '../services/pdf';
 import { createNotification } from '../services/notifications';
 
 // Constants
@@ -111,6 +111,15 @@ const INPUT_BASE = {
   fontSize: 13, padding: '10px 14px', outline: 'none', width: '100%',
   transition: 'border-color .2s, box-shadow .2s',
 };
+
+function parseDisplayRemarks(str) {
+  if (!str) return [];
+  const lines = str.split('\n').filter(l => l.trim());
+  return lines.map((line, i) => {
+    const m = line.match(/^Remark (\d+):\s*(.*)/);
+    return m ? { num: parseInt(m[1]), text: m[2] } : { num: i + 1, text: line };
+  });
+}
 
 const MOCK_VERSIONS = {
   1: [{ v: '2.0', date: '2024-01-15', note: 'Current' },{ v: '1.0', date: '2023-05-10', note: 'Initial upload' }],
@@ -285,6 +294,327 @@ function WorkflowBadge({ status }) {
   );
 }
 
+function DocViewModal({ doc, onClose }) {
+  const [blobUrl, setBlobUrl]         = useState(null);
+  const [pdfDoc, setPdfDoc]           = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages]   = useState(1);
+  const [zoom, setZoom]               = useState(100);
+  const [rotation, setRotation]       = useState(0);
+  const canvasRefs   = useRef([]);
+  const containerRef = useRef(null);
+  const suppressRef  = useRef(false);
+
+  useEffect(() => {
+    const h = e => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, [onClose]);
+
+  useEffect(() => {
+    let url = null;
+    setBlobUrl(null); setPdfDoc(null); setCurrentPage(1);
+    getPdfFile(doc.id)
+      .then(res => {
+        const blob = new Blob([res.data], { type: 'application/pdf' });
+        url = URL.createObjectURL(blob);
+        setBlobUrl(url);
+      })
+      .catch(() => {});
+    return () => { if (url) URL.revokeObjectURL(url); };
+  }, [doc.id]);
+
+  useEffect(() => {
+    if (!blobUrl) return;
+    let cancelled = false;
+    pdfjsLib.getDocument({ url: blobUrl }).promise
+      .then(pdf => { if (!cancelled) { setPdfDoc(pdf); setTotalPages(pdf.numPages); } })
+      .catch(e => console.error('PDF load:', e));
+    return () => { cancelled = true; };
+  }, [blobUrl]);
+
+  useEffect(() => {
+    if (!pdfDoc) return;
+    let cancelled = false;
+    const scale = (zoom / 100) * 1.5;
+    canvasRefs.current = canvasRefs.current.slice(0, pdfDoc.numPages);
+    for (let i = 0; i < pdfDoc.numPages; i++) {
+      const canvas = canvasRefs.current[i];
+      if (!canvas) continue;
+      pdfDoc.getPage(i + 1).then(page => {
+        if (cancelled) return;
+        const vp = page.getViewport({ scale, rotation });
+        canvas.width = vp.width; canvas.height = vp.height;
+        page.render({ canvasContext: canvas.getContext('2d'), viewport: vp });
+      });
+    }
+    return () => { cancelled = true; };
+  }, [pdfDoc, zoom, rotation]);
+
+  useEffect(() => {
+    const canvas = canvasRefs.current[currentPage - 1];
+    if (!canvas || !containerRef.current) return;
+    suppressRef.current = true;
+    containerRef.current.scrollTo({ top: canvas.offsetTop - 8, behavior: 'smooth' });
+    setTimeout(() => { suppressRef.current = false; }, 700);
+  }, [currentPage]);
+
+  function handleScroll() {
+    if (suppressRef.current || !containerRef.current) return;
+    const st = containerRef.current.scrollTop;
+    const ch = containerRef.current.clientHeight;
+    let best = 0, bestVis = -1;
+    canvasRefs.current.forEach((canvas, i) => {
+      if (!canvas) return;
+      const top = canvas.offsetTop;
+      const vis = Math.max(0, Math.min(top + canvas.offsetHeight, st + ch) - Math.max(top, st));
+      if (vis > bestVis) { bestVis = vis; best = i; }
+    });
+    if (best + 1 !== currentPage) setCurrentPage(best + 1);
+  }
+
+  const LS = { fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)' };
+
+  const meta = [
+    ['Reference No.',  doc.referenceNumber || null],
+    ['Issue Date',     doc.enactmentDate   || null],
+    ['Effective From', doc.effectiveFrom   || null],
+    ['Gazette Ref.',   doc.gazette         || null],
+    ['Legal Authority',doc.authority       || null],
+    ['Upload Date',    doc.uploadedAt      || null],
+    ['File',           doc.fileName        || null],
+  ].filter(([, v]) => v);
+
+  const statusAccent = doc.status === 'approved' ? '#16a34a' : doc.status === 'rejected' ? '#ef4444' : '#f59e0b';
+  const statusBg     = doc.status === 'approved' ? 'rgba(34,197,94,.1)'  : doc.status === 'rejected' ? 'rgba(239,68,68,.1)'  : 'rgba(245,158,11,.1)';
+  const StatusIconV  = doc.status === 'approved' ? CheckCircle : doc.status === 'rejected' ? XCircle : Clock;
+  const typeColor    = TYPE_CARD_COLORS[doc.type] || { accent: '#94a3b8', bg: 'rgba(148,163,184,.12)', text: '#64748b' };
+
+  const iconBtn = {
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.15)',
+    borderRadius: 7, width: 32, height: 32, cursor: 'pointer',
+    color: 'rgba(255,255,255,.85)', transition: 'background .15s',
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', flexDirection: 'column', background: 'var(--surface-card)' }}>
+
+      {/* ── Top bar ── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 24px', borderBottom: '1px solid var(--surface-border)', background: 'var(--surface-50)', flexShrink: 0, minHeight: 64 }}>
+        {/* Doc icon */}
+        <div style={{ width: 40, height: 40, borderRadius: 10, background: typeColor.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <FileText size={18} color={typeColor.accent} />
+        </div>
+        {/* Title + breadcrumb */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.3 }}>{doc.title}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 20, background: typeColor.bg, color: typeColor.text || typeColor.accent }}>{doc.type}</span>
+            <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)' }}>{doc.dept}</span>
+            <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: .7 }}>· {doc.year}</span>
+            {doc.version && <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: .7 }}>· v{doc.version}</span>}
+          </div>
+        </div>
+        {/* Status chip */}
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px 6px 10px', borderRadius: 20, background: statusBg, border: `1px solid ${statusAccent}44`, flexShrink: 0 }}>
+          <StatusIconV size={13} color={statusAccent} />
+          <span style={{ fontSize: 11.5, fontWeight: 700, color: statusAccent, fontFamily: 'var(--mono)', letterSpacing: '.04em' }}>
+            {doc.status === 'approved' ? 'APPROVED' : doc.status === 'rejected' ? 'REJECTED' : 'PENDING'}
+          </span>
+        </div>
+        {/* Close */}
+        <button onClick={onClose}
+          style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 18px', borderRadius: 9, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0, transition: 'background .15s' }}
+          onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+          onMouseLeave={e => e.currentTarget.style.background = 'var(--surface-ground)'}>
+          <X size={14} /> Close
+        </button>
+      </div>
+
+      {/* ── 2-panel body ── */}
+      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '57% 43%', overflow: 'hidden' }}>
+
+        {/* ── Left: PDF viewer ── */}
+        <div style={{ borderRight: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#3a3d40' }}>
+
+          {/* PDF toolbar */}
+          <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10, background: '#2d2f31', flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,.08)' }}>
+            <Eye size={14} color="rgba(255,255,255,.7)" />
+            <span style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(255,255,255,.85)', flex: 1 }}>Original PDF</span>
+
+            {/* Zoom controls */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,.06)', borderRadius: 8, padding: '3px 6px', border: '1px solid rgba(255,255,255,.1)' }}>
+              <button onClick={() => setZoom(z => Math.max(70, z - 10))}
+                style={{ ...iconBtn, width: 28, height: 28, background: 'transparent', border: 'none' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.1)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                <ZoomOut size={13} />
+              </button>
+              <span style={{ fontSize: 11.5, fontFamily: 'var(--mono)', color: 'rgba(255,255,255,.75)', minWidth: 38, textAlign: 'center', userSelect: 'none' }}>{zoom}%</span>
+              <button onClick={() => setZoom(z => Math.min(150, z + 10))}
+                style={{ ...iconBtn, width: 28, height: 28, background: 'transparent', border: 'none' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.1)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                <ZoomIn size={13} />
+              </button>
+            </div>
+
+            {/* Rotate */}
+            <button onClick={() => setRotation(r => (r + 90) % 360)}
+              style={iconBtn}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.15)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,.08)'}>
+              <RotateCw size={14} />
+            </button>
+
+            {/* Open externally */}
+            {blobUrl && (
+              <a href={blobUrl} target="_blank" rel="noreferrer"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 7, background: 'rgba(26,86,219,.25)', border: '1px solid rgba(26,86,219,.4)', color: '#93c5fd', textDecoration: 'none', fontSize: 11.5, fontWeight: 600, fontFamily: 'var(--font)', transition: 'background .15s' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(26,86,219,.4)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'rgba(26,86,219,.25)'}>
+                <ExternalLink size={12} /> Open
+              </a>
+            )}
+          </div>
+
+          {/* PDF scroll area */}
+          <div ref={containerRef} onScroll={handleScroll}
+            style={{ flex: 1, overflow: 'auto', background: '#525659', padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center' }}>
+            {!blobUrl && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 14 }}>
+                <div style={{ width: 36, height: 36, border: '3px solid rgba(255,255,255,.2)', borderTopColor: 'rgba(255,255,255,.8)', borderRadius: '50%', animation: 'spin .7s linear infinite' }} />
+                <span style={{ fontSize: 13, fontFamily: 'var(--mono)', color: 'rgba(255,255,255,.6)', letterSpacing: '.04em' }}>Loading PDF…</span>
+              </div>
+            )}
+            {blobUrl && Array.from({ length: totalPages }, (_, i) => (
+              <canvas key={i} ref={el => { canvasRefs.current[i] = el; }}
+                style={{ display: 'block', borderRadius: 4, boxShadow: '0 4px 20px rgba(0,0,0,.6)', maxWidth: '100%' }} />
+            ))}
+          </div>
+
+          {/* Page navigation */}
+          <div style={{ padding: '10px 20px', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, background: '#2d2f31', flexShrink: 0 }}>
+            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px', borderRadius: 7, border: '1px solid rgba(255,255,255,.12)', background: currentPage === 1 ? 'transparent' : 'rgba(255,255,255,.07)', color: currentPage === 1 ? 'rgba(255,255,255,.25)' : 'rgba(255,255,255,.75)', fontSize: 12, fontWeight: 600, cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', transition: 'background .15s' }}>
+              ← Prev
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 14px', borderRadius: 7, background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)' }}>
+              <span style={{ fontSize: 12.5, fontFamily: 'var(--mono)', color: 'rgba(255,255,255,.85)', fontWeight: 600 }}>{currentPage}</span>
+              <span style={{ fontSize: 11, color: 'rgba(255,255,255,.35)' }}>of</span>
+              <span style={{ fontSize: 12.5, fontFamily: 'var(--mono)', color: 'rgba(255,255,255,.55)' }}>{totalPages}</span>
+            </div>
+            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px', borderRadius: 7, border: '1px solid rgba(255,255,255,.12)', background: currentPage === totalPages ? 'transparent' : 'rgba(255,255,255,.07)', color: currentPage === totalPages ? 'rgba(255,255,255,.25)' : 'rgba(255,255,255,.75)', fontSize: 12, fontWeight: 600, cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', transition: 'background .15s' }}>
+              Next →
+            </button>
+          </div>
+        </div>
+
+        {/* ── Right: Document details ── */}
+        <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--surface-card)' }}>
+
+          {/* Right panel header */}
+          <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, background: 'var(--surface-50)', flexShrink: 0 }}>
+            <div style={{ width: 30, height: 30, borderRadius: 8, background: 'rgba(26,86,219,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <FileText size={14} color="var(--primary)" />
+            </div>
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)' }}>Document Details</span>
+          </div>
+
+          {/* Scrollable content */}
+          <div style={{ flex: 1, overflow: 'auto', padding: '20px 20px 28px' }}>
+
+            {/* Core info strip */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 22 }}>
+              {[
+                { label: 'Type',       value: doc.type,           color: typeColor.accent, bg: typeColor.bg },
+                { label: 'Department', value: doc.dept,           color: 'var(--primary)', bg: 'rgba(26,86,219,.07)' },
+                { label: 'Year',       value: String(doc.year),   color: '#64748b',        bg: 'rgba(100,116,139,.08)' },
+                { label: 'Version',    value: `v${doc.version || '1.0'}`, color: '#64748b', bg: 'rgba(100,116,139,.08)' },
+              ].map(({ label, value, color, bg }) => (
+                <div key={label} style={{ padding: '12px 14px', borderRadius: 10, background: bg, border: '1px solid transparent' }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color, letterSpacing: '.06em', textTransform: 'uppercase', fontFamily: 'var(--mono)', marginBottom: 4, opacity: .8 }}>{label}</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Additional metadata */}
+            {meta.length > 0 && (
+              <div style={{ marginBottom: 22 }}>
+                <div style={{ ...LS, marginBottom: 10 }}>Additional Info</div>
+                <div style={{ borderRadius: 10, border: '1px solid var(--surface-border)', overflow: 'hidden' }}>
+                  {meta.map(([k, v], idx) => (
+                    <div key={k} style={{ display: 'flex', alignItems: 'flex-start', gap: 0, borderBottom: idx < meta.length - 1 ? '1px solid var(--surface-border)' : 'none' }}>
+                      <div style={{ padding: '10px 14px', minWidth: 128, flexShrink: 0, background: 'var(--surface-50)', fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', fontWeight: 600, borderRight: '1px solid var(--surface-border)' }}>
+                        {k}
+                      </div>
+                      <div style={{ padding: '10px 14px', fontSize: 12.5, color: 'var(--text-heading)', fontWeight: 500, flex: 1, wordBreak: 'break-word' }}>
+                        {String(v)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Description */}
+            {doc.desc && (
+              <div style={{ marginBottom: 22 }}>
+                <div style={{ ...LS, marginBottom: 10 }}>Description</div>
+                <div style={{ padding: '14px 16px', borderRadius: 10, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', fontSize: 13, color: 'var(--text-color)', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>
+                  {doc.desc}
+                </div>
+              </div>
+            )}
+
+            {/* Reviewer Remarks */}
+            {doc.approval && (
+              <div>
+                <div style={{ ...LS, marginBottom: 10 }}>Reviewer Remarks</div>
+                <div style={{ borderRadius: 12, border: `1px solid ${statusAccent}44`, overflow: 'hidden' }}>
+                  {/* Approver header */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', background: doc.status === 'approved' ? 'rgba(34,197,94,.06)' : doc.status === 'rejected' ? 'rgba(239,68,68,.06)' : 'rgba(245,158,11,.06)', borderBottom: doc.approval.comments ? `1px solid ${statusAccent}22` : 'none' }}>
+                    <div style={{ width: 36, height: 36, borderRadius: 9, background: statusBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <StatusIconV size={16} color={statusAccent} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: statusAccent }}>
+                        {doc.status === 'approved' ? 'Document Approved' : doc.status === 'rejected' ? 'Document Rejected' : 'Pending Review'}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', marginTop: 3 }}>
+                        By {doc.approval.approver_first_name
+                          ? `${doc.approval.approver_first_name} ${doc.approval.approver_last_name || ''}`.trim()
+                          : doc.approval.approver_username || '—'}
+                        {doc.approval.acted_at && <> · {doc.approval.acted_at.split('T')[0]}</>}
+                      </div>
+                    </div>
+                  </div>
+                  {/* Remarks list */}
+                  {doc.approval.comments && (
+                    <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 8, background: 'var(--surface-card)' }}>
+                      {parseDisplayRemarks(doc.approval.comments).map(({ num, text }) => (
+                        <div key={num} style={{ display: 'flex', gap: 12, padding: '12px 14px', borderRadius: 9, background: 'var(--surface-ground)', border: `1px solid ${statusAccent}22`, alignItems: 'flex-start' }}>
+                          <div style={{ flexShrink: 0, width: 24, height: 24, borderRadius: 6, background: statusBg, border: `1px solid ${statusAccent}33`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>
+                            <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, color: statusAccent }}>{num}</span>
+                          </div>
+                          <span style={{ fontSize: 13, color: 'var(--text-color)', lineHeight: 1.6, flex: 1 }}>{text || '—'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Main component
 export default function UploaderDashboard({ activePage, onAuditLog, documents = [], onAddDocument, taxonomy = [] }) {
   const { user } = useAuth();
@@ -311,6 +641,8 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   const [uploads, setUploads] = useState([]);
   const [myDocsLoading, setMyDocsLoading] = useState(false);
   const [myDocsError,   setMyDocsError]   = useState('');
+  const [remarksModal,  setRemarksModal]  = useState(null);
+  const [viewDoc,       setViewDoc]       = useState(null);
 
   function mapApiDoc(d) {
     return {
@@ -338,6 +670,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
       shortTitle:      d.short_title || '',
       tags:            d.tags || [],
       relationships:   d.relationships || [],
+      approval:        d.latest_approval || null,
     };
   }
 
@@ -889,6 +1222,72 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
           </div>
         )}
 
+        {/* Remarks modal */}
+        {remarksModal && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            onClick={() => setRemarksModal(null)}>
+            <div style={{ background: 'var(--surface-card)', borderRadius: 14, padding: 28, minWidth: 400, maxWidth: 520, boxShadow: '0 24px 80px rgba(0,0,0,.3)', width: '90vw' }}
+              onClick={e => e.stopPropagation()}>
+
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, paddingBottom: 12, borderBottom: '1px solid var(--surface-border)' }}>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 4 }}>Reviewer Remarks</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 360 }}>{remarksModal.title}</div>
+                </div>
+                <button onClick={() => setRemarksModal(null)}
+                  style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '5px 8px', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', flexShrink: 0 }}>
+                  <X size={14} />
+                </button>
+              </div>
+
+              {/* Status + approver */}
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16,
+                padding: '10px 14px', borderRadius: 8,
+                background: remarksModal.status === 'approved' ? 'rgba(34,197,94,.06)' : 'rgba(239,68,68,.06)',
+                border: `1px solid ${remarksModal.status === 'approved' ? 'rgba(34,197,94,.2)' : 'rgba(239,68,68,.2)'}`,
+              }}>
+                {remarksModal.status === 'approved'
+                  ? <CheckCircle size={16} color="#16a34a" style={{ flexShrink: 0 }} />
+                  : <XCircle    size={16} color="#ef4444" style={{ flexShrink: 0 }} />
+                }
+                <div>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: remarksModal.status === 'approved' ? '#16a34a' : '#ef4444' }}>
+                    {remarksModal.status === 'approved' ? 'Approved' : 'Rejected'}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', marginTop: 2 }}>
+                    By {remarksModal.approval.approver_first_name
+                      ? `${remarksModal.approval.approver_first_name} ${remarksModal.approval.approver_last_name || ''}`.trim()
+                      : remarksModal.approval.approver_username}
+                    {' · '}
+                    {remarksModal.approval.acted_at?.split('T')[0] || '—'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Remarks list */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {parseDisplayRemarks(remarksModal.approval.comments).map(({ num, text }) => (
+                  <div key={num} style={{ display: 'flex', gap: 10, padding: '10px 14px', borderRadius: 8, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', alignItems: 'baseline' }}>
+                    <span style={{ fontSize: 10.5, fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--primary)', flexShrink: 0, minWidth: 62 }}>
+                      Remark {num}
+                    </span>
+                    <span style={{ fontSize: 13, color: 'var(--text-color)', lineHeight: 1.6 }}>{text || '—'}</span>
+                  </div>
+                ))}
+              </div>
+
+              <button onClick={() => setRemarksModal(null)} style={{ marginTop: 20, width: '100%', padding: '9px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontFamily: 'var(--font)', fontSize: 13, cursor: 'pointer' }}>
+                Close
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Full-screen document viewer */}
+        {viewDoc && <DocViewModal doc={viewDoc} onClose={() => setViewDoc(null)} />}
+
         {/* API loading / error */}
         {myDocsLoading && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -1031,11 +1430,12 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
           return (
         <div ref={uploadsTableRef} style={{ scrollMarginTop: 16 }}>
         <Card padding="0">
-          {/* Card header */}
-          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+
+          {/* ── Header ── */}
+          <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>My Uploads</div>
             <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '2px 9px', borderRadius: 20 }}>
-              {`${filtered.length} document${filtered.length !== 1 ? 's' : ''}`}
+              {filtered.length} document{filtered.length !== 1 ? 's' : ''}
             </span>
             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
               {bulkSelectMode ? (
@@ -1056,21 +1456,41 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
             </div>
           </div>
 
-          {/* Search + type filter buttons */}
-          <div style={{ padding: '10px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', gap: 8, background: 'var(--surface-50)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '6px 12px', flex: 1, maxWidth: 300 }}>
+          {/* ── Search + Sort + Filter ── */}
+          <div style={{ padding: '10px 20px', borderBottom: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', gap: 8, background: 'var(--surface-50)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              {/* Search */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '7px 12px', flex: 1, maxWidth: 320 }}>
                 <Search size={13} color="var(--text-color-secondary)" />
-                <input value={tableSearch} onChange={e => setTableSearch(e.target.value)} placeholder="Search by title…"
+                <input value={tableSearch} onChange={e => setTableSearch(e.target.value)} placeholder="Search documents…"
                   style={{ background: 'transparent', border: 'none', outline: 'none', fontSize: 12.5, color: 'var(--text-color)', width: '100%' }} />
                 {tableSearch && <button onClick={() => setTableSearch('')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', padding: 0 }}><X size={12} /></button>}
               </div>
-              {filterStatus && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px 5px 12px', borderRadius: 20, background: 'rgba(34,197,94,.1)', border: '1px solid rgba(34,197,94,.3)', fontSize: 12.5, fontWeight: 600, color: '#16a34a', whiteSpace: 'nowrap' }}>
-                  {{ all: 'All Uploads', approved: 'Approved', pending: 'Pending Review', rejected: 'Rejected' }[filterStatus]}
-                  <button onClick={() => setFilterStatus('')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#16a34a', display: 'flex', padding: 0, marginLeft: 2 }}><X size={11} /></button>
+              {/* Active status filter chip */}
+              {filterStatus && filterStatus !== 'all' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px 5px 12px', borderRadius: 20, background: 'rgba(26,86,219,.08)', border: '1px solid rgba(26,86,219,.2)', fontSize: 12, fontWeight: 600, color: 'var(--primary)', whiteSpace: 'nowrap' }}>
+                  {{ approved: 'Approved', pending: 'Pending Review', rejected: 'Rejected' }[filterStatus]}
+                  <button onClick={() => setFilterStatus('')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--primary)', display: 'flex', padding: 0, marginLeft: 2 }}><X size={11} /></button>
                 </div>
               )}
+              {/* Sort controls */}
+              <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', marginRight: 2 }}>Sort:</span>
+                {[
+                  { col: 'uploadedAt', label: 'Date' },
+                  { col: 'title',      label: 'Title' },
+                  { col: 'status',     label: 'Status' },
+                  { col: 'type',       label: 'Type' },
+                ].map(({ col, label }) => {
+                  const active = sortCol === col;
+                  return (
+                    <button key={col} onClick={() => toggleSort(col)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '4px 11px', borderRadius: 20, border: `1px solid ${active ? 'var(--primary)' : 'var(--surface-border)'}`, background: active ? 'rgba(26,86,219,.08)' : 'transparent', color: active ? 'var(--primary)' : 'var(--text-color-secondary)', fontSize: 11.5, fontWeight: active ? 700 : 500, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'all .15s' }}>
+                      {label}{active && <span style={{ fontSize: 9 }}>{sortDir === 'asc' ? '▲' : '▼'}</span>}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
             {/* Type filter pills */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
@@ -1079,19 +1499,10 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 const active = filterType === type;
                 const c = TYPE_CARD_COLORS[type] || { accent: '#94a3b8', bg: 'rgba(148,163,184,.1)', text: '#64748b' };
                 return (
-                  <button key={type} type="button"
-                    onClick={() => setFilterType(active ? '' : type)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 5,
-                      padding: '4px 10px', borderRadius: 20, cursor: 'pointer', fontFamily: 'var(--font)',
-                      fontSize: 12, fontWeight: 600, transition: 'all .15s',
-                      background: active ? c.accent : 'var(--surface-card)',
-                      border: `1.5px solid ${active ? c.accent : c.accent + '55'}`,
-                      color: active ? 'white' : c.text || c.accent,
-                      opacity: count === 0 ? 0.4 : 1,
-                    }}>
+                  <button key={type} type="button" onClick={() => setFilterType(active ? '' : type)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 20, cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 12, fontWeight: 600, transition: 'all .15s', background: active ? c.accent : 'var(--surface-card)', border: `1.5px solid ${active ? c.accent : c.accent + '55'}`, color: active ? 'white' : c.text || c.accent, opacity: count === 0 ? 0.4 : 1 }}>
                     {type}
-                    <span style={{ fontSize: 10, fontFamily: 'var(--mono)', background: active ? 'rgba(255,255,255,.25)' : 'var(--surface-ground)', color: active ? 'white' : 'var(--text-color-secondary)', padding: '0px 5px', borderRadius: 10 }}>{count}</span>
+                    <span style={{ fontSize: 10, fontFamily: 'var(--mono)', background: active ? 'rgba(255,255,255,.25)' : 'var(--surface-ground)', color: active ? 'white' : 'var(--text-color-secondary)', padding: '0 5px', borderRadius: 10 }}>{count}</span>
                   </button>
                 );
               })}
@@ -1104,91 +1515,135 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
             </div>
           </div>
 
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
-              <colgroup>
-                {bulkSelectMode && <col style={{ width: '3%' }} />}
-                <col style={{ width: bulkSelectMode ? '32%' : '36%' }} />
-                <col style={{ width: '10%' }} />
-                <col style={{ width: '16%' }} />
-                <col style={{ width: '7%' }} />
-                <col style={{ width: '12%' }} />
-                <col style={{ width: '11%' }} />
-                <col style={{ width: bulkSelectMode ? '9%' : '8%' }} />
-              </colgroup>
-              <thead>
-                <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
+          {/* ── Column headers ── */}
+          {(() => {
+            const cols = bulkSelectMode ? '4px 48px 1fr 190px 115px 280px' : '4px 1fr 190px 115px 280px';
+            return (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: cols, background: 'var(--surface-50)', borderBottom: '2px solid var(--surface-border)' }}>
+                  <div />
                   {bulkSelectMode && (
-                    <th style={{ padding: '10px 10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', padding: '0 0 0 16px' }}>
                       <button onClick={toggleSelectAll} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', alignItems: 'center' }}>
-                        {selectedIds.size === draftUploads.length && draftUploads.length > 0
-                          ? <CheckSquare size={14} color="var(--primary)" />
-                          : <Square size={14} />}
+                        {selectedIds.size === draftUploads.length && draftUploads.length > 0 ? <CheckSquare size={14} color="var(--primary)" /> : <Square size={14} />}
                       </button>
-                    </th>
+                    </div>
                   )}
-                  <th style={{ padding: '10px 14px', textAlign: 'left' }}><SortBtn col="title" label="Document Title" /></th>
-                  <th style={{ padding: '10px 14px', textAlign: 'left' }}><SortBtn col="type" label="Type" /></th>
-                  <th style={{ padding: '10px 14px', textAlign: 'left' }}><SortBtn col="dept" label="Department" /></th>
-                  <th style={{ padding: '10px 14px', textAlign: 'left' }}><SortBtn col="year" label="Year" /></th>
-                  <th style={{ padding: '10px 14px', textAlign: 'left' }}><SortBtn col="status" label="Status" /></th>
-                  <th style={{ padding: '10px 14px', textAlign: 'left' }}><SortBtn col="uploadedAt" label="Uploaded On" /></th>
-                  <th style={{ ...LABEL, padding: '10px 14px', textAlign: 'left' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.length === 0 && (
-                  <tr><td colSpan={8} style={{ padding: '52px 0', textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>No documents found.</td></tr>
-                )}
-                {filtered.map(doc => {
-                  const isDraft = !doc.workflowStatus || doc.workflowStatus === WORKFLOW_STATUS.DRAFT;
-                  const isPublished = doc.workflowStatus === WORKFLOW_STATUS.PUBLISHED;
-                  const isPending = doc.workflowStatus === WORKFLOW_STATUS.PENDING;
-                  return (
-                  <tr key={doc.id} style={{ borderBottom: '1px solid var(--surface-border)', transition: 'background .15s', background: selectedIds.has(doc.id) ? 'rgba(26,86,219,.04)' : 'transparent' }}
-                    onMouseEnter={e => { if (!selectedIds.has(doc.id)) e.currentTarget.style.background = 'var(--surface-hover)'; }}
-                    onMouseLeave={e => { if (!selectedIds.has(doc.id)) e.currentTarget.style.background = 'transparent'; }}>
-                    {bulkSelectMode && (
-                      <td style={{ padding: '12px 10px' }}>
-                        {isDraft ? (
-                          <button onClick={() => toggleSelectDoc(doc.id)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', alignItems: 'center' }}>
-                            {selectedIds.has(doc.id) ? <CheckSquare size={14} color="var(--primary)" /> : <Square size={14} />}
-                          </button>
-                        ) : (
-                          <div style={{ width: 14, height: 14 }} title={isPublished ? 'Published — use Request Correction' : 'Under review'}>
-                            <Square size={14} color="var(--surface-200)" />
+                  <div style={{ ...LABEL, padding: '10px 16px 10px 68px' }}>Document</div>
+                  <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Status</div>
+                  <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Uploaded On</div>
+                  <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Actions</div>
+                </div>
+
+                {/* ── Document rows ── */}
+                <div>
+                  {filtered.length === 0 && (
+                    <div style={{ padding: '52px 0', textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>
+                      No documents found.
+                    </div>
+                  )}
+                  {filtered.map(doc => {
+                    const isDraft      = !doc.workflowStatus || doc.workflowStatus === WORKFLOW_STATUS.DRAFT;
+                    const isPublished  = doc.workflowStatus === WORKFLOW_STATUS.PUBLISHED;
+                    const isSelected   = selectedIds.has(doc.id);
+                    const statusAccent = doc.status === 'approved' ? '#16a34a' : doc.status === 'rejected' ? '#ef4444' : '#f59e0b';
+                    const statusBg     = doc.status === 'approved' ? 'rgba(34,197,94,.07)' : doc.status === 'rejected' ? 'rgba(239,68,68,.07)' : 'rgba(245,158,11,.07)';
+                    const statusBorder = doc.status === 'approved' ? 'rgba(34,197,94,.25)' : doc.status === 'rejected' ? 'rgba(239,68,68,.25)' : 'rgba(245,158,11,.25)';
+                    const typeColor    = TYPE_CARD_COLORS[doc.type] || { accent: '#94a3b8', bg: 'rgba(148,163,184,.1)', text: '#64748b' };
+                    const approverName = doc.approval?.approver_first_name
+                      ? `${doc.approval.approver_first_name} ${doc.approval.approver_last_name || ''}`.trim()
+                      : doc.approval?.approver_username;
+                    const StatusIcon = doc.status === 'approved' ? CheckCircle : doc.status === 'rejected' ? XCircle : Clock;
+
+                    return (
+                      <div key={doc.id}
+                        style={{ display: 'grid', gridTemplateColumns: cols, borderBottom: '1px solid var(--surface-border)', background: isSelected ? 'rgba(26,86,219,.04)' : 'transparent', transition: 'background .15s' }}
+                        onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = 'var(--surface-hover)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = isSelected ? 'rgba(26,86,219,.04)' : 'transparent'; }}>
+
+                        {/* Status accent strip */}
+                        <div style={{ background: statusAccent }} />
+
+                        {/* Bulk select */}
+                        {bulkSelectMode && (
+                          <div style={{ display: 'flex', alignItems: 'center', padding: '0 0 0 16px' }}>
+                            {isDraft ? (
+                              <button onClick={() => toggleSelectDoc(doc.id)}
+                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', alignItems: 'center' }}>
+                                {isSelected ? <CheckSquare size={14} color="var(--primary)" /> : <Square size={14} />}
+                              </button>
+                            ) : (
+                              <Square size={14} color="var(--surface-200)" title={isPublished ? 'Published — use Request Correction' : 'Under review'} />
+                            )}
                           </div>
                         )}
-                      </td>
-                    )}
-                    <td style={{ padding: '12px 14px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                        {doc.isWord ? <FileType size={13} color="#2b579a" /> : <FileText size={13} color="var(--primary)" />}
-                        <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.title}</span>
-                      </div>
-                      {doc.hierarchy?.act && (
-                        <div style={{ fontSize: 10.5, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {doc.hierarchy.act}{doc.hierarchy.chapter ? ` › ${doc.hierarchy.chapter}` : ''}{doc.hierarchy.section ? ` › ${doc.hierarchy.section}` : ''}
+
+                        {/* Document: icon + title + meta */}
+                        <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                          <div style={{ width: 40, height: 40, borderRadius: 10, background: typeColor.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            {doc.isWord ? <FileType size={17} color={typeColor.accent} /> : <FileText size={17} color={typeColor.accent} />}
+                          </div>
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {doc.title}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 5, flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: typeColor.bg, color: typeColor.text || typeColor.accent }}>
+                                {doc.type}
+                              </span>
+                              <span style={{ fontSize: 11, color: 'var(--text-color-secondary)' }}>{doc.dept}</span>
+                              <span style={{ fontSize: 10.5, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '1px 7px', borderRadius: 20 }}>{doc.year}</span>
+                            </div>
+                          </div>
                         </div>
-                      )}
-                    </td>
-                    <td style={{ padding: '12px 14px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)' }}>{doc.type}</td>
-                    <td style={{ padding: '12px 14px', fontSize: 12, color: 'var(--text-color-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.dept}</td>
-                    <td style={{ padding: '12px 14px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)' }}>{doc.year}</td>
-                    <td style={{ padding: '12px 14px' }}><Badge label={doc.status} variant={doc.status} /></td>
-                    <td style={{ padding: '12px 14px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)' }}>{doc.uploadedAt}</td>
-                    <td style={{ padding: '12px 14px' }}>
-                      <button onClick={() => setVersionModal(doc)}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 6, border: '1px solid var(--surface-border)', background: 'transparent', color: 'var(--text-color-secondary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                        <Eye size={11} /> v{doc.version || '1.0'}
-                      </button>
-                    </td>
-                  </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+
+                        {/* Status */}
+                        <div style={{ padding: '14px 16px', borderLeft: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 6 }}>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px 4px 8px', borderRadius: 20, background: statusBg, border: `1px solid ${statusBorder}`, alignSelf: 'flex-start' }}>
+                            <StatusIcon size={11} color={statusAccent} />
+                            <span style={{ fontSize: 10.5, fontWeight: 700, color: statusAccent, fontFamily: 'var(--mono)', letterSpacing: '.05em' }}>
+                              {doc.status === 'approved' ? 'APPROVED' : doc.status === 'rejected' ? 'REJECTED' : 'PENDING'}
+                            </span>
+                          </div>
+                          {approverName && (
+                            <div style={{ fontSize: 10.5, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', lineHeight: 1.5 }}>
+                              {approverName}
+                              {doc.approval?.acted_at && <div style={{ opacity: .75 }}>{doc.approval.acted_at.split('T')[0]}</div>}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Uploaded On */}
+                        <div style={{ padding: '14px 16px', borderLeft: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', fontFamily: 'var(--mono)', fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
+                          {doc.uploadedAt}
+                        </div>
+
+                        {/* Actions */}
+                        <div style={{ padding: '14px 16px', borderLeft: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 7 }}>
+                          <button onClick={() => setViewDoc(doc)}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 7, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', whiteSpace: 'nowrap', transition: 'background .15s' }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(26,86,219,.14)'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'rgba(26,86,219,.07)'}>
+                            <Eye size={13} /> View
+                          </button>
+                          {doc.approval?.comments && (
+                            <button onClick={() => setRemarksModal(doc)}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 7, border: `1px solid ${statusBorder}`, background: statusBg, color: statusAccent, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', whiteSpace: 'nowrap', transition: 'opacity .15s' }}>
+                              <MessageSquare size={13} /> Remarks
+                            </button>
+                          )}
+                          <button onClick={() => setVersionModal(doc)}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 11px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--mono)', whiteSpace: 'nowrap' }}>
+                            <GitBranch size={12} /> v{doc.version || '1.0'}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            );
+          })()}
         </Card>
         </div>
           );
