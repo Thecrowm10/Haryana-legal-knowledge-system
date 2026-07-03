@@ -19,7 +19,7 @@ const DEFAULT_PAGE = {
   csoffice: 'analytics',
   officer:  'analytics',
   admin:    'users',
-  nodal_officer: 'users',
+  nodal_officer: 'nodalusers',
   auditor:  'auditlog',
 };
 

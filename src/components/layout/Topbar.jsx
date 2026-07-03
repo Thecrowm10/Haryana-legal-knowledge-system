@@ -21,6 +21,8 @@ const BREADCRUMBS = {
   users: ['Admin', 'User Management'], roles: ['Admin', 'Role Matrix'], logs: ['Admin', 'System Logs'],
   auditfull: ['Admin', 'Full MIS Report'],
   auditlog: ['Auditor', 'MIS Report'],
+  nodalusers: ['Nodal Officer', 'User Management'],
+  nodalauditfull: ['Nodal Officer', 'MIS Report'],
 };
 
 export default function Topbar({ user, activePage, onLogout, onToggleSidebar, onChangePassword }) {

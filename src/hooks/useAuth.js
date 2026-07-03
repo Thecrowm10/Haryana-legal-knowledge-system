@@ -69,7 +69,7 @@ export function useAuth() {
       if (!payload) throw new Error('Invalid token received');
 
       // Admin/super_admin must log in via the OTP flow, not username/password.
-      if (payload.role === 'admin' || payload.role === 'super_admin') {
+      if (normalizeRole(payload.role) === 'admin' || normalizeRole(payload.role) === 'super_admin') {
         setError('Admin accounts must sign in via Admin Access (OTP) on the portal selection screen.');
         return;
       }

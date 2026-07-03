@@ -54,7 +54,7 @@ export default function NodalOfficerDashboard({ activePage }) {
   const [roles, setRoles]               = useState([]);
 
   useEffect(() => {
-    if (activePage !== 'users') return;
+    if (activePage !== 'nodalusers') return;
     setUsersLoading(true);
     setUsersError('');
     Promise.all([getUsers(), getRoles()])
@@ -70,7 +70,7 @@ export default function NodalOfficerDashboard({ activePage }) {
   const [depts, setDepts] = useState([]);
 
   useEffect(() => {
-    if (activePage !== 'users') return;
+    if (activePage !== 'nodalusers') return;
     getDepartments()
       .then(res => setDepts(res.data))
       .catch(() => {});
@@ -166,7 +166,7 @@ export default function NodalOfficerDashboard({ activePage }) {
   const [deptFilter, setDeptFilter] = useState('');
 
   // ── User Management ─────────────────────────────────────────────────────
-  if (activePage === 'users') {
+  if (activePage === 'nodalusers') {
     const active   = users.filter(u => u.status === 'active').length;
     const inactive = users.filter(u => u.status === 'inactive').length;
 
@@ -520,7 +520,7 @@ export default function NodalOfficerDashboard({ activePage }) {
   }
 
   // ── Full MIS Report ──────────────────────────────────────────────────────
-  if (activePage === 'auditfull') {
+  if (activePage === 'nodalauditfull') {
     return (
       <div style={{ animation: 'fadeSlideIn .3s ease' }}>
         <Card padding="0">
