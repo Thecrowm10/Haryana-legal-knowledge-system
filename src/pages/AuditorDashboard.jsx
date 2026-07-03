@@ -5,7 +5,7 @@ import Badge from '../components/ui/Badge';
 
 const LABEL = { fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)' };
 
-// Displayed role label — 'citizen' role id stays internal (Badge color lookup), shown as "Guest"
+
 const roleLabel = role => role === 'citizen' ? 'Guest' : role;
 
 const MOCK_AUDIT = [

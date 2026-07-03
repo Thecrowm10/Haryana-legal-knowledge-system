@@ -50,6 +50,12 @@ const MENU_CONFIG = {
       { icon: ClipboardList, label: 'Full Audit Log',  id: 'auditfull' },
     ]},
   ],
+  nodal: [
+    { label: 'ADMINISTRATION', items: [
+      { icon: Users,       label: 'User Management', id: 'users' },
+      { icon: ClipboardList, label: 'Audit Log',      id: 'auditfull' },
+    ]},
+  ],
   auditor: [
     { label: 'AUDIT', items: [
       { icon: ClipboardList, label: 'Audit Log',        id: 'auditlog' },
