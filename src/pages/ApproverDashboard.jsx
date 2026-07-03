@@ -2,7 +2,7 @@
 import {
   CheckCircle, XCircle, FileText, ChevronDown, Search, Clock,
   Check, X, Eye, AlignLeft, Cpu, Link, AlertTriangle, ChevronRight,
-  ZoomIn, ZoomOut, RotateCw, ExternalLink,
+  ZoomIn, ZoomOut, RotateCw, ExternalLink, Plus,
 } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
@@ -30,6 +30,15 @@ const LABEL = {
   fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)',
   letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)',
 };
+
+function parseDisplayRemarks(str) {
+  if (!str) return [];
+  const lines = str.split('\n').filter(l => l.trim());
+  return lines.map((line, i) => {
+    const m = line.match(/^Remark (\d+):\s*(.*)/);
+    return m ? { num: parseInt(m[1]), text: m[2] } : { num: i + 1, text: line };
+  });
+}
 
 // Word confidence helpers
 function _hashStr(s) {
@@ -822,6 +831,37 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, activePage,
   const [blobUrl, setBlobUrl]           = useState(null);
   const [pdfTotalPages, setPdfTotalPages] = useState(null);
 
+  const [remarkLines, setRemarkLines] = useState(() => {
+    if (!remarks) return [''];
+    const lines = remarks.split('\n').filter(l => l.trim());
+    const texts = lines.map(l => l.replace(/^Remark \d+:\s*/, ''));
+    return texts.length > 0 ? texts : [''];
+  });
+
+  function updateRemark(idx, val) {
+    const updated = remarkLines.map((r, i) => i === idx ? val : r);
+    setRemarkLines(updated);
+    onRemarksChange(
+      updated.some(l => l.trim())
+        ? updated.map((l, i) => `Remark ${i + 1}: ${l}`).join('\n')
+        : ''
+    );
+  }
+
+  function addRemark() {
+    setRemarkLines(prev => [...prev, '']);
+  }
+
+  function removeRemark(idx) {
+    const updated = remarkLines.length > 1 ? remarkLines.filter((_, i) => i !== idx) : [''];
+    setRemarkLines(updated);
+    onRemarksChange(
+      updated.some(l => l.trim())
+        ? updated.map((l, i) => `Remark ${i + 1}: ${l}`).join('\n')
+        : ''
+    );
+  }
+
   const mockOcr    = useMemo(() => getMockOcrData(doc), [doc.id]);
   const totalPages = pdfTotalPages || mockOcr.pageCount;
 
@@ -870,17 +910,57 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, activePage,
 
       {/* Approve / Reject — only for pending docs */}
       {activePage === 'pending' && doc.status === 'pending' && (
-        <div style={{ padding: '16px 20px' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12 }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ ...LABEL, marginBottom: 7 }}>Remarks</div>
-              <textarea rows={2} value={remarks || ''} onChange={e => onRemarksChange(e.target.value)}
-                placeholder="Add remarks (optional)…"
-                style={{ width: '100%', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 8, color: 'var(--text-color)', fontFamily: 'var(--font)', fontSize: 13, padding: '9px 12px', outline: 'none', resize: 'none', lineHeight: 1.5, transition: 'border-color .2s', boxSizing: 'border-box' }}
-                onFocus={e => e.target.style.borderColor = 'var(--primary)'}
-                onBlur={e => e.target.style.borderColor = 'var(--surface-border)'} />
-            </div>
-            <div style={{ display: 'flex', gap: 10, flexShrink: 0, paddingBottom: 1 }}>
+        <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+          {/* Numbered remark fields */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {remarkLines.map((remark, idx) => (
+              <div key={idx}>
+                <div style={{ ...LABEL, marginBottom: 5 }}>Remark {idx + 1}</div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input
+                    value={remark}
+                    onChange={e => updateRemark(idx, e.target.value)}
+                    placeholder={`Enter remark ${idx + 1}…`}
+                    style={{
+                      flex: 1, background: 'var(--surface-ground)',
+                      border: '1px solid var(--surface-border)', borderRadius: 8,
+                      color: 'var(--text-color)', fontFamily: 'var(--font)', fontSize: 13,
+                      padding: '9px 12px', outline: 'none', transition: 'border-color .2s',
+                    }}
+                    onFocus={e => e.target.style.borderColor = 'var(--primary)'}
+                    onBlur={e => e.target.style.borderColor = 'var(--surface-border)'}
+                  />
+                  {remarkLines.length > 1 && (
+                    <button onClick={() => removeRemark(idx)}
+                      style={{
+                        background: 'rgba(239,68,68,.06)', border: '1px solid rgba(239,68,68,.2)',
+                        color: '#dc2626', borderRadius: 7, width: 32, height: 32,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: 'pointer', flexShrink: 0,
+                      }}>
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Add Remark + action buttons row */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <button onClick={addRemark}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                background: 'transparent', border: '1.5px dashed var(--surface-border)',
+                color: 'var(--primary)', borderRadius: 7, padding: '6px 14px',
+                fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.background = 'rgba(26,86,219,.05)'; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--surface-border)'; e.currentTarget.style.background = 'transparent'; }}>
+              <Plus size={13} /> Add Remark
+            </button>
+            <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={() => onDecide('rejected')} disabled={!!deciding}
                 style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.3)', color: '#b91c1c', padding: '9px 18px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 600, cursor: deciding ? 'not-allowed' : 'pointer', opacity: deciding && deciding !== 'rejected' ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
                 onMouseEnter={e => { if (!deciding) e.currentTarget.style.background = 'rgba(239,68,68,.15)'; }}
@@ -901,19 +981,28 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, activePage,
       {/* Remarks display for already-reviewed documents */}
       {doc.status !== 'pending' && doc.remarks && (
         <div style={{
-          padding: '12px 20px', display: 'flex', alignItems: 'flex-start', gap: 10,
+          padding: '12px 20px',
           background: doc.status === 'approved' ? 'rgba(34,197,94,.04)' : 'rgba(239,68,68,.04)',
           borderTop: '1px solid var(--surface-border)',
         }}>
-          {doc.status === 'approved'
-            ? <CheckCircle size={14} color="#16a34a" style={{ flexShrink: 0, marginTop: 1 }} />
-            : <XCircle    size={14} color="#ef4444" style={{ flexShrink: 0, marginTop: 1 }} />
-          }
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 700, fontFamily: 'var(--mono)', color: doc.status === 'approved' ? '#16a34a' : '#ef4444', marginBottom: 3 }}>
-              {doc.status === 'approved' ? 'APPROVED' : 'REJECTED'} — REVIEWER REMARKS
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+            {doc.status === 'approved'
+              ? <CheckCircle size={14} color="#16a34a" style={{ flexShrink: 0, marginTop: 2 }} />
+              : <XCircle    size={14} color="#ef4444" style={{ flexShrink: 0, marginTop: 2 }} />
+            }
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, fontFamily: 'var(--mono)', color: doc.status === 'approved' ? '#16a34a' : '#ef4444', marginBottom: 6 }}>
+                {doc.status === 'approved' ? 'APPROVED' : 'REJECTED'} — REVIEWER REMARKS
+              </div>
+              {parseDisplayRemarks(doc.remarks).map(({ num, text }) => (
+                <div key={num} style={{ display: 'flex', gap: 8, marginBottom: 4, alignItems: 'baseline' }}>
+                  <span style={{ fontSize: 10.5, fontFamily: 'var(--mono)', fontWeight: 700, color: doc.status === 'approved' ? '#16a34a' : '#ef4444', flexShrink: 0, minWidth: 62 }}>
+                    Remark {num}
+                  </span>
+                  <span style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', lineHeight: 1.5 }}>{text || '—'}</span>
+                </div>
+              ))}
             </div>
-            <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)' }}>{doc.remarks}</div>
           </div>
         </div>
       )}
@@ -1220,11 +1309,17 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
                     ))}
                   </div>
                   {/* Remarks preview for reviewed docs (collapsed state) */}
-                  {doc.status !== 'pending' && doc.remarks && !isOpen && (
-                    <div style={{ marginTop: 4, fontSize: 11.5, color: 'var(--text-color-secondary)', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 460 }}>
-                      Remarks: "{doc.remarks}"
-                    </div>
-                  )}
+                  {doc.status !== 'pending' && doc.remarks && !isOpen && (() => {
+                    const parsed = parseDisplayRemarks(doc.remarks);
+                    return (
+                      <div style={{ marginTop: 4, fontSize: 11.5, color: 'var(--text-color-secondary)', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 460 }}>
+                        {parsed.length <= 1
+                          ? `Remark 1: "${parsed[0]?.text ?? doc.remarks}"`
+                          : `${parsed.length} remarks — Remark 1: "${parsed[0].text}"`
+                        }
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
