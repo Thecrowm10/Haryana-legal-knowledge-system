@@ -1,5 +1,5 @@
-﻿import { useState, useEffect } from 'react';
-import { Users, ShieldCheck, Settings, Activity, ClipboardList, Trash2, Edit2, Plus, CheckCircle, XCircle, Building2, X, Eye, EyeOff, Download } from 'lucide-react';
+﻿import { useState, useEffect, useRef } from 'react';
+import { Users, ShieldCheck, Settings, Activity, ClipboardList, Trash2, Edit2, Plus, CheckCircle, XCircle, Building2, X, Eye, EyeOff, ChevronDown, Check } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import SelectField from '../components/ui/SelectField';
@@ -18,8 +18,10 @@ function normalizeUser(u) {
     email:     u.email ?? '',
     role:      u.role?.name ?? '—',
     roleId:    u.role?.id ?? null,
-    dept:      u.department?.name ?? '—',
+    dept:      u.departments?.length > 0 ? u.departments.map(d => d.name).join(', ') : (u.department?.name ?? '—'),
     deptId:    u.department?.id ?? null,
+    deptIds:   u.departments?.map(d => d.id) ?? [],
+    deptRaw:   u.departments?.length > 0 ? u.departments.map(d => String(d.id)).join(',') : null,
     status:    u.is_active ? 'active' : 'inactive',
     isActive:  u.is_active,
     lastLogin: u.last_login ? u.last_login.split('T')[0] : '—',
@@ -167,40 +169,43 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   }
 
   // Add User modal state
-  const EMPTY_ADD_FORM = { username: '', email: '', mobile_number: '', password: '', first_name: '', last_name: '', role_id: '', department_id: '' };
+  const EMPTY_ADD_FORM = { username: '', email: '', mobile_number: '', password: '', first_name: '', last_name: '', role_id: '', department_id: '', dept_ids: [] };
   const [addingUser, setAddingUser]   = useState(false);
   const [addForm, setAddForm]         = useState(EMPTY_ADD_FORM);
   const [addSaving, setAddSaving]     = useState(false);
   const [addError, setAddError]       = useState('');
   const [showAddPass, setShowAddPass] = useState(false);
 
-  function handleAddUser() {
+  async function handleAddUser() {
     if (!addForm.username.trim()) { setAddError('Username is required.'); return; }
     if (!addForm.email.trim())    { setAddError('Email is required.'); return; }
     if (!addForm.password)        { setAddError('Password is required.'); return; }
     setAddSaving(true);
     setAddError('');
-    registerUser({
-      username:      addForm.username.trim(),
-      email:         addForm.email.trim(),
-      mobile_number: addForm.mobile_number.trim() || undefined,
-      password:      addForm.password,
-      first_name:    addForm.first_name.trim(),
-      last_name:     addForm.last_name.trim(),
-      role_id:       addForm.role_id       ? Number(addForm.role_id)       : undefined,
-      department_id: addForm.department_id ? Number(addForm.department_id) : undefined,
-    })
-      .then(res => {
-        setUsers(prev => [normalizeUser(res.data), ...prev]);
-        setAddingUser(false);
-        setAddForm(EMPTY_ADD_FORM);
-        setShowAddPass(false);
-      })
-      .catch(err => {
-        const detail = err.response?.data?.detail;
-        setAddError(typeof detail === 'string' ? detail : 'Failed to create user.');
-      })
-      .finally(() => setAddSaving(false));
+    try {
+      const isNodal = roles.find(r => String(r.id) === String(addForm.role_id))?.name === 'nodal Officer';
+      const res = await registerUser({
+        username:      addForm.username.trim(),
+        email:         addForm.email.trim(),
+        mobile_number: addForm.mobile_number.trim() || undefined,
+        password:      addForm.password,
+        first_name:    addForm.first_name.trim(),
+        last_name:     addForm.last_name.trim(),
+        role_id:       addForm.role_id ? Number(addForm.role_id) : undefined,
+        department_id: isNodal
+          ? (addForm.dept_ids.length > 0 ? addForm.dept_ids.join(',') : undefined)
+          : (addForm.department_id || undefined),
+      });
+      setUsers(prev => [normalizeUser(res.data), ...prev]);
+      setAddingUser(false);
+      setAddForm(EMPTY_ADD_FORM);
+      setShowAddPass(false);
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      setAddError(typeof detail === 'string' ? detail : 'Failed to create user.');
+    } finally {
+      setAddSaving(false);
+    }
   }
 
   // Edit modal state
@@ -211,6 +216,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   const [togglingId, setTogglingId]   = useState(null);
 
   function openEdit(u) {
+    const isNodal = u.role === 'nodal Officer';
     setEditingUser(u);
     setEditForm({
       first_name:    u.firstName,
@@ -218,15 +224,27 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       email:         u.email,
       is_active:     u.isActive,
       role_id:       u.roleId,
-      department_id: u.deptId,
+      department_id: isNodal ? '' : String(u.deptId ?? ''),
+      dept_ids:      isNodal ? u.deptIds : [],
     });
     setEditError('');
   }
 
   function handleEditSave() {
+    const isNodal = roles.find(r => String(r.id) === String(editForm.role_id))?.name === 'nodal Officer';
     setEditSaving(true);
     setEditError('');
-    updateUser({ user_id: editingUser.id, ...editForm })
+    updateUser({
+      user_id:       editingUser.id,
+      first_name:    editForm.first_name,
+      last_name:     editForm.last_name,
+      email:         editForm.email,
+      is_active:     editForm.is_active,
+      role_id:       editForm.role_id,
+      department_id: isNodal
+        ? (editForm.dept_ids.length > 0 ? editForm.dept_ids.join(',') : undefined)
+        : (editForm.department_id || undefined),
+    })
       .then(res => {
         setUsers(prev => prev.map(u => u.id === editingUser.id ? normalizeUser(res.data) : u));
         setEditingUser(null);
@@ -247,7 +265,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       email:         u.email,
       is_active:     !u.isActive,
       role_id:       u.roleId,
-      department_id: u.deptId,
+      department_id: u.deptRaw || undefined,
     })
       .then(res => setUsers(prev => prev.map(x => x.id === u.id ? normalizeUser(res.data) : x)))
       .catch(() => {})
@@ -305,10 +323,8 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
               </SelectField>
               <button
-                disabled={!deptFilter}
-                title={!deptFilter ? 'Select a department first' : undefined}
                 onClick={() => { setAddingUser(true); setAddError(''); setAddForm({ ...EMPTY_ADD_FORM, department_id: deptFilter }); setShowAddPass(false); }}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--primary)', color: 'white', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 12.5, fontWeight: 600, cursor: deptFilter ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap', opacity: deptFilter ? 1 : 0.5 }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--primary)', color: 'white', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
                 <Plus size={13} /> Add User
               </button>
             </div>
@@ -471,22 +487,48 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 </div>
 
                 {/* Role + Department */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div>
-                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Role</label>
-                    <SelectField value={addForm.role_id} onChange={e => setAddForm(f => ({ ...f, role_id: e.target.value }))} placeholder="Select Role">
-                      {roles.map(r => (
-                        <option key={r.id} value={r.id}>{r.name.charAt(0).toUpperCase() + r.name.slice(1)}</option>
-                      ))}
-                    </SelectField>
-                  </div>
-                  <div>
-                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Department</label>
-                    <div style={{ ...INP_STYLE, background: 'var(--surface-hover)', color: 'var(--text-color-secondary)', cursor: 'not-allowed' }}>
-                      {depts.find(d => String(d.id) === String(addForm.department_id))?.name ?? '—'}
-                    </div>
-                  </div>
-                </div>
+                {(() => {
+                  const isNodal = roles.find(r => String(r.id) === String(addForm.role_id))?.name === 'nodal Officer';
+                  return (
+                    <>
+                      <div style={{ display: 'grid', gridTemplateColumns: isNodal ? '1fr' : '1fr 1fr', gap: 12 }}>
+                        <div>
+                          <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Role</label>
+                          <SelectField
+                            value={addForm.role_id}
+                            onChange={e => setAddForm(f => ({ ...f, role_id: e.target.value, department_id: '', dept_ids: [] }))}
+                            placeholder="Select Role"
+                          >
+                            {roles.map(r => (
+                              <option key={r.id} value={r.id}>{r.name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</option>
+                            ))}
+                          </SelectField>
+                        </div>
+                        {!isNodal && (
+                          <div>
+                            <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Department</label>
+                            <SelectField value={addForm.department_id} onChange={e => setAddForm(f => ({ ...f, department_id: e.target.value }))} placeholder="Select Department">
+                              {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                            </SelectField>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Managed Departments — nodal officer only */}
+                      {isNodal && (
+                        <div>
+                          <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Department</label>
+                          <MultiSelectField
+                            value={addForm.dept_ids}
+                            onChange={ids => setAddForm(f => ({ ...f, dept_ids: ids }))}
+                            options={depts}
+                            placeholder="Select departments…"
+                          />
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
 
                 {addError && (
                   <div style={{ padding: '9px 12px', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, fontSize: 12.5, color: '#ef4444', display: 'flex', gap: 7, alignItems: 'center' }}>
@@ -560,24 +602,48 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                     onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div>
-                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Role</label>
-                    <SelectField value={editForm.role_id ?? ''} onChange={e => setEditForm(f => ({ ...f, role_id: e.target.value ? Number(e.target.value) : null }))} placeholder="Select Role">
-                      {roles.map(r => (
-                        <option key={r.id} value={r.id}>{r.name.charAt(0).toUpperCase() + r.name.slice(1)}</option>
-                      ))}
-                    </SelectField>
-                  </div>
-                  <div>
-                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Department</label>
-                    <SelectField value={editForm.department_id ?? ''} onChange={e => setEditForm(f => ({ ...f, department_id: e.target.value ? Number(e.target.value) : null }))} placeholder="No Department">
-                      {depts.map(d => (
-                        <option key={d.id} value={d.id}>{d.name}</option>
-                      ))}
-                    </SelectField>
-                  </div>
-                </div>
+                {(() => {
+                  const isNodal = roles.find(r => String(r.id) === String(editForm.role_id))?.name === 'nodal Officer';
+                  return (
+                    <>
+                      <div style={{ display: 'grid', gridTemplateColumns: isNodal ? '1fr' : '1fr 1fr', gap: 12 }}>
+                        <div>
+                          <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Role</label>
+                          <SelectField
+                            value={editForm.role_id ?? ''}
+                            onChange={e => setEditForm(f => ({ ...f, role_id: e.target.value ? Number(e.target.value) : null, department_id: '', dept_ids: [] }))}
+                            placeholder="Select Role"
+                          >
+                            {roles.map(r => (
+                              <option key={r.id} value={r.id}>{r.name.charAt(0).toUpperCase() + r.name.slice(1)}</option>
+                            ))}
+                          </SelectField>
+                        </div>
+                        {!isNodal && (
+                          <div>
+                            <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Department</label>
+                            <SelectField value={editForm.department_id ?? ''} onChange={e => setEditForm(f => ({ ...f, department_id: e.target.value || null }))} placeholder="No Department">
+                              {depts.map(d => (
+                                <option key={d.id} value={d.id}>{d.name}</option>
+                              ))}
+                            </SelectField>
+                          </div>
+                        )}
+                      </div>
+                      {isNodal && (
+                        <div>
+                          <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Department</label>
+                          <MultiSelectField
+                            value={editForm.dept_ids}
+                            onChange={ids => setEditForm(f => ({ ...f, dept_ids: ids }))}
+                            options={depts}
+                            placeholder="Select departments…"
+                          />
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
 
                 {/* Active status toggle */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: 'var(--surface-ground)', borderRadius: 10, border: '1px solid var(--surface-border)' }}>
@@ -1039,4 +1105,110 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   }
 
   return null;
+}
+
+function MultiSelectField({ value = [], onChange, options = [], placeholder = 'Select...' }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = e => { if (!ref.current?.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [open]);
+
+  function toggle(id) {
+    onChange(value.includes(id) ? value.filter(v => v !== id) : [...value, id]);
+  }
+
+  const selectedOptions = options.filter(o => value.includes(o.id));
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      {/* Trigger */}
+      <button type="button" onClick={() => setOpen(o => !o)} style={{
+        width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+        padding: '10px 12px 10px 14px', fontFamily: 'var(--font)', fontSize: 13,
+        borderRadius: 8, background: 'var(--surface-ground)',
+        border: `1px solid ${open ? 'var(--primary)' : 'var(--surface-border)'}`,
+        boxShadow: open ? '0 0 0 3px rgba(26,86,219,.1)' : 'none',
+        cursor: 'pointer', outline: 'none', textAlign: 'left',
+        color: selectedOptions.length ? 'var(--text-color)' : 'var(--text-color-secondary)',
+        transition: 'border-color .2s, box-shadow .2s',
+      }}>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {selectedOptions.length === 0
+            ? placeholder
+            : selectedOptions.length === 1
+            ? selectedOptions[0].name
+            : `${selectedOptions.length} departments selected`}
+        </span>
+        <ChevronDown size={15} strokeWidth={2} style={{
+          flexShrink: 0, color: 'var(--text-color-secondary)',
+          transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .2s',
+        }} />
+      </button>
+
+      {/* Dropdown panel */}
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 600,
+          background: 'rgba(255,255,255,.75)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
+          border: '1.5px solid rgba(255,255,255,.8)', borderRadius: 12,
+          boxShadow: '0 8px 32px rgba(0,0,0,.1), 0 2px 8px rgba(0,0,0,.06), inset 0 1px 0 rgba(255,255,255,.95)',
+          maxHeight: 200, overflowY: 'auto', animation: 'dropdownIn .15s cubic-bezier(.2,.8,.3,1)',
+        }}>
+          {options.map(opt => {
+            const isChecked = value.includes(opt.id);
+            return (
+              <div key={opt.id} onMouseDown={() => toggle(opt.id)} style={{
+                display: 'flex', alignItems: 'center', gap: 9,
+                padding: '10px 14px', fontSize: 13, fontFamily: 'var(--font)',
+                color: isChecked ? 'var(--primary)' : 'var(--text-color)',
+                fontWeight: isChecked ? 600 : 400, cursor: 'pointer',
+                transition: 'background .12s', background: 'transparent',
+              }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(26,86,219,.08)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+              >
+                <div style={{
+                  width: 15, height: 15, borderRadius: 4, flexShrink: 0,
+                  border: `2px solid ${isChecked ? 'var(--primary)' : 'var(--surface-border)'}`,
+                  background: isChecked ? 'var(--primary)' : 'transparent',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  transition: 'background .15s, border-color .15s',
+                }}>
+                  {isChecked && <Check size={9} color="white" strokeWidth={3} />}
+                </div>
+                {opt.name}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Selected tags */}
+      {selectedOptions.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 8 }}>
+          {selectedOptions.map(o => (
+            <span key={o.id} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              padding: '3px 6px 3px 10px', borderRadius: 20,
+              background: 'rgba(26,86,219,.1)', border: '1px solid rgba(26,86,219,.2)',
+              fontSize: 11.5, color: 'var(--primary)', fontWeight: 600,
+            }}>
+              {o.name}
+              <button type="button" onMouseDown={e => { e.stopPropagation(); toggle(o.id); }} style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: 'var(--primary)', display: 'flex', padding: '1px',
+              }}>
+                <X size={10} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
