@@ -21,6 +21,7 @@ const BREADCRUMBS = {
   users: ['Admin', 'User Management'], logs: ['Admin', 'System Logs'],
   taxonomy: ['Admin', 'Master Data Manager'],
   auditfull: ['Admin', 'Full MIS Report'],
+  alluploads: ['Admin', 'All Uploads'],
   auditlog: ['Auditor', 'MIS Report'],
   nodalusers: ['Nodal Officer', 'User Management'],
   nodalauditfull: ['Nodal Officer', 'MIS Report'],

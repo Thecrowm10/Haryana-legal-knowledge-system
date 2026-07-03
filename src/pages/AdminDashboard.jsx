@@ -1,10 +1,11 @@
 ﻿import { useState, useEffect, useRef } from 'react';
-import { Users, ShieldCheck, Settings, Activity, ClipboardList, Trash2, Edit2, Plus, CheckCircle, XCircle, Building2, X, Eye, EyeOff, ChevronDown, Check, Download } from 'lucide-react';
+import { Users, ShieldCheck, Settings, Activity, ClipboardList, Trash2, Edit2, Plus, CheckCircle, XCircle, Building2, X, Eye, EyeOff, ChevronDown, Check, Download, Layers, FileText, Clock, Search, Filter } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import SelectField from '../components/ui/SelectField';
 import { getUsers, getRoles, updateUser, registerUser } from '../services/users';
 import { getDepartments, createDepartment, getDocumentTypes, createDocumentType } from '../services/departments';
+import { getAllDocumentsAdmin } from '../services/pdf';
 
 const LABEL = { fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)' };
 
@@ -103,6 +104,32 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       .then(res => setDocTypes(res.data))
       .catch(() => setDocTypesError('Failed to load document types. Please try again.'))
       .finally(() => setDocTypesLoading(false));
+  }, [activePage]);
+
+  // All Uploads state
+  const [allDocs, setAllDocs]           = useState([]);
+  const [allDocsLoading, setAllDocsLoading] = useState(false);
+  const [allDocsError, setAllDocsError] = useState('');
+  const [uploadsSearch, setUploadsSearch] = useState('');
+  const [uploadsFilterStatus, setUploadsFilterStatus] = useState('');
+  const [uploadsFilterDept, setUploadsFilterDept]     = useState('');
+  const [uploadsFilterUploader, setUploadsFilterUploader] = useState('');
+  const [uploadsFilterApprover, setUploadsFilterApprover] = useState('');
+
+  useEffect(() => {
+    if (activePage !== 'alluploads') return;
+    setAllDocsLoading(true);
+    setAllDocsError('');
+    Promise.all([
+      getAllDocumentsAdmin(),
+      getDepartments(),
+    ])
+      .then(([docsRes, deptsRes]) => {
+        setAllDocs(docsRes.data.documents || []);
+        setDepts(deptsRes.data);
+      })
+      .catch(() => setAllDocsError('Failed to load documents. Please try again.'))
+      .finally(() => setAllDocsLoading(false));
   }, [activePage]);
 
   function handleCreateDept(e) {
@@ -1057,6 +1084,220 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
               ))}
             </tbody>
           </table>
+        </Card>
+      </div>
+    );
+  }
+
+  // All Uploads
+  if (activePage === 'alluploads') {
+    const totalDocs    = allDocs.length;
+    const approvedDocs = allDocs.filter(d => d.status === 'approved').length;
+    const pendingDocs  = allDocs.filter(d => d.status === 'pending').length;
+    const rejectedDocs = allDocs.filter(d => d.status === 'rejected').length;
+
+    // unique uploaders
+    const uploaderOptions = [];
+    const seenUp = new Set();
+    for (const d of allDocs) {
+      if (d.uploader_username && !seenUp.has(d.uploader_username)) {
+        seenUp.add(d.uploader_username);
+        const label = [d.uploader_first_name, d.uploader_last_name].filter(Boolean).join(' ') || d.uploader_username;
+        uploaderOptions.push({ value: d.uploader_username, label });
+      }
+    }
+    // unique approvers
+    const approverOptions = [];
+    const seenAp = new Set();
+    for (const d of allDocs) {
+      const key = d.latest_approval?.approver_username;
+      if (key && !seenAp.has(key)) {
+        seenAp.add(key);
+        const label = [d.latest_approval.approver_first_name, d.latest_approval.approver_last_name].filter(Boolean).join(' ') || key;
+        approverOptions.push({ value: key, label });
+      }
+    }
+
+    const filteredDocs = allDocs.filter(d => {
+      if (uploadsFilterStatus && d.status !== uploadsFilterStatus) return false;
+      if (uploadsFilterDept && d.department_name !== uploadsFilterDept) return false;
+      if (uploadsFilterUploader && d.uploader_username !== uploadsFilterUploader) return false;
+      if (uploadsFilterApprover && d.latest_approval?.approver_username !== uploadsFilterApprover) return false;
+      if (uploadsSearch) {
+        const q = uploadsSearch.toLowerCase();
+        const name = (d.document_name || d.original_filename || '').toLowerCase();
+        const dept = (d.department_name || '').toLowerCase();
+        const up   = (d.uploader_username || '').toLowerCase();
+        if (!name.includes(q) && !dept.includes(q) && !up.includes(q)) return false;
+      }
+      return true;
+    });
+
+    const SC = {
+      approved: { color: '#16a34a', bg: 'rgba(34,197,94,.1)',   label: 'Approved' },
+      pending:  { color: '#f59e0b', bg: 'rgba(245,158,11,.1)',  label: 'Pending'  },
+      rejected: { color: '#ef4444', bg: 'rgba(239,68,68,.1)',   label: 'Rejected' },
+    };
+    const cols = '4px 1fr 180px 160px 120px';
+    const anyFilter = uploadsSearch || uploadsFilterStatus || uploadsFilterDept || uploadsFilterUploader || uploadsFilterApprover;
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
+        {/* Stats */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
+          {[
+            { label: 'Total Uploads', value: totalDocs,    color: 'var(--primary)', bg: 'rgba(26,86,219,.12)',  icon: Layers,      key: '' },
+            { label: 'Approved',      value: approvedDocs, color: '#16a34a',        bg: 'rgba(34,197,94,.12)',  icon: CheckCircle, key: 'approved' },
+            { label: 'Pending',       value: pendingDocs,  color: '#f59e0b',        bg: 'rgba(245,158,11,.12)', icon: Clock,       key: 'pending'  },
+            { label: 'Rejected',      value: rejectedDocs, color: '#ef4444',        bg: 'rgba(239,68,68,.12)',  icon: XCircle,     key: 'rejected' },
+          ].map(s => {
+            const isActive = uploadsFilterStatus === s.key && s.key !== '';
+            return (
+              <Card key={s.label}
+                onClick={() => setUploadsFilterStatus(f => f === s.key ? '' : s.key)}
+                style={{ cursor: 'pointer', outline: isActive ? `2px solid ${s.color}` : '2px solid transparent', transition: 'all .2s' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                  <div>
+                    <div style={{ ...LABEL, marginBottom: 8, color: isActive ? s.color : undefined }}>{s.label}</div>
+                    <div style={{ fontSize: 28, fontWeight: 700, color: isActive ? s.color : 'var(--text-heading)', fontFamily: 'var(--mono)', lineHeight: 1 }}>
+                      {allDocsLoading ? '–' : s.value}
+                    </div>
+                  </div>
+                  <div style={{ width: 44, height: 44, borderRadius: 11, background: isActive ? s.color + '22' : s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background .2s' }}>
+                    <s.icon size={20} color={s.color} strokeWidth={1.8} />
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+
+        {/* Filter bar + table */}
+        <Card padding="0">
+          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            {/* Search */}
+            <div style={{ position: 'relative', flex: '1 1 200px', minWidth: 180 }}>
+              <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-color-secondary)', pointerEvents: 'none' }} />
+              <input
+                value={uploadsSearch}
+                onChange={e => setUploadsSearch(e.target.value)}
+                placeholder="Search documents…"
+                style={{ width: '100%', padding: '7px 12px 7px 30px', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, color: 'var(--text-color)', outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+            <SelectField value={uploadsFilterUploader} onChange={e => setUploadsFilterUploader(e.target.value)} style={{ flex: '0 0 155px' }}>
+              <option value="">All Uploaders</option>
+              {uploaderOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </SelectField>
+            <SelectField value={uploadsFilterApprover} onChange={e => setUploadsFilterApprover(e.target.value)} style={{ flex: '0 0 155px' }}>
+              <option value="">All Approvers</option>
+              {approverOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </SelectField>
+            <SelectField value={uploadsFilterDept} onChange={e => setUploadsFilterDept(e.target.value)} style={{ flex: '0 0 155px' }}>
+              <option value="">All Departments</option>
+              {depts.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+            </SelectField>
+            <SelectField value={uploadsFilterStatus} onChange={e => setUploadsFilterStatus(e.target.value)} style={{ flex: '0 0 130px' }}>
+              <option value="">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </SelectField>
+            {anyFilter && (
+              <button onClick={() => { setUploadsSearch(''); setUploadsFilterStatus(''); setUploadsFilterDept(''); setUploadsFilterUploader(''); setUploadsFilterApprover(''); }}
+                style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'transparent', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '7px 12px', fontSize: 12, cursor: 'pointer', color: 'var(--text-color-secondary)', whiteSpace: 'nowrap' }}>
+                <X size={11} /> Clear
+              </button>
+            )}
+            <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
+              {filteredDocs.length} of {totalDocs}
+            </div>
+          </div>
+
+          {allDocsLoading && (
+            <div style={{ padding: '50px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>Loading documents…</div>
+          )}
+          {allDocsError && (
+            <div style={{ padding: '20px 18px', fontSize: 13, color: '#ef4444' }}>{allDocsError}</div>
+          )}
+
+          {!allDocsLoading && !allDocsError && (
+            <>
+              {/* Column headers */}
+              <div style={{ display: 'grid', gridTemplateColumns: cols, background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
+                <div />
+                <div style={{ ...LABEL, padding: '10px 16px 10px 68px' }}>Document</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Uploader</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Status</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Uploaded On</div>
+              </div>
+
+              {filteredDocs.length === 0 ? (
+                <div style={{ padding: '50px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>
+                  No documents match the current filters
+                </div>
+              ) : filteredDocs.map(doc => {
+                const sc = SC[doc.status] || SC.pending;
+                const uploaderName = [doc.uploader_first_name, doc.uploader_last_name].filter(Boolean).join(' ') || doc.uploader_username || '—';
+                const approverName = doc.latest_approval
+                  ? ([doc.latest_approval.approver_first_name, doc.latest_approval.approver_last_name].filter(Boolean).join(' ') || doc.latest_approval.approver_username)
+                  : null;
+                const uploadedDate = doc.created_at ? doc.created_at.split('T')[0] : '—';
+                return (
+                  <div key={doc.id} style={{ display: 'grid', gridTemplateColumns: cols, borderBottom: '1px solid var(--surface-border)', alignItems: 'stretch', minHeight: 60, transition: 'background .15s' }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                    {/* Status strip */}
+                    <div style={{ background: sc.color, opacity: .7 }} />
+                    {/* Document */}
+                    <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 9, background: sc.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <FileText size={16} color={sc.color} strokeWidth={1.8} />
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 340 }}>
+                          {doc.document_name || doc.original_filename}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3, flexWrap: 'wrap' }}>
+                          {doc.document_type_name && (
+                            <span style={{ fontSize: 10, fontWeight: 600, color: sc.color, background: sc.bg, borderRadius: 4, padding: '1px 5px' }}>{doc.document_type_name}</span>
+                          )}
+                          {doc.department_name && (
+                            <span style={{ fontSize: 10, color: 'var(--text-color-secondary)' }}>{doc.department_name}</span>
+                          )}
+                          {doc.version_no && (
+                            <span style={{ fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', borderRadius: 4, padding: '1px 5px', border: '1px solid var(--surface-border)' }}>v{doc.version_no}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    {/* Uploader */}
+                    <div style={{ padding: '10px 14px', borderLeft: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-heading)' }}>{uploaderName}</div>
+                      {doc.uploader_username && (
+                        <div style={{ fontSize: 10.5, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>@{doc.uploader_username}</div>
+                      )}
+                    </div>
+                    {/* Status */}
+                    <div style={{ padding: '10px 14px', borderLeft: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10.5, fontWeight: 700, color: sc.color, background: sc.bg, borderRadius: 12, padding: '3px 9px', textTransform: 'uppercase', letterSpacing: '.05em', width: 'fit-content' }}>
+                        {sc.label}
+                      </span>
+                      {approverName && (
+                        <div style={{ fontSize: 10.5, color: 'var(--text-color-secondary)', marginTop: 4 }}>
+                          {doc.status === 'approved' ? '✓' : '✗'} {approverName}
+                        </div>
+                      )}
+                    </div>
+                    {/* Date */}
+                    <div style={{ padding: '10px 14px', borderLeft: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', fontFamily: 'var(--mono)', fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
+                      {uploadedDate}
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          )}
         </Card>
       </div>
     );

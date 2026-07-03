@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Home, Search, Upload, FileText, CheckSquare, Eye, BarChart2, GitBranch, ClipboardList, ChevronDown, Users, Settings, Activity, FileSearch, BarChart, Building2 } from 'lucide-react';
+import { Home, Search, Upload, FileText, CheckSquare, Eye, BarChart2, GitBranch, ClipboardList, ChevronDown, Users, Settings, Activity, FileSearch, BarChart, Building2, Layers } from 'lucide-react';
 import haryanaLogo from '../../assets/haryana-logo.png';
 const MENU_CONFIG = {
   citizen: [
@@ -42,6 +42,7 @@ const MENU_CONFIG = {
     { label: 'ADMINISTRATION', items: [
       { icon: Users,       label: 'User Management',    id: 'users' },
       { icon: Building2,   label: 'Departments',         id: 'departments' },
+      { icon: Layers,      label: 'All Uploads',         id: 'alluploads' },
     ]},
     { label: 'SYSTEM', items: [
       { icon: Settings,      label: 'Master Data Manager', id: 'taxonomy' },
