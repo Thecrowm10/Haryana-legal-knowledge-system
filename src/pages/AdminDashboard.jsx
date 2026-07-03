@@ -7,6 +7,7 @@ import DocViewModal from '../components/DocViewModal';
 import { getUsers, getRoles, updateUser, registerUser } from '../services/users';
 import { getDepartments, createDepartment, toggleDepartment, getDocumentTypes, createDocumentType, toggleDocumentType } from '../services/departments';
 import { getAllDocumentsAdmin } from '../services/pdf';
+import { getAuditLogs } from '../services/audit';
 
 const LABEL = { fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)' };
 
@@ -39,16 +40,26 @@ function exportCSV(data, filename) {
   URL.revokeObjectURL(url);
 }
 
-const MOCK_AUDIT = [
-  { time: '2026-05-25 10:42', user: 'Priya Sharma',  role: 'uploader', action: 'Uploaded document: Haryana Municipal Act 2024' },
-  { time: '2026-05-25 10:18', user: 'Sunil Verma',   role: 'approver', action: 'Approved: Punjab Land Revenue Act Amendment' },
-  { time: '2026-05-25 09:55', user: 'Guest',          role: 'citizen',  action: 'Searched: "factory license renewal rules"' },
-  { time: '2026-05-25 09:30', user: 'Anita Singh',   role: 'csoffice', action: 'Viewed analytics dashboard' },
-  { time: '2026-05-24 17:12', user: 'Sunil Verma',   role: 'approver', action: 'Rejected: Draft Notification — missing metadata' },
-  { time: '2026-05-24 16:45', user: 'Guest',          role: 'citizen',  action: 'Searched: "land acquisition compensation"' },
-  { time: '2026-05-24 15:30', user: 'Deepa Nair',    role: 'auditor',  action: 'Exported audit log (CSV)' },
-  { time: '2026-05-24 14:10', user: 'Harish Gupta',  role: 'approver', action: 'Approved: Excise Policy Circular 2026' },
+const AUDIT_PAGE_SIZE = 20;
+
+const AUDIT_ENTITY_OPTIONS = [
+  { value: '',              label: 'All Entities' },
+  { value: 'auth',         label: 'Auth' },
+  { value: 'user',         label: 'User' },
+  { value: 'pdf',          label: 'PDF' },
+  { value: 'department',   label: 'Department' },
+  { value: 'document_type',label: 'Document Type' },
 ];
+
+function fmtAction(action) {
+  return action.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function fmtAuditActor(actor) {
+  if (!actor) return 'System';
+  const full = [actor.first_name, actor.last_name].filter(Boolean).join(' ');
+  return full || actor.username || `User #${actor.id}`;
+}
 
 export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxonomy }) {
   const [users, setUsers]               = useState([]);
@@ -136,6 +147,34 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       .catch(() => setAllDocsError('Failed to load documents. Please try again.'))
       .finally(() => setAllDocsLoading(false));
   }, [activePage]);
+
+  // Audit Log state
+  const [auditLogs, setAuditLogs]               = useState([]);
+  const [auditTotal, setAuditTotal]             = useState(0);
+  const [auditLoading, setAuditLoading]         = useState(false);
+  const [auditError, setAuditError]             = useState('');
+  const [auditPage, setAuditPage]               = useState(0);
+  const [auditFilterEntity, setAuditFilterEntity] = useState('');
+  const [auditFilterAction, setAuditFilterAction] = useState('');
+  const [auditFilterStatus, setAuditFilterStatus] = useState('');
+  const [auditFromDate, setAuditFromDate]       = useState('');
+  const [auditToDate, setAuditToDate]           = useState('');
+  const [auditSearch, setAuditSearch]           = useState('');
+
+  useEffect(() => {
+    if (activePage !== 'auditfull') return;
+    setAuditLoading(true);
+    setAuditError('');
+    const params = { skip: auditPage * AUDIT_PAGE_SIZE, limit: AUDIT_PAGE_SIZE };
+    if (auditFilterEntity) params.entity_type = auditFilterEntity;
+    if (auditFilterAction) params.action       = auditFilterAction;
+    if (auditFromDate)     params.from_date    = auditFromDate;
+    if (auditToDate)       params.to_date      = auditToDate + 'T23:59:59';
+    getAuditLogs(params)
+      .then(res => { setAuditLogs(res.data.logs || []); setAuditTotal(res.data.total || 0); })
+      .catch(() => setAuditError('Failed to load audit logs. Please try again.'))
+      .finally(() => setAuditLoading(false));
+  }, [activePage, auditPage, auditFilterEntity, auditFilterAction, auditFilterStatus, auditFromDate, auditToDate]);
 
   function handleCreateDept(e) {
     e.preventDefault();
@@ -1106,39 +1145,169 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     );
   }
 
-  // Full MIS Report
+  // Full MIS Report — real audit log data, excludes current user
   if (activePage === 'auditfull') {
+    const totalPages = Math.max(1, Math.ceil(auditTotal / AUDIT_PAGE_SIZE));
+
+    const visibleLogs = auditLogs.filter(l => {
+      if (auditFilterStatus && l.status !== auditFilterStatus) return false;
+      if (auditSearch.trim()) {
+        const q = auditSearch.toLowerCase();
+        const name = fmtAuditActor(l.actor).toLowerCase();
+        const usr  = (l.actor?.username || '').toLowerCase();
+        const act  = (l.action || '').toLowerCase();
+        if (!name.includes(q) && !usr.includes(q) && !act.includes(q)) return false;
+      }
+      return true;
+    });
+
+    function exportAuditCSV() {
+      if (!visibleLogs.length) return;
+      const rows = visibleLogs.map(l => ({
+        timestamp:   l.created_at,
+        user:        fmtAuditActor(l.actor),
+        username:    l.actor?.username || '',
+        action:      l.action,
+        entity_type: l.entity_type,
+        entity_id:   l.entity_id ?? '',
+        status:      l.status,
+        ip_address:  l.ip_address || '',
+      }));
+      exportCSV(rows, 'mis-audit-report.csv');
+    }
+
     return (
-      <div style={{ animation: 'fadeSlideIn .3s ease' }}>
-        <Card padding="0">
-          <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>Full System MIS Report</div>
-            <button onClick={() => exportCSV(MOCK_AUDIT, 'mis-report.csv')}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--surface-ground)', color: 'var(--text-color)', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '7px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
+      <div style={{ animation: 'fadeSlideIn .3s ease', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+        {/* Filter bar */}
+        <Card>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            {/* Search */}
+            <div style={{ position: 'relative', flex: '1 1 180px', minWidth: 160 }}>
+              <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-color-secondary)' }} />
+              <input
+                value={auditSearch}
+                onChange={e => setAuditSearch(e.target.value)}
+                placeholder="Search user or action…"
+                style={{ width: '100%', paddingLeft: 30, paddingRight: 10, height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, background: 'var(--surface-ground)', color: 'var(--text-color)', boxSizing: 'border-box', outline: 'none' }}
+              />
+            </div>
+
+            {/* Entity type */}
+            <select
+              value={auditFilterEntity}
+              onChange={e => { setAuditFilterEntity(e.target.value); setAuditPage(0); }}
+              style={{ height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, padding: '0 10px', background: 'var(--surface-ground)', color: 'var(--text-color)', cursor: 'pointer' }}>
+              {AUDIT_ENTITY_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+
+            {/* Status */}
+            <select
+              value={auditFilterStatus}
+              onChange={e => { setAuditFilterStatus(e.target.value); setAuditPage(0); }}
+              style={{ height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, padding: '0 10px', background: 'var(--surface-ground)', color: 'var(--text-color)', cursor: 'pointer' }}>
+              <option value="">All Statuses</option>
+              <option value="success">Success</option>
+              <option value="failure">Failure</option>
+            </select>
+
+            {/* Date from */}
+            <input type="date" value={auditFromDate} onChange={e => { setAuditFromDate(e.target.value); setAuditPage(0); }}
+              style={{ height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, padding: '0 10px', background: 'var(--surface-ground)', color: 'var(--text-color)' }} />
+            <span style={{ fontSize: 11, color: 'var(--text-color-secondary)' }}>to</span>
+            <input type="date" value={auditToDate} onChange={e => { setAuditToDate(e.target.value); setAuditPage(0); }}
+              style={{ height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, padding: '0 10px', background: 'var(--surface-ground)', color: 'var(--text-color)' }} />
+
+            {/* Clear */}
+            {(auditFilterEntity || auditFilterStatus || auditFromDate || auditToDate || auditSearch) && (
+              <button onClick={() => { setAuditFilterEntity(''); setAuditFilterStatus(''); setAuditFromDate(''); setAuditToDate(''); setAuditSearch(''); setAuditPage(0); }}
+                style={{ height: 34, padding: '0 12px', border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+                <X size={11} /> Clear
+              </button>
+            )}
+
+            <div style={{ flex: 1 }} />
+
+            <button onClick={exportAuditCSV}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--surface-ground)', color: 'var(--text-color)', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '0 14px', height: 34, fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
               <Download size={13} /> Export CSV
             </button>
           </div>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
-                {['Timestamp', 'User', 'Role', 'Action'].map(h => (
-                  <th key={h} style={{ ...LABEL, padding: '11px 16px', textAlign: 'left' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {MOCK_AUDIT.map((log, i) => (
-                <tr key={i} style={{ borderBottom: '1px solid var(--surface-border)', transition: 'background .15s' }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                  <td style={{ padding: '12px 16px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)', whiteSpace: 'nowrap' }}>{log.time}</td>
-                  <td style={{ padding: '12px 16px', fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>{log.user}</td>
-                  <td style={{ padding: '12px 16px' }}><Badge label={log.role} variant={log.role} /></td>
-                  <td style={{ padding: '12px 16px', fontSize: 12.5, color: 'var(--text-color)' }}>{log.action}</td>
+        </Card>
+
+        {/* Table */}
+        <Card padding="0">
+          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>User Audit History</div>
+            <span style={{ ...LABEL }}>{auditTotal} total entries</span>
+          </div>
+
+          {auditLoading ? (
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>Loading audit logs…</div>
+          ) : auditError ? (
+            <div style={{ padding: 24, color: '#ef4444', fontSize: 13 }}>{auditError}</div>
+          ) : visibleLogs.length === 0 ? (
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>No audit records found.</div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
+                  {['Timestamp', 'User', 'Action', 'Entity', 'Status', 'IP Address'].map(h => (
+                    <th key={h} style={{ ...LABEL, padding: '11px 16px', textAlign: 'left' }}>{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {visibleLogs.map(log => {
+                  const isSuccess = log.status === 'success';
+                  return (
+                    <tr key={log.id} style={{ borderBottom: '1px solid var(--surface-border)', transition: 'background .15s' }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                      <td style={{ padding: '12px 16px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)', whiteSpace: 'nowrap' }}>
+                        {new Date(log.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })}
+                      </td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>{fmtAuditActor(log.actor)}</div>
+                        {log.actor?.username && <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>@{log.actor.username}</div>}
+                      </td>
+                      <td style={{ padding: '12px 16px', fontSize: 12.5, color: 'var(--text-color)' }}>{fmtAction(log.action)}</td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <span style={{ fontSize: 11, fontWeight: 600, fontFamily: 'var(--mono)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 5, padding: '2px 7px', color: 'var(--text-color-secondary)' }}>
+                          {log.entity_type}{log.entity_id ? ` #${log.entity_id}` : ''}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, borderRadius: 5, padding: '3px 8px', background: isSuccess ? 'rgba(34,197,94,.1)' : 'rgba(239,68,68,.1)', color: isSuccess ? '#16a34a' : '#ef4444' }}>
+                          {log.status}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px 16px', fontSize: 11.5, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>
+                        {log.ip_address || '—'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+
+          {/* Pagination */}
+          {!auditLoading && auditTotal > AUDIT_PAGE_SIZE && (
+            <div style={{ padding: '12px 18px', borderTop: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ ...LABEL }}>Page {auditPage + 1} of {totalPages}</span>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => setAuditPage(p => Math.max(0, p - 1))} disabled={auditPage === 0}
+                  style={{ padding: '6px 14px', border: '1px solid var(--surface-border)', borderRadius: 7, fontSize: 12.5, background: 'var(--surface-ground)', color: auditPage === 0 ? 'var(--text-color-secondary)' : 'var(--text-color)', cursor: auditPage === 0 ? 'default' : 'pointer', opacity: auditPage === 0 ? 0.5 : 1 }}>
+                  Previous
+                </button>
+                <button onClick={() => setAuditPage(p => Math.min(totalPages - 1, p + 1))} disabled={auditPage >= totalPages - 1}
+                  style={{ padding: '6px 14px', border: '1px solid var(--surface-border)', borderRadius: 7, fontSize: 12.5, background: 'var(--surface-ground)', color: auditPage >= totalPages - 1 ? 'var(--text-color-secondary)' : 'var(--text-color)', cursor: auditPage >= totalPages - 1 ? 'default' : 'pointer', opacity: auditPage >= totalPages - 1 ? 0.5 : 1 }}>
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </Card>
       </div>
     );
