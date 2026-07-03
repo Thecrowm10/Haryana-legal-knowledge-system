@@ -253,12 +253,13 @@ function PageNav({ currentPage, totalPages, onPageChange }) {
 // PDF Viewer Panel
 // Renders real PDFs as stacked canvases (pdfjs-dist) so scroll can be detected
 // and synced with OcrTextPanel. Mock docs use the styled layout fallback.
-function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, rotation, onRotate, blobUrl, onTotalPagesChange, annotations = [], onAnnotationsChange, highlightMode = false, onHighlightModeChange }) {
+function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, rotation, onRotate, blobUrl, onTotalPagesChange, annotations = [], onAnnotationsChange, highlightMode = false, onHighlightModeChange, onScrollRef }) {
   const [zoom, setZoom]     = useState(100);
   const containerRef        = useRef(null);
   const canvasRefs          = useRef([]);
   const [pdfDoc, setPdfDoc] = useState(null);
   const suppressRef         = useRef(false);
+  const scrollDetectedRef   = useRef(false);
 
   const [selectedColor,  setSelectedColor]  = useState('rgba(253,224,71,.55)');
   const [drawState,      setDrawState]      = useState('idle');
@@ -307,8 +308,10 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
     return () => { cancelled = true; };
   }, [pdfDoc, zoom, rotation]);
 
-  // Scroll canvas to currentPage when driven externally (nav buttons or OCR scroll)
+  // Scroll to currentPage only when the change comes from nav buttons / external source,
+  // NOT when it comes from handleScroll (which would create a conflicting scroll-back).
   useEffect(() => {
+    if (scrollDetectedRef.current) { scrollDetectedRef.current = false; return; }
     const canvas = canvasRefs.current[currentPage - 1];
     if (!canvas || !containerRef.current) return;
     suppressRef.current = true;
@@ -329,7 +332,10 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
       const vis = Math.max(0, Math.min(top + canvas.offsetHeight, st + ch) - Math.max(top, st));
       if (vis > bestVis) { bestVis = vis; best = i; }
     });
-    if (best + 1 !== currentPage) onPageChange(best + 1);
+    if (best + 1 !== currentPage) {
+      scrollDetectedRef.current = true;
+      onPageChange(best + 1);
+    }
   }
 
   function getSvgFractional(e, pageIdx) {
@@ -383,6 +389,23 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
     setDrawState('popup');
     setDragRect(null);
   }
+
+  function scrollToAnnotation(ann) {
+    const canvas = canvasRefs.current[ann.page - 1];
+    if (!canvas || !containerRef.current) return;
+    suppressRef.current = true;
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const wrapper = canvas.parentElement || canvas;
+    const wrapperRect = wrapper.getBoundingClientRect();
+    const annotCenterY = ann.y * wrapperRect.height + (ann.h * wrapperRect.height) / 2;
+    const wrapperTopInScroll = wrapperRect.top - containerRect.top + containerRef.current.scrollTop;
+    const target = wrapperTopInScroll + annotCenterY - containerRef.current.clientHeight / 2;
+    containerRef.current.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
+    setTimeout(() => { suppressRef.current = false; }, 900);
+  }
+
+  // Keep the ref current on every render so ThreePanelReview can call it
+  if (onScrollRef) onScrollRef.current = scrollToAnnotation;
 
   function confirmAnnotation() {
     if (!pendingRect) return;
@@ -773,7 +796,7 @@ function OcrTextPanel({ ocrData, currentPage, wordEdits, onWordEdit, isScanned =
 // Document Details Panel
 // Shows every field the uploader filled in: metadata, description, hierarchy,
 // type-specific fields, legal authorities, relationships, amendment provisions.
-function DocumentDetailsPanel({ doc }) {
+function DocumentDetailsPanel({ doc, reviewAnnotations = [], onScrollToAnnotation }) {
   const meta = [
     ['Title',           doc.title],
     ['Type',            doc.type],
@@ -1007,6 +1030,24 @@ function DocumentDetailsPanel({ doc }) {
           </div>
         )}
 
+        {/* ── PDF Highlights ── */}
+        {reviewAnnotations.length > 0 && (
+          <div>
+            <div style={{ ...LABEL, marginBottom: 8 }}>PDF Highlights ({reviewAnnotations.length})</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {reviewAnnotations.map(ann => (
+                <div key={ann.id} onClick={() => onScrollToAnnotation?.(ann)}
+                  style={{ display: 'flex', gap: 10, padding: '9px 12px', borderRadius: 8, background: ann.color, border: '1px solid rgba(0,0,0,.1)', alignItems: 'flex-start', cursor: 'pointer', transition: 'filter .15s' }}
+                  onMouseEnter={e => e.currentTarget.style.filter = 'brightness(.92)'}
+                  onMouseLeave={e => e.currentTarget.style.filter = 'none'}>
+                  <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, color: 'rgba(0,0,0,.5)', flexShrink: 0, marginTop: 2 }}>P{ann.page}</span>
+                  <span style={{ fontSize: 12.5, color: 'rgba(0,0,0,.75)', lineHeight: 1.5, flex: 1 }}>{ann.comment || <span style={{ opacity: 0.5 }}>No comment</span>}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
       </div>
     </div>
   );
@@ -1019,8 +1060,12 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, activePage,
   const [rotation, setRotation]         = useState(0);
   const [blobUrl, setBlobUrl]           = useState(null);
   const [pdfTotalPages, setPdfTotalPages] = useState(null);
-  const [annotations, setAnnotations]   = useState([]);
+  const [annotations, setAnnotations]   = useState(() => {
+    try { return doc.annotationsJson ? JSON.parse(doc.annotationsJson) : []; }
+    catch { return []; }
+  });
   const [highlightMode, setHighlightMode] = useState(false);
+  const pdfScrollRef = useRef(null);
 
   const [remarkLines, setRemarkLines] = useState(() => {
     if (!remarks) return [''];
@@ -1087,12 +1132,17 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, activePage,
             blobUrl={blobUrl} onTotalPagesChange={setPdfTotalPages}
             annotations={annotations} onAnnotationsChange={setAnnotations}
             highlightMode={highlightMode} onHighlightModeChange={setHighlightMode}
+            onScrollRef={pdfScrollRef}
           />
         </div>
 
         {/* Panel 2 — Document Details */}
         <div style={{ overflow: 'hidden' }}>
-          <DocumentDetailsPanel doc={doc} />
+          <DocumentDetailsPanel
+            doc={doc}
+            reviewAnnotations={annotations}
+            onScrollToAnnotation={(ann) => pdfScrollRef.current?.(ann)}
+          />
         </div>
       </div>
 
