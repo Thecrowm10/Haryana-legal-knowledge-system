@@ -1,9 +1,9 @@
-﻿import { useState, useEffect, useRef, useCallback } from 'react';
+﻿import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   Upload, FileText, CheckCircle, XCircle, X, TrendingUp, FileType, Download,
   RotateCcw, AlertCircle, Eye, GitBranch, Plus, Clock,
   Layers, ChevronRight, AlertTriangle, CheckSquare, Square,
-  Edit3, Tag, Search, MessageSquare, ZoomIn, ZoomOut, RotateCw, ExternalLink,
+  Edit3, Tag, Search, MessageSquare, MessageCircle, ZoomIn, ZoomOut, RotateCw, ExternalLink,
 } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
@@ -304,6 +304,11 @@ function DocViewModal({ doc, onClose }) {
   const canvasRefs   = useRef([]);
   const containerRef = useRef(null);
   const suppressRef  = useRef(false);
+  const svgRefs      = useRef([]);
+  const annotations  = useMemo(() => {
+    try { return doc.approval?.annotations_json ? JSON.parse(doc.approval.annotations_json) : []; }
+    catch { return []; }
+  }, [doc.approval?.annotations_json]);
 
   useEffect(() => {
     const h = e => { if (e.key === 'Escape') onClose(); };
@@ -489,8 +494,27 @@ function DocViewModal({ doc, onClose }) {
               </div>
             )}
             {blobUrl && Array.from({ length: totalPages }, (_, i) => (
-              <canvas key={i} ref={el => { canvasRefs.current[i] = el; }}
-                style={{ display: 'block', borderRadius: 4, boxShadow: '0 4px 20px rgba(0,0,0,.6)', maxWidth: '100%' }} />
+              <div key={i} style={{ position: 'relative', display: 'inline-block' }}>
+                <canvas ref={el => { canvasRefs.current[i] = el; }}
+                  style={{ display: 'block', borderRadius: 4, boxShadow: '0 4px 20px rgba(0,0,0,.6)', maxWidth: '100%' }} />
+                {annotations.some(a => a.page === i + 1) && (
+                  <svg ref={el => { svgRefs.current[i] = el; }}
+                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
+                    {annotations.filter(a => a.page === i + 1).map(ann => (
+                      <g key={ann.id}>
+                        <rect x={`${ann.x * 100}%`} y={`${ann.y * 100}%`} width={`${ann.w * 100}%`} height={`${ann.h * 100}%`}
+                          fill={ann.color} stroke="rgba(0,0,0,.2)" strokeWidth="1" />
+                        <title>{ann.comment}</title>
+                        <foreignObject x={`${ann.x * 100}%`} y={`${ann.y * 100}%`} width="20" height="20" style={{ overflow: 'visible', pointerEvents: 'auto' }}>
+                          <div title={ann.comment} style={{ width: 16, height: 16, borderRadius: '50%', background: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'default' }}>
+                            <MessageCircle size={9} color="white" />
+                          </div>
+                        </foreignObject>
+                      </g>
+                    ))}
+                  </svg>
+                )}
+              </div>
             ))}
           </div>
 
@@ -605,6 +629,21 @@ function DocViewModal({ doc, onClose }) {
                       ))}
                     </div>
                   )}
+                </div>
+              </div>
+            )}
+
+            {/* PDF Highlights from reviewer */}
+            {annotations.length > 0 && (
+              <div style={{ marginTop: 16 }}>
+                <div style={{ ...LS, marginBottom: 8 }}>PDF Highlights ({annotations.length})</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {annotations.map(ann => (
+                    <div key={ann.id} style={{ display: 'flex', gap: 10, padding: '9px 12px', borderRadius: 8, background: ann.color, border: '1px solid rgba(0,0,0,.1)', alignItems: 'flex-start' }}>
+                      <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, color: 'rgba(0,0,0,.5)', flexShrink: 0, marginTop: 2 }}>P{ann.page}</span>
+                      <span style={{ fontSize: 12.5, color: 'rgba(0,0,0,.75)', lineHeight: 1.5, flex: 1 }}>{ann.comment || <span style={{ opacity: 0.5 }}>No comment</span>}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}

@@ -2,7 +2,7 @@
 import {
   CheckCircle, XCircle, FileText, ChevronDown, Search, Clock,
   Check, X, Eye, AlignLeft, Cpu, Link, AlertTriangle, ChevronRight,
-  ZoomIn, ZoomOut, RotateCw, ExternalLink, Plus,
+  ZoomIn, ZoomOut, RotateCw, ExternalLink, Plus, Highlighter, MessageCircle,
 } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
@@ -253,12 +253,21 @@ function PageNav({ currentPage, totalPages, onPageChange }) {
 // PDF Viewer Panel
 // Renders real PDFs as stacked canvases (pdfjs-dist) so scroll can be detected
 // and synced with OcrTextPanel. Mock docs use the styled layout fallback.
-function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, rotation, onRotate, blobUrl, onTotalPagesChange }) {
+function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, rotation, onRotate, blobUrl, onTotalPagesChange, annotations = [], onAnnotationsChange, highlightMode = false, onHighlightModeChange }) {
   const [zoom, setZoom]     = useState(100);
   const containerRef        = useRef(null);
   const canvasRefs          = useRef([]);
   const [pdfDoc, setPdfDoc] = useState(null);
   const suppressRef         = useRef(false);
+
+  const [selectedColor,  setSelectedColor]  = useState('rgba(253,224,71,.55)');
+  const [drawState,      setDrawState]      = useState('idle');
+  const [dragStart,      setDragStart]      = useState(null);
+  const [dragRect,       setDragRect]       = useState(null);
+  const [pendingRect,    setPendingRect]    = useState(null);
+  const [popupComment,   setPopupComment]   = useState('');
+  const [activeAnnotId,  setActiveAnnotId]  = useState(null);
+  const svgRefs = useRef([]);
 
   const pageData = ocrData.pages.find(p => p.pageNum === currentPage) || ocrData.pages[0];
   const numPages = pdfDoc ? pdfDoc.numPages : totalPages;
@@ -322,6 +331,73 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
     if (best + 1 !== currentPage) onPageChange(best + 1);
   }
 
+  function getSvgFractional(e, pageIdx) {
+    const svg = svgRefs.current[pageIdx];
+    if (!svg) return null;
+    const rect = svg.getBoundingClientRect();
+    return {
+      x: (e.clientX - rect.left) / rect.width,
+      y: (e.clientY - rect.top) / rect.height,
+      pageIdx,
+    };
+  }
+
+  function handleSvgMouseDown(e, pageIdx) {
+    if (drawState !== 'idle') return;
+    e.preventDefault();
+    const pt = getSvgFractional(e, pageIdx);
+    if (!pt) return;
+    setDragStart(pt);
+    setDragRect({ w: 0, h: 0 });
+    setDrawState('drawing');
+  }
+
+  function handleSvgMouseMove(e, pageIdx) {
+    if (drawState !== 'drawing' || !dragStart || dragStart.pageIdx !== pageIdx) return;
+    const pt = getSvgFractional(e, pageIdx);
+    if (!pt) return;
+    setDragRect({ w: pt.x - dragStart.x, h: pt.y - dragStart.y });
+  }
+
+  function handleSvgMouseUp(e, pageIdx) {
+    if (drawState !== 'drawing' || !dragStart || dragStart.pageIdx !== pageIdx) return;
+    const pt = getSvgFractional(e, pageIdx);
+    if (!pt) return;
+    const w = pt.x - dragStart.x;
+    const h = pt.y - dragStart.y;
+    if (Math.abs(w) < 0.01 || Math.abs(h) < 0.01) {
+      setDrawState('idle');
+      setDragStart(null);
+      setDragRect(null);
+      return;
+    }
+    setPendingRect({
+      page: pageIdx + 1,
+      x: Math.min(dragStart.x, dragStart.x + w),
+      y: Math.min(dragStart.y, dragStart.y + h),
+      w: Math.abs(w),
+      h: Math.abs(h),
+    });
+    setPopupComment('');
+    setDrawState('popup');
+    setDragRect(null);
+  }
+
+  function confirmAnnotation() {
+    if (!pendingRect) return;
+    const newAnnot = {
+      id: crypto.randomUUID(),
+      ...pendingRect,
+      color: selectedColor,
+      comment: popupComment.trim(),
+    };
+    onAnnotationsChange?.([...annotations, newAnnot]);
+    setPendingRect(null);
+    setPopupComment('');
+    setDrawState('idle');
+    setDragStart(null);
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Toolbar */}
@@ -349,6 +425,20 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
             <ZoomIn size={11} />
           </button>
         </div>
+        {/* Highlight mode toggle + color palette */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 6 }}>
+          <button
+            onClick={() => onHighlightModeChange?.(!highlightMode)}
+            title={highlightMode ? 'Exit highlight mode' : 'Draw highlight on PDF'}
+            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 5, border: highlightMode ? '1.5px solid #f59e0b' : '1px solid var(--surface-border)', background: highlightMode ? 'rgba(245,158,11,.12)' : 'var(--surface-ground)', color: highlightMode ? '#b45309' : 'var(--text-color-secondary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'all .15s' }}>
+            <Highlighter size={11} />
+            {highlightMode ? 'Exit Highlight' : 'Highlight'}
+          </button>
+          {highlightMode && ['rgba(253,224,71,.55)', 'rgba(134,239,172,.55)', 'rgba(147,197,253,.55)', 'rgba(249,168,212,.55)'].map(c => (
+            <button key={c} onClick={() => setSelectedColor(c)} title="Pick color"
+              style={{ width: 18, height: 18, borderRadius: '50%', background: c, border: selectedColor === c ? '2.5px solid #374151' : '1px solid rgba(0,0,0,.2)', cursor: 'pointer', padding: 0, flexShrink: 0 }} />
+          ))}
+        </div>
       </div>
 
       {/* Content area */}
@@ -362,8 +452,41 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
             </div>
           )}
           {Array.from({ length: numPages }, (_, i) => (
-            <canvas key={i} ref={el => { canvasRefs.current[i] = el; }}
-              style={{ display: 'block', boxShadow: '0 2px 12px rgba(0,0,0,.5)', maxWidth: '100%' }} />
+            <div key={i} style={{ position: 'relative', display: 'inline-block' }}>
+              <canvas ref={el => { canvasRefs.current[i] = el; }}
+                style={{ display: 'block', boxShadow: '0 2px 12px rgba(0,0,0,.5)', maxWidth: '100%' }} />
+              <svg ref={el => { svgRefs.current[i] = el; }}
+                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+                  cursor: highlightMode ? 'crosshair' : 'default',
+                  pointerEvents: highlightMode || annotations.some(a => a.page === i + 1) ? 'auto' : 'none' }}
+                onMouseDown={e => highlightMode && handleSvgMouseDown(e, i)}
+                onMouseMove={e => highlightMode && handleSvgMouseMove(e, i)}
+                onMouseUp={e => highlightMode && handleSvgMouseUp(e, i)}>
+
+                {/* Existing annotations */}
+                {annotations.filter(a => a.page === i + 1).map(ann => (
+                  <g key={ann.id} onClick={e => { e.stopPropagation(); setActiveAnnotId(ann.id); }} style={{ cursor: 'pointer' }}>
+                    <rect x={`${ann.x * 100}%`} y={`${ann.y * 100}%`} width={`${ann.w * 100}%`} height={`${ann.h * 100}%`}
+                      fill={ann.color} stroke="rgba(0,0,0,.25)" strokeWidth="1" />
+                    <foreignObject x={`${ann.x * 100}%`} y={`${ann.y * 100}%`} width="20" height="20" style={{ overflow: 'visible' }}>
+                      <div style={{ width: 16, height: 16, borderRadius: '50%', background: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <MessageCircle size={9} color="white" />
+                      </div>
+                    </foreignObject>
+                  </g>
+                ))}
+
+                {/* Live drag rect while drawing */}
+                {drawState === 'drawing' && dragRect && dragStart?.pageIdx === i && (
+                  <rect
+                    x={`${Math.min(dragStart.x, dragStart.x + dragRect.w) * 100}%`}
+                    y={`${Math.min(dragStart.y, dragStart.y + dragRect.h) * 100}%`}
+                    width={`${Math.abs(dragRect.w) * 100}%`}
+                    height={`${Math.abs(dragRect.h) * 100}%`}
+                    fill={selectedColor} stroke="#f59e0b" strokeWidth="1.5" strokeDasharray="4 3" />
+                )}
+              </svg>
+            </div>
           ))}
         </div>
       ) : (
@@ -392,6 +515,71 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
           </div>
         </div>
       )}
+
+      {/* Draw-comment popup */}
+      {drawState === 'popup' && pendingRect && (
+        <>
+          <div onClick={() => { setDrawState('idle'); setPendingRect(null); setDragStart(null); }}
+            style={{ position: 'fixed', inset: 0, zIndex: 1100 }} />
+          <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+            zIndex: 1101, width: 300, background: 'var(--surface-card)', border: '1px solid var(--surface-border)',
+            borderRadius: 12, padding: '14px 16px', boxShadow: '0 12px 40px rgba(0,0,0,.25)',
+            display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ fontSize: 10.5, fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', letterSpacing: '.07em' }}>ADD COMMENT — Page {pendingRect.page}</div>
+            <div style={{ width: '100%', height: 10, borderRadius: 4, background: selectedColor, border: '1px solid rgba(0,0,0,.15)' }} />
+            <textarea
+              autoFocus
+              value={popupComment}
+              onChange={e => setPopupComment(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) confirmAnnotation();
+                if (e.key === 'Escape') { setDrawState('idle'); setPendingRect(null); setDragStart(null); }
+              }}
+              placeholder="Describe the issue…"
+              rows={3}
+              style={{ resize: 'none', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 7, color: 'var(--text-color)', fontFamily: 'var(--font)', fontSize: 13, padding: '8px 10px', outline: 'none', width: '100%', boxSizing: 'border-box' }}
+            />
+            <div style={{ fontSize: 10, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>Ctrl+Enter to save</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button onClick={() => { setDrawState('idle'); setPendingRect(null); setDragStart(null); }}
+                style={{ flex: 1, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '7px 0', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', color: 'var(--text-color-secondary)', fontFamily: 'var(--font)' }}>
+                Cancel
+              </button>
+              <button onClick={confirmAnnotation}
+                style={{ flex: 1, background: '#f59e0b', color: 'white', border: 'none', borderRadius: 7, padding: '7px 0', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                Save
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Annotation detail popup */}
+      {activeAnnotId && (() => {
+        const ann = annotations.find(a => a.id === activeAnnotId);
+        if (!ann) return null;
+        return (
+          <>
+            <div onClick={() => setActiveAnnotId(null)} style={{ position: 'fixed', inset: 0, zIndex: 1100 }} />
+            <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+              zIndex: 1101, width: 280, background: 'var(--surface-card)', border: '1px solid var(--surface-border)',
+              borderRadius: 12, padding: '14px 16px', boxShadow: '0 12px 40px rgba(0,0,0,.25)',
+              display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ fontSize: 10.5, fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', letterSpacing: '.07em' }}>HIGHLIGHT — PAGE {ann.page}</div>
+                <button onClick={() => setActiveAnnotId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex' }}><X size={14} /></button>
+              </div>
+              <div style={{ padding: '8px 10px', borderRadius: 7, background: ann.color, border: '1px solid rgba(0,0,0,.12)', fontSize: 13, color: 'rgba(0,0,0,.75)', lineHeight: 1.5, minHeight: 40 }}>
+                {ann.comment || <span style={{ opacity: 0.5 }}>No comment</span>}
+              </div>
+              <button onClick={() => { onAnnotationsChange?.(annotations.filter(a => a.id !== activeAnnotId)); setActiveAnnotId(null); }}
+                style={{ background: 'rgba(239,68,68,.07)', border: '1px solid rgba(239,68,68,.25)', color: '#dc2626', borderRadius: 7, padding: '7px 0', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                Delete Highlight
+              </button>
+            </div>
+          </>
+        );
+      })()}
     </div>
   );
 }
@@ -830,6 +1018,8 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, activePage,
   const [rotation, setRotation]         = useState(0);
   const [blobUrl, setBlobUrl]           = useState(null);
   const [pdfTotalPages, setPdfTotalPages] = useState(null);
+  const [annotations, setAnnotations]   = useState([]);
+  const [highlightMode, setHighlightMode] = useState(false);
 
   const [remarkLines, setRemarkLines] = useState(() => {
     if (!remarks) return [''];
@@ -894,6 +1084,8 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, activePage,
             currentPage={currentPage} onPageChange={setCurrentPage} totalPages={totalPages}
             rotation={rotation} onRotate={() => setRotation(r => (r + 90) % 360)}
             blobUrl={blobUrl} onTotalPagesChange={setPdfTotalPages}
+            annotations={annotations} onAnnotationsChange={setAnnotations}
+            highlightMode={highlightMode} onHighlightModeChange={setHighlightMode}
           />
         </div>
 
@@ -961,13 +1153,13 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, activePage,
               <Plus size={13} /> Add Remark
             </button>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={() => onDecide('rejected')} disabled={!!deciding}
+              <button onClick={() => onDecide('rejected', annotations)} disabled={!!deciding}
                 style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.3)', color: '#b91c1c', padding: '9px 18px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 600, cursor: deciding ? 'not-allowed' : 'pointer', opacity: deciding && deciding !== 'rejected' ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
                 onMouseEnter={e => { if (!deciding) e.currentTarget.style.background = 'rgba(239,68,68,.15)'; }}
                 onMouseLeave={e => { if (!deciding) e.currentTarget.style.background = 'rgba(239,68,68,.08)'; }}>
                 <X size={14} /> {deciding === 'rejected' ? 'Rejecting…' : 'Reject'}
               </button>
-              <button onClick={() => onDecide('approved')} disabled={!!deciding}
+              <button onClick={() => onDecide('approved', annotations)} disabled={!!deciding}
                 style={{ background: 'rgba(34,197,94,.1)', border: '1px solid rgba(34,197,94,.3)', color: '#1e40af', padding: '9px 20px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700, cursor: deciding ? 'not-allowed' : 'pointer', opacity: deciding && deciding !== 'approved' ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
                 onMouseEnter={e => { if (!deciding) e.currentTarget.style.background = 'rgba(34,197,94,.18)'; }}
                 onMouseLeave={e => { if (!deciding) e.currentTarget.style.background = 'rgba(34,197,94,.1)'; }}>
@@ -1033,6 +1225,7 @@ function mapApiDoc(d) {
     gazette:         d.gazette_reference || '',
     authority:       d.legal_authority || '',
     remarks:         d.latest_approval?.comments || '',
+    annotationsJson: d.latest_approval?.annotations_json || null,
     fileUrl:         null,
     relationships:   d.relationships || [],
     docRelations:    (d.relationships || [])
@@ -1105,10 +1298,11 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
   const pending  = docs.filter(d => d.status === 'pending');
   const reviewed = docs.filter(d => d.status !== 'pending');
 
-  function decide(id, decision) {
+  function decide(id, decision, annotations = []) {
     const doc      = docs.find(d => d.id === id);
     const remark   = remarks[id] || '';
     const hasToken = !!localStorage.getItem('token');
+    const annotationsJson = annotations.length ? JSON.stringify(annotations) : undefined;
     setDeciding({ id, action: decision });
 
     function apply() {
@@ -1138,7 +1332,7 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
       return;
     }
 
-    reviewDocument(id, decision, remark || undefined)
+    reviewDocument(id, decision, remark || undefined, annotationsJson)
       .then(() => apply())
       .catch(err => {
         const detail = err.response?.data?.detail || 'Action failed. Please try again.';
@@ -1351,7 +1545,7 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
                   doc={doc}
                   remarks={remarks[doc.id] || ''}
                   onRemarksChange={val => setRemarks(r => ({ ...r, [doc.id]: val }))}
-                  onDecide={decision => decide(doc.id, decision)}
+                  onDecide={(decision, annots) => decide(doc.id, decision, annots)}
                   activePage={activePage}
                   deciding={deciding?.id === doc.id ? deciding.action : null}
                 />
