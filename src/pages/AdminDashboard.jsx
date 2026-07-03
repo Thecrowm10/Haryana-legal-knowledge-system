@@ -253,8 +253,8 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     const inactive = users.filter(u => u.status === 'inactive').length;
 
     const filteredUsers = deptFilter
-      ? users.filter(u => String(u.deptId) === String(deptFilter) && u.isActive)
-      : [];
+      ? users.filter(u => String(u.deptId) === String(deptFilter))
+      : users;
 
     const INP_STYLE = {
       width: '100%', padding: '9px 12px',
@@ -291,7 +291,8 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
           <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>System Users</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <SelectField value={deptFilter} onChange={e => setDeptFilter(e.target.value)} placeholder="Select Department" style={{ width: 200 }}>
+              <SelectField value={deptFilter} onChange={e => setDeptFilter(e.target.value)} placeholder="All Departments" style={{ width: 200 }}>
+                <option value="">All Departments</option>
                 {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
               </SelectField>
               <button
@@ -315,7 +316,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
           )}
           {!usersLoading && !usersError && filteredUsers.length === 0 && (
             <div style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>
-              {deptFilter ? 'No users yet' : 'Select a department to view users'}
+              No users yet
             </div>
           )}
           {!usersLoading && !usersError && filteredUsers.length > 0 && (
