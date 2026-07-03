@@ -20,6 +20,8 @@ function normalizeUser(u) {
     roleId:    u.role?.id ?? null,
     dept:      u.departments?.length > 0 ? u.departments.map(d => d.name).join(', ') : (u.department?.name ?? '—'),
     deptId:    u.department?.id ?? null,
+    deptIds:   u.departments?.map(d => d.id) ?? [],
+    deptRaw:   u.departments?.length > 0 ? u.departments.map(d => String(d.id)).join(',') : null,
     status:    u.is_active ? 'active' : 'inactive',
     isActive:  u.is_active,
     lastLogin: u.last_login ? u.last_login.split('T')[0] : '—',
@@ -205,6 +207,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   const [togglingId, setTogglingId]   = useState(null);
 
   function openEdit(u) {
+    const isNodal = u.role === 'nodal Officer';
     setEditingUser(u);
     setEditForm({
       first_name:    u.firstName,
@@ -212,15 +215,27 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       email:         u.email,
       is_active:     u.isActive,
       role_id:       u.roleId,
-      department_id: u.deptId,
+      department_id: isNodal ? '' : String(u.deptId ?? ''),
+      dept_ids:      isNodal ? u.deptIds : [],
     });
     setEditError('');
   }
 
   function handleEditSave() {
+    const isNodal = roles.find(r => String(r.id) === String(editForm.role_id))?.name === 'nodal Officer';
     setEditSaving(true);
     setEditError('');
-    updateUser({ user_id: editingUser.id, ...editForm })
+    updateUser({
+      user_id:       editingUser.id,
+      first_name:    editForm.first_name,
+      last_name:     editForm.last_name,
+      email:         editForm.email,
+      is_active:     editForm.is_active,
+      role_id:       editForm.role_id,
+      department_id: isNodal
+        ? (editForm.dept_ids.length > 0 ? editForm.dept_ids.join(',') : undefined)
+        : (editForm.department_id || undefined),
+    })
       .then(res => {
         setUsers(prev => prev.map(u => u.id === editingUser.id ? normalizeUser(res.data) : u));
         setEditingUser(null);
@@ -241,7 +256,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       email:         u.email,
       is_active:     !u.isActive,
       role_id:       u.roleId,
-      department_id: u.deptId,
+      department_id: u.deptRaw || undefined,
     })
       .then(res => setUsers(prev => prev.map(x => x.id === u.id ? normalizeUser(res.data) : x)))
       .catch(() => {})
@@ -578,24 +593,48 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                     onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div>
-                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Role</label>
-                    <SelectField value={editForm.role_id ?? ''} onChange={e => setEditForm(f => ({ ...f, role_id: e.target.value ? Number(e.target.value) : null }))} placeholder="Select Role">
-                      {roles.map(r => (
-                        <option key={r.id} value={r.id}>{r.name.charAt(0).toUpperCase() + r.name.slice(1)}</option>
-                      ))}
-                    </SelectField>
-                  </div>
-                  <div>
-                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Department</label>
-                    <SelectField value={editForm.department_id ?? ''} onChange={e => setEditForm(f => ({ ...f, department_id: e.target.value ? Number(e.target.value) : null }))} placeholder="No Department">
-                      {depts.map(d => (
-                        <option key={d.id} value={d.id}>{d.name}</option>
-                      ))}
-                    </SelectField>
-                  </div>
-                </div>
+                {(() => {
+                  const isNodal = roles.find(r => String(r.id) === String(editForm.role_id))?.name === 'nodal Officer';
+                  return (
+                    <>
+                      <div style={{ display: 'grid', gridTemplateColumns: isNodal ? '1fr' : '1fr 1fr', gap: 12 }}>
+                        <div>
+                          <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Role</label>
+                          <SelectField
+                            value={editForm.role_id ?? ''}
+                            onChange={e => setEditForm(f => ({ ...f, role_id: e.target.value ? Number(e.target.value) : null, department_id: '', dept_ids: [] }))}
+                            placeholder="Select Role"
+                          >
+                            {roles.map(r => (
+                              <option key={r.id} value={r.id}>{r.name.charAt(0).toUpperCase() + r.name.slice(1)}</option>
+                            ))}
+                          </SelectField>
+                        </div>
+                        {!isNodal && (
+                          <div>
+                            <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Department</label>
+                            <SelectField value={editForm.department_id ?? ''} onChange={e => setEditForm(f => ({ ...f, department_id: e.target.value || null }))} placeholder="No Department">
+                              {depts.map(d => (
+                                <option key={d.id} value={d.id}>{d.name}</option>
+                              ))}
+                            </SelectField>
+                          </div>
+                        )}
+                      </div>
+                      {isNodal && (
+                        <div>
+                          <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Department</label>
+                          <MultiSelectField
+                            value={editForm.dept_ids}
+                            onChange={ids => setEditForm(f => ({ ...f, dept_ids: ids }))}
+                            options={depts}
+                            placeholder="Select departments…"
+                          />
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
 
                 {/* Active status toggle */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: 'var(--surface-ground)', borderRadius: 10, border: '1px solid var(--surface-border)' }}>
