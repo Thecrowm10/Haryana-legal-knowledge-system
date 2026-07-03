@@ -19,15 +19,10 @@ const BREADCRUMBS = {
   pending: ['Review', 'Pending Approvals'], reviewed: ['Review', 'Reviewed'],
   analytics: ['Analytics', 'Dashboard'], graph: ['Analytics', 'Knowledge Graph'], audit: ['Analytics', 'MIS Report'],
   users: ['Admin', 'User Management'], roles: ['Admin', 'Role Matrix'], logs: ['Admin', 'System Logs'],
-<<<<<<< HEAD
-  auditfull: ['Admin', 'Full Audit Log'],
-  auditlog: ['Auditor', 'Audit Log'],
-=======
   auditfull: ['Admin', 'Full MIS Report'],
   auditlog: ['Auditor', 'MIS Report'],
   nodalusers: ['Nodal Officer', 'User Management'],
   nodalauditfull: ['Nodal Officer', 'MIS Report'],
->>>>>>> 307abd81189d3156002eec0b59c3a9d7e071ab6d
 };
 
 export default function Topbar({ user, activePage, onLogout, onToggleSidebar, onChangePassword }) {
