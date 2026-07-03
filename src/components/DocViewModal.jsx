@@ -88,14 +88,17 @@ export default function DocViewModal({ doc, onClose }) {
     return () => { cancelled = true; };
   }, [pdfDoc, zoom, rotation]);
 
-  useEffect(() => {
-    const canvas = canvasRefs.current[currentPage - 1];
-    if (!canvas || !containerRef.current) return;
+  // scrollToPage is called only by Prev/Next buttons — never by handleScroll or scrollToAnnotation
+  function scrollToPage(page) {
+    const clamped = Math.max(1, Math.min(totalPages, page));
+    const canvas = canvasRefs.current[clamped - 1];
+    if (!canvas || !containerRef.current) { setCurrentPage(clamped); return; }
     suppressRef.current = true;
-    const top = (canvas.parentElement?.offsetTop ?? canvas.offsetTop);
+    const top = canvas.parentElement?.offsetTop ?? canvas.offsetTop;
     containerRef.current.scrollTo({ top: top - 8, behavior: 'smooth' });
+    setCurrentPage(clamped);
     setTimeout(() => { suppressRef.current = false; }, 700);
-  }, [currentPage]);
+  }
 
   function handleScroll() {
     if (suppressRef.current || !containerRef.current) return;
@@ -109,6 +112,20 @@ export default function DocViewModal({ doc, onClose }) {
       if (vis > bestVis) { bestVis = vis; best = i; }
     });
     if (best + 1 !== currentPage) setCurrentPage(best + 1);
+  }
+
+  function scrollToAnnotation(ann) {
+    const canvas = canvasRefs.current[ann.page - 1];
+    if (!canvas || !containerRef.current) return;
+    suppressRef.current = true;
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const wrapper = canvas.parentElement || canvas;
+    const wrapperRect = wrapper.getBoundingClientRect();
+    const annotCenterY = ann.y * wrapperRect.height + (ann.h * wrapperRect.height) / 2;
+    const wrapperTopInScroll = wrapperRect.top - containerRect.top + containerRef.current.scrollTop;
+    const target = wrapperTopInScroll + annotCenterY - containerRef.current.clientHeight / 2;
+    containerRef.current.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
+    setTimeout(() => { suppressRef.current = false; }, 900);
   }
 
   const LS = { fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)' };
@@ -239,7 +256,7 @@ export default function DocViewModal({ doc, onClose }) {
           </div>
 
           <div style={{ padding: '10px 20px', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, background: '#2d2f31', flexShrink: 0 }}>
-            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
+            <button onClick={() => scrollToPage(currentPage - 1)} disabled={currentPage === 1}
               style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px', borderRadius: 7, border: '1px solid rgba(255,255,255,.12)', background: currentPage === 1 ? 'transparent' : 'rgba(255,255,255,.07)', color: currentPage === 1 ? 'rgba(255,255,255,.25)' : 'rgba(255,255,255,.75)', fontSize: 12, fontWeight: 600, cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', transition: 'background .15s' }}>
               ← Prev
             </button>
@@ -248,7 +265,7 @@ export default function DocViewModal({ doc, onClose }) {
               <span style={{ fontSize: 11, color: 'rgba(255,255,255,.35)' }}>of</span>
               <span style={{ fontSize: 12.5, fontFamily: 'var(--mono)', color: 'rgba(255,255,255,.55)' }}>{totalPages}</span>
             </div>
-            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
+            <button onClick={() => scrollToPage(currentPage + 1)} disabled={currentPage === totalPages}
               style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px', borderRadius: 7, border: '1px solid rgba(255,255,255,.12)', background: currentPage === totalPages ? 'transparent' : 'rgba(255,255,255,.07)', color: currentPage === totalPages ? 'rgba(255,255,255,.25)' : 'rgba(255,255,255,.75)', fontSize: 12, fontWeight: 600, cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', transition: 'background .15s' }}>
               Next →
             </button>
@@ -344,7 +361,10 @@ export default function DocViewModal({ doc, onClose }) {
                 <div style={{ ...LS, marginBottom: 8 }}>PDF Highlights ({annotations.length})</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {annotations.map(ann => (
-                    <div key={ann.id} style={{ display: 'flex', gap: 10, padding: '9px 12px', borderRadius: 8, background: ann.color, border: '1px solid rgba(0,0,0,.1)', alignItems: 'flex-start' }}>
+                    <div key={ann.id} onClick={() => scrollToAnnotation(ann)}
+                      style={{ display: 'flex', gap: 10, padding: '9px 12px', borderRadius: 8, background: ann.color, border: '1px solid rgba(0,0,0,.1)', alignItems: 'flex-start', cursor: 'pointer', transition: 'filter .15s' }}
+                      onMouseEnter={e => e.currentTarget.style.filter = 'brightness(.92)'}
+                      onMouseLeave={e => e.currentTarget.style.filter = 'none'}>
                       <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, color: 'rgba(0,0,0,.5)', flexShrink: 0, marginTop: 2 }}>P{ann.page}</span>
                       <span style={{ fontSize: 12.5, color: 'rgba(0,0,0,.75)', lineHeight: 1.5, flex: 1 }}>{ann.comment || <span style={{ opacity: 0.5 }}>No comment</span>}</span>
                     </div>
