@@ -18,7 +18,7 @@ function normalizeUser(u) {
     email:     u.email ?? '',
     role:      u.role?.name ?? '—',
     roleId:    u.role?.id ?? null,
-    dept:      u.department?.name ?? '—',
+    dept:      u.departments?.length > 0 ? u.departments.map(d => d.name).join(', ') : (u.department?.name ?? '—'),
     deptId:    u.department?.id ?? null,
     status:    u.is_active ? 'active' : 'inactive',
     isActive:  u.is_active,
