@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Users, CheckCircle, XCircle, Plus, Edit2, X, Eye, EyeOff, Download } from 'lucide-react';
+import { Users, CheckCircle, XCircle, Plus, Edit2, X, Eye, EyeOff, Download, Layers, FileText, Clock, Search } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import SelectField from '../components/ui/SelectField';
+import DocViewModal from '../components/DocViewModal';
 import { getUsers, getRoles, updateUser, registerUser } from '../services/users';
 import { getMyDepartments } from '../services/departments';
+import { getAllDocumentsAdmin } from '../services/pdf';
 
 
 const LABEL = { fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)' };
@@ -68,14 +70,38 @@ export default function NodalOfficerDashboard({ activePage }) {
       .finally(() => setUsersLoading(false));
   }, [activePage]);
 
-  // Only the nodal officer's own departments — used for filter dropdown and add/edit selectors.
+  // Nodal officer's authorised departments — drives both the user management selectors and the uploads dept filter.
   const [depts, setDepts] = useState([]);
 
   useEffect(() => {
-    if (activePage !== 'nodalusers') return;
+    if (!['nodalusers', 'nodaluploads'].includes(activePage)) return;
     getMyDepartments()
       .then(res => setDepts(res.data))
       .catch(() => {});
+  }, [activePage]);
+
+  // All Uploads state
+  const [allDocs, setAllDocs]                             = useState([]);
+  const [allDocsLoading, setAllDocsLoading]               = useState(false);
+  const [allDocsError, setAllDocsError]                   = useState('');
+  const [uploadsSearch, setUploadsSearch]                 = useState('');
+  const [uploadsFilterStatus, setUploadsFilterStatus]     = useState('');
+  const [uploadsFilterDept, setUploadsFilterDept]         = useState('');
+  const [uploadsFilterUploader, setUploadsFilterUploader] = useState('');
+  const [uploadsFilterApprover, setUploadsFilterApprover] = useState('');
+  const [viewDoc, setViewDoc]                             = useState(null);
+
+  useEffect(() => {
+    if (activePage !== 'nodaluploads') return;
+    setAllDocsLoading(true);
+    setAllDocsError('');
+    Promise.all([getAllDocumentsAdmin(), getMyDepartments()])
+      .then(([docsRes, deptsRes]) => {
+        setAllDocs(docsRes.data.documents || []);
+        setDepts(deptsRes.data);
+      })
+      .catch(() => setAllDocsError('Failed to load documents. Please try again.'))
+      .finally(() => setAllDocsLoading(false));
   }, [activePage]);
 
   // Add User drawer state
@@ -521,6 +547,284 @@ export default function NodalOfficerDashboard({ activePage }) {
         )}
 
       </div>
+    );
+  }
+
+  // ── All Uploads (department-scoped) ─────────────────────────────────────
+  if (activePage === 'nodaluploads') {
+    // Authorised department names set — only docs belonging to these are shown.
+    const authorisedDeptNames = new Set(depts.map(d => d.name));
+
+    // Base list: filter to authorised departments only
+    const deptScopedDocs = allDocs.filter(d =>
+      !authorisedDeptNames.size || authorisedDeptNames.has(d.department_name)
+    );
+
+    const totalDocs    = deptScopedDocs.length;
+    const approvedDocs = deptScopedDocs.filter(d => d.status === 'approved').length;
+    const pendingDocs  = deptScopedDocs.filter(d => d.status === 'pending').length;
+    const rejectedDocs = deptScopedDocs.filter(d => d.status === 'rejected').length;
+
+    // Unique uploaders within authorised scope
+    const uploaderOptions = [];
+    const seenUp = new Set();
+    for (const d of deptScopedDocs) {
+      if (d.uploader_username && !seenUp.has(d.uploader_username)) {
+        seenUp.add(d.uploader_username);
+        const label = [d.uploader_first_name, d.uploader_last_name].filter(Boolean).join(' ') || d.uploader_username;
+        uploaderOptions.push({ value: d.uploader_username, label });
+      }
+    }
+
+    // Unique approvers within authorised scope
+    const approverOptions = [];
+    const seenAp = new Set();
+    for (const d of deptScopedDocs) {
+      const key = d.latest_approval?.approver_username;
+      if (key && !seenAp.has(key)) {
+        seenAp.add(key);
+        const label = [d.latest_approval.approver_first_name, d.latest_approval.approver_last_name].filter(Boolean).join(' ') || key;
+        approverOptions.push({ value: key, label });
+      }
+    }
+
+    const filteredDocs = deptScopedDocs.filter(d => {
+      if (uploadsFilterStatus && d.status !== uploadsFilterStatus) return false;
+      if (uploadsFilterDept && d.department_name !== uploadsFilterDept) return false;
+      if (uploadsFilterUploader && d.uploader_username !== uploadsFilterUploader) return false;
+      if (uploadsFilterApprover && d.latest_approval?.approver_username !== uploadsFilterApprover) return false;
+      if (uploadsSearch) {
+        const q = uploadsSearch.toLowerCase();
+        const name = (d.document_name || d.original_filename || '').toLowerCase();
+        const dept = (d.department_name || '').toLowerCase();
+        const up   = (d.uploader_username || '').toLowerCase();
+        if (!name.includes(q) && !dept.includes(q) && !up.includes(q)) return false;
+      }
+      return true;
+    });
+
+    function mapDocForViewer(d) {
+      return {
+        id:              d.id,
+        title:           d.document_name || d.original_filename || 'Untitled',
+        type:            d.document_type_name || 'Unclassified',
+        dept:            d.department_name || 'Unassigned',
+        year:            d.issue_date ? new Date(d.issue_date).getFullYear() : (d.created_at ? new Date(d.created_at).getFullYear() : '—'),
+        version:         d.version_no || '1.0',
+        status:          d.status || 'pending',
+        desc:            d.description || '',
+        fileName:        d.original_filename,
+        uploadedAt:      d.created_at?.split('T')[0] || '',
+        referenceNumber: d.reference_number || null,
+        enactmentDate:   d.issue_date?.split('T')[0] || null,
+        effectiveFrom:   d.effective_from?.split('T')[0] || null,
+        gazette:         d.gazette_reference || null,
+        authority:       d.legal_authority || null,
+        approval:        d.latest_approval || null,
+      };
+    }
+
+    const SC = {
+      approved: { color: '#16a34a', bg: 'rgba(34,197,94,.1)',  label: 'Approved' },
+      pending:  { color: '#f59e0b', bg: 'rgba(245,158,11,.1)', label: 'Pending'  },
+      rejected: { color: '#ef4444', bg: 'rgba(239,68,68,.1)',  label: 'Rejected' },
+    };
+    const cols = '4px 1fr 175px 155px 155px 90px';
+    const anyFilter = uploadsSearch || uploadsFilterStatus || uploadsFilterDept || uploadsFilterUploader || uploadsFilterApprover;
+
+    return (
+      <>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
+
+        {/* Department scope notice */}
+        {depts.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderRadius: 10, background: 'rgba(14,165,233,.07)', border: '1px solid rgba(14,165,233,.2)', fontSize: 12.5, color: '#0369a1' }}>
+            <Layers size={14} color="#0ea5e9" />
+            <span>Showing uploads from your authorised departments: <strong>{depts.map(d => d.name).join(' · ')}</strong></span>
+          </div>
+        )}
+
+        {/* Stats */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
+          {[
+            { label: 'Total Uploads', value: totalDocs,    color: 'var(--primary)', bg: 'rgba(26,86,219,.12)',  icon: Layers,      key: '' },
+            { label: 'Approved',      value: approvedDocs, color: '#16a34a',        bg: 'rgba(34,197,94,.12)',  icon: CheckCircle, key: 'approved' },
+            { label: 'Pending',       value: pendingDocs,  color: '#f59e0b',        bg: 'rgba(245,158,11,.12)', icon: Clock,       key: 'pending'  },
+            { label: 'Rejected',      value: rejectedDocs, color: '#ef4444',        bg: 'rgba(239,68,68,.12)',  icon: XCircle,     key: 'rejected' },
+          ].map(s => {
+            const isActive = uploadsFilterStatus === s.key && s.key !== '';
+            return (
+              <Card key={s.label}
+                onClick={() => setUploadsFilterStatus(f => f === s.key ? '' : s.key)}
+                style={{ cursor: 'pointer', outline: isActive ? `2px solid ${s.color}` : '2px solid transparent', transition: 'all .2s' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                  <div>
+                    <div style={{ ...LABEL, marginBottom: 8, color: isActive ? s.color : undefined }}>{s.label}</div>
+                    <div style={{ fontSize: 28, fontWeight: 700, color: isActive ? s.color : 'var(--text-heading)', fontFamily: 'var(--mono)', lineHeight: 1 }}>
+                      {allDocsLoading ? '–' : s.value}
+                    </div>
+                  </div>
+                  <div style={{ width: 44, height: 44, borderRadius: 11, background: isActive ? s.color + '22' : s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background .2s' }}>
+                    <s.icon size={20} color={s.color} strokeWidth={1.8} />
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+
+        {/* Filter bar + table */}
+        <Card padding="0">
+          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative', flex: '1 1 200px', minWidth: 180 }}>
+              <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-color-secondary)', pointerEvents: 'none' }} />
+              <input
+                value={uploadsSearch}
+                onChange={e => setUploadsSearch(e.target.value)}
+                placeholder="Search documents…"
+                style={{ width: '100%', padding: '7px 12px 7px 30px', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, color: 'var(--text-color)', outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+            <SelectField value={uploadsFilterUploader} onChange={e => setUploadsFilterUploader(e.target.value)} style={{ flex: '0 0 155px' }}>
+              <option value="">All Uploaders</option>
+              {uploaderOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </SelectField>
+            <SelectField value={uploadsFilterApprover} onChange={e => setUploadsFilterApprover(e.target.value)} style={{ flex: '0 0 155px' }}>
+              <option value="">All Approvers</option>
+              {approverOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </SelectField>
+            {/* Department filter is limited to the nodal officer's authorised departments */}
+            <SelectField value={uploadsFilterDept} onChange={e => setUploadsFilterDept(e.target.value)} style={{ flex: '0 0 155px' }}>
+              <option value="">All Departments</option>
+              {depts.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+            </SelectField>
+            <SelectField value={uploadsFilterStatus} onChange={e => setUploadsFilterStatus(e.target.value)} style={{ flex: '0 0 130px' }}>
+              <option value="">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </SelectField>
+            {anyFilter && (
+              <button onClick={() => { setUploadsSearch(''); setUploadsFilterStatus(''); setUploadsFilterDept(''); setUploadsFilterUploader(''); setUploadsFilterApprover(''); }}
+                style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'transparent', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '7px 12px', fontSize: 12, cursor: 'pointer', color: 'var(--text-color-secondary)', whiteSpace: 'nowrap' }}>
+                <X size={11} /> Clear
+              </button>
+            )}
+            <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
+              {filteredDocs.length} of {totalDocs}
+            </div>
+          </div>
+
+          {allDocsLoading && (
+            <div style={{ padding: '50px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>Loading documents…</div>
+          )}
+          {allDocsError && (
+            <div style={{ padding: '20px 18px', fontSize: 13, color: '#ef4444' }}>{allDocsError}</div>
+          )}
+
+          {!allDocsLoading && !allDocsError && (
+            <>
+              {/* Column headers */}
+              <div style={{ display: 'grid', gridTemplateColumns: cols, background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
+                <div />
+                <div style={{ ...LABEL, padding: '10px 16px 10px 68px' }}>Document</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Uploader</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Status</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Dates</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Actions</div>
+              </div>
+
+              {filteredDocs.length === 0 ? (
+                <div style={{ padding: '50px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>
+                  No documents match the current filters
+                </div>
+              ) : filteredDocs.map(doc => {
+                const sc = SC[doc.status] || SC.pending;
+                const uploaderName = [doc.uploader_first_name, doc.uploader_last_name].filter(Boolean).join(' ') || doc.uploader_username || '—';
+                const approverName = doc.latest_approval
+                  ? ([doc.latest_approval.approver_first_name, doc.latest_approval.approver_last_name].filter(Boolean).join(' ') || doc.latest_approval.approver_username)
+                  : null;
+                const uploadedDate   = doc.created_at ? doc.created_at.split('T')[0] : '—';
+                const lastActionDate = doc.latest_approval?.acted_at ? doc.latest_approval.acted_at.split('T')[0] : null;
+                return (
+                  <div key={doc.id} style={{ display: 'grid', gridTemplateColumns: cols, borderBottom: '1px solid var(--surface-border)', alignItems: 'stretch', minHeight: 62, transition: 'background .15s' }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                    <div style={{ background: sc.color, opacity: .7 }} />
+                    {/* Document */}
+                    <div style={{ padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ width: 36, height: 36, borderRadius: 9, background: sc.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <FileText size={16} color={sc.color} strokeWidth={1.8} />
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 320 }}>
+                          {doc.document_name || doc.original_filename}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3, flexWrap: 'wrap' }}>
+                          {doc.document_type_name && (
+                            <span style={{ fontSize: 10, fontWeight: 600, color: sc.color, background: sc.bg, borderRadius: 4, padding: '1px 5px' }}>{doc.document_type_name}</span>
+                          )}
+                          {doc.department_name && (
+                            <span style={{ fontSize: 10, color: 'var(--text-color-secondary)' }}>{doc.department_name}</span>
+                          )}
+                          {doc.version_no && (
+                            <span style={{ fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', borderRadius: 4, padding: '1px 5px', border: '1px solid var(--surface-border)' }}>v{doc.version_no}</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    {/* Uploader */}
+                    <div style={{ padding: '10px 14px', borderLeft: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-heading)' }}>{uploaderName}</div>
+                      {doc.uploader_username && (
+                        <div style={{ fontSize: 10.5, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>@{doc.uploader_username}</div>
+                      )}
+                    </div>
+                    {/* Status */}
+                    <div style={{ padding: '10px 14px', borderLeft: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10.5, fontWeight: 700, color: sc.color, background: sc.bg, borderRadius: 12, padding: '3px 9px', textTransform: 'uppercase', letterSpacing: '.05em', width: 'fit-content' }}>
+                        {sc.label}
+                      </span>
+                      {approverName && (
+                        <div style={{ fontSize: 10.5, color: 'var(--text-color-secondary)', marginTop: 4 }}>
+                          {doc.status === 'approved' ? '✓' : '✗'} {approverName}
+                        </div>
+                      )}
+                    </div>
+                    {/* Dates */}
+                    <div style={{ padding: '10px 14px', borderLeft: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 5 }}>
+                      <div>
+                        <div style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--text-color-secondary)', textTransform: 'uppercase', letterSpacing: '.05em', fontFamily: 'var(--mono)', marginBottom: 2 }}>Uploaded</div>
+                        <div style={{ fontFamily: 'var(--mono)', fontSize: 11.5, color: 'var(--text-color)' }}>{uploadedDate}</div>
+                      </div>
+                      {lastActionDate && (
+                        <div>
+                          <div style={{ fontSize: 9.5, fontWeight: 700, color: sc.color, textTransform: 'uppercase', letterSpacing: '.05em', fontFamily: 'var(--mono)', marginBottom: 2 }}>
+                            {doc.status === 'approved' ? 'Approved' : doc.status === 'rejected' ? 'Rejected' : 'Reviewed'}
+                          </div>
+                          <div style={{ fontFamily: 'var(--mono)', fontSize: 11.5, color: sc.color }}>{lastActionDate}</div>
+                        </div>
+                      )}
+                    </div>
+                    {/* Actions */}
+                    <div style={{ padding: '10px 14px', borderLeft: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <button onClick={() => setViewDoc(mapDocForViewer(doc))}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 7, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'background .15s' }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(26,86,219,.14)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'rgba(26,86,219,.07)'}>
+                        <Eye size={12} /> View
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          )}
+        </Card>
+      </div>
+
+      {viewDoc && <DocViewModal doc={viewDoc} onClose={() => setViewDoc(null)} />}
+      </>
     );
   }
 

@@ -24,6 +24,7 @@ const BREADCRUMBS = {
   alluploads: ['Admin', 'All Uploads'],
   auditlog: ['Auditor', 'MIS Report'],
   nodalusers: ['Nodal Officer', 'User Management'],
+  nodaluploads:   ['Nodal Officer', 'All Uploads'],
   nodalauditfull: ['Nodal Officer', 'MIS Report'],
 };
 

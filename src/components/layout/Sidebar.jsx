@@ -52,7 +52,8 @@ const MENU_CONFIG = {
   ],
   nodal_officer: [
     { label: 'ADMINISTRATION', items: [
-      { icon: Users,       label: 'User Management', id: 'nodalusers' },
+      { icon: Users,         label: 'User Management', id: 'nodalusers' },
+      { icon: Layers,        label: 'All Uploads',     id: 'nodaluploads' },
       { icon: ClipboardList, label: 'MIS Report',      id: 'nodalauditfull' },
     ]},
   ],
