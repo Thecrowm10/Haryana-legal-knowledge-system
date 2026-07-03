@@ -48,7 +48,7 @@ function exportCSV(data, filename) {
 
 export default function AuditorDashboard({ activePage }) {
 
-  // ── Audit Log ────────────────────────────────────────────────────────────
+  // ── MIS Report ───────────────────────────────────────────────────────────
   if (activePage === 'auditlog') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
@@ -76,15 +76,15 @@ export default function AuditorDashboard({ activePage }) {
         <Card padding="0">
           <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>System Audit Log</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>System MIS Report</div>
               <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 2 }}>Read-only · Tamper-evident · Append-only</div>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => exportCSV(MOCK_AUDIT, 'audit-log.csv')}
+              <button onClick={() => exportCSV(MOCK_AUDIT, 'mis-report.csv')}
                 style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--surface-ground)', color: 'var(--text-color)', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '7px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
                 <Download size={13} /> Export CSV
               </button>
-              <button onClick={() => exportCSV(MOCK_AUDIT, 'audit-log.json')}
+              <button onClick={() => exportCSV(MOCK_AUDIT, 'mis-report.json')}
                 style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--surface-ground)', color: 'var(--text-color)', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '7px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
                 <Download size={13} /> Export JSON
               </button>

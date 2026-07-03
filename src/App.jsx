@@ -19,7 +19,11 @@ const DEFAULT_PAGE = {
   csoffice: 'analytics',
   officer:  'analytics',
   admin:    'users',
+<<<<<<< HEAD
   nodal:    'users',
+=======
+  nodal_officer: 'nodalusers',
+>>>>>>> 307abd81189d3156002eec0b59c3a9d7e071ab6d
   auditor:  'auditlog',
 };
 
@@ -141,7 +145,7 @@ export default function App() {
         );
       case 'admin':
         return <AdminDashboard activePage={activePage} taxonomy={taxonomy} onUpdateTaxonomy={setTaxonomy} />;
-      case 'nodal':
+      case 'nodal_officer':
         return <NodalOfficerDashboard activePage={activePage} />;
       case 'auditor':
         return <AuditorDashboard activePage={activePage} />;

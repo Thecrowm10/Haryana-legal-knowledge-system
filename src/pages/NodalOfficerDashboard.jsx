@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, CheckCircle, XCircle, Plus, Edit2, X, Eye, EyeOff } from 'lucide-react';
+import { Users, CheckCircle, XCircle, Plus, Edit2, X, Eye, EyeOff, Download } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import SelectField from '../components/ui/SelectField';
@@ -27,6 +27,18 @@ function normalizeUser(u) {
   };
 }
 
+<<<<<<< HEAD
+=======
+function exportCSV(data, filename) {
+  const headers = Object.keys(data[0]).join(',');
+  const rows = data.map(r => Object.values(r).map(v => `"${v}"`).join(',')).join('\n');
+  const blob = new Blob([headers + '\n' + rows], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+>>>>>>> 307abd81189d3156002eec0b59c3a9d7e071ab6d
 const MOCK_AUDIT = [
   { time: '2026-05-25 10:42', user: 'Priya Sharma',  role: 'uploader', action: 'Uploaded document: Haryana Municipal Act 2024' },
   { time: '2026-05-25 10:18', user: 'Sunil Verma',   role: 'approver', action: 'Approved: Punjab Land Revenue Act Amendment' },
@@ -45,7 +57,11 @@ export default function NodalOfficerDashboard({ activePage }) {
   const [roles, setRoles]               = useState([]);
 
   useEffect(() => {
+<<<<<<< HEAD
     if (activePage !== 'users') return;
+=======
+    if (activePage !== 'nodalusers') return;
+>>>>>>> 307abd81189d3156002eec0b59c3a9d7e071ab6d
     setUsersLoading(true);
     setUsersError('');
     Promise.all([getUsers(), getRoles()])
@@ -61,7 +77,11 @@ export default function NodalOfficerDashboard({ activePage }) {
   const [depts, setDepts] = useState([]);
 
   useEffect(() => {
+<<<<<<< HEAD
     if (activePage !== 'users') return;
+=======
+    if (activePage !== 'nodalusers') return;
+>>>>>>> 307abd81189d3156002eec0b59c3a9d7e071ab6d
     getDepartments()
       .then(res => setDepts(res.data))
       .catch(() => {});
@@ -157,7 +177,11 @@ export default function NodalOfficerDashboard({ activePage }) {
   const [deptFilter, setDeptFilter] = useState('');
 
   // ── User Management ─────────────────────────────────────────────────────
+<<<<<<< HEAD
   if (activePage === 'users') {
+=======
+  if (activePage === 'nodalusers') {
+>>>>>>> 307abd81189d3156002eec0b59c3a9d7e071ab6d
     const active   = users.filter(u => u.status === 'active').length;
     const inactive = users.filter(u => u.status === 'inactive').length;
 
@@ -510,15 +534,27 @@ export default function NodalOfficerDashboard({ activePage }) {
     );
   }
 
+<<<<<<< HEAD
   // ── Full Audit Log ──────────────────────────────────────────────────────
   if (activePage === 'auditfull') {
+=======
+  // ── Full MIS Report ──────────────────────────────────────────────────────
+  if (activePage === 'nodalauditfull') {
+>>>>>>> 307abd81189d3156002eec0b59c3a9d7e071ab6d
     return (
       <div style={{ animation: 'fadeSlideIn .3s ease' }}>
         <Card padding="0">
           <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+<<<<<<< HEAD
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>Full System Audit Log</div>
             <button style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--surface-ground)', color: 'var(--text-color)', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '7px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
               Export CSV
+=======
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>Full System MIS Report</div>
+            <button onClick={() => exportCSV(MOCK_AUDIT, 'mis-report.csv')}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--surface-ground)', color: 'var(--text-color)', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '7px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
+              <Download size={13} /> Export CSV
+>>>>>>> 307abd81189d3156002eec0b59c3a9d7e071ab6d
             </button>
           </div>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>

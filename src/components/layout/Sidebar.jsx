@@ -26,7 +26,7 @@ const MENU_CONFIG = {
     ]},
     { label: 'KNOWLEDGE', items: [
       { icon: GitBranch,     label: 'Knowledge Graph', id: 'graph' },
-      { icon: ClipboardList, label: 'Audit Log',       id: 'audit' },
+      { icon: ClipboardList, label: 'MIS Report',      id: 'audit' },
     ]},
   ],
   officer: [
@@ -35,7 +35,7 @@ const MENU_CONFIG = {
     ]},
     { label: 'KNOWLEDGE', items: [
       { icon: GitBranch,     label: 'Knowledge Graph', id: 'graph' },
-      { icon: ClipboardList, label: 'Audit Log',       id: 'audit' },
+      { icon: ClipboardList, label: 'MIS Report',      id: 'audit' },
     ]},
   ],
   admin: [
@@ -47,7 +47,13 @@ const MENU_CONFIG = {
     { label: 'SYSTEM', items: [
       { icon: Settings,      label: 'Taxonomy Editor', id: 'taxonomy' },
       { icon: Activity,      label: 'System Monitor',  id: 'monitor' },
-      { icon: ClipboardList, label: 'Full Audit Log',  id: 'auditfull' },
+      { icon: ClipboardList, label: 'Full MIS Report',  id: 'auditfull' },
+    ]},
+  ],
+  nodal_officer: [
+    { label: 'ADMINISTRATION', items: [
+      { icon: Users,       label: 'User Management', id: 'nodalusers' },
+      { icon: ClipboardList, label: 'MIS Report',      id: 'nodalauditfull' },
     ]},
   ],
   nodal: [
@@ -58,7 +64,7 @@ const MENU_CONFIG = {
   ],
   auditor: [
     { label: 'AUDIT', items: [
-      { icon: ClipboardList, label: 'Audit Log',        id: 'auditlog' },
+      { icon: ClipboardList, label: 'MIS Report',        id: 'auditlog' },
       { icon: FileSearch,    label: 'Query History',    id: 'queryhistory' },
     ]},
     { label: 'REPORTS', items: [
