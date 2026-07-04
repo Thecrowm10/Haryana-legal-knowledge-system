@@ -1313,6 +1313,8 @@ function mapApiDoc(d) {
 // Link Request Review Panel
 // Shows the PDF + document details for a pending link request with Approve/Reject actions.
 function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
+  const isReadOnly = lr.link_status !== 'pending';
+
   const [blobUrl, setBlobUrl]             = useState(null);
   const [currentPage, setCurrentPage]     = useState(1);
   const [pdfTotalPages, setPdfTotalPages] = useState(null);
@@ -1321,6 +1323,14 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
   const [annotations, setAnnotations]     = useState([]);
   const [highlightMode, setHighlightMode] = useState(false);
   const pdfScrollRef                      = useRef(null);
+
+  // For read-only mode: parse stored annotations from the review
+  const storedAnnotations = useMemo(() => {
+    if (!isReadOnly || !lr.annotations_json) return [];
+    try { return JSON.parse(lr.annotations_json); } catch { return []; }
+  }, [isReadOnly, lr.annotations_json]);
+
+  const displayAnnotations = isReadOnly ? storedAnnotations : annotations;
 
   function updateRemark(idx, val) {
     setRemarkLines(prev => prev.map((r, i) => i === idx ? val : r));
@@ -1423,10 +1433,10 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
             onRotate={() => setRotation(r => (r + 90) % 360)}
             blobUrl={blobUrl}
             onTotalPagesChange={setPdfTotalPages}
-            annotations={annotations}
-            onAnnotationsChange={setAnnotations}
-            highlightMode={highlightMode}
-            onHighlightModeChange={setHighlightMode}
+            annotations={displayAnnotations}
+            onAnnotationsChange={isReadOnly ? undefined : setAnnotations}
+            highlightMode={isReadOnly ? false : highlightMode}
+            onHighlightModeChange={isReadOnly ? undefined : setHighlightMode}
             onScrollRef={pdfScrollRef}
           />
         </div>
@@ -1466,7 +1476,11 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
               {lr.requested_by_username && <InfoRow label="Username" value={lr.requested_by_username} mono />}
               <InfoRow label="Requested At" value={lr.requested_at?.split('T')[0]} mono />
               <InfoRow label="Status" value={
-                <span style={{ background: 'rgba(245,158,11,.12)', color: '#d97706', padding: '2px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700, textTransform: 'capitalize' }}>
+                <span style={{
+                  background: lr.link_status === 'approved' ? 'rgba(34,197,94,.12)' : lr.link_status === 'rejected' ? 'rgba(239,68,68,.1)' : 'rgba(245,158,11,.12)',
+                  color: lr.link_status === 'approved' ? '#16a34a' : lr.link_status === 'rejected' ? '#dc2626' : '#d97706',
+                  padding: '2px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700, textTransform: 'capitalize',
+                }}>
                   {lr.link_status}
                 </span>
               } />
@@ -1474,11 +1488,11 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
           </div>
 
           {/* Annotations */}
-          {annotations.length > 0 && (
+          {displayAnnotations.length > 0 && (
             <div>
-              <div style={{ ...LABEL, marginBottom: 8 }}>Annotations · {annotations.length}</div>
+              <div style={{ ...LABEL, marginBottom: 8 }}>PDF Highlights · {displayAnnotations.length}</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {annotations.map((ann, i) => (
+                {displayAnnotations.map((ann, i) => (
                   <div key={ann.id || i}
                     onClick={() => pdfScrollRef.current?.(ann)}
                     style={{ display: 'flex', gap: 10, padding: '9px 12px', borderRadius: 8, background: ann.color, border: '1px solid rgba(0,0,0,.1)', alignItems: 'flex-start', cursor: 'pointer', transition: 'filter .15s' }}
@@ -1497,76 +1511,127 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
       {/* Page nav */}
       <PageNav currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
 
-      {/* Remarks + Approve / Reject */}
-      <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12, borderTop: '1px solid var(--surface-border)' }}>
-
-        {/* Numbered remark fields */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {remarkLines.map((remark, idx) => (
-            <div key={idx}>
-              <div style={{ ...LABEL, marginBottom: 5 }}>Remark {idx + 1}</div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <input
-                  value={remark}
-                  onChange={e => updateRemark(idx, e.target.value)}
-                  placeholder={`Enter remark ${idx + 1}…`}
-                  style={{
-                    flex: 1, background: 'var(--surface-ground)',
-                    border: '1px solid var(--surface-border)', borderRadius: 8,
-                    color: 'var(--text-color)', fontFamily: 'var(--font)', fontSize: 13,
-                    padding: '9px 12px', outline: 'none', transition: 'border-color .2s',
-                  }}
-                  onFocus={e => e.target.style.borderColor = 'var(--primary)'}
-                  onBlur={e => e.target.style.borderColor = 'var(--surface-border)'}
-                />
-                {remarkLines.length > 1 && (
-                  <button onClick={() => removeRemark(idx)}
-                    style={{
-                      background: 'rgba(239,68,68,.06)', border: '1px solid rgba(239,68,68,.2)',
-                      color: '#dc2626', borderRadius: 7, width: 32, height: 32,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      cursor: 'pointer', flexShrink: 0,
-                    }}>
-                    <X size={12} />
-                  </button>
-                )}
+      {/* Remarks + Approve / Reject — or read-only summary */}
+      {isReadOnly ? (
+        /* ── Read-only: show stored reviewer remarks ── */
+        (() => {
+          const isApproved = lr.link_status === 'approved';
+          const accent = isApproved ? '#16a34a' : '#dc2626';
+          const accentBg = isApproved ? 'rgba(34,197,94,.06)' : 'rgba(239,68,68,.06)';
+          const accentBorder = isApproved ? 'rgba(34,197,94,.25)' : 'rgba(239,68,68,.25)';
+          const ReviewerIcon = isApproved ? CheckCircle : XCircle;
+          const reviewerName = lr.reviewed_by_first_name
+            ? `${lr.reviewed_by_first_name} ${lr.reviewed_by_last_name || ''}`.trim()
+            : lr.reviewed_by_username || 'Reviewer';
+          const parsedRemarks = parseDisplayRemarks(lr.review_comments);
+          return (
+            <div style={{ padding: '16px 20px', borderTop: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ ...LABEL }}>Review Details</div>
+              {/* Status banner */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 10, background: accentBg, border: `1px solid ${accentBorder}` }}>
+                <ReviewerIcon size={22} color={accent} style={{ flexShrink: 0 }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: accent }}>
+                    Link {isApproved ? 'Approved' : 'Rejected'}
+                  </div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 2 }}>
+                    By <strong style={{ color: 'var(--text-color)' }}>{reviewerName}</strong>
+                    {lr.reviewed_at && <> · {lr.reviewed_at.split('T')[0]}</>}
+                  </div>
+                </div>
               </div>
+              {/* Remarks */}
+              {parsedRemarks.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {parsedRemarks.map(({ num, text }) => (
+                    <div key={num} style={{ display: 'flex', gap: 12, padding: '10px 14px', borderRadius: 9, background: 'var(--surface-ground)', border: `1px solid ${accentBorder}`, alignItems: 'flex-start' }}>
+                      <div style={{ flexShrink: 0, width: 22, height: 22, borderRadius: 6, background: accentBg, border: `1px solid ${accentBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>
+                        <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, color: accent }}>{num}</span>
+                      </div>
+                      <span style={{ fontSize: 13, color: 'var(--text-color)', lineHeight: 1.6, flex: 1 }}>{text || '—'}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ fontSize: 13, color: 'var(--text-color-secondary)', fontStyle: 'italic', padding: '8px 0' }}>
+                  No remarks were provided.
+                </div>
+              )}
             </div>
-          ))}
-        </div>
+          );
+        })()
+      ) : (
+        /* ── Editable: remark inputs + Approve/Reject ── */
+        <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12, borderTop: '1px solid var(--surface-border)' }}>
 
-        {/* Add Remark + action buttons */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <button onClick={addRemark}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              background: 'transparent', border: '1.5px dashed var(--surface-border)',
-              color: 'var(--primary)', borderRadius: 7, padding: '6px 14px',
-              fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.background = 'rgba(26,86,219,.05)'; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--surface-border)'; e.currentTarget.style.background = 'transparent'; }}>
-            <Plus size={13} /> Add Remark
-          </button>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={() => onReview(lr.link_id, 'rejected', buildComments(), buildAnnotationsJson())}
-              disabled={deciding === lr.link_id || !hasRemarks}
-              title={!hasRemarks ? 'Enter at least one remark before rejecting' : undefined}
-              style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.3)', color: '#b91c1c', padding: '9px 18px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 600, cursor: (deciding === lr.link_id || !hasRemarks) ? 'not-allowed' : 'pointer', opacity: (deciding === lr.link_id || !hasRemarks) ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
-              onMouseEnter={e => { if (!deciding && hasRemarks) e.currentTarget.style.background = 'rgba(239,68,68,.15)'; }}
-              onMouseLeave={e => { if (!deciding) e.currentTarget.style.background = 'rgba(239,68,68,.08)'; }}>
-              <X size={14} /> {deciding === lr.link_id ? 'Rejecting…' : 'Reject'}
+          {/* Numbered remark fields */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {remarkLines.map((remark, idx) => (
+              <div key={idx}>
+                <div style={{ ...LABEL, marginBottom: 5 }}>Remark {idx + 1}</div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input
+                    value={remark}
+                    onChange={e => updateRemark(idx, e.target.value)}
+                    placeholder={`Enter remark ${idx + 1}…`}
+                    style={{
+                      flex: 1, background: 'var(--surface-ground)',
+                      border: '1px solid var(--surface-border)', borderRadius: 8,
+                      color: 'var(--text-color)', fontFamily: 'var(--font)', fontSize: 13,
+                      padding: '9px 12px', outline: 'none', transition: 'border-color .2s',
+                    }}
+                    onFocus={e => e.target.style.borderColor = 'var(--primary)'}
+                    onBlur={e => e.target.style.borderColor = 'var(--surface-border)'}
+                  />
+                  {remarkLines.length > 1 && (
+                    <button onClick={() => removeRemark(idx)}
+                      style={{
+                        background: 'rgba(239,68,68,.06)', border: '1px solid rgba(239,68,68,.2)',
+                        color: '#dc2626', borderRadius: 7, width: 32, height: 32,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: 'pointer', flexShrink: 0,
+                      }}>
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Add Remark + action buttons */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <button onClick={addRemark}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                background: 'transparent', border: '1.5px dashed var(--surface-border)',
+                color: 'var(--primary)', borderRadius: 7, padding: '6px 14px',
+                fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.background = 'rgba(26,86,219,.05)'; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--surface-border)'; e.currentTarget.style.background = 'transparent'; }}>
+              <Plus size={13} /> Add Remark
             </button>
-            <button onClick={() => onReview(lr.link_id, 'approved', buildComments(), buildAnnotationsJson())}
-              disabled={deciding === lr.link_id}
-              style={{ background: 'rgba(34,197,94,.1)', border: '1px solid rgba(34,197,94,.3)', color: '#1e40af', padding: '9px 20px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700, cursor: deciding === lr.link_id ? 'not-allowed' : 'pointer', opacity: deciding === lr.link_id ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
-              onMouseEnter={e => { if (!deciding) e.currentTarget.style.background = 'rgba(34,197,94,.18)'; }}
-              onMouseLeave={e => { if (!deciding) e.currentTarget.style.background = 'rgba(34,197,94,.1)'; }}>
-              <Check size={14} /> {deciding === lr.link_id ? 'Approving…' : 'Approve'}
-            </button>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => onReview(lr.link_id, 'rejected', buildComments(), buildAnnotationsJson())}
+                disabled={deciding === lr.link_id || !hasRemarks}
+                title={!hasRemarks ? 'Enter at least one remark before rejecting' : undefined}
+                style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.3)', color: '#b91c1c', padding: '9px 18px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 600, cursor: (deciding === lr.link_id || !hasRemarks) ? 'not-allowed' : 'pointer', opacity: (deciding === lr.link_id || !hasRemarks) ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
+                onMouseEnter={e => { if (!deciding && hasRemarks) e.currentTarget.style.background = 'rgba(239,68,68,.15)'; }}
+                onMouseLeave={e => { if (!deciding) e.currentTarget.style.background = 'rgba(239,68,68,.08)'; }}>
+                <X size={14} /> {deciding === lr.link_id ? 'Rejecting…' : 'Reject'}
+              </button>
+              <button onClick={() => onReview(lr.link_id, 'approved', buildComments(), buildAnnotationsJson())}
+                disabled={deciding === lr.link_id}
+                style={{ background: 'rgba(34,197,94,.1)', border: '1px solid rgba(34,197,94,.3)', color: '#1e40af', padding: '9px 20px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700, cursor: deciding === lr.link_id ? 'not-allowed' : 'pointer', opacity: deciding === lr.link_id ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
+                onMouseEnter={e => { if (!deciding) e.currentTarget.style.background = 'rgba(34,197,94,.18)'; }}
+                onMouseLeave={e => { if (!deciding) e.currentTarget.style.background = 'rgba(34,197,94,.1)'; }}>
+                <Check size={14} /> {deciding === lr.link_id ? 'Approving…' : 'Approve'}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
