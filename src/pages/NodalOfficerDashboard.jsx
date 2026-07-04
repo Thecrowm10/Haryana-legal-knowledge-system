@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Users, CheckCircle, XCircle, Plus, Edit2, X, Eye, EyeOff, Download, Layers, FileText, Clock, Search } from 'lucide-react';
+import { Users, CheckCircle, XCircle, Plus, Edit2, X, Eye, EyeOff, Download, Layers, FileText, Clock, Search, Link2 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import SelectField from '../components/ui/SelectField';
 import DocViewModal from '../components/DocViewModal';
 import { getUsers, getRoles, updateUser, registerUser } from '../services/users';
 import { getMyDepartments } from '../services/departments';
-import { getAllDocumentsAdmin } from '../services/pdf';
+import { getAllDocumentsAdmin, getAllDepartmentLinks } from '../services/pdf';
 
 
 const LABEL = { fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)' };
@@ -74,7 +74,7 @@ export default function NodalOfficerDashboard({ activePage }) {
   const [depts, setDepts] = useState([]);
 
   useEffect(() => {
-    if (!['nodalusers', 'nodaluploads'].includes(activePage)) return;
+    if (!['nodalusers', 'nodaluploads', 'nodallinkedocs'].includes(activePage)) return;
     getMyDepartments()
       .then(res => setDepts(res.data))
       .catch(() => {});
@@ -196,6 +196,23 @@ export default function NodalOfficerDashboard({ activePage }) {
       .catch(() => {})
       .finally(() => setTogglingId(null));
   }
+
+  // Linked Documents state (nodal view)
+  const [nodalLinks, setNodalLinks]             = useState([]);
+  const [nodalLinksLoading, setNodalLinksLoading] = useState(false);
+  const [nodalLinksError, setNodalLinksError]   = useState('');
+  const [nodalLinksSearch, setNodalLinksSearch] = useState('');
+  const [nodalLinksFilterStatus, setNodalLinksFilterStatus] = useState('');
+
+  useEffect(() => {
+    if (activePage !== 'nodallinkedocs') return;
+    setNodalLinksLoading(true);
+    setNodalLinksError('');
+    getAllDepartmentLinks()
+      .then(res => setNodalLinks(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setNodalLinksError('Failed to load linked documents.'))
+      .finally(() => setNodalLinksLoading(false));
+  }, [activePage]);
 
   const [deptFilter, setDeptFilter] = useState('');
 
@@ -861,6 +878,178 @@ export default function NodalOfficerDashboard({ activePage }) {
               ))}
             </tbody>
           </table>
+        </Card>
+      </div>
+    );
+  }
+
+  // ── Linked Documents (department-scoped) ────────────────────────────────
+  if (activePage === 'nodallinkedocs') {
+    const authorisedDeptNames = new Set(depts.map(d => d.name));
+
+    // Scope links to departments the nodal officer manages
+    const scopedLinks = authorisedDeptNames.size
+      ? nodalLinks.filter(l =>
+          authorisedDeptNames.has(l.linked_department_name) ||
+          authorisedDeptNames.has(l.original_department_name)
+        )
+      : nodalLinks;
+
+    const filteredLinks = scopedLinks.filter(l => {
+      if (nodalLinksFilterStatus && l.link_status !== nodalLinksFilterStatus) return false;
+      if (nodalLinksSearch) {
+        const q = nodalLinksSearch.toLowerCase();
+        if (
+          !(l.document_name || '').toLowerCase().includes(q) &&
+          !(l.original_department_name || '').toLowerCase().includes(q) &&
+          !(l.linked_department_name || '').toLowerCase().includes(q)
+        ) return false;
+      }
+      return true;
+    });
+
+    const LS = {
+      approved: { color: '#16a34a', bg: 'rgba(34,197,94,.1)',  label: 'Approved' },
+      pending:  { color: '#f59e0b', bg: 'rgba(245,158,11,.1)', label: 'Pending'  },
+      rejected: { color: '#ef4444', bg: 'rgba(239,68,68,.1)',  label: 'Rejected' },
+    };
+    const totals = { all: scopedLinks.length, pending: 0, approved: 0, rejected: 0 };
+    scopedLinks.forEach(l => { if (totals[l.link_status] !== undefined) totals[l.link_status]++; });
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
+        {/* Scope notice */}
+        {depts.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderRadius: 10, background: 'rgba(14,165,233,.07)', border: '1px solid rgba(14,165,233,.2)', fontSize: 12.5, color: '#0369a1' }}>
+            <Link2 size={14} color="#0ea5e9" />
+            <span>Showing links involving your authorised departments: <strong>{depts.map(d => d.name).join(' · ')}</strong></span>
+          </div>
+        )}
+
+        {/* Stats */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
+          {[
+            { label: 'Total Links', value: totals.all,      color: 'var(--primary)', bg: 'rgba(26,86,219,.12)',  icon: Link2,       key: '' },
+            { label: 'Approved',    value: totals.approved,  color: '#16a34a',       bg: 'rgba(34,197,94,.12)',  icon: CheckCircle, key: 'approved' },
+            { label: 'Pending',     value: totals.pending,   color: '#f59e0b',       bg: 'rgba(245,158,11,.12)', icon: Clock,       key: 'pending'  },
+            { label: 'Rejected',    value: totals.rejected,  color: '#ef4444',       bg: 'rgba(239,68,68,.12)',  icon: XCircle,     key: 'rejected' },
+          ].map(s => {
+            const isActive = nodalLinksFilterStatus === s.key && s.key !== '';
+            return (
+              <Card key={s.label}
+                onClick={() => setNodalLinksFilterStatus(f => f === s.key ? '' : s.key)}
+                style={{ cursor: 'pointer', outline: isActive ? `2px solid ${s.color}` : '2px solid transparent', transition: 'all .2s' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                  <div>
+                    <div style={{ ...LABEL, marginBottom: 8, color: isActive ? s.color : undefined }}>{s.label}</div>
+                    <div style={{ fontSize: 28, fontWeight: 700, color: isActive ? s.color : 'var(--text-heading)', fontFamily: 'var(--mono)', lineHeight: 1 }}>
+                      {nodalLinksLoading ? '–' : s.value}
+                    </div>
+                  </div>
+                  <div style={{ width: 44, height: 44, borderRadius: 11, background: isActive ? s.color + '22' : s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background .2s' }}>
+                    <s.icon size={20} color={s.color} strokeWidth={1.8} />
+                  </div>
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+
+        {/* Filter + table */}
+        <Card padding="0">
+          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative', flex: '1 1 200px', minWidth: 180 }}>
+              <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-color-secondary)', pointerEvents: 'none' }} />
+              <input
+                value={nodalLinksSearch}
+                onChange={e => setNodalLinksSearch(e.target.value)}
+                placeholder="Search by document or department…"
+                style={{ width: '100%', padding: '7px 12px 7px 30px', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, color: 'var(--text-color)', outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+            <select value={nodalLinksFilterStatus} onChange={e => setNodalLinksFilterStatus(e.target.value)}
+              style={{ height: 36, padding: '0 10px', border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, background: 'var(--surface-ground)', color: 'var(--text-color)', cursor: 'pointer' }}>
+              <option value="">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+            {(nodalLinksSearch || nodalLinksFilterStatus) && (
+              <button onClick={() => { setNodalLinksSearch(''); setNodalLinksFilterStatus(''); }}
+                style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'transparent', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '7px 12px', fontSize: 12, cursor: 'pointer', color: 'var(--text-color-secondary)' }}>
+                <X size={11} /> Clear
+              </button>
+            )}
+            <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginLeft: 'auto' }}>
+              {filteredLinks.length} of {scopedLinks.length}
+            </div>
+          </div>
+
+          {nodalLinksLoading && <div style={{ padding: '50px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>Loading linked documents…</div>}
+          {nodalLinksError && <div style={{ padding: '20px 18px', fontSize: 13, color: '#ef4444' }}>{nodalLinksError}</div>}
+
+          {!nodalLinksLoading && !nodalLinksError && (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 150px 150px 110px 150px', background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
+                <div style={{ ...LABEL, padding: '10px 16px' }}>Document</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Original Dept</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Linked-to Dept</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Status</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Requester / Reviewer</div>
+              </div>
+
+              {filteredLinks.length === 0 ? (
+                <div style={{ padding: '50px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>No linked documents match the current filters.</div>
+              ) : filteredLinks.map(link => {
+                const ls = LS[link.link_status] || LS.pending;
+                const requesterName = link.requested_by_first_name
+                  ? `${link.requested_by_first_name} ${link.requested_by_last_name || ''}`.trim()
+                  : link.requested_by_username || '—';
+                const reviewerName = link.reviewed_by_first_name
+                  ? `${link.reviewed_by_first_name} ${link.reviewed_by_last_name || ''}`.trim()
+                  : link.reviewed_by_username || null;
+                return (
+                  <div key={link.link_id} style={{ display: 'grid', gridTemplateColumns: '1fr 150px 150px 110px 150px', borderBottom: '1px solid var(--surface-border)', alignItems: 'stretch', minHeight: 58, transition: 'background .15s' }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                    <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(245,158,11,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <Link2 size={14} color="#d97706" strokeWidth={2} />
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 280 }}>{link.document_name}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 3 }}>
+                          {link.document_type_name && <span style={{ fontSize: 10, fontWeight: 600, color: '#d97706', background: 'rgba(245,158,11,.1)', borderRadius: 4, padding: '1px 5px' }}>{link.document_type_name}</span>}
+                          {link.version_no && <span style={{ fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>v{link.version_no}</span>}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ padding: '10px 14px', borderLeft: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center' }}>
+                      <span style={{ fontSize: 12.5, color: 'var(--text-color-secondary)' }}>{link.original_department_name || '—'}</span>
+                    </div>
+                    <div style={{ padding: '10px 14px', borderLeft: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center' }}>
+                      <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-heading)' }}>{link.linked_department_name || '—'}</span>
+                    </div>
+                    <div style={{ padding: '10px 14px', borderLeft: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center' }}>
+                      <span style={{ fontSize: 11.5, fontWeight: 700, background: ls.bg, color: ls.color, padding: '3px 10px', borderRadius: 20 }}>{ls.label}</span>
+                    </div>
+                    <div style={{ padding: '10px 14px', borderLeft: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 3 }}>
+                      <div style={{ fontSize: 12, color: 'var(--text-color-secondary)' }}>
+                        <span style={{ fontSize: 9.5, fontWeight: 700, fontFamily: 'var(--mono)', letterSpacing: '.05em', textTransform: 'uppercase', display: 'block', marginBottom: 1 }}>Requested</span>
+                        {requesterName} · <span style={{ fontFamily: 'var(--mono)', fontSize: 10.5 }}>{link.requested_at?.split('T')[0]}</span>
+                      </div>
+                      {reviewerName && (
+                        <div style={{ fontSize: 12, color: ls.color }}>
+                          <span style={{ fontSize: 9.5, fontWeight: 700, fontFamily: 'var(--mono)', letterSpacing: '.05em', textTransform: 'uppercase', display: 'block', marginBottom: 1 }}>Reviewed</span>
+                          {reviewerName} · <span style={{ fontFamily: 'var(--mono)', fontSize: 10.5 }}>{link.reviewed_at?.split('T')[0]}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          )}
         </Card>
       </div>
     );

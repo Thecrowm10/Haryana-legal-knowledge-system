@@ -17,7 +17,8 @@ export const reviewDocument       = (pdf_id, action, comments, annotations_json)
 export const getPdfFile           = (id)                              => api.get(`/pdf/${id}/file`, { responseType: 'arraybuffer' });
 export const getAllDocumentsAdmin  = (status, skip = 0, limit = 500)  => api.get('/pdf/all', { params: { skip, limit, ...(status ? { status } : {}) } });
 export const checkDuplicateDocument    = (document_name, document_type_id) => api.get('/pdf/check-duplicate', { params: { document_name, document_type_id } });
-export const linkDocumentToDepartment  = (pdf_id)             => api.post('/pdf/link-department', { pdf_id });
-export const getLinkedDocuments        = ()                   => api.get('/pdf/linked-documents');
-export const getDepartmentLinkRequests = ()                   => api.get('/pdf/department-link-requests');
-export const reviewDepartmentLink      = (link_id, action)   => api.post('/pdf/review-link', { link_id, action });
+export const linkDocumentToDepartment  = (pdf_id)                       => api.post('/pdf/link-department', { pdf_id });
+export const getLinkedDocuments        = (link_status)                  => api.get('/pdf/linked-documents', { params: link_status ? { link_status } : {} });
+export const getDepartmentLinkRequests = (link_status = 'pending')      => api.get('/pdf/department-link-requests', { params: { link_status } });
+export const getAllDepartmentLinks      = (link_status, department_id)   => api.get('/pdf/all-department-links', { params: { ...(link_status ? { link_status } : {}), ...(department_id ? { department_id } : {}) } });
+export const reviewDepartmentLink      = (link_id, action, comments, annotations_json) => api.post('/pdf/review-link', { link_id, action, comments: comments || null, annotations_json: annotations_json || null });

@@ -1310,6 +1310,267 @@ function mapApiDoc(d) {
   };
 }
 
+// Link Request Review Panel
+// Shows the PDF + document details for a pending link request with Approve/Reject actions.
+function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
+  const [blobUrl, setBlobUrl]             = useState(null);
+  const [currentPage, setCurrentPage]     = useState(1);
+  const [pdfTotalPages, setPdfTotalPages] = useState(null);
+  const [rotation, setRotation]           = useState(0);
+  const [remarkLines, setRemarkLines]     = useState(['']);
+  const [annotations, setAnnotations]     = useState([]);
+  const [highlightMode, setHighlightMode] = useState(false);
+  const pdfScrollRef                      = useRef(null);
+
+  function updateRemark(idx, val) {
+    setRemarkLines(prev => prev.map((r, i) => i === idx ? val : r));
+  }
+  function addRemark() {
+    setRemarkLines(prev => [...prev, '']);
+  }
+  function removeRemark(idx) {
+    setRemarkLines(prev => prev.length > 1 ? prev.filter((_, i) => i !== idx) : ['']);
+  }
+  function buildComments() {
+    const filled = remarkLines.filter(l => l.trim());
+    if (!filled.length) return null;
+    return filled.map((l, i) => `Remark ${i + 1}: ${l}`).join('\n');
+  }
+  function buildAnnotationsJson() {
+    return annotations.length ? JSON.stringify(annotations) : null;
+  }
+  const hasRemarks = remarkLines.some(l => l.trim());
+
+  const mockOcr = useMemo(
+    () => getMockOcrData({ title: lr.document_name || '', type: lr.document_type_name || 'Act' }),
+    [lr.pdf_id],
+  );
+  const totalPages = pdfTotalPages || mockOcr.pageCount;
+
+  useEffect(() => {
+    if (!lr.pdf_id || !localStorage.getItem('token')) return;
+    let url = null;
+    setBlobUrl(null);
+    getPdfFile(lr.pdf_id)
+      .then(res => {
+        const blob = new Blob([res.data], { type: 'application/pdf' });
+        url = URL.createObjectURL(blob);
+        setBlobUrl(url);
+      })
+      .catch(() => {});
+    return () => { if (url) URL.revokeObjectURL(url); };
+  }, [lr.pdf_id]);
+
+  const docForViewer = useMemo(() => ({
+    id: lr.pdf_id,
+    title: lr.document_name || 'Document',
+    type: lr.document_type_name || 'Act',
+    fileUrl: blobUrl || null,
+  }), [lr.pdf_id, lr.document_name, lr.document_type_name, blobUrl]);
+
+  const typeColor    = TYPE_COLORS[lr.document_type_name] || TYPE_COLORS['Miscellaneous'];
+  const requesterName = lr.requested_by_first_name
+    ? `${lr.requested_by_first_name} ${lr.requested_by_last_name || ''}`.trim()
+    : lr.requested_by_username || 'Unknown';
+
+  function InfoRow({ label, value, mono }) {
+    return (
+      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+        <span style={{ fontSize: 11, color: 'var(--text-color-secondary)', width: 130, flexShrink: 0, paddingTop: 2 }}>{label}</span>
+        <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-heading)', fontFamily: mono ? 'var(--mono)' : 'var(--font)', flex: 1, lineHeight: 1.5 }}>{value || '—'}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      {/* Header bar */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 20px', borderBottom: '1px solid var(--surface-border)', flexShrink: 0 }}>
+        <button onClick={onBack}
+          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 7, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+          ← Back to Requests
+        </button>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {lr.document_name}
+          </div>
+          <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 2 }}>
+            Requested by <strong style={{ color: 'var(--text-color)' }}>{requesterName}</strong> · {lr.requested_at?.split('T')[0]}
+          </div>
+        </div>
+        <span style={{ background: typeColor.bg, color: typeColor.text, padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
+          {lr.document_type_name}
+        </span>
+        {lr.version_no && (
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 700, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)', padding: '2px 8px', borderRadius: 20, flexShrink: 0 }}>
+            v{lr.version_no}
+          </span>
+        )}
+      </div>
+
+      {/* 2-panel grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: '58% 42%', height: 560, borderBottom: '1px solid var(--surface-border)' }}>
+
+        {/* Left — PDF Viewer */}
+        <div style={{ borderRight: '1px solid var(--surface-border)', overflow: 'hidden' }}>
+          <PdfViewerPanel
+            doc={docForViewer}
+            ocrData={mockOcr}
+            currentPage={currentPage}
+            onPageChange={setCurrentPage}
+            totalPages={totalPages}
+            rotation={rotation}
+            onRotate={() => setRotation(r => (r + 90) % 360)}
+            blobUrl={blobUrl}
+            onTotalPagesChange={setPdfTotalPages}
+            annotations={annotations}
+            onAnnotationsChange={setAnnotations}
+            highlightMode={highlightMode}
+            onHighlightModeChange={setHighlightMode}
+            onScrollRef={pdfScrollRef}
+          />
+        </div>
+
+        {/* Right — Details */}
+        <div style={{ overflowY: 'auto', padding: '20px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+          {/* Document Info card */}
+          <div style={{ padding: '14px 16px', borderRadius: 10, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)' }}>
+            <div style={{ ...LABEL, marginBottom: 12 }}>Document Information</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <InfoRow label="Document Name" value={lr.document_name} />
+              <InfoRow label="Type" value={
+                <span style={{ background: typeColor.bg, color: typeColor.text, padding: '2px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
+                  {lr.document_type_name}
+                </span>
+              } />
+              {lr.version_no && <InfoRow label="Version" value={`v${lr.version_no}`} mono />}
+              <InfoRow label="Document Status" value={
+                <span style={{
+                  background: lr.document_status === 'approved' ? 'rgba(34,197,94,.12)' : lr.document_status === 'rejected' ? 'rgba(239,68,68,.1)' : 'rgba(245,158,11,.1)',
+                  color: lr.document_status === 'approved' ? '#16a34a' : lr.document_status === 'rejected' ? '#dc2626' : '#d97706',
+                  padding: '2px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700, textTransform: 'capitalize',
+                }}>
+                  {lr.document_status}
+                </span>
+              } />
+              <InfoRow label="Original Department" value={lr.original_department_name || '—'} />
+            </div>
+          </div>
+
+          {/* Link Request card */}
+          <div style={{ padding: '14px 16px', borderRadius: 10, background: 'rgba(245,158,11,.04)', border: '1px solid rgba(245,158,11,.2)' }}>
+            <div style={{ ...LABEL, marginBottom: 12, color: '#d97706' }}>Link Request</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <InfoRow label="Requested By" value={requesterName} />
+              {lr.requested_by_username && <InfoRow label="Username" value={lr.requested_by_username} mono />}
+              <InfoRow label="Requested At" value={lr.requested_at?.split('T')[0]} mono />
+              <InfoRow label="Status" value={
+                <span style={{ background: 'rgba(245,158,11,.12)', color: '#d97706', padding: '2px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700, textTransform: 'capitalize' }}>
+                  {lr.link_status}
+                </span>
+              } />
+            </div>
+          </div>
+
+          {/* Annotations */}
+          {annotations.length > 0 && (
+            <div>
+              <div style={{ ...LABEL, marginBottom: 8 }}>Annotations · {annotations.length}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {annotations.map((ann, i) => (
+                  <div key={ann.id || i}
+                    onClick={() => pdfScrollRef.current?.(ann)}
+                    style={{ display: 'flex', gap: 10, padding: '9px 12px', borderRadius: 8, background: ann.color, border: '1px solid rgba(0,0,0,.1)', alignItems: 'flex-start', cursor: 'pointer', transition: 'filter .15s' }}
+                    onMouseEnter={e => e.currentTarget.style.filter = 'brightness(.92)'}
+                    onMouseLeave={e => e.currentTarget.style.filter = 'none'}>
+                    <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, color: 'rgba(0,0,0,.5)', flexShrink: 0, marginTop: 2 }}>P{ann.page}</span>
+                    <span style={{ fontSize: 12.5, color: 'rgba(0,0,0,.75)', lineHeight: 1.5, flex: 1 }}>{ann.comment || <span style={{ opacity: 0.5 }}>No comment</span>}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Page nav */}
+      <PageNav currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+
+      {/* Remarks + Approve / Reject */}
+      <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12, borderTop: '1px solid var(--surface-border)' }}>
+
+        {/* Numbered remark fields */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {remarkLines.map((remark, idx) => (
+            <div key={idx}>
+              <div style={{ ...LABEL, marginBottom: 5 }}>Remark {idx + 1}</div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input
+                  value={remark}
+                  onChange={e => updateRemark(idx, e.target.value)}
+                  placeholder={`Enter remark ${idx + 1}…`}
+                  style={{
+                    flex: 1, background: 'var(--surface-ground)',
+                    border: '1px solid var(--surface-border)', borderRadius: 8,
+                    color: 'var(--text-color)', fontFamily: 'var(--font)', fontSize: 13,
+                    padding: '9px 12px', outline: 'none', transition: 'border-color .2s',
+                  }}
+                  onFocus={e => e.target.style.borderColor = 'var(--primary)'}
+                  onBlur={e => e.target.style.borderColor = 'var(--surface-border)'}
+                />
+                {remarkLines.length > 1 && (
+                  <button onClick={() => removeRemark(idx)}
+                    style={{
+                      background: 'rgba(239,68,68,.06)', border: '1px solid rgba(239,68,68,.2)',
+                      color: '#dc2626', borderRadius: 7, width: 32, height: 32,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      cursor: 'pointer', flexShrink: 0,
+                    }}>
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Add Remark + action buttons */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <button onClick={addRemark}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: 'transparent', border: '1.5px dashed var(--surface-border)',
+              color: 'var(--primary)', borderRadius: 7, padding: '6px 14px',
+              fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.background = 'rgba(26,86,219,.05)'; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--surface-border)'; e.currentTarget.style.background = 'transparent'; }}>
+            <Plus size={13} /> Add Remark
+          </button>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={() => onReview(lr.link_id, 'rejected', buildComments(), buildAnnotationsJson())}
+              disabled={deciding === lr.link_id || !hasRemarks}
+              title={!hasRemarks ? 'Enter at least one remark before rejecting' : undefined}
+              style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.3)', color: '#b91c1c', padding: '9px 18px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 600, cursor: (deciding === lr.link_id || !hasRemarks) ? 'not-allowed' : 'pointer', opacity: (deciding === lr.link_id || !hasRemarks) ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
+              onMouseEnter={e => { if (!deciding && hasRemarks) e.currentTarget.style.background = 'rgba(239,68,68,.15)'; }}
+              onMouseLeave={e => { if (!deciding) e.currentTarget.style.background = 'rgba(239,68,68,.08)'; }}>
+              <X size={14} /> {deciding === lr.link_id ? 'Rejecting…' : 'Reject'}
+            </button>
+            <button onClick={() => onReview(lr.link_id, 'approved', buildComments(), buildAnnotationsJson())}
+              disabled={deciding === lr.link_id}
+              style={{ background: 'rgba(34,197,94,.1)', border: '1px solid rgba(34,197,94,.3)', color: '#1e40af', padding: '9px 20px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700, cursor: deciding === lr.link_id ? 'not-allowed' : 'pointer', opacity: deciding === lr.link_id ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
+              onMouseEnter={e => { if (!deciding) e.currentTarget.style.background = 'rgba(34,197,94,.18)'; }}
+              onMouseLeave={e => { if (!deciding) e.currentTarget.style.background = 'rgba(34,197,94,.1)'; }}>
+              <Check size={14} /> {deciding === lr.link_id ? 'Approving…' : 'Approve'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ApproverDashboard({ activePage, onAuditLog, documents, onApprove }) {
   const [docs, setDocs]           = useState([]);
   const [loading, setLoading]     = useState(false);
@@ -1320,6 +1581,8 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
   const [linkRequests, setLinkRequests]   = useState([]);
   const [linkLoading, setLinkLoading]     = useState(false);
   const [linkDeciding, setLinkDeciding]   = useState(null); // link_id being actioned
+  const [viewingLink, setViewingLink]     = useState(null); // lr being viewed in detail
+  const [linkFilter, setLinkFilter]       = useState('pending'); // 'pending' | 'approved' | 'rejected'
   const [filter, setFilter]       = useState('');
   const [searchQ, setSearchQ]     = useState('');
   const [cardFilter, setCardFilter] = useState(null);
@@ -1343,20 +1606,23 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
   useEffect(() => { fetchDocs(documents); }, [activePage, documents]);
 
   useEffect(() => {
-    if (activePage !== 'links') return;
+    if (activePage !== 'links') { setViewingLink(null); return; }
     if (!localStorage.getItem('token')) return;
     setLinkLoading(true);
-    getDepartmentLinkRequests()
+    getDepartmentLinkRequests(linkFilter)
       .then(res => setLinkRequests(Array.isArray(res.data) ? res.data : []))
       .catch(() => {})
       .finally(() => setLinkLoading(false));
-  }, [activePage]);
+  }, [activePage, linkFilter]);
 
-  async function handleReviewLink(link_id, action) {
+  async function handleReviewLink(link_id, action, comments, annotations_json) {
     setLinkDeciding(link_id);
     try {
-      await reviewDepartmentLink(link_id, action);
-      setLinkRequests(prev => prev.filter(l => l.link_id !== link_id));
+      await reviewDepartmentLink(link_id, action, comments, annotations_json);
+      setViewingLink(null);
+      // Refetch for current filter so the list stays accurate
+      const res = await getDepartmentLinkRequests(linkFilter);
+      setLinkRequests(Array.isArray(res.data) ? res.data : []);
     } catch (_) {}
     setLinkDeciding(null);
   }
@@ -1437,14 +1703,41 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
 
       {/* ── Link Requests tab ──────────────────────────────────────────────── */}
       {activePage === 'links' && (
+        viewingLink ? (
+          <LinkReviewPanel
+            lr={viewingLink}
+            onBack={() => setViewingLink(null)}
+            onReview={handleReviewLink}
+            deciding={linkDeciding}
+          />
+        ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)' }}>Department Link Requests</span>
-            {linkRequests.length > 0 && (
-              <span style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 700, background: 'rgba(245,158,11,.12)', color: '#d97706', border: '1px solid rgba(245,158,11,.3)', padding: '2px 9px', borderRadius: 20 }}>
-                {linkRequests.length} pending
-              </span>
-            )}
+            <div style={{ display: 'flex', background: 'var(--surface-ground)', borderRadius: 8, padding: 3, gap: 2, border: '1px solid var(--surface-border)', marginLeft: 'auto' }}>
+              {[
+                { key: 'pending',  label: 'Pending',  color: '#d97706', bg: 'rgba(245,158,11,.12)' },
+                { key: 'approved', label: 'Approved', color: '#16a34a', bg: 'rgba(34,197,94,.12)' },
+                { key: 'rejected', label: 'Rejected', color: '#dc2626', bg: 'rgba(239,68,68,.1)' },
+              ].map(tab => {
+                const active = linkFilter === tab.key;
+                return (
+                  <button key={tab.key} onClick={() => setLinkFilter(tab.key)}
+                    style={{ padding: '5px 14px', borderRadius: 6, border: 'none', fontFamily: 'var(--font)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', transition: 'all .15s',
+                      background: active ? tab.bg : 'transparent',
+                      color: active ? tab.color : 'var(--text-color-secondary)',
+                      outline: active ? `1px solid ${tab.color}44` : 'none',
+                    }}>
+                    {tab.label}
+                    {linkRequests.length > 0 && active && (
+                      <span style={{ marginLeft: 5, background: active ? tab.color : 'var(--surface-border)', color: active ? 'white' : 'var(--text-color-secondary)', fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, padding: '1px 5px', borderRadius: 10 }}>
+                        {linkRequests.length}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
           {linkLoading && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -1454,11 +1747,21 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
           {!linkLoading && linkRequests.length === 0 && (
             <Card style={{ textAlign: 'center', padding: '64px 0' }}>
               <CheckCircle size={44} color="var(--surface-200)" style={{ margin: '0 auto 14px', display: 'block' }} />
-              <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-color-secondary)', marginBottom: 6 }}>No pending link requests</div>
-              <div style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>When a department requests to link a shared document, it will appear here.</div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-color-secondary)', marginBottom: 6 }}>
+                No {linkFilter} link requests
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>
+                {linkFilter === 'pending' ? 'When a department requests to link a shared document, it will appear here.' : `No ${linkFilter} link requests to show.`}
+              </div>
             </Card>
           )}
-          {linkRequests.map(lr => (
+          {linkRequests.map(lr => {
+            const lsColor = lr.link_status === 'approved' ? '#16a34a' : lr.link_status === 'rejected' ? '#dc2626' : '#d97706';
+            const lsBg    = lr.link_status === 'approved' ? 'rgba(34,197,94,.1)' : lr.link_status === 'rejected' ? 'rgba(239,68,68,.1)' : 'rgba(245,158,11,.1)';
+            const reviewerName = lr.reviewed_by_first_name
+              ? `${lr.reviewed_by_first_name} ${lr.reviewed_by_last_name || ''}`.trim()
+              : lr.reviewed_by_username || null;
+            return (
             <Card key={lr.link_id} padding="0">
               <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '16px 20px' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -1471,6 +1774,9 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
                         v{lr.version_no}
                       </span>
                     )}
+                    <span style={{ fontSize: 10.5, fontWeight: 700, background: lsBg, color: lsColor, padding: '2px 9px', borderRadius: 20, textTransform: 'capitalize', flexShrink: 0 }}>
+                      {lr.link_status}
+                    </span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
                     <span style={{ background: 'rgba(245,158,11,.1)', color: '#d97706', padding: '2px 8px', borderRadius: 20, fontWeight: 600, fontSize: 10.5 }}>{lr.document_type_name}</span>
@@ -1483,24 +1789,46 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
                     </strong></span>
                     <span>·</span>
                     <span style={{ fontFamily: 'var(--mono)', fontSize: 11 }}>{lr.requested_at?.split('T')[0]}</span>
+                    {reviewerName && (
+                      <>
+                        <span>·</span>
+                        <span>{lr.link_status === 'approved' ? 'Approved' : 'Rejected'} by <strong style={{ color: lsColor }}>{reviewerName}</strong></span>
+                        {lr.reviewed_at && <span style={{ fontFamily: 'var(--mono)', fontSize: 11 }}>{lr.reviewed_at.split('T')[0]}</span>}
+                      </>
+                    )}
                   </div>
+                  {lr.review_comments && (
+                    <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 7, background: lsBg, border: `1px solid ${lsColor}33`, fontSize: 12, color: lsColor, fontStyle: 'italic' }}>
+                      {lr.review_comments}
+                    </div>
+                  )}
                 </div>
-                <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-                  <button onClick={() => handleReviewLink(lr.link_id, 'rejected')}
-                    disabled={linkDeciding === lr.link_id}
-                    style={{ padding: '7px 16px', borderRadius: 8, border: '1px solid rgba(239,68,68,.3)', background: 'rgba(239,68,68,.06)', color: '#dc2626', fontSize: 12.5, fontWeight: 700, cursor: linkDeciding === lr.link_id ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: linkDeciding === lr.link_id ? 0.6 : 1 }}>
-                    Reject
+                <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
+                  <button onClick={() => setViewingLink(lr)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--surface-hover)'; e.currentTarget.style.color = 'var(--primary)'; e.currentTarget.style.borderColor = 'var(--primary)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'var(--surface-ground)'; e.currentTarget.style.color = 'var(--text-color-secondary)'; e.currentTarget.style.borderColor = 'var(--surface-border)'; }}>
+                    <Eye size={13} /> View Document
                   </button>
-                  <button onClick={() => handleReviewLink(lr.link_id, 'approved')}
-                    disabled={linkDeciding === lr.link_id}
-                    style={{ padding: '7px 16px', borderRadius: 8, border: 'none', background: linkDeciding === lr.link_id ? 'rgba(34,197,94,.5)' : '#16a34a', color: 'white', fontSize: 12.5, fontWeight: 700, cursor: linkDeciding === lr.link_id ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)' }}>
-                    {linkDeciding === lr.link_id ? 'Processing…' : 'Approve'}
-                  </button>
+                  {lr.link_status === 'pending' && (<>
+                    <button onClick={() => handleReviewLink(lr.link_id, 'rejected')}
+                      disabled={linkDeciding === lr.link_id}
+                      style={{ padding: '7px 16px', borderRadius: 8, border: '1px solid rgba(239,68,68,.3)', background: 'rgba(239,68,68,.06)', color: '#dc2626', fontSize: 12.5, fontWeight: 700, cursor: linkDeciding === lr.link_id ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: linkDeciding === lr.link_id ? 0.6 : 1 }}>
+                      Reject
+                    </button>
+                    <button onClick={() => handleReviewLink(lr.link_id, 'approved')}
+                      disabled={linkDeciding === lr.link_id}
+                      style={{ padding: '7px 16px', borderRadius: 8, border: 'none', background: linkDeciding === lr.link_id ? 'rgba(34,197,94,.5)' : '#16a34a', color: 'white', fontSize: 12.5, fontWeight: 700, cursor: linkDeciding === lr.link_id ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)' }}>
+                      {linkDeciding === lr.link_id ? 'Processing…' : 'Approve'}
+                    </button>
+                  </>)}
                 </div>
               </div>
             </Card>
-          ))}
+            );
+          })}
         </div>
+        )
       )}
 
       {/* Loading skeleton */}

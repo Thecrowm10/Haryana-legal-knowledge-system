@@ -44,6 +44,7 @@ const MENU_CONFIG = {
       { icon: Users,       label: 'User Management',    id: 'users' },
       { icon: Building2,   label: 'Departments',         id: 'departments' },
       { icon: Layers,      label: 'All Uploads',         id: 'alluploads' },
+      { icon: Link2,       label: 'Linked Documents',    id: 'linkedocs' },
     ]},
     { label: 'SYSTEM', items: [
       { icon: Settings,      label: 'Master Data Manager', id: 'taxonomy' },
@@ -53,9 +54,10 @@ const MENU_CONFIG = {
   ],
   nodal_officer: [
     { label: 'ADMINISTRATION', items: [
-      { icon: Users,         label: 'User Management', id: 'nodalusers' },
-      { icon: Layers,        label: 'All Uploads',     id: 'nodaluploads' },
-      { icon: ClipboardList, label: 'MIS Report',      id: 'nodalauditfull' },
+      { icon: Users,         label: 'User Management',  id: 'nodalusers' },
+      { icon: Layers,        label: 'All Uploads',      id: 'nodaluploads' },
+      { icon: Link2,         label: 'Linked Documents', id: 'nodallinkedocs' },
+      { icon: ClipboardList, label: 'MIS Report',       id: 'nodalauditfull' },
     ]},
   ],
   nodal: [

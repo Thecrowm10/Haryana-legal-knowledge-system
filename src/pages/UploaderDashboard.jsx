@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
-  Upload, FileText, CheckCircle, XCircle, X, TrendingUp, FileType, Download,
-  RotateCcw, AlertCircle, Eye, GitBranch, Plus, Clock,
+  Upload, FileText, CheckCircle, XCircle, X, TrendingUp, FileType, Download, Clock,
+  RotateCcw, AlertCircle, Eye, GitBranch, Plus,
   Layers, ChevronRight, AlertTriangle, CheckSquare, Square,
   Edit3, Tag, Search, MessageSquare, MessageCircle, ZoomIn, ZoomOut, RotateCw, ExternalLink,
 } from 'lucide-react';
@@ -624,7 +624,7 @@ function DocViewModal({ doc, onClose }) {
                     </div>
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 700, color: statusAccent }}>
-                        {doc.status === 'approved' ? 'Document Approved' : doc.status === 'rejected' ? 'Document Rejected' : 'Pending Review'}
+                        {doc.reviewTitle || (doc.status === 'approved' ? 'Document Approved' : doc.status === 'rejected' ? 'Document Rejected' : 'Pending Review')}
                       </div>
                       <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', marginTop: 3 }}>
                         By {doc.approval.approver_first_name
@@ -763,6 +763,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   const [duplicateModal, setDuplicateModal] = useState(null); // { matches: DuplicateCheckItem[] }
   const [linkedDocs, setLinkedDocs] = useState([]);
   const [linkingId, setLinkingId] = useState(null); // pdf_id being linked (loading state)
+  const [viewingLinkedDoc, setViewingLinkedDoc] = useState(null); // linked doc open in DocViewModal
 
   // Correction request state
   const [correctionModal, setCorrectionModal] = useState(null); // { doc }
@@ -1750,50 +1751,99 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
               <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginLeft: 4 }}>Documents shared from other departments</span>
             </div>
             {linkedDocs.map(l => {
-              const typeColor = TYPE_CARD_COLORS[l.document_type_name] || { accent: '#94a3b8', bg: 'rgba(148,163,184,.1)', text: '#64748b' };
-              const isPending  = l.link_status === 'pending';
-              const linkAccent = isPending ? '#d97706' : '#16a34a';
-              const linkBg     = isPending ? 'rgba(245,158,11,.07)' : 'rgba(34,197,94,.07)';
-              const linkBorder = isPending ? 'rgba(245,158,11,.25)' : 'rgba(34,197,94,.25)';
+              const typeColor   = TYPE_CARD_COLORS[l.document_type_name] || { accent: '#94a3b8', bg: 'rgba(148,163,184,.1)', text: '#64748b' };
+              const isApproved  = l.link_status === 'approved';
+              const isRejected  = l.link_status === 'rejected';
+              const linkAccent  = isApproved ? '#16a34a' : isRejected ? '#dc2626' : '#d97706';
+              const linkBg      = isApproved ? 'rgba(34,197,94,.07)' : isRejected ? 'rgba(239,68,68,.07)' : 'rgba(245,158,11,.07)';
+              const linkBorder  = isApproved ? 'rgba(34,197,94,.25)' : isRejected ? 'rgba(239,68,68,.25)' : 'rgba(245,158,11,.25)';
+              const linkLabel   = isApproved ? 'LINK APPROVED' : isRejected ? 'LINK REJECTED' : 'LINK PENDING';
+              const LinkIcon    = isApproved ? CheckCircle : isRejected ? XCircle : Clock;
+              const mapLinkedDocForViewer = () => {
+                const hasLinkReview = l.link_reviewed_by_username || l.link_reviewed_by_first_name || l.review_comments || l.link_annotations_json;
+                return {
+                  id:          l.id,
+                  title:       l.document_name || l.original_filename || 'Document',
+                  type:        l.document_type_name || 'Miscellaneous',
+                  dept:        l.department_name || '',
+                  year:        l.created_at ? new Date(l.created_at).getFullYear() : '—',
+                  version:     l.version_no || '1.0',
+                  status:      l.link_status || 'pending',
+                  reviewTitle: l.link_status === 'approved' ? 'Link Approved' : l.link_status === 'rejected' ? 'Link Rejected' : 'Link Pending Review',
+                  desc:        '',
+                  fileName:    l.original_filename || '',
+                  uploadedAt:  l.created_at?.split('T')[0] || '',
+                  approval: hasLinkReview ? {
+                    approver_first_name: l.link_reviewed_by_first_name || null,
+                    approver_last_name:  l.link_reviewed_by_last_name  || null,
+                    approver_username:   l.link_reviewed_by_username   || null,
+                    acted_at:            l.reviewed_at || null,
+                    comments:            l.review_comments || null,
+                    annotations_json:    l.link_annotations_json || null,
+                  } : null,
+                };
+              };
               return (
-                <div key={l.link_id} style={{ display: 'grid', gridTemplateColumns: '4px 1fr 190px 115px', borderBottom: '1px solid var(--surface-border)', background: 'transparent', transition: 'background .15s' }}
+                <div key={l.link_id} style={{ borderBottom: '1px solid var(--surface-border)', background: 'transparent', transition: 'background .15s' }}
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                  <div style={{ background: linkAccent }} />
-                  <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-                    <div style={{ width: 40, height: 40, borderRadius: 10, background: typeColor.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <FileText size={17} color={typeColor.accent} />
-                    </div>
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                        <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {l.document_name || l.original_filename}
-                        </span>
-                        <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 20, background: 'rgba(245,158,11,.12)', color: '#d97706', flexShrink: 0, letterSpacing: '.05em' }}>LINKED</span>
+                  <div style={{ display: 'grid', gridTemplateColumns: '4px 1fr 190px 90px 115px' }}>
+                    <div style={{ background: linkAccent }} />
+                    <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                      <div style={{ width: 40, height: 40, borderRadius: 10, background: typeColor.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <FileText size={17} color={typeColor.accent} />
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: typeColor.bg, color: typeColor.text || typeColor.accent }}>{l.document_type_name}</span>
-                        <span style={{ fontSize: 11, color: 'var(--text-color-secondary)' }}>{l.department_name}</span>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                          <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {l.document_name || l.original_filename}
+                          </span>
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 20, background: 'rgba(245,158,11,.12)', color: '#d97706', flexShrink: 0, letterSpacing: '.05em' }}>LINKED</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: typeColor.bg, color: typeColor.text || typeColor.accent }}>{l.document_type_name}</span>
+                          <span style={{ fontSize: 11, color: 'var(--text-color-secondary)' }}>{l.department_name}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div style={{ padding: '14px 16px', borderLeft: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center' }}>
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 20, background: linkBg, border: `1px solid ${linkBorder}` }}>
-                      {isPending ? <Clock size={11} color={linkAccent} /> : <CheckCircle size={11} color={linkAccent} />}
-                      <span style={{ fontSize: 10.5, fontWeight: 700, color: linkAccent, fontFamily: 'var(--mono)', letterSpacing: '.05em' }}>
-                        {isPending ? 'LINK PENDING' : 'LINK APPROVED'}
-                      </span>
+                    <div style={{ padding: '14px 16px', borderLeft: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center' }}>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 20, background: linkBg, border: `1px solid ${linkBorder}` }}>
+                        <LinkIcon size={11} color={linkAccent} />
+                        <span style={{ fontSize: 10.5, fontWeight: 700, color: linkAccent, fontFamily: 'var(--mono)', letterSpacing: '.05em' }}>{linkLabel}</span>
+                      </div>
+                    </div>
+                    <div style={{ padding: '10px 14px', borderLeft: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <button
+                        onClick={() => setViewingLinkedDoc(mapLinkedDocForViewer())}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 7, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'background .15s' }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(26,86,219,.14)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'rgba(26,86,219,.07)'}>
+                        <Eye size={12} /> View
+                      </button>
+                    </div>
+                    <div style={{ padding: '14px 16px', borderLeft: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', fontFamily: 'var(--mono)', fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
+                      {l.created_at?.split('T')[0] || ''}
                     </div>
                   </div>
-                  <div style={{ padding: '14px 16px', borderLeft: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', fontFamily: 'var(--mono)', fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
-                    {l.created_at?.split('T')[0] || ''}
-                  </div>
+                  {/* Reviewer remarks for rejected links */}
+                  {isRejected && l.review_comments && (
+                    <div style={{ marginLeft: 4, padding: '8px 16px 12px', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                      <XCircle size={13} color="#dc2626" style={{ flexShrink: 0, marginTop: 2 }} />
+                      <div>
+                        <div style={{ fontSize: 10.5, fontWeight: 700, color: '#dc2626', fontFamily: 'var(--mono)', marginBottom: 3 }}>REJECTION REMARKS</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-color-secondary)', lineHeight: 1.6 }}>{l.review_comments}</div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
           </Card>
         )}
 
+      {viewingLinkedDoc && (
+        <DocViewModal doc={viewingLinkedDoc} onClose={() => setViewingLinkedDoc(null)} />
+      )}
       </div>
     );
   }
