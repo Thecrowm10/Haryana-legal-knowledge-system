@@ -183,6 +183,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   const [linksSearch, setLinksSearch]     = useState('');
   const [linksFilterStatus, setLinksFilterStatus] = useState('');
   const [linksFilterDept, setLinksFilterDept]     = useState('');
+  const [viewingLink, setViewingLink]     = useState(null);
 
   useEffect(() => {
     if (activePage !== 'linkedocs') return;
@@ -1622,6 +1623,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     allLinks.forEach(l => { if (totals[l.link_status] !== undefined) totals[l.link_status]++; });
 
     return (
+      <>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
 
         {/* Stats */}
@@ -1692,12 +1694,13 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
           {!allLinksLoading && !allLinksError && (
             <>
               {/* Column headers */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px 160px 110px 150px', background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px 160px 110px 150px 80px', background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
                 <div style={{ ...LABEL, padding: '10px 16px' }}>Document</div>
                 <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Original Dept</div>
                 <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Linked-to Dept</div>
                 <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Status</div>
                 <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Requester / Reviewer</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>View</div>
               </div>
 
               {filteredLinks.length === 0 ? (
@@ -1711,7 +1714,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                   ? `${link.reviewed_by_first_name} ${link.reviewed_by_last_name || ''}`.trim()
                   : link.reviewed_by_username || null;
                 return (
-                  <div key={link.link_id} style={{ display: 'grid', gridTemplateColumns: '1fr 160px 160px 110px 150px', borderBottom: '1px solid var(--surface-border)', alignItems: 'stretch', minHeight: 58, transition: 'background .15s' }}
+                  <div key={link.link_id} style={{ display: 'grid', gridTemplateColumns: '1fr 160px 160px 110px 150px 80px', borderBottom: '1px solid var(--surface-border)', alignItems: 'stretch', minHeight: 58, transition: 'background .15s' }}
                     onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
 
@@ -1761,6 +1764,36 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                         </div>
                       )}
                     </div>
+
+                    {/* View */}
+                    <div style={{ padding: '10px 12px', borderLeft: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <button
+                        onClick={() => setViewingLink({
+                          id:         link.pdf_id,
+                          title:      link.document_name || 'Document',
+                          type:       link.document_type_name || 'Miscellaneous',
+                          dept:       link.linked_department_name || link.original_department_name || '',
+                          year:       link.requested_at ? new Date(link.requested_at).getFullYear() : '—',
+                          version:    link.version_no || '1.0',
+                          status:     link.link_status,
+                          desc:       '',
+                          fileName:   '',
+                          uploadedAt: link.requested_at?.split('T')[0] || '',
+                          approval:   (link.reviewed_by_username || link.reviewed_by_first_name || link.review_comments) ? {
+                            approver_first_name: link.reviewed_by_first_name || null,
+                            approver_last_name:  link.reviewed_by_last_name  || null,
+                            approver_username:   link.reviewed_by_username   || null,
+                            acted_at:            link.reviewed_at            || null,
+                            comments:            link.review_comments        || null,
+                            annotations_json:    link.annotations_json       || null,
+                          } : null,
+                        })}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 10px', borderRadius: 7, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'background .15s' }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(26,86,219,.14)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'rgba(26,86,219,.07)'}>
+                        <Eye size={12} /> View
+                      </button>
+                    </div>
                   </div>
                 );
               })}
@@ -1768,6 +1801,8 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
           )}
         </Card>
       </div>
+      {viewingLink && <DocViewModal doc={viewingLink} onClose={() => setViewingLink(null)} />}
+      </>
     );
   }
 
