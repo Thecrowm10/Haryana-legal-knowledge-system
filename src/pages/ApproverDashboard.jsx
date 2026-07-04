@@ -9,7 +9,7 @@ import pdfjsWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl;
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
-import { getApproverDocuments, getPdfFile, reviewDocument } from '../services/pdf';
+import { getApproverDocuments, getPdfFile, reviewDocument, getDepartmentLinkRequests, reviewDepartmentLink } from '../services/pdf';
 import { createNotification } from '../services/notifications';
 
 // Constants
@@ -1317,6 +1317,9 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
   const [remarks, setRemarks]     = useState({});
   const [deciding, setDeciding]   = useState(null); // { id, action } while API call is in-flight
   const [expanded, setExpanded]   = useState(null);
+  const [linkRequests, setLinkRequests]   = useState([]);
+  const [linkLoading, setLinkLoading]     = useState(false);
+  const [linkDeciding, setLinkDeciding]   = useState(null); // link_id being actioned
   const [filter, setFilter]       = useState('');
   const [searchQ, setSearchQ]     = useState('');
   const [cardFilter, setCardFilter] = useState(null);
@@ -1338,6 +1341,25 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
   }
 
   useEffect(() => { fetchDocs(documents); }, [activePage, documents]);
+
+  useEffect(() => {
+    if (activePage !== 'links') return;
+    if (!localStorage.getItem('token')) return;
+    setLinkLoading(true);
+    getDepartmentLinkRequests()
+      .then(res => setLinkRequests(Array.isArray(res.data) ? res.data : []))
+      .catch(() => {})
+      .finally(() => setLinkLoading(false));
+  }, [activePage]);
+
+  async function handleReviewLink(link_id, action) {
+    setLinkDeciding(link_id);
+    try {
+      await reviewDepartmentLink(link_id, action);
+      setLinkRequests(prev => prev.filter(l => l.link_id !== link_id));
+    } catch (_) {}
+    setLinkDeciding(null);
+  }
 
   // Scroll expanded card into view
   useEffect(() => {
@@ -1413,8 +1435,76 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
 
+      {/* ── Link Requests tab ──────────────────────────────────────────────── */}
+      {activePage === 'links' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)' }}>Department Link Requests</span>
+            {linkRequests.length > 0 && (
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 700, background: 'rgba(245,158,11,.12)', color: '#d97706', border: '1px solid rgba(245,158,11,.3)', padding: '2px 9px', borderRadius: 20 }}>
+                {linkRequests.length} pending
+              </span>
+            )}
+          </div>
+          {linkLoading && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {[1, 2].map(i => <div key={i} style={{ height: 72, borderRadius: 12, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', animation: 'pulse 1.4s ease-in-out infinite' }} />)}
+            </div>
+          )}
+          {!linkLoading && linkRequests.length === 0 && (
+            <Card style={{ textAlign: 'center', padding: '64px 0' }}>
+              <CheckCircle size={44} color="var(--surface-200)" style={{ margin: '0 auto 14px', display: 'block' }} />
+              <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-color-secondary)', marginBottom: 6 }}>No pending link requests</div>
+              <div style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>When a department requests to link a shared document, it will appear here.</div>
+            </Card>
+          )}
+          {linkRequests.map(lr => (
+            <Card key={lr.link_id} padding="0">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '16px 20px' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {lr.document_name}
+                    </span>
+                    {lr.version_no && (
+                      <span style={{ fontSize: 10.5, fontFamily: 'var(--mono)', fontWeight: 700, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)', padding: '1px 7px', borderRadius: 20, flexShrink: 0 }}>
+                        v{lr.version_no}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
+                    <span style={{ background: 'rgba(245,158,11,.1)', color: '#d97706', padding: '2px 8px', borderRadius: 20, fontWeight: 600, fontSize: 10.5 }}>{lr.document_type_name}</span>
+                    <span>Originally from <strong style={{ color: 'var(--text-color)' }}>{lr.original_department_name || 'Unknown'}</strong></span>
+                    <span>·</span>
+                    <span>Requested by <strong style={{ color: 'var(--text-color)' }}>
+                      {lr.requested_by_first_name
+                        ? `${lr.requested_by_first_name} ${lr.requested_by_last_name || ''}`.trim()
+                        : lr.requested_by_username || 'Unknown'}
+                    </strong></span>
+                    <span>·</span>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: 11 }}>{lr.requested_at?.split('T')[0]}</span>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+                  <button onClick={() => handleReviewLink(lr.link_id, 'rejected')}
+                    disabled={linkDeciding === lr.link_id}
+                    style={{ padding: '7px 16px', borderRadius: 8, border: '1px solid rgba(239,68,68,.3)', background: 'rgba(239,68,68,.06)', color: '#dc2626', fontSize: 12.5, fontWeight: 700, cursor: linkDeciding === lr.link_id ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: linkDeciding === lr.link_id ? 0.6 : 1 }}>
+                    Reject
+                  </button>
+                  <button onClick={() => handleReviewLink(lr.link_id, 'approved')}
+                    disabled={linkDeciding === lr.link_id}
+                    style={{ padding: '7px 16px', borderRadius: 8, border: 'none', background: linkDeciding === lr.link_id ? 'rgba(34,197,94,.5)' : '#16a34a', color: 'white', fontSize: 12.5, fontWeight: 700, cursor: linkDeciding === lr.link_id ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)' }}>
+                    {linkDeciding === lr.link_id ? 'Processing…' : 'Approve'}
+                  </button>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+
       {/* Loading skeleton */}
-      {loading && (
+      {activePage !== 'links' && loading && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {[1, 2, 3].map(i => (
             <div key={i} style={{ height: 72, borderRadius: 12, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', opacity: 1 - i * 0.2, animation: 'pulse 1.4s ease-in-out infinite' }} />
@@ -1423,7 +1513,7 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
       )}
 
       {/* API error */}
-      {apiError && (
+      {activePage !== 'links' && apiError && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderRadius: 10, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', color: '#dc2626' }}>
           <XCircle size={15} style={{ flexShrink: 0 }} />
           <span style={{ fontSize: 13, flex: 1 }}>{apiError}</span>
@@ -1435,7 +1525,7 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
       )}
 
       {/* Summary strip — only on Reviewed tab */}
-      {activePage !== 'pending' && (
+      {activePage !== 'pending' && activePage !== 'links' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
           {[
             { icon: Clock,       label: 'Pending',  value: pending.length,                                       bg: 'rgba(245,158,11,.12)', color: '#f59e0b', key: 'pending'  },
@@ -1462,7 +1552,7 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
       )}
 
       {/* Filter + search */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {activePage !== 'links' && <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '6px 12px', flex: 1, maxWidth: 300 }}>
             <Search size={13} color="var(--text-color-secondary)" />
@@ -1508,10 +1598,10 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
             </button>
           )}
         </div>
-      </div>
+      </div>}
 
       {/* Empty state */}
-      {list.length === 0 && (
+      {activePage !== 'links' && list.length === 0 && (
         <Card style={{ textAlign: 'center', padding: '64px 0' }}>
           <CheckCircle size={44} color="var(--surface-200)" style={{ margin: '0 auto 14px', display: 'block' }} />
           <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-color-secondary)', marginBottom: 6 }}>
@@ -1524,8 +1614,8 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
       )}
 
       {/* Document cards */}
-      <div ref={tableRef} style={{ scrollMarginTop: 16 }} />
-      {list.map(doc => {
+      {activePage !== 'links' && <div ref={tableRef} style={{ scrollMarginTop: 16 }} />}
+      {activePage !== 'links' && list.map(doc => {
         const isOpen = expanded === doc.id;
         return (
           <div key={doc.id} ref={isOpen ? expandedRef : null}>

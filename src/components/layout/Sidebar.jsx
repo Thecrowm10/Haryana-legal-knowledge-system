@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Home, Search, Upload, FileText, CheckSquare, Eye, BarChart2, GitBranch, ClipboardList, ChevronDown, Users, Settings, Activity, FileSearch, BarChart, Building2, Layers } from 'lucide-react';
+import { Home, Search, Upload, FileText, CheckSquare, Eye, BarChart2, GitBranch, ClipboardList, ChevronDown, Users, Settings, Activity, FileSearch, BarChart, Building2, Layers, Link2 } from 'lucide-react';
 import haryanaLogo from '../../assets/haryana-logo.png';
 const MENU_CONFIG = {
   citizen: [
@@ -18,6 +18,7 @@ const MENU_CONFIG = {
     { label: 'REVIEW QUEUE', items: [
       { icon: CheckSquare, label: 'Pending Approvals', id: 'pending' },
       { icon: Eye,         label: 'Reviewed',          id: 'reviewed' },
+      { icon: Link2,       label: 'Link Requests',     id: 'links' },
     ]},
   ],
   csoffice: [

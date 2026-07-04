@@ -25,7 +25,7 @@ function userFromPayload(payload) {
     role:               normalizeRole(payload.role),
     name:               payload.username,
     email:              payload.email,
-    dept:               payload.department ?? '',
+    dept:               payload.departments?.[0]?.name ?? payload.department ?? '',
     isActive:           payload.is_active,
     mustChangePassword: payload.must_change_password ?? false,
     passwordExpired:    payload.password_expired ?? false,

@@ -16,3 +16,8 @@ export const getApproverDocuments = (status, skip = 0, limit = 100) => api.get('
 export const reviewDocument       = (pdf_id, action, comments, annotations_json) => api.post('/pdf/review', { pdf_id, action, ...(comments ? { comments } : {}), ...(annotations_json ? { annotations_json } : {}) });
 export const getPdfFile           = (id)                              => api.get(`/pdf/${id}/file`, { responseType: 'arraybuffer' });
 export const getAllDocumentsAdmin  = (status, skip = 0, limit = 500)  => api.get('/pdf/all', { params: { skip, limit, ...(status ? { status } : {}) } });
+export const checkDuplicateDocument    = (document_name, document_type_id) => api.get('/pdf/check-duplicate', { params: { document_name, document_type_id } });
+export const linkDocumentToDepartment  = (pdf_id)             => api.post('/pdf/link-department', { pdf_id });
+export const getLinkedDocuments        = ()                   => api.get('/pdf/linked-documents');
+export const getDepartmentLinkRequests = ()                   => api.get('/pdf/department-link-requests');
+export const reviewDepartmentLink      = (link_id, action)   => api.post('/pdf/review-link', { link_id, action });

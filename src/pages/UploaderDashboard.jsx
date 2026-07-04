@@ -13,7 +13,7 @@ import Badge from '../components/ui/Badge';
 import SelectField from '../components/ui/SelectField';
 import { useAuth } from '../hooks/useAuth';
 import { getDepartments, getDocumentTypes } from '../services/departments';
-import { uploadPdfFile, uploadPdfMetadata, getMyDocuments, searchDocuments, getPdfFile } from '../services/pdf';
+import { uploadPdfFile, uploadPdfMetadata, getMyDocuments, searchDocuments, getPdfFile, checkDuplicateDocument, linkDocumentToDepartment, getLinkedDocuments } from '../services/pdf';
 import { createNotification } from '../services/notifications';
 
 // Constants
@@ -739,8 +739,11 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     if (!localStorage.getItem('token')) return;
     setMyDocsLoading(true);
     setMyDocsError('');
-    getMyDocuments()
-      .then(res => setUploads((res.data.documents || []).map(mapApiDoc)))
+    Promise.all([getMyDocuments(), getLinkedDocuments().catch(() => ({ data: [] }))])
+      .then(([myRes, linkedRes]) => {
+        setUploads((myRes.data.documents || []).map(mapApiDoc));
+        setLinkedDocs(Array.isArray(linkedRes.data) ? linkedRes.data : []);
+      })
       .catch(err => {
         const detail = err.response?.data?.detail;
         setMyDocsError(typeof detail === 'string' ? detail : 'Failed to load your documents');
@@ -757,6 +760,9 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   const [rejected, setRejected]     = useState([]);
   const [versionModal, setVersionModal] = useState(null);
   const [conflictModal, setConflictModal] = useState(null); // { existingDoc, pendingDocs, pendingRelations }
+  const [duplicateModal, setDuplicateModal] = useState(null); // { matches: DuplicateCheckItem[] }
+  const [linkedDocs, setLinkedDocs] = useState([]);
+  const [linkingId, setLinkingId] = useState(null); // pdf_id being linked (loading state)
 
   // Correction request state
   const [correctionModal, setCorrectionModal] = useState(null); // { doc }
@@ -1195,6 +1201,30 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
       finalizeUpload(newDocs, relations);
     }
   }
+  // Called on document-name field blur: checks for cross-department duplicates
+  async function checkDuplicate() {
+    const docName = form.act.trim();
+    const typeObj  = typesData.find(d => d.name === form.type);
+    if (!docName || !typeObj?.id) return;
+    try {
+      const res = await checkDuplicateDocument(docName, typeObj.id);
+      const matches = Array.isArray(res.data) ? res.data : [];
+      if (matches.length > 0) setDuplicateModal({ matches });
+    } catch (_) { /* silent — duplicate check is advisory */ }
+  }
+
+  // Called when user clicks "Link to My Department" in the duplicate modal
+  async function handleLinkDocument(pdfId) {
+    setLinkingId(pdfId);
+    try {
+      await linkDocumentToDepartment(pdfId);
+      setDuplicateModal(null);
+      // Refresh linked docs
+      getLinkedDocuments().then(r => setLinkedDocs(Array.isArray(r.data) ? r.data : [])).catch(() => {});
+    } catch (_) {}
+    setLinkingId(null);
+  }
+
   // Called when user clicks "Upload as vX.X" in the conflict modal
   function handleConflictResolve(newVersion) {
     const { pendingDocs, pendingRelations } = conflictModal;
@@ -1708,6 +1738,62 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         </div>
           );
         })()}
+
+        {/* ── Linked Documents section ── */}
+        {linkedDocs.length > 0 && (
+          <Card padding="0">
+            <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>Linked Documents</div>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: '#d97706', background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.25)', padding: '2px 9px', borderRadius: 20 }}>
+                {linkedDocs.length}
+              </span>
+              <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginLeft: 4 }}>Documents shared from other departments</span>
+            </div>
+            {linkedDocs.map(l => {
+              const typeColor = TYPE_CARD_COLORS[l.document_type_name] || { accent: '#94a3b8', bg: 'rgba(148,163,184,.1)', text: '#64748b' };
+              const isPending  = l.link_status === 'pending';
+              const linkAccent = isPending ? '#d97706' : '#16a34a';
+              const linkBg     = isPending ? 'rgba(245,158,11,.07)' : 'rgba(34,197,94,.07)';
+              const linkBorder = isPending ? 'rgba(245,158,11,.25)' : 'rgba(34,197,94,.25)';
+              return (
+                <div key={l.link_id} style={{ display: 'grid', gridTemplateColumns: '4px 1fr 190px 115px', borderBottom: '1px solid var(--surface-border)', background: 'transparent', transition: 'background .15s' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  <div style={{ background: linkAccent }} />
+                  <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                    <div style={{ width: 40, height: 40, borderRadius: 10, background: typeColor.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <FileText size={17} color={typeColor.accent} />
+                    </div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                        <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {l.document_name || l.original_filename}
+                        </span>
+                        <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 20, background: 'rgba(245,158,11,.12)', color: '#d97706', flexShrink: 0, letterSpacing: '.05em' }}>LINKED</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: typeColor.bg, color: typeColor.text || typeColor.accent }}>{l.document_type_name}</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-color-secondary)' }}>{l.department_name}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ padding: '14px 16px', borderLeft: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center' }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 20, background: linkBg, border: `1px solid ${linkBorder}` }}>
+                      {isPending ? <Clock size={11} color={linkAccent} /> : <CheckCircle size={11} color={linkAccent} />}
+                      <span style={{ fontSize: 10.5, fontWeight: 700, color: linkAccent, fontFamily: 'var(--mono)', letterSpacing: '.05em' }}>
+                        {isPending ? 'LINK PENDING' : 'LINK APPROVED'}
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ padding: '14px 16px', borderLeft: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', fontFamily: 'var(--mono)', fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
+                    {l.created_at?.split('T')[0] || ''}
+                  </div>
+                </div>
+              );
+            })}
+          </Card>
+        )}
+
       </div>
     );
   }
@@ -1724,6 +1810,89 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
           onCancel={() => setConflictModal(null)}
         />
       )}
+
+      {/* ── Duplicate document modal ──────────────────────────────────────── */}
+      {duplicateModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+          onClick={() => setDuplicateModal(null)}>
+          <div style={{ background: 'var(--surface-card)', borderRadius: 16, padding: 28, width: '100%', maxWidth: 560, boxShadow: '0 28px 80px rgba(0,0,0,.35)', maxHeight: '85vh', overflowY: 'auto' }}
+            onClick={e => e.stopPropagation()}>
+
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <AlertTriangle size={18} color="#d97706" />
+                  <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)' }}>Document Already Exists</span>
+                </div>
+                <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)' }}>
+                  A document with this name and type was found in the system.
+                </div>
+              </div>
+              <button onClick={() => setDuplicateModal(null)} style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '5px 8px', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex' }}>
+                <X size={14} />
+              </button>
+            </div>
+
+            {/* Own-department matches — version upgrade */}
+            {duplicateModal.matches.filter(m => m.match_type === 'own_dept').map(m => (
+              <div key={m.id} style={{ marginBottom: 16, padding: '14px 16px', borderRadius: 10, background: 'rgba(59,130,246,.06)', border: '1px solid rgba(59,130,246,.2)' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#3b82f6', letterSpacing: '.06em', marginBottom: 8 }}>IN YOUR DEPARTMENT</div>
+                <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-heading)', marginBottom: 4 }}>{m.document_name}</div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12, fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
+                  <span style={{ background: 'rgba(59,130,246,.1)', color: '#3b82f6', padding: '2px 8px', borderRadius: 20, fontWeight: 600 }}>{m.document_type_name}</span>
+                  <span>v{m.version_no || '1.0'}</span>
+                  <span style={{ background: m.status === 'approved' ? 'rgba(34,197,94,.1)' : 'rgba(245,158,11,.1)', color: m.status === 'approved' ? '#16a34a' : '#d97706', padding: '2px 8px', borderRadius: 20, fontWeight: 600, textTransform: 'capitalize' }}>{m.status}</span>
+                  <span>{m.created_at?.split('T')[0]}</span>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => {
+                    const nextVer = (parseFloat(m.version_no || '1.0') + 0.1).toFixed(1);
+                    fmt('version', nextVer);
+                    setDuplicateModal(null);
+                  }} style={{ flex: 1, padding: '8px 14px', borderRadius: 8, border: 'none', background: '#3b82f6', color: 'white', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                    Upload as New Version (v{(parseFloat(m.version_no || '1.0') + 0.1).toFixed(1)})
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            {/* Other-department matches — link */}
+            {duplicateModal.matches.filter(m => m.match_type === 'other_dept').length > 0 && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#d97706', letterSpacing: '.06em', marginBottom: 10 }}>IN OTHER DEPARTMENTS</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {duplicateModal.matches.filter(m => m.match_type === 'other_dept').map(m => (
+                    <div key={m.id} style={{ padding: '14px 16px', borderRadius: 10, background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)' }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-heading)', marginBottom: 4 }}>{m.document_name}</div>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12, fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
+                        <span style={{ background: 'rgba(245,158,11,.1)', color: '#d97706', padding: '2px 8px', borderRadius: 20, fontWeight: 600 }}>{m.document_type_name}</span>
+                        <span style={{ fontWeight: 600 }}>{m.department_name}</span>
+                        <span style={{ background: m.status === 'approved' ? 'rgba(34,197,94,.1)' : 'rgba(245,158,11,.1)', color: m.status === 'approved' ? '#16a34a' : '#d97706', padding: '2px 8px', borderRadius: 20, fontWeight: 600, textTransform: 'capitalize' }}>{m.status}</span>
+                        <span>{m.created_at?.split('T')[0]}</span>
+                      </div>
+                      <button onClick={() => handleLinkDocument(m.id)}
+                        disabled={linkingId === m.id}
+                        style={{ width: '100%', padding: '8px 14px', borderRadius: 8, border: 'none', background: linkingId === m.id ? 'rgba(245,158,11,.4)' : '#d97706', color: 'white', fontSize: 12.5, fontWeight: 700, cursor: linkingId === m.id ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)' }}>
+                        {linkingId === m.id ? 'Sending request…' : 'Link to My Department'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Footer */}
+            <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end' }}>
+              <button onClick={() => setDuplicateModal(null)}
+                style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'transparent', color: 'var(--text-color-secondary)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                Continue uploading anyway
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Unified single-page upload layout ─────────────────────────────── */}
       <div style={{ display: 'grid', gridTemplateColumns: '330px 1fr', gap: 20, alignItems: 'start' }}>
 
@@ -2021,7 +2190,8 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                   'Bye Laws': 'e.g. Municipal Corporation Bye-laws, 2020',
                   'Miscellaneous': 'e.g. Departmental Guidelines / Reference Manual',
                 }[form.type] || 'Enter document name')}
-                style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                style={INPUT_BASE} onFocus={focusStyle}
+                onBlur={e => { blurStyle(e); if (files.length <= 1) checkDuplicate(); }} />
             </div>
 
             {/* ── ACT: all fields inline ── */}
@@ -2485,18 +2655,20 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
             <button type="submit"
               disabled={files.length === 0 || uploadStep === 'uploading' || uploadStep === 'saving' || uploadStep === 'done'}
               style={{
-                background: uploadStep === 'done' ? '#16a34a' : files.length > 0 && !uploadStep ? 'var(--primary)' : uploadStep === 'error' ? 'var(--primary)' : 'var(--surface-200)',
-                color: uploadStep === 'done' || (files.length > 0 && (!uploadStep || uploadStep === 'error')) ? 'white' : '#94a3b8',
+                background: uploadStep === 'done' ? '#16a34a'
+                  : files.length > 0 && (!uploadStep || uploadStep === 'ready' || uploadStep === 'error') ? 'var(--primary)'
+                  : 'var(--surface-200)',
+                color: files.length > 0 && (!uploadStep || uploadStep === 'ready' || uploadStep === 'error' || uploadStep === 'done') ? 'white' : '#94a3b8',
                 border: 'none', padding: '10px 28px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700,
-                cursor: files.length > 0 && (!uploadStep || uploadStep === 'error') ? 'pointer' : 'not-allowed',
+                cursor: files.length > 0 && (!uploadStep || uploadStep === 'ready' || uploadStep === 'error') ? 'pointer' : 'not-allowed',
                 display: 'flex', alignItems: 'center', gap: 8,
-                boxShadow: files.length > 0 && (!uploadStep || uploadStep === 'error') ? '0 2px 8px rgba(26,86,219,.2)' : 'none',
+                boxShadow: files.length > 0 && (!uploadStep || uploadStep === 'ready' || uploadStep === 'error') ? '0 2px 8px rgba(26,86,219,.2)' : 'none',
                 transition: 'all .2s',
               }}>
               {uploadStep === 'uploading' && <><Clock size={14} /> Uploading file…</>}
               {uploadStep === 'saving'    && <><Clock size={14} /> Saving details…</>}
               {uploadStep === 'done'      && <><CheckCircle size={14} /> Submitted!</>}
-              {(!uploadStep || uploadStep === 'error') && <><CheckCircle size={14} /> Submit for Approval</>}
+              {(!uploadStep || uploadStep === 'ready' || uploadStep === 'error') && <><CheckCircle size={14} /> Submit for Approval</>}
             </button>
           </div>
         </form>
