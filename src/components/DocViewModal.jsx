@@ -3,6 +3,7 @@ import { FileText, CheckCircle, XCircle, Clock, Eye, ZoomIn, ZoomOut, RotateCw, 
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl;
+import mammoth from 'mammoth';
 import { getPdfFile } from '../services/pdf';
 
 const TYPE_CARD_COLORS = {
@@ -33,6 +34,7 @@ export default function DocViewModal({ doc, onClose }) {
   const [totalPages, setTotalPages]   = useState(1);
   const [zoom, setZoom]               = useState(100);
   const [rotation, setRotation]       = useState(0);
+  const [docxHtml, setDocxHtml]       = useState(null);
   const canvasRefs   = useRef([]);
   const containerRef = useRef(null);
   const suppressRef  = useRef(false);
@@ -50,9 +52,13 @@ export default function DocViewModal({ doc, onClose }) {
 
   useEffect(() => {
     let url = null;
-    setBlobUrl(null); setPdfDoc(null); setCurrentPage(1);
+    setBlobUrl(null); setPdfDoc(null); setCurrentPage(1); setDocxHtml(null);
     getPdfFile(doc.id)
       .then(res => {
+        const ct = (res.headers['content-type'] || '').toLowerCase();
+        if (ct.includes('wordprocessingml') || ct.includes('officedocument')) {
+          return mammoth.convertToHtml({ arrayBuffer: res.data }).then(r => setDocxHtml(r.value));
+        }
         const blob = new Blob([res.data], { type: 'application/pdf' });
         url = URL.createObjectURL(blob);
         setBlobUrl(url);
@@ -190,29 +196,33 @@ export default function DocViewModal({ doc, onClose }) {
         <div style={{ borderRight: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#3a3d40' }}>
           <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10, background: '#2d2f31', flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,.08)' }}>
             <Eye size={14} color="rgba(255,255,255,.7)" />
-            <span style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(255,255,255,.85)', flex: 1 }}>Original PDF</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,.06)', borderRadius: 8, padding: '3px 6px', border: '1px solid rgba(255,255,255,.1)' }}>
-              <button onClick={() => setZoom(z => Math.max(70, z - 10))}
-                style={{ ...iconBtn, width: 28, height: 28, background: 'transparent', border: 'none' }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.1)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                <ZoomOut size={13} />
+            <span style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(255,255,255,.85)', flex: 1 }}>{docxHtml ? 'Document Preview' : 'Original PDF'}</span>
+            {!docxHtml && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,.06)', borderRadius: 8, padding: '3px 6px', border: '1px solid rgba(255,255,255,.1)' }}>
+                <button onClick={() => setZoom(z => Math.max(70, z - 10))}
+                  style={{ ...iconBtn, width: 28, height: 28, background: 'transparent', border: 'none' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.1)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  <ZoomOut size={13} />
+                </button>
+                <span style={{ fontSize: 11.5, fontFamily: 'var(--mono)', color: 'rgba(255,255,255,.75)', minWidth: 38, textAlign: 'center', userSelect: 'none' }}>{zoom}%</span>
+                <button onClick={() => setZoom(z => Math.min(150, z + 10))}
+                  style={{ ...iconBtn, width: 28, height: 28, background: 'transparent', border: 'none' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.1)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  <ZoomIn size={13} />
+                </button>
+              </div>
+            )}
+            {!docxHtml && (
+              <button onClick={() => setRotation(r => (r + 90) % 360)}
+                style={iconBtn}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.15)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,.08)'}>
+                <RotateCw size={14} />
               </button>
-              <span style={{ fontSize: 11.5, fontFamily: 'var(--mono)', color: 'rgba(255,255,255,.75)', minWidth: 38, textAlign: 'center', userSelect: 'none' }}>{zoom}%</span>
-              <button onClick={() => setZoom(z => Math.min(150, z + 10))}
-                style={{ ...iconBtn, width: 28, height: 28, background: 'transparent', border: 'none' }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.1)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                <ZoomIn size={13} />
-              </button>
-            </div>
-            <button onClick={() => setRotation(r => (r + 90) % 360)}
-              style={iconBtn}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.15)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,.08)'}>
-              <RotateCw size={14} />
-            </button>
-            {blobUrl && (
+            )}
+            {blobUrl && !docxHtml && (
               <a href={blobUrl} target="_blank" rel="noreferrer"
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 7, background: 'rgba(26,86,219,.25)', border: '1px solid rgba(26,86,219,.4)', color: '#93c5fd', textDecoration: 'none', fontSize: 11.5, fontWeight: 600, fontFamily: 'var(--font)', transition: 'background .15s' }}
                 onMouseEnter={e => e.currentTarget.style.background = 'rgba(26,86,219,.4)'}
@@ -222,54 +232,61 @@ export default function DocViewModal({ doc, onClose }) {
             )}
           </div>
 
-          <div ref={containerRef} onScroll={handleScroll}
-            style={{ flex: 1, overflow: 'auto', background: '#525659', padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center' }}>
-            {!blobUrl && (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 14 }}>
-                <div style={{ width: 36, height: 36, border: '3px solid rgba(255,255,255,.2)', borderTopColor: 'rgba(255,255,255,.8)', borderRadius: '50%', animation: 'spin .7s linear infinite' }} />
-                <span style={{ fontSize: 13, fontFamily: 'var(--mono)', color: 'rgba(255,255,255,.6)', letterSpacing: '.04em' }}>Loading PDF…</span>
-              </div>
-            )}
-            {blobUrl && Array.from({ length: totalPages }, (_, i) => (
-              <div key={i} style={{ position: 'relative', display: 'inline-block' }}>
-                <canvas ref={el => { canvasRefs.current[i] = el; }}
-                  style={{ display: 'block', borderRadius: 4, boxShadow: '0 4px 20px rgba(0,0,0,.6)', maxWidth: '100%' }} />
-                {annotations.some(a => a.page === i + 1) && (
-                  <svg ref={el => { svgRefs.current[i] = el; }}
-                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
-                    {annotations.filter(a => a.page === i + 1).map(ann => (
-                      <g key={ann.id}>
-                        <rect x={`${ann.x * 100}%`} y={`${ann.y * 100}%`} width={`${ann.w * 100}%`} height={`${ann.h * 100}%`}
-                          fill={ann.color} stroke="rgba(0,0,0,.2)" strokeWidth="1" />
-                        <title>{ann.comment}</title>
-                        <foreignObject x={`${ann.x * 100}%`} y={`${ann.y * 100}%`} width="20" height="20" style={{ overflow: 'visible', pointerEvents: 'auto' }}>
-                          <div title={ann.comment} style={{ width: 16, height: 16, borderRadius: '50%', background: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'default' }}>
-                            <MessageCircle size={9} color="white" />
-                          </div>
-                        </foreignObject>
-                      </g>
-                    ))}
-                  </svg>
-                )}
-              </div>
-            ))}
-          </div>
-
-          <div style={{ padding: '10px 20px', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, background: '#2d2f31', flexShrink: 0 }}>
-            <button onClick={() => scrollToPage(currentPage - 1)} disabled={currentPage === 1}
-              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px', borderRadius: 7, border: '1px solid rgba(255,255,255,.12)', background: currentPage === 1 ? 'transparent' : 'rgba(255,255,255,.07)', color: currentPage === 1 ? 'rgba(255,255,255,.25)' : 'rgba(255,255,255,.75)', fontSize: 12, fontWeight: 600, cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', transition: 'background .15s' }}>
-              ← Prev
-            </button>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 14px', borderRadius: 7, background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)' }}>
-              <span style={{ fontSize: 12.5, fontFamily: 'var(--mono)', color: 'rgba(255,255,255,.85)', fontWeight: 600 }}>{currentPage}</span>
-              <span style={{ fontSize: 11, color: 'rgba(255,255,255,.35)' }}>of</span>
-              <span style={{ fontSize: 12.5, fontFamily: 'var(--mono)', color: 'rgba(255,255,255,.55)' }}>{totalPages}</span>
+          {docxHtml ? (
+            <div style={{ flex: 1, overflow: 'auto', background: 'white', padding: '40px 48px', color: '#1a1a1a', lineHeight: 1.8, fontSize: 13 }}
+              dangerouslySetInnerHTML={{ __html: docxHtml }} />
+          ) : (
+            <div ref={containerRef} onScroll={handleScroll}
+              style={{ flex: 1, overflow: 'auto', background: '#525659', padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center' }}>
+              {!blobUrl && (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 14 }}>
+                  <div style={{ width: 36, height: 36, border: '3px solid rgba(255,255,255,.2)', borderTopColor: 'rgba(255,255,255,.8)', borderRadius: '50%', animation: 'spin .7s linear infinite' }} />
+                  <span style={{ fontSize: 13, fontFamily: 'var(--mono)', color: 'rgba(255,255,255,.6)', letterSpacing: '.04em' }}>Loading document…</span>
+                </div>
+              )}
+              {blobUrl && Array.from({ length: totalPages }, (_, i) => (
+                <div key={i} style={{ position: 'relative', display: 'inline-block' }}>
+                  <canvas ref={el => { canvasRefs.current[i] = el; }}
+                    style={{ display: 'block', borderRadius: 4, boxShadow: '0 4px 20px rgba(0,0,0,.6)', maxWidth: '100%' }} />
+                  {annotations.some(a => a.page === i + 1) && (
+                    <svg ref={el => { svgRefs.current[i] = el; }}
+                      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
+                      {annotations.filter(a => a.page === i + 1).map(ann => (
+                        <g key={ann.id}>
+                          <rect x={`${ann.x * 100}%`} y={`${ann.y * 100}%`} width={`${ann.w * 100}%`} height={`${ann.h * 100}%`}
+                            fill={ann.color} stroke="rgba(0,0,0,.2)" strokeWidth="1" />
+                          <title>{ann.comment}</title>
+                          <foreignObject x={`${ann.x * 100}%`} y={`${ann.y * 100}%`} width="20" height="20" style={{ overflow: 'visible', pointerEvents: 'auto' }}>
+                            <div title={ann.comment} style={{ width: 16, height: 16, borderRadius: '50%', background: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'default' }}>
+                              <MessageCircle size={9} color="white" />
+                            </div>
+                          </foreignObject>
+                        </g>
+                      ))}
+                    </svg>
+                  )}
+                </div>
+              ))}
             </div>
-            <button onClick={() => scrollToPage(currentPage + 1)} disabled={currentPage === totalPages}
-              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px', borderRadius: 7, border: '1px solid rgba(255,255,255,.12)', background: currentPage === totalPages ? 'transparent' : 'rgba(255,255,255,.07)', color: currentPage === totalPages ? 'rgba(255,255,255,.25)' : 'rgba(255,255,255,.75)', fontSize: 12, fontWeight: 600, cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', transition: 'background .15s' }}>
-              Next →
-            </button>
-          </div>
+          )}
+
+          {!docxHtml && (
+            <div style={{ padding: '10px 20px', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, background: '#2d2f31', flexShrink: 0 }}>
+              <button onClick={() => scrollToPage(currentPage - 1)} disabled={currentPage === 1}
+                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px', borderRadius: 7, border: '1px solid rgba(255,255,255,.12)', background: currentPage === 1 ? 'transparent' : 'rgba(255,255,255,.07)', color: currentPage === 1 ? 'rgba(255,255,255,.25)' : 'rgba(255,255,255,.75)', fontSize: 12, fontWeight: 600, cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', transition: 'background .15s' }}>
+                ← Prev
+              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 14px', borderRadius: 7, background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)' }}>
+                <span style={{ fontSize: 12.5, fontFamily: 'var(--mono)', color: 'rgba(255,255,255,.85)', fontWeight: 600 }}>{currentPage}</span>
+                <span style={{ fontSize: 11, color: 'rgba(255,255,255,.35)' }}>of</span>
+                <span style={{ fontSize: 12.5, fontFamily: 'var(--mono)', color: 'rgba(255,255,255,.55)' }}>{totalPages}</span>
+              </div>
+              <button onClick={() => scrollToPage(currentPage + 1)} disabled={currentPage === totalPages}
+                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px', borderRadius: 7, border: '1px solid rgba(255,255,255,.12)', background: currentPage === totalPages ? 'transparent' : 'rgba(255,255,255,.07)', color: currentPage === totalPages ? 'rgba(255,255,255,.25)' : 'rgba(255,255,255,.75)', fontSize: 12, fontWeight: 600, cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', transition: 'background .15s' }}>
+                Next →
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Right: Document details */}

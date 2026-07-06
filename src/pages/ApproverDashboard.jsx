@@ -7,6 +7,7 @@ import {
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl;
+import mammoth from 'mammoth';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import { getApproverDocuments, getPdfFile, reviewDocument, getDepartmentLinkRequests, reviewDepartmentLink } from '../services/pdf';
@@ -253,7 +254,7 @@ function PageNav({ currentPage, totalPages, onPageChange }) {
 // PDF Viewer Panel
 // Renders real PDFs as stacked canvases (pdfjs-dist) so scroll can be detected
 // and synced with OcrTextPanel. Mock docs use the styled layout fallback.
-function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, rotation, onRotate, blobUrl, onTotalPagesChange, annotations = [], onAnnotationsChange, highlightMode = false, onHighlightModeChange, onScrollRef }) {
+function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, rotation, onRotate, blobUrl, onTotalPagesChange, annotations = [], onAnnotationsChange, highlightMode = false, onHighlightModeChange, onScrollRef, docxHtml = null }) {
   const [zoom, setZoom]     = useState(100);
   const containerRef        = useRef(null);
   const canvasRefs          = useRef([]);
@@ -427,46 +428,53 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
       {/* Toolbar */}
       <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surface-50)', flexShrink: 0 }}>
         <Eye size={13} color="var(--primary)" />
-        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-heading)', flex: 1 }}>Original PDF</span>
-        {blobUrl && (
+        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-heading)', flex: 1 }}>{docxHtml ? 'Document Preview' : 'Original PDF'}</span>
+        {blobUrl && !docxHtml && (
           <a href={blobUrl} target="_blank" rel="noreferrer" title="Open in new tab"
             style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 9px', borderRadius: 5, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)', textDecoration: 'none', fontSize: 11, fontWeight: 600, fontFamily: 'var(--font)' }}>
             <ExternalLink size={11} /> Open
           </a>
         )}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <button onClick={onRotate} title="Rotate 90°"
-            style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 5, width: 24, height: 24, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-color-secondary)' }}>
-            <RotateCw size={11} />
-          </button>
-          <button onClick={() => setZoom(z => Math.max(70, z - 10))}
-            style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 5, width: 24, height: 24, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-color-secondary)' }}>
-            <ZoomOut size={11} />
-          </button>
-          <span style={{ fontSize: 10.5, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', minWidth: 34, textAlign: 'center' }}>{zoom}%</span>
-          <button onClick={() => setZoom(z => Math.min(150, z + 10))}
-            style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 5, width: 24, height: 24, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-color-secondary)' }}>
-            <ZoomIn size={11} />
-          </button>
-        </div>
+        {!docxHtml && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <button onClick={onRotate} title="Rotate 90°"
+              style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 5, width: 24, height: 24, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-color-secondary)' }}>
+              <RotateCw size={11} />
+            </button>
+            <button onClick={() => setZoom(z => Math.max(70, z - 10))}
+              style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 5, width: 24, height: 24, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-color-secondary)' }}>
+              <ZoomOut size={11} />
+            </button>
+            <span style={{ fontSize: 10.5, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', minWidth: 34, textAlign: 'center' }}>{zoom}%</span>
+            <button onClick={() => setZoom(z => Math.min(150, z + 10))}
+              style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 5, width: 24, height: 24, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-color-secondary)' }}>
+              <ZoomIn size={11} />
+            </button>
+          </div>
+        )}
         {/* Highlight mode toggle + color palette */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 6 }}>
-          <button
-            onClick={() => onHighlightModeChange?.(!highlightMode)}
-            title={highlightMode ? 'Exit highlight mode' : 'Draw highlight on PDF'}
-            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 5, border: highlightMode ? '1.5px solid #f59e0b' : '1px solid var(--surface-border)', background: highlightMode ? 'rgba(245,158,11,.12)' : 'var(--surface-ground)', color: highlightMode ? '#b45309' : 'var(--text-color-secondary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'all .15s' }}>
-            <Highlighter size={11} />
-            {highlightMode ? 'Exit Highlight' : 'Highlight'}
-          </button>
-          {highlightMode && ['rgba(253,224,71,.55)', 'rgba(134,239,172,.55)', 'rgba(147,197,253,.55)', 'rgba(249,168,212,.55)'].map(c => (
-            <button key={c} onClick={() => setSelectedColor(c)} title="Pick color"
-              style={{ width: 18, height: 18, borderRadius: '50%', background: c, border: selectedColor === c ? '2.5px solid #374151' : '1px solid rgba(0,0,0,.2)', cursor: 'pointer', padding: 0, flexShrink: 0 }} />
-          ))}
-        </div>
+        {!docxHtml && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 6 }}>
+            <button
+              onClick={() => onHighlightModeChange?.(!highlightMode)}
+              title={highlightMode ? 'Exit highlight mode' : 'Draw highlight on PDF'}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 5, border: highlightMode ? '1.5px solid #f59e0b' : '1px solid var(--surface-border)', background: highlightMode ? 'rgba(245,158,11,.12)' : 'var(--surface-ground)', color: highlightMode ? '#b45309' : 'var(--text-color-secondary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'all .15s' }}>
+              <Highlighter size={11} />
+              {highlightMode ? 'Exit Highlight' : 'Highlight'}
+            </button>
+            {highlightMode && ['rgba(253,224,71,.55)', 'rgba(134,239,172,.55)', 'rgba(147,197,253,.55)', 'rgba(249,168,212,.55)'].map(c => (
+              <button key={c} onClick={() => setSelectedColor(c)} title="Pick color"
+                style={{ width: 18, height: 18, borderRadius: '50%', background: c, border: selectedColor === c ? '2.5px solid #374151' : '1px solid rgba(0,0,0,.2)', cursor: 'pointer', padding: 0, flexShrink: 0 }} />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Content area */}
-      {doc.fileUrl ? (
+      {docxHtml ? (
+        <div style={{ flex: 1, overflow: 'auto', background: 'white', padding: '32px 40px', color: '#1a1a1a', lineHeight: 1.8, fontSize: 13 }}
+          dangerouslySetInnerHTML={{ __html: docxHtml }} />
+      ) : doc.fileUrl ? (
         <div ref={containerRef} onScroll={handleScroll}
           style={{ flex: 1, overflow: 'auto', background: '#525659', padding: '12px 8px', display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>
           {!pdfDoc && (
@@ -1065,6 +1073,7 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, activePage,
     catch { return []; }
   });
   const [highlightMode, setHighlightMode] = useState(false);
+  const [docxHtml, setDocxHtml]           = useState(null);
   const pdfScrollRef = useRef(null);
 
   const [remarkLines, setRemarkLines] = useState(() => {
@@ -1104,9 +1113,13 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, activePage,
   useEffect(() => {
     if (!doc.id || !localStorage.getItem('token')) return;
     let url = null;
-    setBlobUrl(null);
+    setBlobUrl(null); setDocxHtml(null);
     getPdfFile(doc.id)
       .then(res => {
+        const ct = (res.headers['content-type'] || '').toLowerCase();
+        if (ct.includes('wordprocessingml') || ct.includes('officedocument')) {
+          return mammoth.convertToHtml({ arrayBuffer: res.data }).then(r => setDocxHtml(r.value));
+        }
         const blob = new Blob([res.data], { type: 'application/pdf' });
         url = URL.createObjectURL(blob);
         setBlobUrl(url);
@@ -1133,6 +1146,7 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, activePage,
             annotations={annotations} onAnnotationsChange={setAnnotations}
             highlightMode={highlightMode} onHighlightModeChange={setHighlightMode}
             onScrollRef={pdfScrollRef}
+            docxHtml={docxHtml}
           />
         </div>
 
@@ -1322,6 +1336,7 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
   const [remarkLines, setRemarkLines]     = useState(['']);
   const [annotations, setAnnotations]     = useState([]);
   const [highlightMode, setHighlightMode] = useState(false);
+  const [docxHtml, setDocxHtml]           = useState(null);
   const pdfScrollRef                      = useRef(null);
 
   // For read-only mode: parse stored annotations from the review
@@ -1360,9 +1375,13 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
   useEffect(() => {
     if (!lr.pdf_id || !localStorage.getItem('token')) return;
     let url = null;
-    setBlobUrl(null);
+    setBlobUrl(null); setDocxHtml(null);
     getPdfFile(lr.pdf_id)
       .then(res => {
+        const ct = (res.headers['content-type'] || '').toLowerCase();
+        if (ct.includes('wordprocessingml') || ct.includes('officedocument')) {
+          return mammoth.convertToHtml({ arrayBuffer: res.data }).then(r => setDocxHtml(r.value));
+        }
         const blob = new Blob([res.data], { type: 'application/pdf' });
         url = URL.createObjectURL(blob);
         setBlobUrl(url);
@@ -1438,6 +1457,7 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
             highlightMode={isReadOnly ? false : highlightMode}
             onHighlightModeChange={isReadOnly ? undefined : setHighlightMode}
             onScrollRef={pdfScrollRef}
+            docxHtml={docxHtml}
           />
         </div>
 
