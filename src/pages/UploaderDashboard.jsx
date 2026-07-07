@@ -122,10 +122,6 @@ function parseDisplayRemarks(str) {
   });
 }
 
-const MOCK_VERSIONS = {
-  1: [{ v: '2.0', date: '2024-01-15', note: 'Current' },{ v: '1.0', date: '2023-05-10', note: 'Initial upload' }],
-  2: [{ v: '1.2', date: '2024-02-10', note: 'Current' },{ v: '1.1', date: '2023-09-01', note: 'Minor edits' },{ v: '1.0', date: '2022-03-15', note: 'Initial upload' }],
-};
 
 // Word-level confidence scoring
 // Deterministic (hash-based) so scores don't change on re-render.
@@ -292,6 +288,25 @@ function WorkflowBadge({ status }) {
     <span style={{ fontSize: 10.5, fontWeight: 700, fontFamily: 'var(--mono)', padding: '3px 9px', borderRadius: 20, background: c.bg, color: c.color }}>
       {c.label}
     </span>
+  );
+}
+
+function Toast({ toast, onClose }) {
+  if (!toast) return null;
+  const isError = toast.type === 'error';
+  const accent  = isError ? '#ef4444' : '#16a34a';
+  const bg      = isError ? 'rgba(239,68,68,.08)'  : 'rgba(34,197,94,.08)';
+  const Icon    = isError ? XCircle : CheckCircle;
+  return (
+    <div style={{ position: 'fixed', top: 20, right: 20, zIndex: 3000, display: 'flex', alignItems: 'flex-start', gap: 10, padding: '13px 16px', borderRadius: 10, background: 'var(--surface-card)', border: `1px solid ${accent}44`, boxShadow: '0 12px 32px rgba(0,0,0,.18)', maxWidth: 380, animation: 'fadeSlideIn .25s ease' }}>
+      <div style={{ width: 26, height: 26, borderRadius: 7, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <Icon size={14} color={accent} />
+      </div>
+      <span style={{ fontSize: 13, color: 'var(--text-color)', lineHeight: 1.5, flex: 1, paddingTop: 3 }}>{toast.message}</span>
+      <button type="button" onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', flexShrink: 0, padding: 3 }}>
+        <X size={13} />
+      </button>
+    </div>
   );
 }
 
@@ -875,6 +890,14 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   const [fileRefs,    setFileRefs]    = useState([]); // [{ fileName, fileRef, originalFilename, fileSize }]
   const [uploadStep, setUploadStep]   = useState(null); // null | 'uploading' | 'ready' | 'saving' | 'done' | 'error'
   const [uploadError, setUploadError] = useState('');
+  const [toast, setToast] = useState(null); // { type: 'success' | 'error', message }
+  const toastTimerRef = useRef(null);
+  const showToast = useCallback((type, message) => {
+    clearTimeout(toastTimerRef.current);
+    setToast({ type, message });
+    toastTimerRef.current = setTimeout(() => setToast(null), 4500);
+  }, []);
+  useEffect(() => () => clearTimeout(toastTimerRef.current), []);
 
   // Table filter + sort
   const [tableSearch, setTableSearch] = useState('');
@@ -1146,8 +1169,10 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
             fileRef = res.data.file_ref;
           } catch (err) {
             const detail = err.response?.data?.detail;
-            setUploadError(typeof detail === 'string' ? detail : `Upload failed for "${f.name}"`);
+            const message = typeof detail === 'string' ? detail : `Upload failed for "${f.name}"`;
+            setUploadError(message);
             setUploadStep('error');
+            showToast('error', message);
             return;
           }
         }
@@ -1196,8 +1221,10 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
           });
         } catch (err) {
           const detail = err.response?.data?.detail;
-          setUploadError(typeof detail === 'string' ? detail : `Failed to save metadata for "${f.name}"`);
+          const message = typeof detail === 'string' ? detail : `Failed to save metadata for "${f.name}"`;
+          setUploadError(message);
           setUploadStep('error');
+          showToast('error', message);
           return;
         }
       }
@@ -1271,6 +1298,9 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
       setUploadStep('done');
       setTimeout(() => { setUploadStep(null); }, 2000);
       finalizeUpload(newDocs, relations);
+      showToast('success', newDocs.length > 1
+        ? `${newDocs.length} documents submitted successfully — pending approval.`
+        : `"${newDocs[0]?.title || 'Document'}" submitted successfully — pending approval.`);
     }
   }
   // Called on document-name field blur: checks for cross-department duplicates
@@ -1355,6 +1385,8 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
 
+        <Toast toast={toast} onClose={() => setToast(null)} />
+
         {/* Version history modal */}
         {versionModal && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setVersionModal(null)}>
@@ -1362,7 +1394,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
               <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 18, paddingBottom: 12, borderBottom: '1px solid var(--surface-border)' }}>
                 Version History — {versionModal.title}
               </div>
-              {(MOCK_VERSIONS[versionModal.id] || [{ v: versionModal.version || '1.0', date: versionModal.uploadedAt, note: 'Current' }]).map((ver, i, arr) => (
+              {[{ v: versionModal.version || '1.0', date: versionModal.uploadedAt, note: 'Current' }].map((ver, i, arr) => (
                 <div key={ver.v} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: i === arr.length - 1 ? 'none' : '1px solid var(--surface-border)' }}>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -1371,12 +1403,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 2, fontFamily: 'var(--mono)' }}>{ver.date} — {ver.note}</div>
                   </div>
-                  {i > 0 && (
-                    <button onClick={() => { alert(`Rolling back to v${ver.v}.`); setVersionModal(null); }}
-                      style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                      <RotateCcw size={12} /> Rollback
-                    </button>
-                  )}
                 </div>
               ))}
               <button onClick={() => setVersionModal(null)} style={{ marginTop: 18, width: '100%', padding: '9px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontFamily: 'var(--font)', fontSize: 13, cursor: 'pointer' }}>Close</button>
@@ -1923,6 +1949,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   const allFilesChecked = files.length > 0 && files.every(f => fileRefs.some(r => r.fileName === f.name));
   return (
     <div style={{ animation: 'fadeSlideIn .3s ease' }}>
+      <Toast toast={toast} onClose={() => setToast(null)} />
       {conflictModal && (
         <VersionConflictModal
           existingDoc={conflictModal.existingDoc}
