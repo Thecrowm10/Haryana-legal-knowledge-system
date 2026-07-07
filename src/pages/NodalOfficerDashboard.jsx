@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Users, CheckCircle, XCircle, Plus, Edit2, X, Eye, EyeOff, Download, Layers, FileText, Clock, Search, Link2, Activity } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
@@ -227,6 +227,11 @@ export default function NodalOfficerDashboard({ activePage }) {
   const [auditFromDate, setAuditFromDate]         = useState('');
   const [auditToDate, setAuditToDate]             = useState('');
   const [auditSearch, setAuditSearch]             = useState('');
+  // Action-type dropdown options are built only from actions actually seen in
+  // fetched pages (never a guessed/hardcoded list) and accumulate across
+  // fetches so the list doesn't shrink once you filter down to one action.
+  const [seenActionsRaw, setSeenActionsRaw]       = useState([]);
+  const auditActionOptions = useMemo(() => Array.from(new Set(seenActionsRaw)).sort(), [seenActionsRaw]);
 
   useEffect(() => {
     if (activePage !== 'nodalauditfull') return;
@@ -238,7 +243,12 @@ export default function NodalOfficerDashboard({ activePage }) {
     if (auditFromDate)     params.from_date    = auditFromDate;
     if (auditToDate)       params.to_date      = auditToDate + 'T23:59:59';
     getAuditLogs(params)
-      .then(res => { setAuditLogs(res.data.logs || []); setAuditTotal(res.data.total || 0); })
+      .then(res => {
+        const logs = res.data.logs || [];
+        setAuditLogs(logs);
+        setAuditTotal(res.data.total || 0);
+        setSeenActionsRaw(prev => [...prev, ...logs.map(l => l.action).filter(Boolean)]);
+      })
       .catch(() => setAuditError('Failed to load audit logs. Please try again.'))
       .finally(() => setAuditLoading(false));
   }, [activePage, auditPage, auditFilterEntity, auditFilterAction, auditFilterStatus, auditFromDate, auditToDate]);
@@ -913,6 +923,11 @@ export default function NodalOfficerDashboard({ activePage }) {
               style={{ height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, padding: '0 10px', background: 'var(--surface-ground)', color: 'var(--text-color)', cursor: 'pointer' }}>
               {AUDIT_ENTITY_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
+            <select value={auditFilterAction} onChange={e => { setAuditFilterAction(e.target.value); setAuditPage(0); }}
+              style={{ height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, padding: '0 10px', background: 'var(--surface-ground)', color: 'var(--text-color)', cursor: 'pointer' }}>
+              <option value="">All Actions</option>
+              {auditActionOptions.map(a => <option key={a} value={a}>{fmtAction(a)}</option>)}
+            </select>
             <select value={auditFilterStatus} onChange={e => { setAuditFilterStatus(e.target.value); setAuditPage(0); }}
               style={{ height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, padding: '0 10px', background: 'var(--surface-ground)', color: 'var(--text-color)', cursor: 'pointer' }}>
               <option value="">All Statuses</option>
@@ -924,8 +939,8 @@ export default function NodalOfficerDashboard({ activePage }) {
             <span style={{ fontSize: 11, color: 'var(--text-color-secondary)' }}>to</span>
             <input type="date" value={auditToDate} onChange={e => { setAuditToDate(e.target.value); setAuditPage(0); }}
               style={{ height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, padding: '0 10px', background: 'var(--surface-ground)', color: 'var(--text-color)' }} />
-            {(auditFilterEntity || auditFilterStatus || auditFromDate || auditToDate || auditSearch) && (
-              <button onClick={() => { setAuditFilterEntity(''); setAuditFilterStatus(''); setAuditFromDate(''); setAuditToDate(''); setAuditSearch(''); setAuditPage(0); }}
+            {(auditFilterEntity || auditFilterAction || auditFilterStatus || auditFromDate || auditToDate || auditSearch) && (
+              <button onClick={() => { setAuditFilterEntity(''); setAuditFilterAction(''); setAuditFilterStatus(''); setAuditFromDate(''); setAuditToDate(''); setAuditSearch(''); setAuditPage(0); }}
                 style={{ height: 34, padding: '0 12px', border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
                 <X size={11} /> Clear
               </button>

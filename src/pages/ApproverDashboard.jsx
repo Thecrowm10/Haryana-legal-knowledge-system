@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect, useRef, useMemo } from 'react';
 import {
   CheckCircle, XCircle, FileText, ChevronDown, Search, Clock,
-  Check, X, Eye, AlignLeft, Cpu, Link, AlertTriangle, ChevronRight,
+  Check, X, Eye, Link, ChevronRight,
   ZoomIn, ZoomOut, RotateCw, ExternalLink, Plus, Highlighter, MessageCircle,
 } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -40,193 +40,20 @@ function parseDisplayRemarks(str) {
   });
 }
 
-// Word confidence helpers
-function _hashStr(s) {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
-  return Math.abs(h) % 100;
-}
-function wordConfidence(word) {
-  const w = word.trim();
-  if (!w) return 100;
-  const seed = _hashStr(w);
-  if (/^\.{3,}$/.test(w))      return 5  + seed % 12;
-  if (/^[A-Z]{2,10}$/.test(w)) return 82 + seed % 15;
-  if (/^[A-Za-z]+$/.test(w))   return 85 + seed % 14;
-  if (/^\d+$/.test(w))         return 88 + seed % 10;
-  const specialRatio = (w.match(/[^A-Za-z0-9\s.,;:()\-']/g) || []).length / w.length;
-  if (specialRatio > 0.5) return 10 + seed % 25;
-  if (specialRatio > 0.3) return 30 + seed % 25;
-  if (specialRatio > 0.1) return 52 + seed % 25;
-  return 70 + seed % 20;
-}
-// Build word-confidence token array from plain text (used for mock/demo docs)
-function textToWords(text) {
-  const tokens = [];
-  text.split('\n').forEach((line, li, lines) => {
-    line.split(/(\s+)/).forEach(token => {
-      if (!token) return;
-      tokens.push({ word: token, confidence: /^\s+$/.test(token) ? 100 : wordConfidence(token) });
-    });
-    if (li < lines.length - 1) tokens.push({ word: '\n', confidence: 100 });
-  });
-  return tokens;
-}
-// Impossible English bigrams — letter pairs that never appear in real English words.
-// Keeping this small (~25) avoids false positives on legal/Hindi proper nouns.
-const IMPOSSIBLE_BIGRAMS = new Set([
-  'bk','bq','bx','cf','cj','cp','cv','cx',
-  'fq','fx','gq','gx','hx','jf','jg','jq','jv','jx','jz',
-  'kq','kx','pq','px','qb','qc','qd','qf','qg','qh','qj',
-  'qk','ql','qm','qn','qp','qr','qs','qt','qv','qx','qy','qz',
-  'sx','vb','vf','vj','vq','vx','wx','xj','xk','xt','xv',
-  'yq','zj','zq','zx',
-]);
-
-// Phonotactic rules — English sound-combination constraints that OCR garbage violates.
-// Skip check for: proper nouns (capital start), acronyms (ALL CAPS), short words (≤2).
-function isSuspiciousWord(word) {
-  const raw = word.replace(/[^a-zA-Z0-9]/g, '');
-  if (raw.length < 3) return false;
-  // Skip proper nouns and acronyms — too many false positives (Panchayat, IPC, etc.)
-  if (/^[A-Z]/.test(word) && !/[a-z]/.test(word)) return false; // ALL-CAPS acronym
-  if (/^[A-Z][a-z]/.test(word)) return false;                   // Title-case proper noun
-
-  const w = raw.toLowerCase();
-
-  // Rule 0 — digit immediately adjacent to a letter (OCR merge: "1l", "0O", "Acr3")
-  if (/[0-9][a-z]|[a-z][0-9]/.test(w)) return true;
-
-  // Rule 1 — classic OCR confusion pairs: lI, Il, 0O, 1I
-  if (/[li][li]|[o0][o0]/.test(w)) return true;
-
-  // Rule 2 — impossible English bigrams (2+ hits → flag, 1 hit alone may be edge case)
-  let badBigrams = 0;
-  for (let i = 0; i < w.length - 1; i++) {
-    if (IMPOSSIBLE_BIGRAMS.has(w[i] + w[i + 1])) badBigrams++;
-  }
-  if (badBigrams >= 2) return true;
-  if (badBigrams === 1 && w.length < 5) return true; // short garbled word like "fcr"
-
-  // Rule 3 — max consecutive consonant cluster > 3 (English limit: "strength" = 4 is rare)
-  const clusters = w.replace(/[aeiou]/g, ' ').split(' ').filter(Boolean);
-  if (clusters.some(c => c.length > 4)) return true;
-
-  // Rule 4 — vowel density < 20% for words longer than 5 chars
-  if (w.length > 5) {
-    const vowels = (w.match(/[aeiou]/g) || []).length;
-    if (vowels / w.length < 0.20) return true;
-  }
-
-  return false;
-}
-// Returns the confidence to use for highlighting — caps high-confidence suspicious
-// tokens at 45 so they render orange instead of green.
-function effectiveConf(word, conf) {
-  if (conf > 80 && isSuspiciousWord(word)) return 45;
-  return conf;
-}
-// Map confidence score → highlight background colour
-function confBg(conf) {
-  if (conf >= 80) return 'rgba(34,197,94,.2)';
-  if (conf >= 50) return 'rgba(234,179,8,.3)';
-  if (conf >= 20) return 'rgba(249,115,22,.35)';
-  return 'rgba(239,68,68,.4)';
-}
-
-// OCR data
-// Confidence is derived deterministically from doc.id so it doesn't flicker on re-render.
-function getMockOcrData(doc) {
-  const idNum     = typeof doc.id === 'number' ? doc.id : parseInt(String(doc.id), 10) || 0;
-  const confidence = doc.ocrConfidence || (92 + (idNum % 8));
-
-  // Real upload with per-page text and word-level confidence from PDF.js
+// Page data for the PDF fallback view — only ever built from real data the
+// uploader/OCR pipeline provided via the API. No confidence scores or body
+// text are ever synthesised on the frontend.
+function getDocPageData(doc) {
   if (doc.extractedPages && doc.extractedPages.length > 0) {
     return {
-      confidence,
       pageCount: doc.extractedPages.length,
-      pages: doc.extractedPages.map((text, i) => ({
-        pageNum:    i + 1,
-        confidence: doc.ocrConfidence || 95,
-        text:       text || '(no text on this page)',
-        words:      doc.extractedWords?.[i] || textToWords(text || ''),
-      })),
+      pages: doc.extractedPages.map((text, i) => ({ pageNum: i + 1, text: text || '' })),
     };
   }
-
-  // Real upload but only concatenated text (legacy)
   if (doc.extractedText) {
-    return {
-      confidence,
-      pageCount: 1,
-      pages: [{
-        pageNum: 1, confidence: doc.ocrConfidence || 95,
-        text:  doc.extractedText,
-        words: textToWords(doc.extractedText),
-      }],
-    };
+    return { pageCount: 1, pages: [{ pageNum: 1, text: doc.extractedText }] };
   }
-
-  // Mock/demo document — synthesise metadata as OCR text
-  const mockText = [
-    doc.title, '',
-    `Department : ${doc.dept}`,
-    `Type       : ${doc.type}`,
-    `Year       : ${doc.year}`,
-    `Version    : ${doc.version || '1.0'}`,
-    `Uploader   : ${doc.uploader || '—'}`,
-    `Date       : ${doc.uploadedAt || '—'}`,
-    doc.desc ? `\nDescription:\n${doc.desc}` : '',
-  ].join('\n');
-
-  return {
-    confidence,
-    pageCount: doc.pages || 1,
-    pages: [{
-      pageNum: 1, confidence: 94,
-      text:  mockText,
-      words: textToWords(mockText),
-    }],
-  };
-}
-
-// AI analysis
-// Prefers real doc.hierarchy and doc.citations from the uploader when available,
-// falls back to mock data for demo documents.
-function getMockAiAnalysis(doc) {
-  const citationSets = {
-    'Act': [
-      { citation: 'Constitution of India, Article 162', status: 'linked', matchedTitle: 'Constitution of India', relLabel: 'Is under' },
-      { citation: 'General Clauses Act, 1897', status: 'linked', matchedTitle: 'General Clauses Act 1897', relLabel: 'References' },
-      { citation: 'Punjab General Rules, 1941', status: 'unresolved', relLabel: 'References' },
-    ],
-    'Notification': [
-      { citation: `${doc.title} (Parent Act)`, status: 'linked', matchedTitle: doc.title, relLabel: 'Notified under' },
-      { citation: 'Official Gazette of Haryana', status: 'unresolved', relLabel: 'References' },
-    ],
-    'Circular': [
-      { citation: 'General Administration Department Guidelines', status: 'linked', matchedTitle: 'GAD Guidelines 2020', relLabel: 'Is under' },
-    ],
-    'Policy': [
-      { citation: 'National Policy Framework', status: 'unresolved', relLabel: 'References' },
-      { citation: 'Haryana Fiscal Policy', status: 'linked', matchedTitle: 'Haryana Fiscal Policy 2022', relLabel: 'References' },
-    ],
-  };
-
-  const rawCitations = (doc.citations && doc.citations.length > 0)
-    ? doc.citations
-    : (citationSets[doc.type] || citationSets['Act']);
-
-  const hierarchy = doc.hierarchy?.act
-    ? doc.hierarchy
-    : { act: doc.title, chapter: 'Chapter I — Preliminary', section: 'Section 1 — Short Title', subsection: '(1)' };
-
-  return {
-    autoMetadata: { title: doc.title, year: doc.year, type: doc.type, dept: doc.dept, version: doc.version || '1.0' },
-    hierarchy,
-    citations:       rawCitations.filter(c => c.status === 'linked'),
-    unresolvedCount: rawCitations.filter(c => c.status === 'unresolved').length,
-  };
+  return { pageCount: doc.pages || 1, pages: [{ pageNum: 1, text: '' }] };
 }
 
 // Shared page navigation
@@ -251,8 +78,9 @@ function PageNav({ currentPage, totalPages, onPageChange }) {
 }
 
 // PDF Viewer Panel
-// Renders real PDFs as stacked canvases (pdfjs-dist) so scroll can be detected
-// and synced with OcrTextPanel. Mock docs use the styled layout fallback.
+// Renders real PDFs as stacked canvases (pdfjs-dist) so scroll can be detected.
+// If no real PDF is available, falls back to a styled layout showing whatever
+// verbatim text the API returned (or nothing) — never synthesised content.
 function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, rotation, onRotate, blobUrl, onTotalPagesChange, annotations = [], onAnnotationsChange, highlightMode = false, onHighlightModeChange, onScrollRef }) {
   const [zoom, setZoom]     = useState(100);
   const containerRef        = useRef(null);
@@ -608,190 +436,6 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
   );
 }
 
-// Word-edit popover
-function WordEditPopover({ editingWord, isSuspicious, onSave, onMarkCorrect, onCancel }) {
-  const [text, setText] = useState(editingWord.text);
-  useEffect(() => {
-    const h = e => { if (e.key === 'Escape') onCancel(); };
-    window.addEventListener('keydown', h);
-    return () => window.removeEventListener('keydown', h);
-  }, []);
-  const left = Math.min(editingWord.x, window.innerWidth - 260);
-  const top  = Math.min(editingWord.y, window.innerHeight - 140);
-  return (
-    <>
-      <div onClick={onCancel} style={{ position: 'fixed', inset: 0, zIndex: 999 }} />
-      <div style={{ position: 'fixed', left, top, zIndex: 1000, width: 250,
-        background: 'var(--surface-card)', border: '1px solid var(--surface-border)',
-        borderRadius: 10, padding: '10px 12px', boxShadow: '0 8px 24px rgba(0,0,0,.18)',
-        display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <div style={{ fontSize: 10, fontWeight: 700, fontFamily: 'var(--mono)',
-          color: 'var(--text-color-secondary)', letterSpacing: '.07em' }}>EDIT WORD</div>
-        <input autoFocus value={text} onChange={e => setText(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') onSave(editingWord.key, text); }}
-          style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)',
-            borderRadius: 6, color: 'var(--text-color)', fontFamily: 'var(--mono)',
-            fontSize: 13, padding: '6px 9px', outline: 'none', width: '100%', boxSizing: 'border-box' }} />
-        <div style={{ display: 'flex', gap: 6 }}>
-          <button onClick={() => onSave(editingWord.key, text)}
-            style={{ flex: 1, background: '#3b82f6', color: '#fff', border: 'none',
-              borderRadius: 6, padding: '6px 0', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-            Save
-          </button>
-          {isSuspicious && (
-            <button onClick={() => onMarkCorrect(editingWord.key, editingWord.text)}
-              style={{ flex: 1, background: 'rgba(34,197,94,.12)', color: '#1e40af',
-                border: '1px solid rgba(34,197,94,.3)', borderRadius: 6, padding: '6px 0',
-                fontSize: 11.5, fontWeight: 600, cursor: 'pointer' }}>
-              ✓ Mark correct
-            </button>
-          )}
-          <button onClick={onCancel}
-            style={{ background: 'var(--surface-ground)', color: 'var(--text-color-secondary)',
-              border: '1px solid var(--surface-border)', borderRadius: 6,
-              padding: '6px 10px', fontSize: 13, cursor: 'pointer' }}>
-            ✕
-          </button>
-        </div>
-      </div>
-    </>
-  );
-}
-
-// OCR Text Panel
-// Shows ALL pages stacked. Scrolls to currentPage when PDF panel drives the page.
-// Each word is clickable for confidence-based editing.
-function OcrTextPanel({ ocrData, currentPage, wordEdits, onWordEdit, isScanned = false }) {
-  const [editingWord, setEditingWord] = useState(null);
-  const containerRef = useRef(null);
-  const pageRefs     = useRef([]);
-  const suppressRef  = useRef(false);
-
-  const LEGEND = [
-    { bg: 'rgba(34,197,94,.22)',  border: 'rgba(34,197,94,.5)',  label: '≥ 80%', desc: 'Correct' },
-    { bg: 'rgba(234,179,8,.28)', border: 'rgba(234,179,8,.6)',  label: '50–80%', desc: 'Review' },
-    { bg: 'rgba(249,115,22,.32)',border: 'rgba(249,115,22,.6)', label: '20–50%', desc: 'Likely wrong' },
-    { bg: 'rgba(239,68,68,.36)', border: 'rgba(239,68,68,.55)', label: '< 20%',  desc: 'Error' },
-  ];
-
-  // When PDF panel changes page, scroll OCR to matching page block
-  useEffect(() => {
-    const el = pageRefs.current[currentPage - 1];
-    if (!el || !containerRef.current) return;
-    suppressRef.current = true;
-    containerRef.current.scrollTo({ top: el.offsetTop - 4, behavior: 'smooth' });
-    setTimeout(() => { suppressRef.current = false; }, 700);
-  }, [currentPage]);
-
-  function handleWordClick(e, key, item) {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const edit = wordEdits[key];
-    setEditingWord({ key, text: edit?.text ?? item.word, x: rect.left, y: rect.bottom + 6 });
-  }
-  function saveEdit(key, text)   { onWordEdit(key, { text, markedCorrect: false }); setEditingWord(null); }
-  function markCorrect(key, text){ onWordEdit(key, { text, markedCorrect: true  }); setEditingWord(null); }
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-
-      {/* Header */}
-      <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surface-50)', flexShrink: 0 }}>
-        <AlignLeft size={13} color="#3b82f6" />
-        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-heading)', flex: 1 }}>Extracted OCR Text</span>
-        {isScanned && (
-          <span style={{ fontSize: 10, fontWeight: 700, fontFamily: 'var(--mono)', padding: '2px 8px', borderRadius: 20, background: 'rgba(245,158,11,.12)', color: '#d97706', border: '1px solid rgba(245,158,11,.3)', marginRight: 4, whiteSpace: 'nowrap' }}>
-            ⚠ SCANNED PDF
-          </span>
-        )}
-        <span style={{ fontSize: 10.5, fontWeight: 700, fontFamily: 'var(--mono)', padding: '2px 8px', borderRadius: 20,
-          background: ocrData.confidence >= 95 ? 'rgba(34,197,94,.1)' : 'rgba(245,158,11,.1)',
-          color:      ocrData.confidence >= 95 ? '#16a34a' : '#d97706',
-        }}>AVG {ocrData.confidence}% CONFIDENCE</span>
-      </div>
-
-      {/* Colour legend */}
-      <div style={{ padding: '6px 14px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, background: 'var(--surface-ground)', flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 9.5, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', fontWeight: 700, letterSpacing: '.05em' }}>WORD CONFIDENCE:</span>
-        {LEGEND.map(l => (
-          <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <div style={{ width: 28, height: 13, borderRadius: 3, background: l.bg, border: `1px solid ${l.border}`, flexShrink: 0 }} />
-            <span style={{ fontSize: 9.5, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', whiteSpace: 'nowrap' }}>
-              <strong style={{ color: 'var(--text-heading)' }}>{l.label}</strong> {l.desc}
-            </span>
-          </div>
-        ))}
-      </div>
-
-      {/* All pages stacked — synced to PDF panel via currentPage */}
-      <div ref={containerRef} style={{ flex: 1, overflow: 'auto' }}>
-        {ocrData.pages.map((pageData, pi) => {
-          const isCurrent  = pi + 1 === currentPage;
-          const confColor  = pageData.confidence >= 95 ? '#16a34a' : pageData.confidence >= 85 ? '#d97706' : '#dc2626';
-          const confBgBar  = pageData.confidence >= 95 ? 'rgba(34,197,94,.08)' : pageData.confidence >= 85 ? 'rgba(245,158,11,.08)' : 'rgba(239,68,68,.08)';
-          return (
-            <div key={pi} ref={el => { pageRefs.current[pi] = el; }}>
-              {/* Sticky page-header with confidence bar */}
-              <div style={{
-                padding: '5px 14px', background: isCurrent ? confBgBar : 'var(--surface-ground)',
-                borderBottom: '1px solid var(--surface-border)', borderLeft: `3px solid ${isCurrent ? confColor : 'transparent'}`,
-                display: 'flex', alignItems: 'center', gap: 10,
-                position: 'sticky', top: 0, zIndex: 1, transition: 'all .2s',
-              }}>
-                <span style={{ fontSize: 10.5, fontFamily: 'var(--mono)', color: confColor, fontWeight: 700, whiteSpace: 'nowrap' }}>
-                  PAGE {pageData.pageNum} — {pageData.confidence}%
-                </span>
-                <div style={{ flex: 1, height: 3, borderRadius: 4, background: 'var(--surface-border)', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', borderRadius: 4, background: confColor, width: `${pageData.confidence}%` }} />
-                </div>
-                {pageData.confidence < 90 && <AlertTriangle size={10} color="#d97706" />}
-              </div>
-              {/* Word-highlighted text */}
-              <div style={{ padding: '12px 16px', borderBottom: pi < ocrData.pages.length - 1 ? '2px dashed var(--surface-border)' : 'none' }}>
-                {pageData.words && pageData.words.length > 0 ? (
-                  <div style={{ fontSize: 12, lineHeight: 2.1, color: 'var(--text-color)', fontFamily: 'var(--mono)', wordBreak: 'break-word' }}>
-                    {pageData.words.map((item, idx) => {
-                      const key        = `${pi}-${idx}`;
-                      if (item.word === '\n')        return <br key={key} />;
-                      if (/^\s+$/.test(item.word))   return <span key={key}>{item.word}</span>;
-                      const edit        = wordEdits[key];
-                      const displayText = edit?.text ?? item.word;
-                      const markedOk    = edit?.markedCorrect ?? false;
-                      const conf        = markedOk ? 100 : effectiveConf(displayText, item.confidence);
-                      const susp        = !markedOk && isSuspiciousWord(displayText) && item.confidence > 80;
-                      const isEditing   = editingWord?.key === key;
-                      return (
-                        <span key={key} onClick={e => handleWordClick(e, key, item)}
-                          title={susp ? `${item.confidence}% (suspicious)` : `${item.confidence}% confidence`}
-                          style={{ background: confBg(conf), borderRadius: 3, padding: '1px 3px', margin: '0 1px', cursor: 'pointer', display: 'inline-block', lineHeight: 1.5, outline: isEditing ? '2px solid #3b82f6' : 'none', transition: 'outline .1s' }}>
-                          {displayText}
-                          {markedOk && <sup style={{ fontSize: 7, color: '#16a34a', marginLeft: 1 }}>✓</sup>}
-                        </span>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div style={{ fontSize: 12, lineHeight: 1.9, color: 'var(--text-color)', whiteSpace: 'pre-wrap', fontFamily: 'var(--mono)' }}>
-                    {pageData.text || 'No text on this page.'}
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {editingWord && (
-        <WordEditPopover
-          editingWord={editingWord}
-          isSuspicious={isSuspiciousWord(editingWord.text)}
-          onSave={saveEdit}
-          onMarkCorrect={markCorrect}
-          onCancel={() => setEditingWord(null)}
-        />
-      )}
-    </div>
-  );
-}
 
 // Document Details Panel
 // Shows every field the uploader filled in: metadata, description, hierarchy,
@@ -1098,8 +742,8 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, activePage,
     );
   }
 
-  const mockOcr    = useMemo(() => getMockOcrData(doc), [doc.id]);
-  const totalPages = pdfTotalPages || mockOcr.pageCount;
+  const docPageData = useMemo(() => getDocPageData(doc), [doc.id]);
+  const totalPages   = pdfTotalPages || docPageData.pageCount;
 
   useEffect(() => {
     if (!doc.id || !localStorage.getItem('token')) return;
@@ -1126,7 +770,7 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, activePage,
         {/* Panel 1 — Original PDF */}
         <div style={{ borderRight: '1px solid var(--surface-border)', overflow: 'hidden' }}>
           <PdfViewerPanel
-            doc={docWithUrl} ocrData={mockOcr}
+            doc={docWithUrl} ocrData={docPageData}
             currentPage={currentPage} onPageChange={setCurrentPage} totalPages={totalPages}
             rotation={rotation} onRotate={() => setRotation(r => (r + 90) % 360)}
             blobUrl={blobUrl} onTotalPagesChange={setPdfTotalPages}
@@ -1351,11 +995,11 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
   }
   const hasRemarks = remarkLines.some(l => l.trim());
 
-  const mockOcr = useMemo(
-    () => getMockOcrData({ title: lr.document_name || '', type: lr.document_type_name || 'Act' }),
+  const docPageData = useMemo(
+    () => getDocPageData({ title: lr.document_name || '', type: lr.document_type_name || 'Act' }),
     [lr.pdf_id],
   );
-  const totalPages = pdfTotalPages || mockOcr.pageCount;
+  const totalPages = pdfTotalPages || docPageData.pageCount;
 
   useEffect(() => {
     if (!lr.pdf_id || !localStorage.getItem('token')) return;
@@ -1425,7 +1069,7 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
         <div style={{ borderRight: '1px solid var(--surface-border)', overflow: 'hidden' }}>
           <PdfViewerPanel
             doc={docForViewer}
-            ocrData={mockOcr}
+            ocrData={docPageData}
             currentPage={currentPage}
             onPageChange={setCurrentPage}
             totalPages={totalPages}
@@ -2055,9 +1699,7 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
                   {!isOpen && doc.status === 'pending' && (
                     <div style={{ display: 'flex', gap: 6 }}>
                       {[
-                        { icon: Eye,       color: '#1a56db', label: 'PDF' },
-                        { icon: AlignLeft, color: '#3b82f6', label: 'OCR' },
-                        { icon: Cpu,       color: '#8b5cf6', label: 'AI'  },
+                        { icon: Eye, color: '#1a56db', label: 'PDF' },
                       ].map(({ icon: Icon, color, label }) => (
                         <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '3px 8px', borderRadius: 20, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)' }}>
                           <Icon size={10} color={color} />
