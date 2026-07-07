@@ -270,6 +270,8 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
   const [popupComment,   setPopupComment]   = useState('');
   const [activeAnnotId,  setActiveAnnotId]  = useState(null);
   const svgRefs = useRef([]);
+  const docxContainerRef                      = useRef(null);
+  const [pendingDocxText, setPendingDocxText] = useState(null);
 
   const pageData = ocrData.pages.find(p => p.pageNum === currentPage) || ocrData.pages[0];
   const numPages = pdfDoc ? pdfDoc.numPages : totalPages;
@@ -308,6 +310,22 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
     }
     return () => { cancelled = true; };
   }, [pdfDoc, zoom, rotation]);
+
+  useEffect(() => {
+    if (!docxContainerRef.current || !docxHtml) return;
+    docxContainerRef.current.innerHTML = docxHtml;
+  }, [docxHtml]);
+
+  useEffect(() => {
+    if (!docxContainerRef.current || !docxHtml) return;
+    docxContainerRef.current.querySelectorAll('[data-docx-annot]').forEach(span => {
+      const parent = span.parentNode;
+      if (!parent) return;
+      while (span.firstChild) parent.insertBefore(span.firstChild, span);
+      parent.removeChild(span);
+    });
+    annotations.filter(a => a.isDocx).forEach(ann => applyDocxHighlight(docxContainerRef.current, ann));
+  }, [annotations, docxHtml]);
 
   // Scroll to currentPage only when the change comes from nav buttons / external source,
   // NOT when it comes from handleScroll (which would create a conflicting scroll-back).
@@ -405,8 +423,61 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
     setTimeout(() => { suppressRef.current = false; }, 900);
   }
 
+  function applyDocxHighlight(container, ann) {
+    if (!container || !ann.text) return;
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
+    let node;
+    while ((node = walker.nextNode())) {
+      const idx = node.textContent.indexOf(ann.text);
+      if (idx < 0) continue;
+      const range = document.createRange();
+      range.setStart(node, idx);
+      range.setEnd(node, idx + ann.text.length);
+      const span = document.createElement('span');
+      span.style.cssText = `background-color:${ann.color};border-radius:2px;cursor:pointer;padding:0 1px;`;
+      span.dataset.docxAnnot = ann.id;
+      if (ann.comment) span.title = ann.comment;
+      span.addEventListener('click', e => { e.stopPropagation(); setActiveAnnotId(ann.id); });
+      try { range.surroundContents(span); } catch { const f = range.extractContents(); span.appendChild(f); range.insertNode(span); }
+      return;
+    }
+  }
+
+  function handleDocxMouseUp() {
+    if (!highlightMode || !onAnnotationsChange) return;
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed) return;
+    const text = sel.toString().trim();
+    if (!text || !docxContainerRef.current?.contains(sel.anchorNode)) return;
+    setPendingDocxText(text);
+    setPopupComment('');
+    setDrawState('popup');
+    sel.removeAllRanges();
+  }
+
+  function confirmDocxAnnotation() {
+    if (!pendingDocxText) return;
+    onAnnotationsChange?.([...annotations, {
+      id: crypto.randomUUID(),
+      text: pendingDocxText,
+      comment: popupComment.trim(),
+      color: selectedColor,
+      isDocx: true,
+    }]);
+    setPendingDocxText(null);
+    setPopupComment('');
+    setDrawState('idle');
+  }
+
   // Keep the ref current on every render so ThreePanelReview can call it
-  if (onScrollRef) onScrollRef.current = scrollToAnnotation;
+  if (onScrollRef) onScrollRef.current = (ann) => {
+    if (ann.isDocx) {
+      const span = docxContainerRef.current?.querySelector(`[data-docx-annot="${ann.id}"]`);
+      if (span) span.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else {
+      scrollToAnnotation(ann);
+    }
+  };
 
   function confirmAnnotation() {
     if (!pendingRect) return;
@@ -453,27 +524,28 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
           </div>
         )}
         {/* Highlight mode toggle + color palette */}
-        {!docxHtml && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 6 }}>
-            <button
-              onClick={() => onHighlightModeChange?.(!highlightMode)}
-              title={highlightMode ? 'Exit highlight mode' : 'Draw highlight on PDF'}
-              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 5, border: highlightMode ? '1.5px solid #f59e0b' : '1px solid var(--surface-border)', background: highlightMode ? 'rgba(245,158,11,.12)' : 'var(--surface-ground)', color: highlightMode ? '#b45309' : 'var(--text-color-secondary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'all .15s' }}>
-              <Highlighter size={11} />
-              {highlightMode ? 'Exit Highlight' : 'Highlight'}
-            </button>
-            {highlightMode && ['rgba(253,224,71,.55)', 'rgba(134,239,172,.55)', 'rgba(147,197,253,.55)', 'rgba(249,168,212,.55)'].map(c => (
-              <button key={c} onClick={() => setSelectedColor(c)} title="Pick color"
-                style={{ width: 18, height: 18, borderRadius: '50%', background: c, border: selectedColor === c ? '2.5px solid #374151' : '1px solid rgba(0,0,0,.2)', cursor: 'pointer', padding: 0, flexShrink: 0 }} />
-            ))}
-          </div>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 6 }}>
+          <button
+            onClick={() => onHighlightModeChange?.(!highlightMode)}
+            title={highlightMode ? 'Exit highlight mode' : docxHtml ? 'Select text to highlight' : 'Draw highlight on PDF'}
+            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 5, border: highlightMode ? '1.5px solid #f59e0b' : '1px solid var(--surface-border)', background: highlightMode ? 'rgba(245,158,11,.12)' : 'var(--surface-ground)', color: highlightMode ? '#b45309' : 'var(--text-color-secondary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'all .15s' }}>
+            <Highlighter size={11} />
+            {highlightMode ? 'Exit Highlight' : 'Highlight'}
+          </button>
+          {highlightMode && ['rgba(253,224,71,.55)', 'rgba(134,239,172,.55)', 'rgba(147,197,253,.55)', 'rgba(249,168,212,.55)'].map(c => (
+            <button key={c} onClick={() => setSelectedColor(c)} title="Pick color"
+              style={{ width: 18, height: 18, borderRadius: '50%', background: c, border: selectedColor === c ? '2.5px solid #374151' : '1px solid rgba(0,0,0,.2)', cursor: 'pointer', padding: 0, flexShrink: 0 }} />
+          ))}
+        </div>
       </div>
 
       {/* Content area */}
       {docxHtml ? (
-        <div style={{ flex: 1, overflow: 'auto', background: 'white', padding: '32px 40px', color: '#1a1a1a', lineHeight: 1.8, fontSize: 13 }}
-          dangerouslySetInnerHTML={{ __html: docxHtml }} />
+        <div
+          ref={docxContainerRef}
+          onMouseUp={handleDocxMouseUp}
+          style={{ flex: 1, overflow: 'auto', background: 'white', padding: '32px 40px', color: '#1a1a1a', lineHeight: 1.8, fontSize: 13, cursor: highlightMode ? 'text' : 'auto' }}
+        />
       ) : doc.fileUrl ? (
         <div ref={containerRef} onScroll={handleScroll}
           style={{ flex: 1, overflow: 'auto', background: '#525659', padding: '12px 8px', display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>
@@ -549,23 +621,27 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
       )}
 
       {/* Draw-comment popup */}
-      {drawState === 'popup' && pendingRect && (
+      {drawState === 'popup' && (pendingRect || pendingDocxText) && (
         <>
-          <div onClick={() => { setDrawState('idle'); setPendingRect(null); setDragStart(null); }}
+          <div onClick={() => { setDrawState('idle'); setPendingRect(null); setPendingDocxText(null); setDragStart(null); }}
             style={{ position: 'fixed', inset: 0, zIndex: 1100 }} />
           <div style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
             zIndex: 1101, width: 300, background: 'var(--surface-card)', border: '1px solid var(--surface-border)',
             borderRadius: 12, padding: '14px 16px', boxShadow: '0 12px 40px rgba(0,0,0,.25)',
             display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ fontSize: 10.5, fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', letterSpacing: '.07em' }}>ADD COMMENT — Page {pendingRect.page}</div>
+            <div style={{ fontSize: 10.5, fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', letterSpacing: '.07em' }}>
+              {pendingDocxText
+                ? `HIGHLIGHT — "${pendingDocxText.slice(0, 35)}${pendingDocxText.length > 35 ? '…' : ''}"`
+                : `ADD COMMENT — Page ${pendingRect?.page}`}
+            </div>
             <div style={{ width: '100%', height: 10, borderRadius: 4, background: selectedColor, border: '1px solid rgba(0,0,0,.15)' }} />
             <textarea
               autoFocus
               value={popupComment}
               onChange={e => setPopupComment(e.target.value)}
               onKeyDown={e => {
-                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) confirmAnnotation();
-                if (e.key === 'Escape') { setDrawState('idle'); setPendingRect(null); setDragStart(null); }
+                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) pendingDocxText ? confirmDocxAnnotation() : confirmAnnotation();
+                if (e.key === 'Escape') { setDrawState('idle'); setPendingRect(null); setPendingDocxText(null); setDragStart(null); }
               }}
               placeholder="Describe the issue…"
               rows={3}
@@ -573,11 +649,11 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
             />
             <div style={{ fontSize: 10, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>Ctrl+Enter to save</div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => { setDrawState('idle'); setPendingRect(null); setDragStart(null); }}
+              <button onClick={() => { setDrawState('idle'); setPendingRect(null); setPendingDocxText(null); setDragStart(null); }}
                 style={{ flex: 1, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '7px 0', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', color: 'var(--text-color-secondary)', fontFamily: 'var(--font)' }}>
                 Cancel
               </button>
-              <button onClick={confirmAnnotation}
+              <button onClick={pendingDocxText ? confirmDocxAnnotation : confirmAnnotation}
                 style={{ flex: 1, background: '#f59e0b', color: 'white', border: 'none', borderRadius: 7, padding: '7px 0', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                 Save
               </button>
@@ -598,9 +674,16 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
               borderRadius: 12, padding: '14px 16px', boxShadow: '0 12px 40px rgba(0,0,0,.25)',
               display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ fontSize: 10.5, fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', letterSpacing: '.07em' }}>HIGHLIGHT — PAGE {ann.page}</div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', letterSpacing: '.07em' }}>
+                  {ann.isDocx ? 'TEXT HIGHLIGHT' : `HIGHLIGHT — PAGE ${ann.page}`}
+                </div>
                 <button onClick={() => setActiveAnnotId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex' }}><X size={14} /></button>
               </div>
+              {ann.isDocx && ann.text && (
+                <div style={{ padding: '6px 10px', borderRadius: 6, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', fontSize: 11.5, color: 'var(--text-color-secondary)', fontStyle: 'italic', lineHeight: 1.4 }}>
+                  "{ann.text.slice(0, 80)}{ann.text.length > 80 ? '…' : ''}"
+                </div>
+              )}
               <div style={{ padding: '8px 10px', borderRadius: 7, background: ann.color, border: '1px solid rgba(0,0,0,.12)', fontSize: 13, color: 'rgba(0,0,0,.75)', lineHeight: 1.5, minHeight: 40 }}>
                 {ann.comment || <span style={{ opacity: 0.5 }}>No comment</span>}
               </div>
@@ -1038,18 +1121,30 @@ function DocumentDetailsPanel({ doc, reviewAnnotations = [], onScrollToAnnotatio
           </div>
         )}
 
-        {/* ── PDF Highlights ── */}
+        {/* ── Highlights ── */}
         {reviewAnnotations.length > 0 && (
           <div>
-            <div style={{ ...LABEL, marginBottom: 8 }}>PDF Highlights ({reviewAnnotations.length})</div>
+            <div style={{ ...LABEL, marginBottom: 8 }}>Highlights ({reviewAnnotations.length})</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {reviewAnnotations.map(ann => (
                 <div key={ann.id} onClick={() => onScrollToAnnotation?.(ann)}
                   style={{ display: 'flex', gap: 10, padding: '9px 12px', borderRadius: 8, background: ann.color, border: '1px solid rgba(0,0,0,.1)', alignItems: 'flex-start', cursor: 'pointer', transition: 'filter .15s' }}
                   onMouseEnter={e => e.currentTarget.style.filter = 'brightness(.92)'}
                   onMouseLeave={e => e.currentTarget.style.filter = 'none'}>
-                  <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, color: 'rgba(0,0,0,.5)', flexShrink: 0, marginTop: 2 }}>P{ann.page}</span>
-                  <span style={{ fontSize: 12.5, color: 'rgba(0,0,0,.75)', lineHeight: 1.5, flex: 1 }}>{ann.comment || <span style={{ opacity: 0.5 }}>No comment</span>}</span>
+                  {ann.isDocx ? (
+                    <>
+                      <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, color: 'rgba(0,0,0,.5)', flexShrink: 0, marginTop: 2 }}>T</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        {ann.text && <div style={{ fontSize: 10.5, color: 'rgba(0,0,0,.55)', fontStyle: 'italic', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>"{ann.text.slice(0, 45)}{ann.text.length > 45 ? '…' : ''}"</div>}
+                        <div style={{ fontSize: 12, color: 'rgba(0,0,0,.75)', lineHeight: 1.4 }}>{ann.comment || <span style={{ opacity: 0.5 }}>No comment</span>}</div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, color: 'rgba(0,0,0,.5)', flexShrink: 0, marginTop: 2 }}>P{ann.page}</span>
+                      <span style={{ fontSize: 12.5, color: 'rgba(0,0,0,.75)', lineHeight: 1.5, flex: 1 }}>{ann.comment || <span style={{ opacity: 0.5 }}>No comment</span>}</span>
+                    </>
+                  )}
                 </div>
               ))}
             </div>
@@ -1510,7 +1605,7 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
           {/* Annotations */}
           {displayAnnotations.length > 0 && (
             <div>
-              <div style={{ ...LABEL, marginBottom: 8 }}>PDF Highlights · {displayAnnotations.length}</div>
+              <div style={{ ...LABEL, marginBottom: 8 }}>Highlights · {displayAnnotations.length}</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {displayAnnotations.map((ann, i) => (
                   <div key={ann.id || i}
@@ -1518,8 +1613,20 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
                     style={{ display: 'flex', gap: 10, padding: '9px 12px', borderRadius: 8, background: ann.color, border: '1px solid rgba(0,0,0,.1)', alignItems: 'flex-start', cursor: 'pointer', transition: 'filter .15s' }}
                     onMouseEnter={e => e.currentTarget.style.filter = 'brightness(.92)'}
                     onMouseLeave={e => e.currentTarget.style.filter = 'none'}>
-                    <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, color: 'rgba(0,0,0,.5)', flexShrink: 0, marginTop: 2 }}>P{ann.page}</span>
-                    <span style={{ fontSize: 12.5, color: 'rgba(0,0,0,.75)', lineHeight: 1.5, flex: 1 }}>{ann.comment || <span style={{ opacity: 0.5 }}>No comment</span>}</span>
+                    {ann.isDocx ? (
+                      <>
+                        <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, color: 'rgba(0,0,0,.5)', flexShrink: 0, marginTop: 2 }}>T</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          {ann.text && <div style={{ fontSize: 10.5, color: 'rgba(0,0,0,.55)', fontStyle: 'italic', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>"{ann.text.slice(0, 45)}{ann.text.length > 45 ? '…' : ''}"</div>}
+                          <div style={{ fontSize: 12, color: 'rgba(0,0,0,.75)', lineHeight: 1.4 }}>{ann.comment || <span style={{ opacity: 0.5 }}>No comment</span>}</div>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, color: 'rgba(0,0,0,.5)', flexShrink: 0, marginTop: 2 }}>P{ann.page}</span>
+                        <span style={{ fontSize: 12.5, color: 'rgba(0,0,0,.75)', lineHeight: 1.5, flex: 1 }}>{ann.comment || <span style={{ opacity: 0.5 }}>No comment</span>}</span>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>

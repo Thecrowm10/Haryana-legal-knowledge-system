@@ -303,10 +303,11 @@ function DocViewModal({ doc, onClose }) {
   const [zoom, setZoom]               = useState(100);
   const [rotation, setRotation]       = useState(0);
   const [docxHtml, setDocxHtml]       = useState(null);
-  const canvasRefs   = useRef([]);
-  const containerRef = useRef(null);
-  const suppressRef  = useRef(false);
-  const svgRefs      = useRef([]);
+  const canvasRefs    = useRef([]);
+  const containerRef  = useRef(null);
+  const suppressRef   = useRef(false);
+  const svgRefs       = useRef([]);
+  const docxViewRef   = useRef(null);
   const annotations  = useMemo(() => {
     try { return doc.approval?.annotations_json ? JSON.parse(doc.approval.annotations_json) : []; }
     catch { return []; }
@@ -343,6 +344,39 @@ function DocViewModal({ doc, onClose }) {
       .catch(e => console.error('PDF load:', e));
     return () => { cancelled = true; };
   }, [blobUrl]);
+
+  useEffect(() => {
+    if (!docxViewRef.current || !docxHtml) return;
+    docxViewRef.current.innerHTML = docxHtml;
+  }, [docxHtml]);
+
+  useEffect(() => {
+    if (!docxViewRef.current || !docxHtml) return;
+    docxViewRef.current.querySelectorAll('[data-docx-annot]').forEach(span => {
+      const parent = span.parentNode;
+      if (!parent) return;
+      while (span.firstChild) parent.insertBefore(span.firstChild, span);
+      parent.removeChild(span);
+    });
+    annotations.filter(a => a.isDocx).forEach(ann => {
+      if (!ann.text || !docxViewRef.current) return;
+      const walker = document.createTreeWalker(docxViewRef.current, NodeFilter.SHOW_TEXT, null);
+      let node;
+      while ((node = walker.nextNode())) {
+        const idx = node.textContent.indexOf(ann.text);
+        if (idx < 0) continue;
+        const range = document.createRange();
+        range.setStart(node, idx);
+        range.setEnd(node, idx + ann.text.length);
+        const span = document.createElement('span');
+        span.style.cssText = `background-color:${ann.color};border-radius:2px;padding:0 1px;`;
+        span.dataset.docxAnnot = ann.id;
+        if (ann.comment) span.title = ann.comment;
+        try { range.surroundContents(span); } catch { const f = range.extractContents(); span.appendChild(f); range.insertNode(span); }
+        return;
+      }
+    });
+  }, [annotations, docxHtml]);
 
   useEffect(() => {
     if (!pdfDoc) return;
@@ -514,8 +548,8 @@ function DocViewModal({ doc, onClose }) {
 
           {/* PDF scroll area / DOCX preview */}
           {docxHtml ? (
-            <div style={{ flex: 1, overflow: 'auto', background: 'white', padding: '40px 48px', color: '#1a1a1a', lineHeight: 1.8, fontSize: 13 }}
-              dangerouslySetInnerHTML={{ __html: docxHtml }} />
+            <div ref={docxViewRef}
+              style={{ flex: 1, overflow: 'auto', background: 'white', padding: '40px 48px', color: '#1a1a1a', lineHeight: 1.8, fontSize: 13 }} />
           ) : (
             <div ref={containerRef} onScroll={handleScroll}
               style={{ flex: 1, overflow: 'auto', background: '#525659', padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center' }}>
@@ -668,18 +702,38 @@ function DocViewModal({ doc, onClose }) {
               </div>
             )}
 
-            {/* PDF Highlights from reviewer */}
+            {/* Highlights from reviewer */}
             {annotations.length > 0 && (
               <div style={{ marginTop: 16 }}>
-                <div style={{ ...LS, marginBottom: 8 }}>PDF Highlights ({annotations.length})</div>
+                <div style={{ ...LS, marginBottom: 8 }}>Highlights ({annotations.length})</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {annotations.map(ann => (
-                    <div key={ann.id} onClick={() => scrollToAnnotation(ann)}
+                    <div key={ann.id}
+                      onClick={() => {
+                        if (ann.isDocx) {
+                          const span = docxViewRef.current?.querySelector(`[data-docx-annot="${ann.id}"]`);
+                          if (span) span.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        } else {
+                          scrollToAnnotation(ann);
+                        }
+                      }}
                       style={{ display: 'flex', gap: 10, padding: '9px 12px', borderRadius: 8, background: ann.color, border: '1px solid rgba(0,0,0,.1)', alignItems: 'flex-start', cursor: 'pointer', transition: 'filter .15s' }}
                       onMouseEnter={e => e.currentTarget.style.filter = 'brightness(.92)'}
                       onMouseLeave={e => e.currentTarget.style.filter = 'none'}>
-                      <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, color: 'rgba(0,0,0,.5)', flexShrink: 0, marginTop: 2 }}>P{ann.page}</span>
-                      <span style={{ fontSize: 12.5, color: 'rgba(0,0,0,.75)', lineHeight: 1.5, flex: 1 }}>{ann.comment || <span style={{ opacity: 0.5 }}>No comment</span>}</span>
+                      {ann.isDocx ? (
+                        <>
+                          <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, color: 'rgba(0,0,0,.5)', flexShrink: 0, marginTop: 2 }}>T</span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            {ann.text && <div style={{ fontSize: 10.5, color: 'rgba(0,0,0,.55)', fontStyle: 'italic', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>"{ann.text.slice(0, 45)}{ann.text.length > 45 ? '…' : ''}"</div>}
+                            <div style={{ fontSize: 12, color: 'rgba(0,0,0,.75)', lineHeight: 1.4 }}>{ann.comment || <span style={{ opacity: 0.5 }}>No comment</span>}</div>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, color: 'rgba(0,0,0,.5)', flexShrink: 0, marginTop: 2 }}>P{ann.page}</span>
+                          <span style={{ fontSize: 12.5, color: 'rgba(0,0,0,.75)', lineHeight: 1.5, flex: 1 }}>{ann.comment || <span style={{ opacity: 0.5 }}>No comment</span>}</span>
+                        </>
+                      )}
                     </div>
                   ))}
                 </div>
