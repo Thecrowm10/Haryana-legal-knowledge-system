@@ -27,7 +27,7 @@ function parseDisplayRemarks(str) {
   });
 }
 
-export default function DocViewModal({ doc, onClose }) {
+export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuery = null, searchPages = null }) {
   const [blobUrl, setBlobUrl]         = useState(null);
   const [pdfDoc, setPdfDoc]           = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -35,11 +35,17 @@ export default function DocViewModal({ doc, onClose }) {
   const [zoom, setZoom]               = useState(100);
   const [rotation, setRotation]       = useState(0);
   const [docxHtml, setDocxHtml]       = useState(null);
+  const [searchHighlights, setSearchHighlights] = useState({});
+  // Which match page is currently being highlighted/shown (changes when user navigates matches)
+  const [activeHitPage, setActiveHitPage]   = useState(initialPage);
+  const [activeHitIdx, setActiveHitIdx]     = useState(() => searchPages ? Math.max(0, searchPages.indexOf(initialPage)) : 0);
   const canvasRefs    = useRef([]);
   const containerRef  = useRef(null);
   const suppressRef   = useRef(false);
   const svgRefs       = useRef([]);
   const docxViewRef   = useRef(null);
+  // Keep a current reference to scrollToPage to avoid stale closures in timeouts
+  const scrollToPageRef = useRef(null);
   const annotations  = useMemo(() => {
     try { return doc.approval?.annotations_json ? JSON.parse(doc.approval.annotations_json) : []; }
     catch { return []; }
@@ -110,6 +116,53 @@ export default function DocViewModal({ doc, onClose }) {
     });
   }, [annotations, docxHtml]);
 
+  // Scroll to the page that contained the search hit
+  useEffect(() => {
+    if (!pdfDoc || initialPage <= 1) return;
+    const timer = setTimeout(() => scrollToPageRef.current?.(initialPage), 450);
+    return () => clearTimeout(timer);
+  }, [pdfDoc, initialPage]); // eslint-disable-line
+
+  // Extract text positions for search term highlighting using PDF.js text content
+  useEffect(() => {
+    if (!pdfDoc || !searchQuery || activeHitPage < 1) return;
+    const STOP = new Set(['a','an','the','and','or','in','of','to','for','by','at','on','is','are','was','were','be','as','it','its','he','she','they','we','you','not','but','if','any','all','may','shall','has','had','have','do','did','does','his','her','their','who','which','such','been','with','from','this','that']);
+    const words = searchQuery.toLowerCase().split(/\s+/).filter(w => w.length >= 3 && !STOP.has(w));
+    if (!words.length) return;
+    const scale = (zoom / 100) * 1.5;
+    let cancelled = false;
+
+    pdfDoc.getPage(activeHitPage).then(async page => {
+      if (cancelled) return;
+      const vp = page.getViewport({ scale, rotation });
+      const { items } = await page.getTextContent();
+      if (cancelled) return;
+
+      const [va, vb, vc, vd, ve, vf] = vp.transform;
+      const rects = [];
+      for (const item of items) {
+        if (!item.str?.trim() || item.width <= 0) continue;
+        if (!words.some(w => item.str.toLowerCase().includes(w))) continue;
+        const [, , , fontScaleY, tx, ty] = item.transform;
+        const cx = va * tx + vc * ty + ve;
+        const cy = vb * tx + vd * ty + vf;
+        const fontH = Math.abs(fontScaleY) * vp.scale;
+        const itemW = item.width * vp.scale;
+        if (fontH <= 0 || itemW <= 0) continue;
+        rects.push({
+          x: cx / vp.width,
+          y: (cy - fontH) / vp.height,
+          w: itemW / vp.width,
+          h: (fontH * 1.3) / vp.height,
+        });
+      }
+      // Replace highlights: clear old page, set new page
+      setSearchHighlights({ [activeHitPage - 1]: rects });
+    }).catch(() => {});
+
+    return () => { cancelled = true; };
+  }, [pdfDoc, searchQuery, activeHitPage, zoom, rotation]);
+
   useEffect(() => {
     if (!pdfDoc) return;
     let cancelled = false;
@@ -129,6 +182,7 @@ export default function DocViewModal({ doc, onClose }) {
   }, [pdfDoc, zoom, rotation]);
 
   // scrollToPage is called only by Prev/Next buttons — never by handleScroll or scrollToAnnotation
+  scrollToPageRef.current = scrollToPage;
   function scrollToPage(page) {
     const clamped = Math.max(1, Math.min(totalPages, page));
     const canvas = canvasRefs.current[clamped - 1];
@@ -166,6 +220,14 @@ export default function DocViewModal({ doc, onClose }) {
     const target = wrapperTopInScroll + annotCenterY - containerRef.current.clientHeight / 2;
     containerRef.current.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
     setTimeout(() => { suppressRef.current = false; }, 900);
+  }
+
+  function goToMatch(idx) {
+    if (!searchPages || idx < 0 || idx >= searchPages.length) return;
+    const page = searchPages[idx];
+    setActiveHitIdx(idx);
+    setActiveHitPage(page);
+    setTimeout(() => scrollToPageRef.current?.(page), 80);
   }
 
   const LS = { fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)' };
@@ -230,7 +292,27 @@ export default function DocViewModal({ doc, onClose }) {
         <div style={{ borderRight: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#3a3d40' }}>
           <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10, background: '#2d2f31', flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,.08)' }}>
             <Eye size={14} color="rgba(255,255,255,.7)" />
-            <span style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(255,255,255,.85)', flex: 1 }}>{docxHtml ? 'Document Preview' : 'Original PDF'}</span>
+            <span style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(255,255,255,.85)' }}>{docxHtml ? 'Document Preview' : 'Original PDF'}</span>
+            {searchQuery && !docxHtml && searchPages && searchPages.length > 0 && (
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(234,179,8,.15)', border: '1px solid rgba(234,179,8,.35)', borderRadius: 20, padding: '3px 4px 3px 10px' }}>
+                <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: '#fde68a', whiteSpace: 'nowrap' }}>
+                  ★ Match {activeHitIdx + 1} of {searchPages.length} · p.{activeHitPage}
+                </span>
+                <button
+                  onClick={() => goToMatch(activeHitIdx - 1)}
+                  disabled={activeHitIdx === 0}
+                  style={{ background: activeHitIdx === 0 ? 'transparent' : 'rgba(255,255,255,.12)', border: 'none', borderRadius: 12, width: 22, height: 22, cursor: activeHitIdx === 0 ? 'not-allowed' : 'pointer', color: activeHitIdx === 0 ? 'rgba(253,230,138,.3)' : '#fde68a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>
+                  ‹
+                </button>
+                <button
+                  onClick={() => goToMatch(activeHitIdx + 1)}
+                  disabled={activeHitIdx === searchPages.length - 1}
+                  style={{ background: activeHitIdx === searchPages.length - 1 ? 'transparent' : 'rgba(255,255,255,.12)', border: 'none', borderRadius: 12, width: 22, height: 22, cursor: activeHitIdx === searchPages.length - 1 ? 'not-allowed' : 'pointer', color: activeHitIdx === searchPages.length - 1 ? 'rgba(253,230,138,.3)' : '#fde68a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>
+                  ›
+                </button>
+              </div>
+            )}
+            <span style={{ flex: 1 }} />
             {!docxHtml && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,.06)', borderRadius: 8, padding: '3px 6px', border: '1px solid rgba(255,255,255,.1)' }}>
                 <button onClick={() => setZoom(z => Math.max(70, z - 10))}
@@ -282,9 +364,17 @@ export default function DocViewModal({ doc, onClose }) {
                 <div key={i} style={{ position: 'relative', display: 'inline-block' }}>
                   <canvas ref={el => { canvasRefs.current[i] = el; }}
                     style={{ display: 'block', borderRadius: 4, boxShadow: '0 4px 20px rgba(0,0,0,.6)', maxWidth: '100%' }} />
-                  {annotations.some(a => a.page === i + 1) && (
+                  {(annotations.some(a => a.page === i + 1) || searchHighlights[i]?.length > 0) && (
                     <svg ref={el => { svgRefs.current[i] = el; }}
                       style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
+                      {/* Search term highlights */}
+                      {(searchHighlights[i] || []).map((hl, idx) => (
+                        <rect key={`sh-${idx}`}
+                          x={`${hl.x * 100}%`} y={`${hl.y * 100}%`}
+                          width={`${hl.w * 100}%`} height={`${hl.h * 100}%`}
+                          fill="rgba(234,179,8,0.45)" rx="2" />
+                      ))}
+                      {/* Reviewer annotation highlights */}
                       {annotations.filter(a => a.page === i + 1).map(ann => (
                         <g key={ann.id}>
                           <rect x={`${ann.x * 100}%`} y={`${ann.y * 100}%`} width={`${ann.w * 100}%`} height={`${ann.h * 100}%`}

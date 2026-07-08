@@ -104,3 +104,12 @@ html[data-contrast="high"] {
 
 :lang(hi), [lang="hi"] { font-family: var(--font-devanagari); }
 ── end DBIM/GIGW compliance ── */
+
+/* Search snippet highlight — backend wraps matched terms in <mark> */
+.search-snippet mark {
+  background: rgba(234, 179, 8, 0.4);
+  color: #78350f;
+  font-weight: 700;
+  border-radius: 2px;
+  padding: 0 2px;
+}
