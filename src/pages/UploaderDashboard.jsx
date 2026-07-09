@@ -888,6 +888,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
   const [bulkFields, setBulkFields]     = useState({ dept: '', type: '', year: '' });
   const [fileRefs,    setFileRefs]    = useState([]); // [{ fileName, fileRef, originalFilename, fileSize }]
+  const [fileMeta,    setFileMeta]    = useState({}); // { [fileName]: { documentName, desc } }
   const [uploadStep, setUploadStep]   = useState(null); // null | 'uploading' | 'ready' | 'saving' | 'done' | 'error'
   const [uploadError, setUploadError] = useState('');
   const [toast, setToast] = useState(null); // { type: 'success' | 'error', message }
@@ -970,6 +971,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   function removeFile(name) {
     setFiles(f => f.filter(x => x.name !== name));
     setFileRefs(r => r.filter(x => x.fileName !== name));
+    setFileMeta(prev => { const next = { ...prev }; delete next[name]; return next; });
   }
   function handleDrop(e) { e.preventDefault(); setDragOver(false); if (!form.type) return; addFiles(e.dataTransfer.files); }
 
@@ -1043,7 +1045,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
       setUploads(u => [{ ...doc, uid }, ...u]);
     });
 
-    setFiles([]); setFileRefs([]); setRelations([]);
+    setFiles([]); setFileRefs([]); setFileMeta({}); setRelations([]);
     setForm({ act:'',dept:user?.dept||'',type:'',version:'1.0',desc:'',enactmentDate:'',parentAct:'',changeTypes:[] });
     setHierarchy({ act:'', actId: null, chapter:'',section:'',subsection:'' });
     setAmendmentProvisions([]); setParentActSearch(''); setTypeFields({});
@@ -1072,6 +1074,13 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
 
       if (!hasToken) {
         setFileRefs(prev => [...prev, { fileName: f.name, fileRef: null, originalFilename: f.name, fileSize: f.size, summary: '' }]);
+        setFileMeta(prev => ({
+          ...prev,
+          [f.name]: {
+            documentName: prev[f.name]?.documentName ?? f.name.replace(/\.(pdf|docx?)$/i, ''),
+            desc:         prev[f.name]?.desc ?? '',
+          },
+        }));
         continue;
       }
 
@@ -1081,7 +1090,13 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         const res = await uploadPdfFile(fd);
         const { file_ref, original_filename, file_size, summary } = res.data;
         setFileRefs(prev => [...prev, { fileName: f.name, fileRef: file_ref, originalFilename: original_filename, fileSize: file_size, summary }]);
-        if (summary) setForm(prevForm => (prevForm.desc ? prevForm : { ...prevForm, desc: summary }));
+        setFileMeta(prev => ({
+          ...prev,
+          [f.name]: {
+            documentName: prev[f.name]?.documentName ?? original_filename.replace(/\.(pdf|docx?)$/i, ''),
+            desc:         prev[f.name]?.desc ?? (summary || ''),
+          },
+        }));
       } catch (err) {
         const detail = err.response?.data?.detail;
         setUploadError(typeof detail === 'string' ? detail : `Document check failed for "${f.name}". Please verify the file and try again.`);
@@ -1183,7 +1198,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
           const payload = {
             file_ref:              fileRef,
             document_type_id:      typeObj?.id ?? null,
-            document_name:         form.act || f.name.replace(/\.(pdf|docx?)$/i, ''),
+            document_name:         fileMeta[f.name]?.documentName || f.name.replace(/\.(pdf|docx?)$/i, ''),
             issue_date:            form.enactmentDate || null,
             reference_number:      referenceNumber,
             effective_from:        effectiveFrom,
@@ -1205,7 +1220,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
               const suffix = provisions.length > 0
                 ? '\n__PROVISIONS__:' + JSON.stringify(provisions)
                 : '';
-              return (form.desc || '') + suffix;
+              return (fileMeta[f.name]?.desc || form.desc || '') + suffix;
             })(),
           };
           const res2 = await uploadPdfMetadata(payload);
@@ -1214,9 +1229,9 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
             toRole:       'approver',
             type:         'new_upload',
             title:        'New Document Submitted',
-            message:      `"${form.act || f.name}" uploaded by ${user?.name || user?.username || 'Uploader'} — awaiting your review`,
+            message:      `"${fileMeta[f.name]?.documentName || f.name}" uploaded by ${user?.name || user?.username || 'Uploader'} — awaiting your review`,
             docId:        apiDoc?.id,
-            docTitle:     form.act || f.name,
+            docTitle:     fileMeta[f.name]?.documentName || f.name,
             uploaderName: user?.name || user?.username,
           });
         } catch (err) {
@@ -1236,7 +1251,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
 
       newDocs.push({
         id:            apiDoc?.id ?? (Date.now() + Math.random()),
-        title:         apiDoc?.document_name || form.act || f.name.replace(/\.(pdf|docx?)$/i, ''),
+        title:         apiDoc?.document_name || fileMeta[f.name]?.documentName || f.name.replace(/\.(pdf|docx?)$/i, ''),
         type:          typeObj?.name || form.type || 'Act',
         dept:          user?.dept || form.dept || 'General Administration',
         year:          form.enactmentDate ? new Date(form.enactmentDate).getFullYear() : new Date().getFullYear(),
@@ -1247,7 +1262,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         uploadedAt:    new Date().toISOString().split('T')[0],
         section:       '1', paragraph: '1',
         version:       apiDoc?.version_no || form.version || '1.0',
-        desc:          form.desc || '',
+        desc:          fileMeta[f.name]?.desc || form.desc || '',
         ocrStatus:     /\.docx?$/i.test(f.name) ? 'queued' : 'processing',
         fileName:      f.name,
         isWord:        /\.docx?$/i.test(f.name),
@@ -1274,9 +1289,9 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         toRole:       'approver',
         type:         'new_upload',
         title:        'New Document Submitted',
-        message:      `"${form.act || f.name}" uploaded by ${user?.name || user?.username || 'Uploader'} — awaiting your review`,
+        message:      `"${fileMeta[f.name]?.documentName || f.name}" uploaded by ${user?.name || user?.username || 'Uploader'} — awaiting your review`,
         docId:        apiDoc?.id ?? null,
-        docTitle:     form.act || f.name,
+        docTitle:     fileMeta[f.name]?.documentName || f.name,
         uploaderName: user?.name || user?.username,
       });
     }
@@ -1304,8 +1319,9 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     }
   }
   // Called on document-name field blur: checks for cross-department duplicates
-  async function checkDuplicate() {
-    const docName = form.act.trim();
+  // Accepts an optional nameOverride so per-file panels can reuse the same logic.
+  async function checkDuplicate(nameOverride) {
+    const docName = (nameOverride ?? form.act).trim();
     const typeObj  = typesData.find(d => d.name === form.type);
     if (!docName || !typeObj?.id) return;
     try {
@@ -2310,7 +2326,78 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         <form onSubmit={handleSubmit}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
 
-            {/* Always: Document name */}
+            {/* Per-file name + description panels (shown when all files are checked) */}
+            {allFilesChecked && files.length > 0 && (
+              <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 4 }}>
+                <div style={{ ...LABEL, marginBottom: 2 }}>
+                  Per-File Details
+                  <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-color-secondary)', textTransform: 'none', letterSpacing: 0, marginLeft: 8 }}>Name and description are set per file — other fields below apply to all</span>
+                </div>
+                {files.map(f => (
+                  <div key={f.name} style={{ padding: '12px 14px', borderRadius: 10, border: '1.5px solid var(--surface-border)', background: 'var(--surface-ground)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ width: 26, height: 26, borderRadius: 6, background: 'rgba(26,86,219,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        {fileIcon(f)}
+                      </div>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>{f.name}</span>
+                      <span style={{ fontSize: 10.5, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', flexShrink: 0 }}>{formatSize(f.size)}</span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8 }}>
+                      <div>
+                        <div style={{ ...LABEL, marginBottom: 4 }}>
+                          {{
+                            'Act': 'Act / Instrument Name',
+                            'Amendment': 'Amendment Name',
+                            'Notification': 'Notification Title',
+                            'Circular': 'Circular Title',
+                            'Policy': 'Policy Name',
+                            'Rules & Regulations': 'Rules / Regulation Name',
+                            'Order / Gazette': 'Order / Gazette Title',
+                            'Bye Laws': 'Bye Law Name',
+                            'Miscellaneous': 'Document Title',
+                          }[form.type] || 'Document Name'} <span style={{ color: '#ef4444' }}>*</span>
+                        </div>
+                        <input
+                          value={fileMeta[f.name]?.documentName ?? ''}
+                          onChange={e => setFileMeta(prev => ({ ...prev, [f.name]: { ...prev[f.name], documentName: e.target.value } }))}
+                          onFocus={focusStyle}
+                          onBlur={e => { blurStyle(e); checkDuplicate(e.target.value); }}
+                          placeholder={({
+                            'Act': 'e.g. Haryana Municipal Act, 1973',
+                            'Amendment': 'e.g. The XYZ (Amendment) Act, 2022',
+                            'Notification': 'e.g. Gazette Notification No. 123',
+                            'Circular': 'e.g. Circular No. 45/2023',
+                            'Policy': 'e.g. Haryana Industrial Policy 2020',
+                            'Rules & Regulations': 'e.g. Haryana Municipal Rules, 1975',
+                            'Order / Gazette': 'e.g. Government Order No. 12/2021',
+                            'Bye Laws': 'e.g. Municipal Corporation Bye-laws, 2020',
+                            'Miscellaneous': 'e.g. Departmental Guidelines / Reference Manual',
+                          }[form.type] || 'Enter document name')}
+                          style={INPUT_BASE} />
+                      </div>
+                      <div>
+                        <div style={{ ...LABEL, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                          Description / Remarks
+                          {fileMeta[f.name]?.desc && (
+                            <span style={{ fontSize: 10, fontWeight: 600, color: '#16a34a', textTransform: 'none', letterSpacing: 0 }}>· auto-filled, you can edit</span>
+                          )}
+                        </div>
+                        <textarea
+                          value={fileMeta[f.name]?.desc ?? ''}
+                          onChange={e => setFileMeta(prev => ({ ...prev, [f.name]: { ...prev[f.name], desc: e.target.value } }))}
+                          onFocus={focusStyle} onBlur={blurStyle}
+                          rows={3}
+                          placeholder="Brief description or upload remarks…"
+                          style={{ ...INPUT_BASE, resize: 'vertical', lineHeight: 1.6 }} />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Shared Document name — only shown when no files are checked yet (single-file fallback) */}
+            {!allFilesChecked && (
             <div style={{ gridColumn: '1 / -1' }}>
               <div style={{ ...LABEL, marginBottom: 6 }}>
                 {{
@@ -2341,6 +2428,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 style={INPUT_BASE} onFocus={focusStyle}
                 onBlur={e => { blurStyle(e); if (files.length <= 1) checkDuplicate(); }} />
             </div>
+            )}
 
             {/* ── ACT: all fields inline ── */}
             {form.type === 'Act' && (<>
@@ -2777,24 +2865,23 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
               ))}
             </>)}
 
-            {/* Always: Description */}
+            {/* Shared description — only shown when per-file panels are not active */}
+            {!allFilesChecked && (
             <div style={{ gridColumn: '1 / -1' }}>
               <div style={{ ...LABEL, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
                 Description / Remarks
-                {fileRefs.some(r => r.fileName === files[0]?.name && r.summary) && (
-                  <span style={{ fontSize: 10, fontWeight: 600, color: '#16a34a', textTransform: 'none', letterSpacing: 0 }}>· auto-filled from document summary, you can edit it</span>
-                )}
               </div>
               <textarea value={form.desc} onChange={e => fmt('desc', e.target.value)} rows={7}
                 placeholder="Brief description or upload remarks…"
                 style={{ ...INPUT_BASE, resize: 'vertical', lineHeight: 1.6, minHeight: 150 }}
                 onFocus={focusStyle} onBlur={blurStyle} />
             </div>
+            )}
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--surface-border)' }}>
             <button type="button"
-              onClick={() => { setForm({ act:'',dept:user?.dept||'',type:'',version:'1.0',desc:'',enactmentDate:'',parentAct:'',changeTypes:[] }); setFiles([]); setFileRefs([]); setRelations([]); setHierarchy({ act:'',chapter:'',section:'',subsection:'' }); setAmendmentProvisions([]); setParentActSearch(''); setRelNote(''); setTypeFields({}); setUploadStep(null); setUploadError(''); }}
+              onClick={() => { setForm({ act:'',dept:user?.dept||'',type:'',version:'1.0',desc:'',enactmentDate:'',parentAct:'',changeTypes:[] }); setFiles([]); setFileRefs([]); setFileMeta({}); setRelations([]); setHierarchy({ act:'',chapter:'',section:'',subsection:'' }); setAmendmentProvisions([]); setParentActSearch(''); setRelNote(''); setTypeFields({}); setUploadStep(null); setUploadError(''); }}
               style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)', padding: '9px 22px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
               onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
               onMouseLeave={e => e.currentTarget.style.background = 'var(--surface-card)'}>
