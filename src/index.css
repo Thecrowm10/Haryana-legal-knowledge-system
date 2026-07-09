@@ -138,7 +138,7 @@ body {
 @keyframes drawerFadeIn  { from { opacity: 0; } to { opacity: 1; } }
 @keyframes dropdownIn    { from { opacity: 0; transform: translateY(-6px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
 
-/* ── DBIM / GIGW compliance — enable in production ────────────────
+/* ── DBIM / GIGW compliance ── */
 @keyframes fadeSlideInUp { from { opacity: 0; transform: translateY(100%); } to { opacity: 1; transform: translateY(0); } }
 @keyframes spin          { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
@@ -155,8 +155,15 @@ body {
   box-shadow: 0 4px 12px rgba(0,0,0,.3);
 }
 
-html[data-font-size="large"] body { zoom: 1.18; }
-html[data-font-size="small"]  body { zoom: 0.9; }
+.a11y-zoom-scope { zoom: var(--a11y-zoom, 1); }
+
+/* Below 100%, pre-inflate the box by the inverse factor so the shrunk visual
+   result still covers exactly 100% of the fixed-height shell (no gap at the
+   bottom/right). Not applied above 100% — enlarging should overflow/scroll. */
+html[data-a11y-shrink] .a11y-zoom-scope {
+  width: calc(100% / var(--a11y-zoom, 1));
+  height: calc(100% / var(--a11y-zoom, 1));
+}
 
 html[data-contrast="high"] {
   --surface-card:    #1a1a1a;
@@ -177,4 +184,3 @@ html[data-contrast="high"] {
 }
 
 :lang(hi), [lang="hi"] { font-family: var(--font-devanagari); }
-── end DBIM/GIGW compliance ── */
