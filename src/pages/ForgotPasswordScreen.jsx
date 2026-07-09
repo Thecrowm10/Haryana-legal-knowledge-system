@@ -1,8 +1,9 @@
-import { useState } from 'react';
-import { Mail, Phone, ArrowLeft, ShieldCheck, Eye, EyeOff, RotateCcw, CheckCircle2 } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Mail, Phone, ArrowLeft, ShieldCheck, Eye, EyeOff, RotateCcw, CheckCircle2, Lock } from 'lucide-react';
 import { requestPasswordReset, resetPasswordWithOtp } from '../services/pdf';
 import haryanaLogo from '../assets/haryana-logo.png';
 import bannerBg from '../assets/banner-1-768x217.png';
+import Captcha from '../components/Captcha';
 
 export default function ForgotPasswordScreen({ onBack }) {
   const [step, setStep]         = useState(1); // 1 = request OTP, 2 = enter OTP + new password, 3 = success
@@ -15,9 +16,12 @@ export default function ForgotPasswordScreen({ onBack }) {
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState('');
   const [resendMsg, setResendMsg] = useState('');
+  const [captchaStatus, setCaptchaStatus] = useState({ touched: false, valid: false });
+  const captchaRef              = useRef(null);
 
   const isEmail   = identifier.includes('@');
   const InputIcon = isEmail ? Mail : Phone;
+  const canSubmitStep2 = !loading && captchaStatus.valid;
 
   // ── Step 1: request OTP ───────────────────────────────────
   async function handleRequestOtp(e) {
@@ -42,6 +46,8 @@ export default function ForgotPasswordScreen({ onBack }) {
     if (otp.length !== 6)       { setError('OTP must be 6 digits.'); return; }
     if (newPass.length < 8)     { setError('Password must be at least 8 characters.'); return; }
     if (newPass !== confirm)    { setError('Passwords do not match.'); return; }
+    if (!captchaStatus.touched)          { setError('Please fill the captcha.'); return; }
+    if (!captchaRef.current?.validate()) { setError('Please enter the correct captcha.'); return; }
     setLoading(true); setError('');
     try {
       await resetPasswordWithOtp(identifier.trim(), otp, newPass);
@@ -49,6 +55,7 @@ export default function ForgotPasswordScreen({ onBack }) {
     } catch (err) {
       const detail = err.response?.data?.detail;
       setError(typeof detail === 'string' ? detail : 'Invalid or expired OTP. Please try again.');
+      captchaRef.current?.reset();
     } finally {
       setLoading(false);
     }
@@ -279,18 +286,22 @@ export default function ForgotPasswordScreen({ onBack }) {
                 }}
               />
 
+              <Captcha ref={captchaRef} onStatusChange={setCaptchaStatus} style={{ marginBottom: 16 }} />
+
               {error    && <ErrorBox msg={error} />}
               {resendMsg && <div style={{ fontSize: 12, color: '#4ade80', marginBottom: 10 }}>{resendMsg}</div>}
 
               <button className="fp-btn" type="submit" disabled={loading} style={{
                 width: '100%', padding: '12px',
-                background: 'linear-gradient(135deg,#22c55e,#16a34a)',
-                borderRadius: 11, color: '#fff', fontSize: 14, fontWeight: 700,
+                background: canSubmitStep2 ? 'linear-gradient(135deg,#22c55e,#16a34a)' : 'rgba(255,255,255,.04)',
+                borderRadius: 11, color: canSubmitStep2 ? '#fff' : 'rgba(255,255,255,.32)', fontSize: 14, fontWeight: 700,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                boxShadow: '0 4px 18px rgba(34,197,94,.35)',
-                opacity: loading ? .7 : 1, marginBottom: 12,
+                border: canSubmitStep2 ? 'none' : '1.5px dashed rgba(255,255,255,.2)',
+                boxShadow: canSubmitStep2 ? '0 4px 18px rgba(34,197,94,.35)' : 'none',
+                cursor: canSubmitStep2 ? 'pointer' : 'not-allowed',
+                marginBottom: 12,
               }}>
-                {loading ? <><Spin /> Resetting…</> : <><ShieldCheck size={14} /> Reset Password</>}
+                {loading ? <><Spin /> Resetting…</> : canSubmitStep2 ? <><ShieldCheck size={14} /> Reset Password</> : <><Lock size={13} /> Reset Password</>}
               </button>
 
               <button type="button" onClick={handleResend} disabled={loading}
