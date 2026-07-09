@@ -1,13 +1,17 @@
-import { useState } from 'react';
-import { Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Eye, EyeOff, ShieldCheck, Lock } from 'lucide-react';
 import haryanaLogo from '../assets/haryana-logo.png';
 import bannerBg from '../assets/banner-1-768x217.png';
+import Captcha from '../components/Captcha';
 
 export default function ChangePasswordScreen({ user, onPasswordChanged, onLogout, reason = 'first_login' }) {
   const [form, setForm]       = useState({ current: '', next: '', confirm: '' });
   const [show, setShow]       = useState({ current: false, next: false, confirm: false });
   const [error, setError]     = useState('');
   const [loading, setLoading] = useState(false);
+  const [captchaStatus, setCaptchaStatus] = useState({ touched: false, valid: false });
+  const captchaRef            = useRef(null);
+  const canSubmit             = !loading && captchaStatus.valid;
 
   function toggle(field) { setShow(s => ({ ...s, [field]: !s[field] })); }
   function set(field, val) { setForm(f => ({ ...f, [field]: val })); setError(''); }
@@ -18,6 +22,8 @@ export default function ChangePasswordScreen({ user, onPasswordChanged, onLogout
     if (form.next.length < 8) { setError('New password must be at least 8 characters.'); return; }
     if (form.next !== form.confirm) { setError('New passwords do not match.'); return; }
     if (form.next === form.current) { setError('New password must differ from the current password.'); return; }
+    if (!captchaStatus.touched)          { setError('Please fill the captcha.'); return; }
+    if (!captchaRef.current?.validate()) { setError('Please enter the correct captcha.'); return; }
 
     setLoading(true);
     setError('');
@@ -26,6 +32,7 @@ export default function ChangePasswordScreen({ user, onPasswordChanged, onLogout
     } catch (err) {
       const detail = err.response?.data?.detail;
       setError(typeof detail === 'string' ? detail : 'Failed to change password. Please try again.');
+      captchaRef.current?.reset();
     } finally {
       setLoading(false);
     }
@@ -126,17 +133,21 @@ export default function ChangePasswordScreen({ user, onPasswordChanged, onLogout
             <label style={labelStyle}>Confirm New Password</label>
             <PwField value={form.confirm} show={show.confirm} onToggle={() => toggle('confirm')} onChange={v => set('confirm', v)} style={{ marginBottom: 16 }} />
 
+            <Captcha ref={captchaRef} onStatusChange={setCaptchaStatus} style={{ marginBottom: 16 }} />
+
             {error && <ErrorBox msg={error} />}
 
             <button className="fp-btn" type="submit" disabled={loading} style={{
               width: '100%', padding: '12px',
-              background: 'linear-gradient(135deg,#22c55e,#16a34a)',
-              borderRadius: 11, color: '#fff', fontSize: 14, fontWeight: 700,
+              background: canSubmit ? 'linear-gradient(135deg,#22c55e,#16a34a)' : 'rgba(255,255,255,.04)',
+              borderRadius: 11, color: canSubmit ? '#fff' : 'rgba(255,255,255,.32)', fontSize: 14, fontWeight: 700,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              boxShadow: '0 4px 18px rgba(34,197,94,.35)',
-              opacity: loading ? .7 : 1, marginBottom: 14,
+              border: canSubmit ? 'none' : '1.5px dashed rgba(255,255,255,.2)',
+              boxShadow: canSubmit ? '0 4px 18px rgba(34,197,94,.35)' : 'none',
+              cursor: canSubmit ? 'pointer' : 'not-allowed',
+              marginBottom: 14,
             }}>
-              {loading ? <><Spin /> Changing Password…</> : <><ShieldCheck size={14} /> Set New Password</>}
+              {loading ? <><Spin /> Changing Password…</> : canSubmit ? <><ShieldCheck size={14} /> Set New Password</> : <><Lock size={13} /> Set New Password</>}
             </button>
 
             <button type="button" onClick={onLogout}

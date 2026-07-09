@@ -163,7 +163,7 @@ export default function AuditorDashboard({ activePage }) {
     );
   }
 
-  // ── Compliance Report ────────────────────────────────────────────────────
+  //  Compliance Report 
   if (activePage === 'compliance') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>

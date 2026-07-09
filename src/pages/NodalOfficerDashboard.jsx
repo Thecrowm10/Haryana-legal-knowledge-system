@@ -215,7 +215,7 @@ export default function NodalOfficerDashboard({ activePage }) {
   const [nodalLinksFilterStatus, setNodalLinksFilterStatus] = useState('');
   const [viewingLink, setViewingLink]           = useState(null);
 
-  // Audit Log state (nodal view — auto-scoped to designated departments)
+  // Audit Log state 
   const [auditLogs, setAuditLogs]                 = useState([]);
   const [auditTotal, setAuditTotal]               = useState(0);
   const [auditLoading, setAuditLoading]           = useState(false);
