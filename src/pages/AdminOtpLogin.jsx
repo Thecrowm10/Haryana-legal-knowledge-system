@@ -113,7 +113,7 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
             <img src={haryanaLogo} alt="" style={{ width: 40, height: 40, objectFit: 'contain' }} />
             <div>
               <div style={{ fontSize: 14.5, fontWeight: 700, color: '#fff' }}>Haryana Government</div>
-              <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,.42)', marginTop: 2 }}>Legal Knowledge System</div>
+              <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,.42)', marginTop: 2 }}>Legal Repository</div>
             </div>
             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 20, background: 'rgba(74,222,128,.12)', border: '1px solid rgba(74,222,128,.3)' }}>
               <ShieldAlert size={11} color="#4ade80" />

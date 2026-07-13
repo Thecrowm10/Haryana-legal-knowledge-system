@@ -61,7 +61,7 @@ export default function Footer() {
             }} aria-hidden="true">⚖️</div>
             <div>
               <div style={{ fontSize: 13.5, fontWeight: 700, color: '#fff', lineHeight: 1.2 }}>
-                Haryana State Legal Knowledge System
+                Haryana Legal Repository
               </div>
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>
                 Government of Haryana

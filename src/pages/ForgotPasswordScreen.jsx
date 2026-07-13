@@ -137,7 +137,7 @@ export default function ForgotPasswordScreen({ onBack }) {
             <img src={haryanaLogo} alt="" style={{ width: 40, height: 40, objectFit: 'contain' }} />
             <div>
               <div style={{ fontSize: 13.5, fontWeight: 700, color: '#fff' }}>Haryana Government</div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)' }}>Legal Knowledge System</div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)' }}>Legal Repository</div>
             </div>
           </div>
 

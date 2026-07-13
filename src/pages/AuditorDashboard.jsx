@@ -94,7 +94,7 @@ export default function AuditorDashboard({ activePage }) {
             <thead>
               <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
                 {['Timestamp', 'User', 'Role', 'Action', 'AI Generated'].map(h => (
-                  <th key={h} style={{ ...LABEL, padding: '11px 16px', textAlign: 'left' }}>{h}</th>
+                  <th key={h} scope="col" style={{ ...LABEL, padding: '11px 16px', textAlign: 'left' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -140,7 +140,7 @@ export default function AuditorDashboard({ activePage }) {
             <thead>
               <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
                 {['Timestamp', 'User Type', 'Query', 'Results', 'Document Pointers Returned'].map(h => (
-                  <th key={h} style={{ ...LABEL, padding: '11px 16px', textAlign: 'left' }}>{h}</th>
+                  <th key={h} scope="col" style={{ ...LABEL, padding: '11px 16px', textAlign: 'left' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -182,7 +182,7 @@ export default function AuditorDashboard({ activePage }) {
             <thead>
               <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
                 {['Month', 'Total Queries Sampled', 'AI Characters in Responses', 'Status'].map(h => (
-                  <th key={h} style={{ ...LABEL, padding: '11px 16px', textAlign: 'left' }}>{h}</th>
+                  <th key={h} scope="col" style={{ ...LABEL, padding: '11px 16px', textAlign: 'left' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -214,7 +214,7 @@ export default function AuditorDashboard({ activePage }) {
             </button>
           </div>
           <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', lineHeight: 1.8 }}>
-            This report certifies that the Haryana Legal Knowledge System has operated in full compliance with the <strong>Zero Generation Constraint</strong> (TOR Module B, Requirement B-04 to B-08). All search results returned during the audit period contained exclusively verbatim document pointers with no AI-generated textual content.
+            This report certifies that the Haryana Legal Repository has operated in full compliance with the <strong>Zero Generation Constraint</strong> (TOR Module B, Requirement B-04 to B-08). All search results returned during the audit period contained exclusively verbatim document pointers with no AI-generated textual content.
           </div>
           <div style={{ marginTop: 16, display: 'flex', gap: 24 }}>
             {[['Audit Period','Feb – May 2026'],['Total Queries Reviewed','978'],['AI Violations Found','0'],['Compliance Rate','100%']].map(([k,v]) => (

@@ -487,7 +487,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
             <thead>
               <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
                 {['Name', 'Username', 'Role', 'Department', 'Status', 'Last Login', 'Actions'].map(h => (
-                  <th key={h} style={{ ...LABEL, padding: '11px 16px', textAlign: 'left' }}>{h}</th>
+                  <th key={h} scope="col" style={{ ...LABEL, padding: '11px 16px', textAlign: 'left' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -1207,7 +1207,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
               <thead>
                 <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
                   {['Timestamp', 'User', 'Action', 'Entity', 'Status', 'IP Address'].map(h => (
-                    <th key={h} style={{ ...LABEL, padding: '11px 16px', textAlign: 'left' }}>{h}</th>
+                    <th key={h} scope="col" style={{ ...LABEL, padding: '11px 16px', textAlign: 'left' }}>{h}</th>
                   ))}
                 </tr>
               </thead>

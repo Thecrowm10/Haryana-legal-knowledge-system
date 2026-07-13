@@ -592,7 +592,7 @@ function NodeDetailPanel({ node, allNodes, allLinks, onClose }) {
         {/* ── Timeline tab ── */}
         {tab === 'timeline' && (
           !history
-            ? <div style={{ padding: '28px 0', textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>No amendment history recorded for this document in HLKS.</div>
+            ? <div style={{ padding: '28px 0', textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>No amendment history recorded for this document in the repository.</div>
             : <div style={{ position: 'relative' }}>
                 {/* Spine line */}
                 <div style={{ position: 'absolute', left: 19, top: 20, bottom: 0, width: 2, background: 'var(--surface-border)' }} />
@@ -1087,7 +1087,7 @@ export default function CSODashboard({ activePage, auditLog, documents = [], rel
           <thead>
             <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
               {['Timestamp', 'User', 'Role', 'Action', 'Detail', 'ZG Verified'].map(h => (
-                <th key={h} style={{ ...label, padding: '12px 16px', textAlign: 'left' }}>{h}</th>
+                <th key={h} scope="col" style={{ ...label, padding: '12px 16px', textAlign: 'left' }}>{h}</th>
               ))}
             </tr>
           </thead>

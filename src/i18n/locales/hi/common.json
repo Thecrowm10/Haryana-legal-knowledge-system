@@ -1,0 +1,92 @@
+{
+  "sidebar": {
+    "orgName": "हरियाणा सरकार",
+    "orgTagline": "विधिक भंडार",
+    "userFallback": "उपयोगकर्ता",
+    "groups": {
+      "main": "मुख्य",
+      "documents": "दस्तावेज़",
+      "reviewQueue": "समीक्षा कतार",
+      "analytics": "विश्लेषण",
+      "knowledge": "ज्ञान",
+      "administration": "प्रशासन",
+      "system": "सिस्टम",
+      "audit": "लेखा परीक्षा",
+      "reports": "रिपोर्ट"
+    },
+    "items": {
+      "home": "होम",
+      "searchDocuments": "दस्तावेज़ खोजें",
+      "uploadDocument": "दस्तावेज़ अपलोड करें",
+      "myUploads": "मेरे अपलोड",
+      "pendingApprovals": "स्वीकृति हेतु लंबित",
+      "reviewed": "समीक्षित",
+      "linkRequests": "लिंक अनुरोध",
+      "dashboard": "डैशबोर्ड",
+      "knowledgeGraph": "ज्ञान ग्राफ़",
+      "misReport": "एमआईएस रिपोर्ट",
+      "userManagement": "उपयोगकर्ता प्रबंधन",
+      "allUploads": "सभी अपलोड",
+      "linkedDocuments": "लिंक किए गए दस्तावेज़",
+      "masterDataManager": "मास्टर डेटा प्रबंधक",
+      "systemMonitor": "सिस्टम मॉनिटर",
+      "fullMisReport": "पूर्ण एमआईएस रिपोर्ट",
+      "auditLog": "लेखा परीक्षा लॉग",
+      "queryHistory": "प्रश्न इतिहास",
+      "complianceReport": "अनुपालन रिपोर्ट"
+    }
+  },
+  "topbar": {
+    "toggleSidebar": "साइडबार टॉगल करें",
+    "roles": {
+      "citizen": "अतिथि",
+      "uploader": "विभाग अपलोडर",
+      "approver": "विभाग अनुमोदक",
+      "csoffice": "सीएस कार्यालय",
+      "admin": "आईटी प्रशासक",
+      "nodalOfficer": "नोडल अधिकारी",
+      "auditor": "लेखा परीक्षक"
+    },
+    "crumbs": {
+      "home": "होम",
+      "documents": "दस्तावेज़",
+      "search": "खोज",
+      "upload": "अपलोड",
+      "myUploads": "मेरे अपलोड",
+      "review": "समीक्षा",
+      "pendingApprovals": "स्वीकृति हेतु लंबित",
+      "reviewed": "समीक्षित",
+      "analytics": "विश्लेषण",
+      "dashboard": "डैशबोर्ड",
+      "knowledgeGraph": "ज्ञान ग्राफ़",
+      "misReport": "एमआईएस रिपोर्ट",
+      "admin": "प्रशासन",
+      "userManagement": "उपयोगकर्ता प्रबंधन",
+      "systemLogs": "सिस्टम लॉग",
+      "masterDataManager": "मास्टर डेटा प्रबंधक",
+      "fullMisReport": "पूर्ण एमआईएस रिपोर्ट",
+      "allUploads": "सभी अपलोड",
+      "auditorLabel": "लेखा परीक्षक",
+      "nodalOfficerLabel": "नोडल अधिकारी"
+    },
+    "userFallback": "उपयोगकर्ता",
+    "profile": "प्रोफ़ाइल",
+    "logout": "लॉगआउट"
+  },
+  "a11y": {
+    "panelTitle": "सुगम्यता",
+    "closeLabel": "सुगम्यता विकल्प बंद करें",
+    "openLabel": "सुगम्यता विकल्प खोलें",
+    "textSize": "टेक्स्ट आकार",
+    "decreaseTextSize": "टेक्स्ट आकार घटाएं",
+    "increaseTextSize": "टेक्स्ट आकार बढ़ाएं",
+    "highContrast": "उच्च कंट्रास्ट",
+    "resetToDefault": "डिफ़ॉल्ट पर रीसेट करें",
+    "screenReaderAccess": "स्क्रीन रीडर सुविधा"
+  },
+  "languageToggle": {
+    "english": "EN",
+    "hindi": "हिंदी",
+    "switchLabel": "अंग्रेज़ी में बदलें"
+  }
+}
