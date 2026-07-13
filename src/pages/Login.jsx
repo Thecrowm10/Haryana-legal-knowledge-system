@@ -1,12 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Search, Eye, EyeOff, Shield, Lock, User, ArrowRight, ShieldAlert } from 'lucide-react';
 import haryanaLogo from '../assets/haryana-logo.png';
 import bannerBg from '../assets/banner-1-768x217.png';
 import ForgotPasswordScreen from './ForgotPasswordScreen';
 import AdminOtpLogin from './AdminOtpLogin';
 import Captcha from '../components/Captcha';
+import LanguageToggle from '../components/LanguageToggle';
 
 export default function Login({ onLogin, loading, authError }) {
+  const { t } = useTranslation('login');
   const [screen, setScreen]       = useState('portal'); // 'portal' | 'login' | 'forgot' | 'admin-otp'
   const [username, setUsername]   = useState('');
   const [password, setPassword]   = useState('');
@@ -29,10 +32,10 @@ export default function Login({ onLogin, loading, authError }) {
 
   const handleLogin = () => {
     setFormError('');
-    if (!username.trim()) { setFormError('Username is required.'); return; }
-    if (!password)        { setFormError('Password is required.'); return; }
-    if (!captchaStatus.touched)          { setFormError('Please fill the captcha.'); return; }
-    if (!captchaRef.current?.validate()) { setFormError('Please enter the correct captcha.'); return; }
+    if (!username.trim()) { setFormError(t('errorUsernameRequired')); return; }
+    if (!password)        { setFormError(t('errorPasswordRequired')); return; }
+    if (!captchaStatus.touched)          { setFormError(t('errorFillCaptcha')); return; }
+    if (!captchaRef.current?.validate()) { setFormError(t('errorCorrectCaptcha')); return; }
     onLogin({ username: username.trim(), password });
   };
 
@@ -60,19 +63,22 @@ export default function Login({ onLogin, loading, authError }) {
         <div style={{ position:'relative', zIndex:2, width:'100%', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'40px 6%', gap:48 }}>
 
           {/* Header */}
-          <div className="lk-left" style={{ textAlign:'center' }}>
+          <div className="lk-left" style={{ textAlign:'center', position: 'relative' }}>
+            <div style={{ position: 'absolute', top: 0, right: 0 }}>
+              <LanguageToggle variant="dark" />
+            </div>
             <div style={{ display:'inline-flex', alignItems:'center', gap:10, marginBottom:20 }}>
               <img src={haryanaLogo} alt="Haryana" style={{ width:52, height:52, objectFit:'contain' }} />
               <div style={{ textAlign:'left' }}>
-                <div style={{ fontSize:16, fontWeight:700, color:'#fff' }}>Government of Haryana</div>
-                <div style={{ fontSize:11.5, color:'rgba(255,255,255,.7)' }}>Legal Knowledge System</div>
+                <div style={{ fontSize:16, fontWeight:700, color:'#fff' }}>{t('orgNamePortal')}</div>
+                <div style={{ fontSize:11.5, color:'rgba(255,255,255,.7)' }}>{t('tagline')}</div>
               </div>
             </div>
             <h1 style={{ fontSize:'clamp(26px,3.5vw,46px)', fontWeight:800, color:'#fff', lineHeight:1.15, letterSpacing:'-.02em', marginBottom:12 }}>
-              How would you like to<br/><span style={{ color:'#4ade80' }}>access the portal?</span>
+              {t('heroLine1')}<br/><span style={{ color:'#4ade80' }}>{t('heroLine2')}</span>
             </h1>
             <p style={{ fontSize:14, color:'rgba(255,255,255,.72)', maxWidth:440, margin:'0 auto' }}>
-              Choose your access type to continue. Guests can search legal documents without logging in.
+              {t('heroSubtitle')}
             </p>
           </div>
 
@@ -92,15 +98,15 @@ export default function Login({ onLogin, loading, authError }) {
                 <Search size={28} color='#4ade80' strokeWidth={1.8} />
               </div>
               <div>
-                <div style={{ fontSize:18, fontWeight:800, color:'#fff', marginBottom:8 }}>Public Access</div>
+                <div style={{ fontSize:18, fontWeight:800, color:'#fff', marginBottom:8 }}>{t('publicAccessTitle')}</div>
                 <div style={{ fontSize:13, color:'rgba(255,255,255,.75)', lineHeight:1.65 }}>
-                  Search and browse legal documents, acts, notifications without logging in.
+                  {t('publicAccessDesc')}
                 </div>
               </div>
               <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:4, padding:'9px 20px', borderRadius:50, background:'rgba(74,222,128,.15)', border:'1px solid rgba(74,222,128,.28)', color:'#4ade80', fontSize:13, fontWeight:700 }}>
-                Continue as Guest <ArrowRight size={14}/>
+                {t('continueAsGuest')} <ArrowRight size={14}/>
               </div>
-              <div style={{ fontSize:11, color:'rgba(255,255,255,.6)', marginTop:-6 }}>No login required</div>
+              <div style={{ fontSize:11, color:'rgba(255,255,255,.6)', marginTop:-6 }}>{t('noLoginRequired')}</div>
             </div>
 
             {/* Official Access */}
@@ -116,15 +122,15 @@ export default function Login({ onLogin, loading, authError }) {
                 <Shield size={28} color='#818cf8' strokeWidth={1.8} />
               </div>
               <div>
-                <div style={{ fontSize:18, fontWeight:800, color:'#fff', marginBottom:8 }}>Official Access</div>
+                <div style={{ fontSize:18, fontWeight:800, color:'#fff', marginBottom:8 }}>{t('officialAccessTitle')}</div>
                 <div style={{ fontSize:13, color:'rgba(255,255,255,.75)', lineHeight:1.65 }}>
-                  For department uploaders, approvers, CS Office and auditors.
+                  {t('officialAccessDesc')}
                 </div>
               </div>
               <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:4, padding:'9px 20px', borderRadius:50, background:'rgba(99,102,241,.15)', border:'1px solid rgba(99,102,241,.3)', color:'#818cf8', fontSize:13, fontWeight:700 }}>
-                Login with Credentials <ArrowRight size={14}/>
+                {t('loginWithCredentials')} <ArrowRight size={14}/>
               </div>
-              <div style={{ fontSize:11, color:'rgba(255,255,255,.6)', marginTop:-6 }}>Password / SSO required</div>
+              <div style={{ fontSize:11, color:'rgba(255,255,255,.6)', marginTop:-6 }}>{t('passwordSsoRequired')}</div>
             </div>
 
             {/* Admin Access */}
@@ -140,22 +146,22 @@ export default function Login({ onLogin, loading, authError }) {
                 <ShieldAlert size={28} color='#a5b4fc' strokeWidth={1.8} />
               </div>
               <div>
-                <div style={{ fontSize:18, fontWeight:800, color:'#fff', marginBottom:8 }}>Admin Access</div>
+                <div style={{ fontSize:18, fontWeight:800, color:'#fff', marginBottom:8 }}>{t('adminAccessTitle')}</div>
                 <div style={{ fontSize:13, color:'rgba(255,255,255,.75)', lineHeight:1.65 }}>
-                  For system administrators. Sign in with your registered mobile number.
+                  {t('adminAccessDesc')}
                 </div>
               </div>
               <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:4, padding:'9px 20px', borderRadius:50, background:'rgba(129,140,248,.15)', border:'1px solid rgba(129,140,248,.3)', color:'#a5b4fc', fontSize:13, fontWeight:700 }}>
-                Login with OTP <ArrowRight size={14}/>
+                {t('loginWithOtp')} <ArrowRight size={14}/>
               </div>
-              <div style={{ fontSize:11, color:'rgba(255,255,255,.6)', marginTop:-6 }}>Mobile OTP required</div>
+              <div style={{ fontSize:11, color:'rgba(255,255,255,.6)', marginTop:-6 }}>{t('mobileOtpRequired')}</div>
             </div>
 
           </div>
         </div>
 
         <div style={{ position:'absolute', bottom:0, left:0, right:0, zIndex:3, padding:'10px 6%', display:'flex', justifyContent:'space-between' }}>
-          <div style={{ fontSize:11, color:'rgba(255,255,255,.16)' }}>© 2026 Government of Haryana · HARTRON</div>
+          <div style={{ fontSize:11, color:'rgba(255,255,255,.16)' }}>{t('footerCopyright')}</div>
           <div style={{ fontSize:11, fontFamily:'monospace', color:'rgba(255,255,255,.13)' }}>TOR: HARTRON/PM(ICT)/ToR-CSO/2026-27/03</div>
         </div>
       </div>
@@ -219,19 +225,19 @@ export default function Login({ onLogin, loading, authError }) {
           <div className="lk-left" style={{ flex:'1 1 0', minWidth:0, maxWidth:500 }}>
             <div style={{ display:'inline-flex', alignItems:'center', gap:8, background:'rgba(255,255,255,.08)', backdropFilter:'blur(8px)', border:'1px solid rgba(255,255,255,.14)', borderRadius:100, padding:'5px 16px', marginBottom:26 }}>
               <span style={{ width:7, height:7, borderRadius:'50%', background:'#4ade80', display:'inline-block', animation:'pulse 2s ease-in-out infinite' }}/>
-              <span style={{ fontSize:11, fontWeight:600, color:'rgba(255,255,255,.7)', letterSpacing:'.1em', textTransform:'uppercase' }}>Legal Document Portal</span>
+              <span style={{ fontSize:11, fontWeight:600, color:'rgba(255,255,255,.7)', letterSpacing:'.1em', textTransform:'uppercase' }}>{t('badge')}</span>
             </div>
             <h1 style={{ fontSize:'clamp(30px,3.8vw,52px)', fontWeight:800, lineHeight:1.1, letterSpacing:'-.025em', color:'#fff', marginBottom:16 }}>
-              Haryana<br/><span style={{ color:'#4ade80' }}>Legal</span><br/>Knowledge<br/>System.
+              {t('brandHaryana')}<br/><span style={{ color:'#4ade80' }}>{t('brandLegal')}</span><br/>{t('brandSystem')}
             </h1>
             <p style={{ fontSize:14.5, color:'rgba(255,255,255,.42)', lineHeight:1.8, maxWidth:360, marginBottom:40 }}>
-              Unified platform for managing government legal documents, circulars, and official orders — secure, auditable, and compliant.
+              {t('heroDescription')}
             </p>
             <div style={{ display:'flex', gap:'clamp(20px,3vw,44px)' }}>
-              {[['5','Official Roles'],['100%','Audit Trail'],['2026','Active Since']].map(([v,l])=>(
-                <div key={l}>
+              {[['5','statOfficialRoles'],['100%','statAuditTrail'],['2026','statActiveSince']].map(([v,lKey])=>(
+                <div key={lKey}>
                   <div style={{ fontSize:'clamp(20px,2.5vw,30px)', fontWeight:800, color:'#fff' }}>{v}</div>
-                  <div style={{ fontSize:10.5, color:'rgba(255,255,255,.3)', textTransform:'uppercase', letterSpacing:'.08em', marginTop:4, fontWeight:600 }}>{l}</div>
+                  <div style={{ fontSize:10.5, color:'rgba(255,255,255,.3)', textTransform:'uppercase', letterSpacing:'.08em', marginTop:4, fontWeight:600 }}>{t(lKey)}</div>
                 </div>
               ))}
             </div>
@@ -264,26 +270,29 @@ export default function Login({ onLogin, loading, authError }) {
                 />
               </div>
               <div>
-                <div style={{ fontSize:14.5, fontWeight:700, color:'#fff' }}>Haryana Government</div>
-                <div style={{ fontSize:11.5, color:'rgba(255,255,255,.42)', marginTop:2 }}>Legal Knowledge System</div>
+                <div style={{ fontSize:14.5, fontWeight:700, color:'#fff' }}>{t('orgNameBrand')}</div>
+                <div style={{ fontSize:11.5, color:'rgba(255,255,255,.42)', marginTop:2 }}>{t('tagline')}</div>
               </div>
               <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:5 }}>
                 <span style={{ width:6, height:6, borderRadius:'50%', background:'#4ade80', display:'inline-block', animation:'pulse 2s ease-in-out infinite' }}/>
-                <span style={{ fontSize:10, color:'rgba(255,255,255,.35)', fontWeight:600 }}>LIVE</span>
+                <span style={{ fontSize:10, color:'rgba(255,255,255,.35)', fontWeight:600 }}>{t('liveLabel')}</span>
               </div>
             </div>
 
-            <button onClick={() => { setScreen('portal'); setUsername(''); setPassword(''); setFormError(''); }}
-              style={{ background:'transparent', border:'none', color:'rgba(255,255,255,.4)', fontSize:11.5, fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', gap:5, marginBottom:14, padding:0, fontFamily:'Plus Jakarta Sans,sans-serif', letterSpacing:'.04em' }}>
-              ← Back to Portal Selection
-            </button>
-            <h2 style={{ fontSize:21, fontWeight:800, color:'#fff', letterSpacing:'-.02em', marginBottom:3 }}>Official Login</h2>
-            <p style={{ fontSize:12.5, color:'rgba(255,255,255,.42)', marginBottom:20 }}>Department & Administration Portal</p>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <button onClick={() => { setScreen('portal'); setUsername(''); setPassword(''); setFormError(''); }}
+                style={{ background:'transparent', border:'none', color:'rgba(255,255,255,.4)', fontSize:11.5, fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', gap:5, padding:0, fontFamily:'Plus Jakarta Sans,sans-serif', letterSpacing:'.04em' }}>
+                {t('backToPortal')}
+              </button>
+              <LanguageToggle variant="dark" style={{ padding: '3px 9px', fontSize: 11 }} />
+            </div>
+            <h2 style={{ fontSize:21, fontWeight:800, color:'#fff', letterSpacing:'-.02em', marginBottom:3 }}>{t('officialLogin')}</h2>
+            <p style={{ fontSize:12.5, color:'rgba(255,255,255,.42)', marginBottom:20 }}>{t('departmentPortalSubtitle')}</p>
 
             {/* Username */}
             <div style={{ marginBottom:14 }}>
               <label style={{ display:'flex', alignItems:'center', gap:5, fontSize:10.5, fontWeight:700, color:'rgba(255,255,255,.5)', marginBottom:7, letterSpacing:'.08em', textTransform:'uppercase' }}>
-                <User size={10} color='rgba(255,255,255,.4)'/> Username
+                <User size={10} color='rgba(255,255,255,.4)'/> {t('username')}
               </label>
               <input
                 className="lk-inp"
@@ -291,7 +300,7 @@ export default function Login({ onLogin, loading, authError }) {
                 value={username}
                 onChange={e => { setUsername(e.target.value); setFormError(''); }}
                 onKeyDown={e => e.key === 'Enter' && handleLogin()}
-                placeholder="Enter your username"
+                placeholder={t('usernamePlaceholder')}
                 autoComplete="username"
                 style={{
                   width:'100%', padding:'11px 13px',
@@ -305,7 +314,7 @@ export default function Login({ onLogin, loading, authError }) {
             {/* Password */}
             <div style={{ marginBottom:16 }}>
               <label style={{ display:'flex', alignItems:'center', gap:5, fontSize:10.5, fontWeight:700, color:'rgba(255,255,255,.5)', marginBottom:7, letterSpacing:'.08em', textTransform:'uppercase' }}>
-                <Lock size={10} color='rgba(255,255,255,.4)'/> Password
+                <Lock size={10} color='rgba(255,255,255,.4)'/> {t('password')}
               </label>
               <div style={{ position:'relative' }}>
                 <input
@@ -314,7 +323,7 @@ export default function Login({ onLogin, loading, authError }) {
                   value={password}
                   onChange={e=>{ setPassword(e.target.value); setFormError(''); }}
                   onKeyDown={e=>e.key==='Enter'&&handleLogin()}
-                  placeholder="Enter your password"
+                  placeholder={t('passwordPlaceholder')}
                   style={{
                     width:'100%', padding:'11px 38px 11px 13px',
                     background:'rgba(255,255,255,.10)',
@@ -352,10 +361,10 @@ export default function Login({ onLogin, loading, authError }) {
               }}
             >
               {loading
-                ? <><div style={{ width:14, height:14, border:'2px solid rgba(255,255,255,.3)', borderTopColor:'#fff', borderRadius:'50%', animation:'spin .7s linear infinite' }}/> Signing in…</>
+                ? <><div style={{ width:14, height:14, border:'2px solid rgba(255,255,255,.3)', borderTopColor:'#fff', borderRadius:'50%', animation:'spin .7s linear infinite' }}/> {t('signingIn')}</>
                 : canSubmit
-                  ? <>Login &nbsp;→</>
-                  : <><Lock size={13}/> Login</>
+                  ? <>{t('loginButton')} &nbsp;→</>
+                  : <><Lock size={13}/> {t('loginButton')}</>
               }
             </button>
 
@@ -366,7 +375,7 @@ export default function Login({ onLogin, loading, authError }) {
                 onClick={() => setScreen('forgot')}
                 style={{ background:'none', border:'none', color:'rgba(255,255,255,.38)', fontSize:12, cursor:'pointer', fontFamily:'Plus Jakarta Sans,sans-serif', textDecoration:'underline', padding:0 }}
               >
-                Forgot Password?
+                {t('forgotPassword')}
               </button>
             </div>
 
@@ -377,7 +386,7 @@ export default function Login({ onLogin, loading, authError }) {
 
         {/* Footer */}
         <div style={{ position:'absolute', bottom:0, left:0, right:0, zIndex:3, padding:'10px 6%', display:'flex', justifyContent:'space-between' }}>
-          <div style={{ fontSize:11, color:'rgba(255,255,255,.16)' }}>© 2026 Government of Haryana · HARTRON</div>
+          <div style={{ fontSize:11, color:'rgba(255,255,255,.16)' }}>{t('footerCopyright')}</div>
           <div style={{ fontSize:11, fontFamily:'monospace', color:'rgba(255,255,255,.13)' }}>TOR: HARTRON/PM(ICT)/ToR-CSO/2026-27/03</div>
         </div>
       </div>

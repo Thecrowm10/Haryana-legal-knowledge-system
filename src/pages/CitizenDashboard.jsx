@@ -312,7 +312,7 @@ export default function CitizenDashboard({ activePage, onAuditLog }) {
             <thead>
               <tr style={{ borderBottom: '1px solid var(--surface-border)' }}>
                 {['Document', 'Type', 'Department', 'Year', 'Status'].map(h => (
-                  <th key={h} style={{ ...LABEL, padding: '0 14px 10px', textAlign: 'left' }}>{h}</th>
+                  <th key={h} scope="col" style={{ ...LABEL, padding: '0 14px 10px', textAlign: 'left' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -519,7 +519,7 @@ export default function CitizenDashboard({ activePage, onAuditLog }) {
                   <thead>
                     <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
                       {['Document', 'Dept', 'Year', 'Status', ''].map(h => (
-                        <th key={h} style={{ ...LABEL, padding: '11px 14px', textAlign: 'left' }}>{h}</th>
+                        <th key={h} scope="col" style={{ ...LABEL, padding: '11px 14px', textAlign: 'left' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>

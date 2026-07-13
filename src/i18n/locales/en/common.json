@@ -1,0 +1,92 @@
+{
+  "sidebar": {
+    "orgName": "Govt Of Haryana",
+    "orgTagline": "Legal Repository",
+    "userFallback": "User",
+    "groups": {
+      "main": "MAIN",
+      "documents": "DOCUMENTS",
+      "reviewQueue": "REVIEW QUEUE",
+      "analytics": "ANALYTICS",
+      "knowledge": "KNOWLEDGE",
+      "administration": "ADMINISTRATION",
+      "system": "SYSTEM",
+      "audit": "AUDIT",
+      "reports": "REPORTS"
+    },
+    "items": {
+      "home": "Home",
+      "searchDocuments": "Search Documents",
+      "uploadDocument": "Upload Document",
+      "myUploads": "My Uploads",
+      "pendingApprovals": "Pending Approvals",
+      "reviewed": "Reviewed",
+      "linkRequests": "Link Requests",
+      "dashboard": "Dashboard",
+      "knowledgeGraph": "Knowledge Graph",
+      "misReport": "MIS Report",
+      "userManagement": "User Management",
+      "allUploads": "All Uploads",
+      "linkedDocuments": "Linked Documents",
+      "masterDataManager": "Master Data Manager",
+      "systemMonitor": "System Monitor",
+      "fullMisReport": "Full MIS Report",
+      "auditLog": "Audit Log",
+      "queryHistory": "Query History",
+      "complianceReport": "Compliance Report"
+    }
+  },
+  "topbar": {
+    "toggleSidebar": "Toggle sidebar",
+    "roles": {
+      "citizen": "Guest",
+      "uploader": "Dept. Uploader",
+      "approver": "Dept. Approver",
+      "csoffice": "CS Office",
+      "admin": "IT Admin",
+      "nodalOfficer": "Nodal Officer",
+      "auditor": "Auditor"
+    },
+    "crumbs": {
+      "home": "Home",
+      "documents": "Documents",
+      "search": "Search",
+      "upload": "Upload",
+      "myUploads": "My Uploads",
+      "review": "Review",
+      "pendingApprovals": "Pending Approvals",
+      "reviewed": "Reviewed",
+      "analytics": "Analytics",
+      "dashboard": "Dashboard",
+      "knowledgeGraph": "Knowledge Graph",
+      "misReport": "MIS Report",
+      "admin": "Admin",
+      "userManagement": "User Management",
+      "systemLogs": "System Logs",
+      "masterDataManager": "Master Data Manager",
+      "fullMisReport": "Full MIS Report",
+      "allUploads": "All Uploads",
+      "auditorLabel": "Auditor",
+      "nodalOfficerLabel": "Nodal Officer"
+    },
+    "userFallback": "User",
+    "profile": "Profile",
+    "logout": "Logout"
+  },
+  "a11y": {
+    "panelTitle": "Accessibility",
+    "closeLabel": "Close accessibility options",
+    "openLabel": "Open accessibility options",
+    "textSize": "Text Size",
+    "decreaseTextSize": "Decrease text size",
+    "increaseTextSize": "Increase text size",
+    "highContrast": "High Contrast",
+    "resetToDefault": "Reset to Default",
+    "screenReaderAccess": "Screen Reader Access"
+  },
+  "languageToggle": {
+    "english": "EN",
+    "hindi": "हिंदी",
+    "switchLabel": "Switch to Hindi"
+  }
+}

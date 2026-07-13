@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Accessibility, Contrast, Type, Minus, Plus, RotateCcw, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { Accessibility, Contrast, Type, Minus, Plus, RotateCcw, X, Headphones } from 'lucide-react';
+import ScreenReaderAccessModal from './ScreenReaderAccessModal';
 
 const FONT_SCALE_STEPS = [90, 100, 125, 150, 175, 200];
 const STORAGE_KEY = 'hlks-a11y-prefs';
@@ -30,14 +32,10 @@ function applyPrefs(prefs) {
   else root.removeAttribute('data-contrast');
 }
 
-/**
- * Floating GIGW 3.0 / WCAG 2.1 AA accessibility widget for the authenticated
- * app shell (Layout.jsx). Provides on-page text-resize (WCAG 1.4.4 / GIGW
- * 5.2.15) and a high-contrast presentation switch (WCAG 1.4.3, 1.4.11 /
- * GIGW 5.2.14, 5.2.18). Preferences persist across sessions via localStorage.
- */
 export default function AccessibilityToolbar() {
+  const { t } = useTranslation('common');
   const [open, setOpen] = useState(false);
+  const [srModalOpen, setSrModalOpen] = useState(false);
   const [prefs, setPrefs] = useState(loadPrefs);
 
   useEffect(() => {
@@ -61,10 +59,10 @@ export default function AccessibilityToolbar() {
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        aria-label={open ? 'Close accessibility options' : 'Open accessibility options'}
+        aria-label={open ? t('a11y.closeLabel') : t('a11y.openLabel')}
         aria-expanded={open}
         aria-controls="a11y-panel"
-        title="Accessibility options"
+        title={t('a11y.panelTitle')}
         style={{
           position: 'fixed', right: 20, bottom: 20, zIndex: 1000,
           width: 48, height: 48, borderRadius: '50%',
@@ -80,7 +78,7 @@ export default function AccessibilityToolbar() {
         <div
           id="a11y-panel"
           role="region"
-          aria-label="Accessibility options"
+          aria-label={t('a11y.panelTitle')}
           style={{
             position: 'fixed', right: 20, bottom: 78, zIndex: 1000,
             width: 264, background: 'var(--surface-card)', color: 'var(--text-color)',
@@ -90,11 +88,11 @@ export default function AccessibilityToolbar() {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)' }}>Accessibility</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)' }}>{t('a11y.panelTitle')}</span>
             <button
               type="button"
               onClick={() => setOpen(false)}
-              aria-label="Close accessibility options"
+              aria-label={t('a11y.closeLabel')}
               style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', padding: 2 }}
             >
               <X size={16} />
@@ -104,14 +102,14 @@ export default function AccessibilityToolbar() {
           {/* Text size */}
           <div style={{ marginBottom: 14 }}>
             <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text-color-secondary)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Type size={13} /> Text Size
+              <Type size={13} /> {t('a11y.textSize')}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <button
                 type="button"
                 onClick={() => changeFontSize(-1)}
                 disabled={prefs.fontScale === FONT_SCALE_STEPS[0]}
-                aria-label="Decrease text size"
+                aria-label={t('a11y.decreaseTextSize')}
                 style={iconBtnStyle(prefs.fontScale === FONT_SCALE_STEPS[0])}
               >
                 <Minus size={14} />
@@ -123,7 +121,7 @@ export default function AccessibilityToolbar() {
                 type="button"
                 onClick={() => changeFontSize(1)}
                 disabled={prefs.fontScale === FONT_SCALE_STEPS[FONT_SCALE_STEPS.length - 1]}
-                aria-label="Increase text size"
+                aria-label={t('a11y.increaseTextSize')}
                 style={iconBtnStyle(prefs.fontScale === FONT_SCALE_STEPS[FONT_SCALE_STEPS.length - 1])}
               >
                 <Plus size={14} />
@@ -145,7 +143,7 @@ export default function AccessibilityToolbar() {
             }}
           >
             <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Contrast size={14} /> High Contrast
+              <Contrast size={14} /> {t('a11y.highContrast')}
             </span>
             <span aria-hidden="true" style={{
               width: 34, height: 18, borderRadius: 99, position: 'relative', flexShrink: 0,
@@ -167,12 +165,27 @@ export default function AccessibilityToolbar() {
               width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
               padding: 8, borderRadius: 9, border: '1px solid var(--surface-border)',
               background: 'transparent', color: 'var(--text-color-secondary)', fontSize: 12, cursor: 'pointer',
+              marginBottom: 8,
             }}
           >
-            <RotateCcw size={12} /> Reset to Default
+            <RotateCcw size={12} /> {t('a11y.resetToDefault')}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => { setOpen(false); setSrModalOpen(true); }}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              padding: 8, borderRadius: 9, border: '1px solid var(--surface-border)',
+              background: 'transparent', color: 'var(--text-color-secondary)', fontSize: 12, cursor: 'pointer',
+            }}
+          >
+            <Headphones size={12} /> {t('a11y.screenReaderAccess')}
           </button>
         </div>
       )}
+
+      {srModalOpen && <ScreenReaderAccessModal onClose={() => setSrModalOpen(false)} />}
     </>
   );
 }

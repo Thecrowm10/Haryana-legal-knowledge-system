@@ -1,82 +1,84 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Home, Search, Upload, FileText, CheckSquare, Eye, BarChart2, GitBranch, ClipboardList, ChevronDown, Users, Settings, Activity, FileSearch, BarChart, Layers, Link2 } from 'lucide-react';
 import haryanaLogo from '../../assets/haryana-logo.png';
 const MENU_CONFIG = {
   citizen: [
-    { label: 'MAIN', items: [
-      { icon: Home,     label: 'Home',             id: 'home' },
-      { icon: Search,   label: 'Search Documents',  id: 'search' },
+    { label: 'sidebar.groups.main', items: [
+      { icon: Home,     label: 'sidebar.items.home',            id: 'home' },
+      { icon: Search,   label: 'sidebar.items.searchDocuments', id: 'search' },
     ]},
   ],
   uploader: [
-    { label: 'DOCUMENTS', items: [
-      { icon: Upload,   label: 'Upload Document',  id: 'upload' },
-      { icon: FileText, label: 'My Uploads',       id: 'myuploads' },
+    { label: 'sidebar.groups.documents', items: [
+      { icon: Upload,   label: 'sidebar.items.uploadDocument', id: 'upload' },
+      { icon: FileText, label: 'sidebar.items.myUploads',      id: 'myuploads' },
     ]},
   ],
   approver: [
-    { label: 'REVIEW QUEUE', items: [
-      { icon: CheckSquare, label: 'Pending Approvals', id: 'pending' },
-      { icon: Eye,         label: 'Reviewed',          id: 'reviewed' },
-      { icon: Link2,       label: 'Link Requests',     id: 'links' },
+    { label: 'sidebar.groups.reviewQueue', items: [
+      { icon: CheckSquare, label: 'sidebar.items.pendingApprovals', id: 'pending' },
+      { icon: Eye,         label: 'sidebar.items.reviewed',         id: 'reviewed' },
+      { icon: Link2,       label: 'sidebar.items.linkRequests',     id: 'links' },
     ]},
   ],
   csoffice: [
-    { label: 'ANALYTICS', items: [
-      { icon: BarChart2, label: 'Dashboard',       id: 'analytics' },
+    { label: 'sidebar.groups.analytics', items: [
+      { icon: BarChart2, label: 'sidebar.items.dashboard',       id: 'analytics' },
     ]},
-    { label: 'KNOWLEDGE', items: [
-      { icon: GitBranch,     label: 'Knowledge Graph', id: 'graph' },
-      { icon: ClipboardList, label: 'MIS Report',      id: 'audit' },
+    { label: 'sidebar.groups.knowledge', items: [
+      { icon: GitBranch,     label: 'sidebar.items.knowledgeGraph', id: 'graph' },
+      { icon: ClipboardList, label: 'sidebar.items.misReport',      id: 'audit' },
     ]},
   ],
   officer: [
-    { label: 'ANALYTICS', items: [
-      { icon: BarChart2, label: 'Dashboard',       id: 'analytics' },
+    { label: 'sidebar.groups.analytics', items: [
+      { icon: BarChart2, label: 'sidebar.items.dashboard',       id: 'analytics' },
     ]},
-    { label: 'KNOWLEDGE', items: [
-      { icon: GitBranch,     label: 'Knowledge Graph', id: 'graph' },
-      { icon: ClipboardList, label: 'MIS Report',      id: 'audit' },
+    { label: 'sidebar.groups.knowledge', items: [
+      { icon: GitBranch,     label: 'sidebar.items.knowledgeGraph', id: 'graph' },
+      { icon: ClipboardList, label: 'sidebar.items.misReport',      id: 'audit' },
     ]},
   ],
   admin: [
-    { label: 'ADMINISTRATION', items: [
-      { icon: Users,       label: 'User Management',    id: 'users' },
-      { icon: Layers,      label: 'All Uploads',         id: 'alluploads' },
-      { icon: Link2,       label: 'Linked Documents',    id: 'linkedocs' },
+    { label: 'sidebar.groups.administration', items: [
+      { icon: Users,       label: 'sidebar.items.userManagement',    id: 'users' },
+      { icon: Layers,      label: 'sidebar.items.allUploads',        id: 'alluploads' },
+      { icon: Link2,       label: 'sidebar.items.linkedDocuments',   id: 'linkedocs' },
     ]},
-    { label: 'SYSTEM', items: [
-      { icon: Settings,      label: 'Master Data Manager', id: 'taxonomy' },
-      { icon: Activity,      label: 'System Monitor',  id: 'monitor' },
-      { icon: ClipboardList, label: 'Full MIS Report',  id: 'auditfull' },
+    { label: 'sidebar.groups.system', items: [
+      { icon: Settings,      label: 'sidebar.items.masterDataManager', id: 'taxonomy' },
+      { icon: Activity,      label: 'sidebar.items.systemMonitor',     id: 'monitor' },
+      { icon: ClipboardList, label: 'sidebar.items.fullMisReport',     id: 'auditfull' },
     ]},
   ],
   nodal_officer: [
-    { label: 'ADMINISTRATION', items: [
-      { icon: Users,         label: 'User Management',  id: 'nodalusers' },
-      { icon: Layers,        label: 'All Uploads',      id: 'nodaluploads' },
-      { icon: Link2,         label: 'Linked Documents', id: 'nodallinkedocs' },
-      { icon: ClipboardList, label: 'MIS Report',       id: 'nodalauditfull' },
+    { label: 'sidebar.groups.administration', items: [
+      { icon: Users,         label: 'sidebar.items.userManagement',  id: 'nodalusers' },
+      { icon: Layers,        label: 'sidebar.items.allUploads',      id: 'nodaluploads' },
+      { icon: Link2,         label: 'sidebar.items.linkedDocuments', id: 'nodallinkedocs' },
+      { icon: ClipboardList, label: 'sidebar.items.misReport',       id: 'nodalauditfull' },
     ]},
   ],
   nodal: [
-    { label: 'ADMINISTRATION', items: [
-      { icon: Users,       label: 'User Management', id: 'users' },
-      { icon: ClipboardList, label: 'Audit Log',      id: 'auditfull' },
+    { label: 'sidebar.groups.administration', items: [
+      { icon: Users,       label: 'sidebar.items.userManagement', id: 'users' },
+      { icon: ClipboardList, label: 'sidebar.items.auditLog',     id: 'auditfull' },
     ]},
   ],
   auditor: [
-    { label: 'AUDIT', items: [
-      { icon: ClipboardList, label: 'MIS Report',        id: 'auditlog' },
-      { icon: FileSearch,    label: 'Query History',    id: 'queryhistory' },
+    { label: 'sidebar.groups.audit', items: [
+      { icon: ClipboardList, label: 'sidebar.items.misReport',       id: 'auditlog' },
+      { icon: FileSearch,    label: 'sidebar.items.queryHistory',    id: 'queryhistory' },
     ]},
-    { label: 'REPORTS', items: [
-      { icon: BarChart,      label: 'Compliance Report', id: 'compliance' },
+    { label: 'sidebar.groups.reports', items: [
+      { icon: BarChart,      label: 'sidebar.items.complianceReport', id: 'compliance' },
     ]},
   ],
 };
 
 export default function Sidebar({ user, activePage, onNavigate, collapsed, onToggle }) {
+  const { t } = useTranslation('common');
   const groups = MENU_CONFIG[user.role] || [];
   const w = collapsed ? 64 : 250;
 
@@ -109,8 +111,8 @@ export default function Sidebar({ user, activePage, onNavigate, collapsed, onTog
         </div>
         {!collapsed && (
           <div style={{ overflow: 'hidden' }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)', whiteSpace: 'nowrap' }}>Govt Of Haryana</div>
-            <div style={{ fontSize: 10, color: 'var(--text-color-secondary)', whiteSpace: 'nowrap' }}>Legal Knowledge System</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)', whiteSpace: 'nowrap' }}>{t('sidebar.orgName')}</div>
+            <div style={{ fontSize: 10, color: 'var(--text-color-secondary)', whiteSpace: 'nowrap' }}>{t('sidebar.orgTagline')}</div>
           </div>
         )}
       </div>
@@ -124,12 +126,12 @@ export default function Sidebar({ user, activePage, onNavigate, collapsed, onTog
                 fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)',
                 letterSpacing: '.08em', textTransform: 'uppercase',
                 padding: '10px 20px 6px', fontFamily: 'var(--mono)',
-              }}>{group.label}</div>
+              }}>{t(group.label)}</div>
             )}
             {group.items.map(({ icon: Icon, label, id }) => {
               const active = activePage === id;
               return (
-                <div key={id} onClick={() => onNavigate(id)} title={collapsed ? label : undefined} style={{
+                <div key={id} onClick={() => onNavigate(id)} title={collapsed ? t(label) : undefined} style={{
                   display: 'flex', alignItems: 'center',
                   gap: collapsed ? 0 : 12,
                   padding: collapsed ? '10px 0' : '9px 16px',
@@ -149,7 +151,7 @@ export default function Sidebar({ user, activePage, onNavigate, collapsed, onTog
                   onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-color-secondary)'; }}}
                 >
                   <Icon size={16} strokeWidth={active ? 2.2 : 1.8} style={{ flexShrink: 0 }} />
-                  {!collapsed && <span style={{ whiteSpace: 'nowrap' }}>{label}</span>}
+                  {!collapsed && <span style={{ whiteSpace: 'nowrap' }}>{t(label)}</span>}
                 </div>
               );
             })}
@@ -169,7 +171,7 @@ export default function Sidebar({ user, activePage, onNavigate, collapsed, onTog
             fontSize: 12, fontWeight: 700, color: 'white', flexShrink: 0,
           }}>{user.role === 'citizen' ? 'U' : user.name[0]}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.role === 'citizen' ? 'User' : user.name}</div>
+            <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.role === 'citizen' ? t('sidebar.userFallback') : user.name}</div>
             <div style={{ fontSize: 11, color: 'var(--text-color-secondary)' }}>{user.role === 'citizen' ? '' : user.dept}</div>
           </div>
         </div>
