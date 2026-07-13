@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Search, Eye, EyeOff, Shield, Lock, User, ArrowRight, ShieldAlert } from 'lucide-react';
 import haryanaLogo from '../assets/haryana-logo.png';
 import bannerBg from '../assets/banner-1-768x217.png';
 import ForgotPasswordScreen from './ForgotPasswordScreen';
 import AdminOtpLogin from './AdminOtpLogin';
+import Captcha from '../components/Captcha';
 
 export default function Login({ onLogin, loading, authError }) {
   const [screen, setScreen]       = useState('portal'); // 'portal' | 'login' | 'forgot' | 'admin-otp'
@@ -12,27 +13,33 @@ export default function Login({ onLogin, loading, authError }) {
   const [showPass, setShowPass]   = useState(false);
   const [formError, setFormError] = useState('');
   const [shake, setShake]         = useState(false);
+  const [captchaStatus, setCaptchaStatus] = useState({ touched: false, valid: false });
+  const captchaRef                = useRef(null);
 
   useEffect(() => {
     if (authError) {
       setShake(true);
       setTimeout(() => setShake(false), 500);
+      captchaRef.current?.reset();
     }
   }, [authError]);
 
   const error = formError || authError;
+  const canSubmit = !loading && captchaStatus.valid;
 
   const handleLogin = () => {
     setFormError('');
     if (!username.trim()) { setFormError('Username is required.'); return; }
     if (!password)        { setFormError('Password is required.'); return; }
+    if (!captchaStatus.touched)          { setFormError('Please fill the captcha.'); return; }
+    if (!captchaRef.current?.validate()) { setFormError('Please enter the correct captcha.'); return; }
     onLogin({ username: username.trim(), password });
   };
 
   if (screen === 'forgot')    return <ForgotPasswordScreen onBack={() => setScreen('login')} />;
   if (screen === 'admin-otp') return <AdminOtpLogin onBack={() => setScreen('portal')} onLogin={onLogin} />;
 
-  // ── Portal Selection Screen ──────────────────────────────────────────────
+  //  Portal Seection Screen 
   if (screen === 'portal') return (
     <>
       <style>{`
@@ -120,7 +127,7 @@ export default function Login({ onLogin, loading, authError }) {
               <div style={{ fontSize:11, color:'rgba(255,255,255,.6)', marginTop:-6 }}>Password / SSO required</div>
             </div>
 
-            {/* Admin Access — deliberately separate flow from Official Access, OTP-based */}
+            {/* Admin Access */}
             <div className="lk-portal-card" onClick={() => setScreen('admin-otp')} style={{
               width: 280, padding:'32px 28px', borderRadius:20, cursor:'pointer',
               background:'rgba(255,255,255,.05)', backdropFilter:'blur(32px) saturate(160%)', WebkitBackdropFilter:'blur(32px) saturate(160%)',
@@ -155,7 +162,7 @@ export default function Login({ onLogin, loading, authError }) {
     </>
   );
 
-  // ── Login Screen ─────────────────────────────────────────────────────────
+  //  Login Screen 
   return (
     <>
       <style>{`
@@ -230,7 +237,7 @@ export default function Login({ onLogin, loading, authError }) {
             </div>
           </div>
 
-          {/* RIGHT — GLASS CARD (no overflow:hidden so dropdown stays inside flow) */}
+          {/* RIGHT — GLASS CARD  */}
           <div
             className="lk-card"
             style={{
@@ -321,6 +328,9 @@ export default function Login({ onLogin, loading, authError }) {
               </div>
             </div>
 
+            {/* Captcha */}
+            <Captcha ref={captchaRef} onStatusChange={setCaptchaStatus} style={{ marginBottom: 16 }} />
+
             {/* Error */}
             {error&&(
               <div style={{ marginBottom:12, padding:'9px 12px', background:'rgba(248,113,113,.1)', border:'1px solid rgba(248,113,113,.28)', borderRadius:9, fontSize:12, color:'#fca5a5', display:'flex', gap:7, alignItems:'center' }}>
@@ -332,16 +342,20 @@ export default function Login({ onLogin, loading, authError }) {
             <button className="lk-btn" onClick={handleLogin} disabled={loading}
               style={{
                 width:'100%', padding:'12px', marginBottom:12,
-                background:'linear-gradient(135deg,#22c55e,#16a34a)',
-                borderRadius:11, color:'#fff', fontSize:14, fontWeight:700,
+                background: canSubmit ? 'linear-gradient(135deg,#22c55e,#16a34a)' : 'rgba(255,255,255,.04)',
+                borderRadius:11, color: canSubmit ? '#fff' : 'rgba(255,255,255,.32)', fontSize:14, fontWeight:700,
                 display:'flex', alignItems:'center', justifyContent:'center', gap:8,
                 letterSpacing:'.01em',
-                boxShadow:'0 4px 18px rgba(34,197,94,.38)',
+                border: canSubmit ? 'none' : '1.5px dashed rgba(255,255,255,.2)',
+                cursor: canSubmit ? 'pointer' : 'not-allowed',
+                boxShadow: canSubmit ? '0 4px 18px rgba(34,197,94,.38)' : 'none',
               }}
             >
               {loading
                 ? <><div style={{ width:14, height:14, border:'2px solid rgba(255,255,255,.3)', borderTopColor:'#fff', borderRadius:'50%', animation:'spin .7s linear infinite' }}/> Signing in…</>
-                : <>Login &nbsp;→</>
+                : canSubmit
+                  ? <>Login &nbsp;→</>
+                  : <><Lock size={13}/> Login</>
               }
             </button>
 
@@ -356,13 +370,7 @@ export default function Login({ onLogin, loading, authError }) {
               </button>
             </div>
 
-            {/* Caution */}
-            <div style={{ padding:'9px 11px', background:'rgba(253,230,138,.08)', border:'1px solid rgba(253,230,138,.2)', borderRadius:10, display:'flex', gap:8, alignItems:'flex-start', marginBottom:12 }}>
-              <span style={{ fontSize:12, flexShrink:0 }}>⚠️</span>
-              <div style={{ fontSize:11.5, color:'rgba(255,255,255,.55)', lineHeight:1.55 }}>
-                <strong style={{ color:'rgba(255,255,255,.8)' }}>Be Cautious</strong> — Never share your password. This portal will never ask for your OTP.
-              </div>
-            </div>
+    
 
           </div>
         </div>

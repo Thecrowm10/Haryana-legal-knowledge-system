@@ -6,8 +6,6 @@ export const resetPasswordWithOtp  = (identifier, otp, new_password) => api.post
 export const requestAdminOtp       = (mobile_number) => api.post('/admin/auth/request-otp', { mobile_number });
 export const verifyAdminOtp        = (mobile_number, otp) => api.post('/admin/auth/verify-otp', { mobile_number, otp });
 // Content-Type is left unset — axios/the browser auto-generates it with the
-// multipart boundary for FormData bodies. Setting it manually here previously
-// dropped the boundary parameter, which can hang or fail the upload server-side.
 export const uploadPdfFile     = (formData) => api.post('/pdf/upload-file', formData);
 export const uploadPdfMetadata = (data)     => api.post('/pdf/upload', data);
 export const getMyDocuments    = ()         => api.get('/pdf/my-documents');

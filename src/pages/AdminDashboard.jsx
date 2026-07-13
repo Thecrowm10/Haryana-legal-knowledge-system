@@ -92,7 +92,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   const [createSuccess, setCreateSuccess] = useState('');
   const [addDeptOpen, setAddDeptOpen]   = useState(false);
   useEffect(() => {
-    if (!['departments', 'taxonomy', 'users'].includes(activePage)) return;
+    if (!['taxonomy', 'users'].includes(activePage)) return;
     setDeptsLoading(true);
     setDeptsError('');
     getDepartments()
@@ -217,6 +217,12 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
         setCreateError(typeof detail === 'string' ? detail : 'Failed to create department.');
       })
       .finally(() => setCreating(false));
+  }
+
+  function closeAddDept() {
+    setAddDeptOpen(false);
+    setNewDept({ name: '', description: '' });
+    setCreateError('');
   }
 
   function updateCategory(category, newItems) {
@@ -821,189 +827,6 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     );
   }
 
-  // Departments
-  if (activePage === 'departments') {
-    const INP = (extra = {}) => ({
-      width: '100%',
-      padding: '10px 13px',
-      background: 'var(--surface-ground)',
-      border: '1px solid var(--surface-border)',
-      borderRadius: 9,
-      fontSize: 13,
-      color: 'var(--text-color)',
-      outline: 'none',
-      fontFamily: 'var(--font)',
-      ...extra,
-    });
-
-    function closeAddDept() {
-      setAddDeptOpen(false);
-      setNewDept({ name: '', description: '' });
-      setCreateError('');
-    }
-
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
-
-        <Card>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-              <div style={{ width: 44, height: 44, borderRadius: 11, background: 'rgba(26,86,219,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Building2 size={20} color='var(--primary)' strokeWidth={1.8} />
-              </div>
-              <div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)' }}>Departments</div>
-                <div style={{ fontSize: 12, color: 'var(--text-color-secondary)', marginTop: 2 }}>
-                  {deptsLoading ? 'Loading…' : `${depts.length} department${depts.length !== 1 ? 's' : ''} registered`}
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={() => setAddDeptOpen(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--primary)', color: 'white', border: 'none', borderRadius: 9, padding: '10px 18px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-              <Plus size={14} /> Add Department
-            </button>
-          </div>
-        </Card>
-
-        {createSuccess && (
-          <div style={{ padding: '10px 14px', background: 'rgba(34,197,94,.08)', border: '1px solid rgba(34,197,94,.25)', borderRadius: 8, fontSize: 12.5, color: '#16a34a', display: 'flex', gap: 7, alignItems: 'center' }}>
-            <CheckCircle size={13} /> {createSuccess}
-          </div>
-        )}
-
-        {/* Departments list */}
-        <Card padding="0">
-          <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--surface-border)' }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>All Departments</div>
-          </div>
-
-          {deptsLoading && (
-            <div style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>
-              Loading departments…
-            </div>
-          )}
-          {deptsError && (
-            <div style={{ padding: '20px 18px', fontSize: 13, color: '#ef4444' }}>{deptsError}</div>
-          )}
-          {!deptsLoading && !deptsError && depts.length === 0 && (
-            <div style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>
-              No departments yet. Click "Add Department" to create one.
-            </div>
-          )}
-          {!deptsLoading && !deptsError && depts.length > 0 && (
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
-                  {['#', 'Name', 'Description'].map(h => (
-                    <th key={h} style={{ ...LABEL, padding: '11px 16px', textAlign: 'left' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {depts.map((d, i) => (
-                  <tr key={d.id}
-                    style={{ borderBottom: '1px solid var(--surface-border)', transition: 'background .15s' }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                  >
-                    <td style={{ padding: '12px 16px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)', width: 40 }}>{i + 1}</td>
-                    <td style={{ padding: '12px 16px', fontSize: 13, fontWeight: 600, color: 'var(--text-heading)', whiteSpace: 'nowrap' }}>{d.name}</td>
-                    <td style={{ padding: '12px 16px', fontSize: 12.5, color: 'var(--text-color-secondary)', lineHeight: 1.5 }}>{d.description || '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </Card>
-
-        {/* Add Department drawer */}
-        {addDeptOpen && (
-          <>
-            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.25)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', zIndex: 300, animation: 'drawerFadeIn .2s ease' }} />
-            <div style={{
-              position: 'fixed', right: 0, top: 0, height: '100vh', width: 420,
-              background: 'var(--surface-card)', boxShadow: '-4px 0 40px rgba(0,0,0,.18)',
-              zIndex: 301, display: 'flex', flexDirection: 'column',
-              animation: 'drawerSlideIn .28s cubic-bezier(.22,1,.36,1)',
-            }}>
-              <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 34, height: 34, borderRadius: 9, background: 'var(--primary-light)', border: '1px solid var(--primary-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Building2 size={16} color="var(--primary)" />
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)' }}>Add Department</div>
-                  <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 1 }}>Create a new department record.</div>
-                </div>
-                <button onClick={closeAddDept}
-                  style={{ width: 30, height: 30, borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-color-secondary)', flexShrink: 0 }}>
-                  <X size={14} />
-                </button>
-              </div>
-
-              <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <div>
-                  <label style={{ ...LABEL, display: 'block', marginBottom: 7 }}>Department Name *</label>
-                  <input
-                    autoFocus
-                    style={INP(createError && !newDept.name.trim() ? { borderColor: 'rgba(239,68,68,.6)' } : {})}
-                    placeholder="e.g. Revenue Department"
-                    value={newDept.name}
-                    onChange={e => { setNewDept(p => ({ ...p, name: e.target.value })); setCreateError(''); }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ ...LABEL, display: 'block', marginBottom: 7 }}>Description</label>
-                  <textarea
-                    rows={5}
-                    style={{ ...INP(), resize: 'vertical', lineHeight: 1.55 }}
-                    placeholder="Brief description of the department's function…"
-                    value={newDept.description}
-                    onChange={e => setNewDept(p => ({ ...p, description: e.target.value }))}
-                  />
-                </div>
-
-                {createError && (
-                  <div style={{ padding: '9px 12px', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, fontSize: 12.5, color: '#ef4444', display: 'flex', gap: 7, alignItems: 'center' }}>
-                    <span>⚠</span> {createError}
-                  </div>
-                )}
-              </div>
-
-              <div style={{ padding: '16px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                <button type="button" onClick={closeAddDept}
-                  style={{ padding: '9px 20px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={creating}
-                  onClick={e => {
-                    handleCreateDept(e);
-                  }}
-                  style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-                    background: creating ? 'var(--surface-border)' : 'var(--primary)',
-                    color: creating ? 'var(--text-color-secondary)' : 'white',
-                    border: 'none', borderRadius: 8, padding: '9px 20px',
-                    fontSize: 13, fontWeight: 700, cursor: creating ? 'not-allowed' : 'pointer',
-                    fontFamily: 'var(--font)',
-                  }}
-                >
-                  {creating
-                    ? <><div style={{ width: 13, height: 13, border: '2px solid rgba(0,0,0,.2)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin .7s linear infinite' }}/> Creating…</>
-                    : <><Plus size={14} /> Add Department</>
-                  }
-                </button>
-              </div>
-            </div>
-          </>
-        )}
-      </div>
-    );
-  }
-
   // Master Data Manager
   if (activePage === 'taxonomy') {
     const INPUT_STYLE = {
@@ -1018,6 +841,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       }}>{label}</button>
     );
     return (
+      <>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
         {taxonomy.map(t => {
           const isApiDriven  = t.category === 'Departments' || t.category === 'Document Types';
@@ -1042,7 +866,17 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 </div>
               </div>
               {(!isApiDriven || canCreateApi) && (
-                <button onClick={() => startAdd(t.category)} style={{ background: 'var(--primary)', color: 'white', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <button
+                  onClick={() => {
+                    if (t.category === 'Departments') {
+                      setNewDept({ name: '', description: '' });
+                      setCreateError('');
+                      setAddDeptOpen(true);
+                    } else {
+                      startAdd(t.category);
+                    }
+                  }}
+                  style={{ background: 'var(--primary)', color: 'white', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
                   <Plus size={11} /> Add
                 </button>
               )}
@@ -1130,6 +964,104 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
           );
         })}
       </div>
+
+      {createSuccess && (
+        <div style={{ position: 'fixed', top: 20, right: 20, zIndex: 400, padding: '10px 16px', background: 'var(--surface-card)', border: '1px solid rgba(34,197,94,.25)', borderRadius: 9, fontSize: 12.5, color: '#16a34a', boxShadow: '0 8px 24px rgba(0,0,0,.12)', display: 'flex', gap: 7, alignItems: 'center' }}>
+          <CheckCircle size={13} /> {createSuccess}
+        </div>
+      )}
+
+      {/* Add Department drawer */}
+      {addDeptOpen && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.25)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', zIndex: 300, animation: 'drawerFadeIn .2s ease' }} onClick={closeAddDept} />
+          <div style={{
+            position: 'fixed', right: 0, top: 0, height: '100vh', width: 420,
+            background: 'var(--surface-card)', boxShadow: '-4px 0 40px rgba(0,0,0,.18)',
+            zIndex: 301, display: 'flex', flexDirection: 'column',
+            animation: 'drawerSlideIn .28s cubic-bezier(.22,1,.36,1)',
+          }}>
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 34, height: 34, borderRadius: 9, background: 'var(--primary-light)', border: '1px solid var(--primary-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Building2 size={16} color="var(--primary)" />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)' }}>Add Department</div>
+                <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 1 }}>Create a new department record.</div>
+              </div>
+              <button onClick={closeAddDept}
+                style={{ width: 30, height: 30, borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-color-secondary)', flexShrink: 0 }}>
+                <X size={14} />
+              </button>
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <label style={{ ...LABEL, display: 'block', marginBottom: 7 }}>Department Name *</label>
+                <input
+                  autoFocus
+                  style={{
+                    width: '100%', padding: '10px 13px', background: 'var(--surface-ground)',
+                    border: `1px solid ${createError && !newDept.name.trim() ? 'rgba(239,68,68,.6)' : 'var(--surface-border)'}`,
+                    borderRadius: 9, fontSize: 13, color: 'var(--text-color)', outline: 'none', fontFamily: 'var(--font)',
+                  }}
+                  placeholder="e.g. Revenue Department"
+                  value={newDept.name}
+                  onChange={e => { setNewDept(p => ({ ...p, name: e.target.value })); setCreateError(''); }}
+                />
+              </div>
+
+              <div>
+                <label style={{ ...LABEL, display: 'block', marginBottom: 7 }}>Description</label>
+                <textarea
+                  rows={5}
+                  style={{
+                    width: '100%', padding: '10px 13px', background: 'var(--surface-ground)',
+                    border: '1px solid var(--surface-border)', borderRadius: 9, fontSize: 13,
+                    color: 'var(--text-color)', outline: 'none', fontFamily: 'var(--font)',
+                    resize: 'vertical', lineHeight: 1.55,
+                  }}
+                  placeholder="Brief description of the department's function…"
+                  value={newDept.description}
+                  onChange={e => setNewDept(p => ({ ...p, description: e.target.value }))}
+                />
+              </div>
+
+              {createError && (
+                <div style={{ padding: '9px 12px', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, fontSize: 12.5, color: '#ef4444', display: 'flex', gap: 7, alignItems: 'center' }}>
+                  <span>⚠</span> {createError}
+                </div>
+              )}
+            </div>
+
+            <div style={{ padding: '16px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button type="button" onClick={closeAddDept}
+                style={{ padding: '9px 20px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={creating}
+                onClick={handleCreateDept}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                  background: creating ? 'var(--surface-border)' : 'var(--primary)',
+                  color: creating ? 'var(--text-color-secondary)' : 'white',
+                  border: 'none', borderRadius: 8, padding: '9px 20px',
+                  fontSize: 13, fontWeight: 700, cursor: creating ? 'not-allowed' : 'pointer',
+                  fontFamily: 'var(--font)',
+                }}
+              >
+                {creating
+                  ? <><div style={{ width: 13, height: 13, border: '2px solid rgba(0,0,0,.2)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin .7s linear infinite' }}/> Creating…</>
+                  : <><Plus size={14} /> Add Department</>
+                }
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </>
     );
   }
 
