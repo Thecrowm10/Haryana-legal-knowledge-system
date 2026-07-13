@@ -105,9 +105,9 @@ export default function App() {
       case 'citizen':
         return (
           <CitizenDashboard
-            activePage={activePage}
             onAuditLog={addAuditLog}
             documents={documents}
+            onLogout={logout}
           />
         );
       case 'uploader':

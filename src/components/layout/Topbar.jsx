@@ -14,7 +14,6 @@ const ROLE_META = {
 };
 
 const BREADCRUMBS = {
-  home: ['Home'], search: ['Documents', 'Search'],
   upload: ['Documents', 'Upload'], myuploads: ['Documents', 'My Uploads'],
   pending: ['Review', 'Pending Approvals'], reviewed: ['Review', 'Reviewed'],
   analytics: ['Analytics', 'Dashboard'], graph: ['Analytics', 'Knowledge Graph'], audit: ['Analytics', 'MIS Report'],

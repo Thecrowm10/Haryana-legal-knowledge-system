@@ -1,13 +1,7 @@
 import { useState } from 'react';
-import { Home, Search, Upload, FileText, CheckSquare, Eye, BarChart2, GitBranch, ClipboardList, ChevronDown, Users, Settings, Activity, FileSearch, BarChart, Layers, Link2 } from 'lucide-react';
+import { Upload, FileText, CheckSquare, Eye, BarChart2, GitBranch, ClipboardList, ChevronDown, Users, Settings, Activity, FileSearch, BarChart, Layers, Link2 } from 'lucide-react';
 import haryanaLogo from '../../assets/haryana-logo.png';
 const MENU_CONFIG = {
-  citizen: [
-    { label: 'MAIN', items: [
-      { icon: Home,     label: 'Home',             id: 'home' },
-      { icon: Search,   label: 'Search Documents',  id: 'search' },
-    ]},
-  ],
   uploader: [
     { label: 'DOCUMENTS', items: [
       { icon: Upload,   label: 'Upload Document',  id: 'upload' },

@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   Search, FileText, X, BookOpen, Bookmark, BookmarkCheck,
-  ChevronRight, MapPin, AlertCircle,
+  ChevronRight, MapPin, AlertCircle, LogOut, Building2, Layers,
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import DocViewModal from '../components/DocViewModal';
+import haryanaLogo from '../assets/haryana-logo.png';
+import bannerBg from '../assets/banner-1-768x217.png';
 import { fullTextSearch, getAllDocumentsAdmin } from '../services/pdf';
 
 // Document types matching backend VALID_DOCUMENT_TYPES
@@ -148,7 +150,7 @@ function GroupedResultCard({ group, query, onView }) {
   );
 }
 
-export default function CitizenDashboard({ activePage, onAuditLog }) {
+export default function CitizenDashboard({ onAuditLog, documents = [], onLogout }) {
   const [query, setQuery]           = useState('');
   const [results, setResults]       = useState([]);
   const [total, setTotal]           = useState(0);
@@ -162,15 +164,14 @@ export default function CitizenDashboard({ activePage, onAuditLog }) {
   const [recentLoading, setRecentLoading] = useState(false);
   const inputRef = useRef(null);
 
-  // Fetch recently published docs for home page
+  // Fetch recently published docs for the idle/landing state
   useEffect(() => {
-    if (activePage !== 'home') return;
     setRecentLoading(true);
     getAllDocumentsAdmin('approved', 0, 8)
       .then(res => setRecentDocs(res.data.documents || []))
       .catch(() => {})
       .finally(() => setRecentLoading(false));
-  }, [activePage]);
+  }, []);
 
   async function doSearch(q = query) {
     const trimmed = (q || '').trim();
@@ -227,170 +228,77 @@ export default function CitizenDashboard({ activePage, onAuditLog }) {
   const isBookmarked = bookmarks.includes(query.trim());
   const suggestions  = QUICK_SEARCHES.filter(s => s.includes(query.toLowerCase()) && query.length >= 2);
 
-  // ── Home page ─────────────────────────────────────────────────────────────
-  if (activePage === 'home') {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
-        {viewDoc && <DocViewModal doc={viewDoc} onClose={() => setViewDoc(null)} initialPage={viewDoc._initialPage || 1} searchQuery={viewDoc._searchQuery || null} searchPages={viewDoc._searchPages || null} />}
+  const publishedCount = documents.filter(d => d.status === 'approved').length;
+  const deptCount = new Set(documents.map(d => d.dept).filter(Boolean)).size;
+  const typeCount = new Set(documents.map(d => d.type).filter(Boolean)).size;
 
-        {/* Hero */}
-        <div style={{ borderRadius: 16, background: 'linear-gradient(135deg, rgba(26,86,219,.08) 0%, rgba(124,58,237,.05) 100%)', border: '1px solid rgba(26,86,219,.14)', padding: '36px 32px 28px', textAlign: 'center' }}>
-          <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--text-heading)', marginBottom: 6, letterSpacing: '-.01em' }}>
-            Haryana Legal Knowledge System
-          </div>
-          <div style={{ fontSize: 13.5, color: 'var(--text-color-secondary)', marginBottom: 24, maxWidth: 460, margin: '0 auto 24px' }}>
-            Search and access published acts, notifications, policies, and circulars.
-          </div>
+  return (
+    <div style={{ minHeight: '100%', display: 'flex', flexDirection: 'column', animation: 'fadeSlideIn .3s ease' }}>
+      {viewDoc && <DocViewModal doc={viewDoc} onClose={() => setViewDoc(null)} initialPage={viewDoc._initialPage || 1} searchQuery={viewDoc._searchQuery || null} searchPages={viewDoc._searchPages || null} />}
 
-          {/* Inline search */}
-          <div style={{ display: 'flex', maxWidth: 580, margin: '0 auto', background: 'var(--surface-card)', border: '1.5px solid var(--surface-border)', borderRadius: 12, overflow: 'hidden', boxShadow: '0 4px 24px rgba(26,86,219,.1)' }}>
-            <span style={{ padding: '0 14px', display: 'flex', alignItems: 'center', color: 'var(--text-color-secondary)', flexShrink: 0 }}>
-              <Search size={16} />
-            </span>
-            <input
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') doSearch(); }}
-              placeholder="Search legal documents, acts, keywords…"
-              style={{ flex: 1, padding: '14px 0', background: 'transparent', border: 'none', outline: 'none', fontFamily: 'var(--font)', fontSize: 14, color: 'var(--text-color)' }}
-            />
-            <button
-              onClick={() => doSearch()}
-              style={{ background: 'var(--primary)', color: 'white', border: 'none', padding: '12px 26px', fontFamily: 'var(--font)', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', letterSpacing: '.04em', textTransform: 'uppercase', flexShrink: 0 }}
-            >
-              Search
+      {/* Hero — full-bleed banner photo, same asset as the login screen */}
+      <div style={{ position: 'relative', overflow: 'hidden', padding: '18px 32px 52px', textAlign: 'center' }}>
+        <img src={bannerBg} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0, filter: 'blur(2px)', transform: 'scale(1.02)' }} />
+        <div style={{ position: 'absolute', inset: 0, zIndex: 1, background: 'linear-gradient(110deg, rgba(2,10,5,.82) 0%, rgba(2,10,5,.62) 45%, rgba(2,10,5,.42) 100%)' }} />
+
+        <div style={{ position: 'relative', zIndex: 2 }}>
+          {/* Utility row */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+            <button onClick={onLogout}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.18)', color: 'rgba(255,255,255,.7)', padding: '5px 12px', borderRadius: 20, fontSize: 11.5, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+              <LogOut size={11} /> Exit Guest Mode
             </button>
           </div>
 
-          {/* Quick search chips */}
-          <div style={{ marginTop: 18, display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
-            {QUICK_SEARCHES.slice(0, 6).map(s => (
-              <button key={s} onClick={() => doSearch(s)}
-                style={{ background: 'rgba(255,255,255,.7)', border: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)', padding: '5px 14px', borderRadius: 20, fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'all .15s' }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)'; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--surface-border)'; e.currentTarget.style.color = 'var(--text-color-secondary)'; }}>
-                {s}
-              </button>
-            ))}
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
+            <img src={haryanaLogo} alt="Haryana Government" style={{ width: 48, height: 48, objectFit: 'contain' }} />
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontSize: 24, fontWeight: 800, color: '#fff', letterSpacing: '-.01em', lineHeight: 1.2 }}>
+                Haryana Legal Repository
+              </div>
+              <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,.65)' }}>Government of Haryana</div>
+            </div>
           </div>
-        </div>
-
-        {/* Document type tiles */}
-        <div>
-          <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 10 }}>Browse by Document Type</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
-            {Object.entries(DOC_TYPE_META).map(([type, meta]) => (
-              <button key={type} onClick={() => doSearch(type)}
-                style={{ background: meta.bg, border: `1px solid ${meta.border}`, borderRadius: 10, padding: '14px 12px', cursor: 'pointer', textAlign: 'left', fontFamily: 'var(--font)', transition: 'transform .15s, box-shadow .15s' }}
-                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 6px 16px ${meta.bg}`; }}
-                onMouseLeave={e => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: meta.color, fontFamily: 'var(--mono)', letterSpacing: '.04em' }}>{type.toUpperCase()}</div>
-              </button>
-            ))}
+          <div style={{ fontSize: 13.5, color: 'rgba(255,255,255,.72)', marginBottom: 26, maxWidth: 460, margin: '0 auto 26px' }}>
+            Search and access published acts, notifications, policies, and circulars.
           </div>
-        </div>
 
-        {/* Recently published */}
-        <Card>
-          <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 14 }}>Recently Published</div>
-          {recentLoading ? (
-            <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-color-secondary)', fontSize: 13 }}>Loading…</div>
-          ) : recentDocs.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-color-secondary)', fontSize: 13 }}>No documents found.</div>
-          ) : (
-            <div>
-              {recentDocs.map((doc, i) => {
-                const meta = doc.document_type_name ? DOC_TYPE_META[doc.document_type_name] : null;
-                return (
-                  <div key={doc.id}
-                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 6px', borderBottom: i < recentDocs.length - 1 ? '1px solid var(--surface-border)' : 'none', cursor: 'pointer', borderRadius: 6, transition: 'background .12s' }}
-                    onClick={() => openRecentDoc(doc)}
-                    onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                    <FileText size={14} color="var(--text-color-secondary)" style={{ flexShrink: 0 }} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {doc.document_name || doc.original_filename}
-                      </div>
-                      <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 1 }}>
-                        {[doc.department_name, doc.document_type_name].filter(Boolean).join(' · ')}
-                      </div>
-                    </div>
-                    {meta && (
-                      <span style={{ fontSize: 9.5, fontWeight: 700, padding: '2px 8px', borderRadius: 5, fontFamily: 'var(--mono)', letterSpacing: '.04em', textTransform: 'uppercase', flexShrink: 0, background: meta.bg, color: meta.color, border: `1px solid ${meta.border}` }}>
-                        {doc.document_type_name}
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </Card>
-
-        {/* Saved searches */}
-        {bookmarks.length > 0 && (
-          <Card>
-            <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <BookmarkCheck size={14} color="var(--primary)" /> Saved Searches
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {bookmarks.map(bm => (
-                <button key={bm} onClick={() => doSearch(bm)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', color: 'var(--text-color)', padding: '6px 14px', borderRadius: 20, fontSize: 12.5, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                  <Search size={11} /> {bm} <ChevronRight size={11} />
+          {/* Search bar */}
+          <div style={{ maxWidth: 620, margin: '0 auto' }}>
+            <div style={{ position: 'relative' }}>
+              <div style={{ display: 'flex', alignItems: 'center', background: '#fff', border: '1.5px solid transparent', borderRadius: 12, overflow: 'hidden', boxShadow: '0 12px 40px rgba(0,0,0,.35)' }}
+                onFocusCapture={e => e.currentTarget.style.borderColor = 'var(--primary)'}
+                onBlurCapture={e => e.currentTarget.style.borderColor = 'transparent'}>
+                <span style={{ padding: '0 14px', display: 'flex', alignItems: 'center', color: 'var(--text-color-secondary)', flexShrink: 0 }}>
+                  <Search size={16} />
+                </span>
+                <input
+                  ref={inputRef}
+                  value={query}
+                  onChange={e => { setQuery(e.target.value); setShowSugg(true); }}
+                  onKeyDown={e => { if (e.key === 'Enter') doSearch(); if (e.key === 'Escape') setShowSugg(false); }}
+                  onFocus={() => setShowSugg(true)}
+                  onBlur={() => setTimeout(() => setShowSugg(false), 150)}
+                  placeholder="Search legal documents, acts, keywords…"
+                  style={{ flex: 1, padding: '15px 0', background: 'transparent', border: 'none', outline: 'none', fontFamily: 'var(--font)', fontSize: 14, color: 'var(--text-color)' }}
+                />
+                {query && (
+                  <button onClick={() => { setQuery(''); setShowSugg(false); inputRef.current?.focus(); }}
+                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0 8px', color: 'var(--text-color-secondary)', display: 'flex' }}>
+                    <X size={14} />
+                  </button>
+                )}
+                <button
+                  onClick={() => doSearch()}
+                  style={{ background: 'var(--primary)', color: 'white', border: 'none', padding: '15px 28px', fontFamily: 'var(--font)', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', letterSpacing: '.04em', textTransform: 'uppercase', flexShrink: 0 }}
+                >
+                  Search
                 </button>
-              ))}
-            </div>
-          </Card>
-        )}
-      </div>
-    );
-  }
-
-  // ── Search page ───────────────────────────────────────────────────────────
-  return (
-    <div style={{ animation: 'fadeSlideIn .3s ease' }}>
-      {viewDoc && <DocViewModal doc={viewDoc} onClose={() => setViewDoc(null)} initialPage={viewDoc._initialPage || 1} searchQuery={viewDoc._searchQuery || null} searchPages={viewDoc._searchPages || null} />}
-
-      {/* Search bar card */}
-      <Card style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 3 }}>Search Legal Documents</div>
-        <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', marginBottom: 16 }}>
-          Full-text search across all published documents — results include verbatim excerpts.
-        </div>
-
-        <div style={{ position: 'relative', marginBottom: 14 }}>
-          <div style={{ display: 'flex', gap: 10 }}>
-            {/* Input wrapper */}
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 8, maxWidth: 700, transition: 'border-color .2s', position: 'relative' }}
-              onFocusCapture={e => e.currentTarget.style.borderColor = 'var(--primary)'}
-              onBlurCapture={e => e.currentTarget.style.borderColor = 'var(--surface-border)'}>
-              <span style={{ padding: '0 12px', color: 'var(--text-color-secondary)', display: 'flex', alignItems: 'center', flexShrink: 0 }}><Search size={15} /></span>
-              <input
-                ref={inputRef}
-                value={query}
-                onChange={e => { setQuery(e.target.value); setShowSugg(true); }}
-                onKeyDown={e => { if (e.key === 'Enter') doSearch(); if (e.key === 'Escape') setShowSugg(false); }}
-                onFocus={() => setShowSugg(true)}
-                onBlur={() => setTimeout(() => setShowSugg(false), 150)}
-                placeholder="Search by act name, keyword, or phrase…"
-                style={{ flex: 1, padding: '11px 0', background: 'transparent', border: 'none', outline: 'none', fontFamily: 'var(--font)', fontSize: 13.5, color: 'var(--text-color)' }}
-              />
-              {query && (
-                <button onClick={() => { setQuery(''); setShowSugg(false); inputRef.current?.focus(); }}
-                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '0 8px', color: 'var(--text-color-secondary)', display: 'flex' }}>
-                  <X size={13} />
-                </button>
-              )}
-              <button onClick={() => doSearch()}
-                style={{ background: 'var(--primary)', color: 'white', border: 'none', padding: '10px 22px', margin: 4, borderRadius: 6, fontFamily: 'var(--font)', fontSize: 12, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', cursor: 'pointer', flexShrink: 0 }}>
-                Search
-              </button>
+              </div>
 
               {/* Autocomplete dropdown */}
               {showSugg && suggestions.length > 0 && (
-                <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 10, boxShadow: 'var(--card-shadow)', zIndex: 100, overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, background: '#fff', border: '1px solid var(--surface-border)', borderRadius: 10, boxShadow: 'var(--card-shadow)', zIndex: 100, overflow: 'hidden', textAlign: 'left' }}>
                   {suggestions.slice(0, 5).map((s, i, arr) => (
                     <div key={i} onMouseDown={() => doSearch(s)}
                       style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer', borderBottom: i < arr.length - 1 ? '1px solid var(--surface-border)' : 'none', fontSize: 13, color: 'var(--text-color)', transition: 'background .12s' }}
@@ -403,142 +311,181 @@ export default function CitizenDashboard({ activePage, onAuditLog }) {
               )}
             </div>
 
-            {/* Bookmark button */}
-            {query && searched && (
-              <button onClick={() => toggleBookmark(query.trim())}
-                title={isBookmarked ? 'Remove bookmark' : 'Save this search'}
-                style={{ background: isBookmarked ? 'rgba(26,86,219,.1)' : 'var(--surface-card)', border: `1px solid ${isBookmarked ? 'rgba(26,86,219,.3)' : 'var(--surface-border)'}`, color: isBookmarked ? 'var(--primary)' : 'var(--text-color-secondary)', padding: '10px 14px', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 500, fontFamily: 'var(--font)', transition: 'all .2s' }}>
-                {isBookmarked ? <BookmarkCheck size={14} /> : <Bookmark size={14} />}
-                {isBookmarked ? 'Saved' : 'Save'}
-              </button>
+            {/* Save / Clear — only relevant once a search has actually run */}
+            {searched && (
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 12 }}>
+                {query && (
+                  <button onClick={() => toggleBookmark(query.trim())}
+                    title={isBookmarked ? 'Remove bookmark' : 'Save this search'}
+                    style={{ background: isBookmarked ? 'rgba(74,222,128,.15)' : 'rgba(255,255,255,.08)', border: `1px solid ${isBookmarked ? 'rgba(74,222,128,.35)' : 'rgba(255,255,255,.18)'}`, color: isBookmarked ? '#4ade80' : 'rgba(255,255,255,.7)', padding: '7px 14px', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 500, fontFamily: 'var(--font)', transition: 'all .2s' }}>
+                    {isBookmarked ? <BookmarkCheck size={13} /> : <Bookmark size={13} />}
+                    {isBookmarked ? 'Saved' : 'Save'}
+                  </button>
+                )}
+                <button onClick={clearSearch}
+                  style={{ background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.18)', color: 'rgba(255,255,255,.7)', padding: '7px 14px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <X size={12} /> Clear
+                </button>
+              </div>
             )}
 
-            {searched && (
-              <button onClick={clearSearch}
-                style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)', padding: '10px 16px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 12.5, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <X size={13} /> Clear
-              </button>
+            {/* Quick search chips — only shown before searching, to keep results uncluttered */}
+            {!searched && (
+              <div style={{ marginTop: 18, display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
+                {QUICK_SEARCHES.slice(0, 6).map(s => (
+                  <button key={s} onClick={() => doSearch(s)}
+                    style={{ background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.18)', color: 'rgba(255,255,255,.75)', padding: '6px 15px', borderRadius: 20, fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'all .15s' }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = '#4ade80'; e.currentTarget.style.color = '#4ade80'; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,.18)'; e.currentTarget.style.color = 'rgba(255,255,255,.75)'; }}>
+                    {s}
+                  </button>
+                ))}
+              </div>
             )}
           </div>
         </div>
+      </div>
 
-        {/* Saved searches quick-access */}
-        {bookmarks.length > 0 && !searched && (
-          <div style={{ paddingTop: 12, borderTop: '1px solid var(--surface-border)' }}>
-            <div style={{ ...LABEL, marginBottom: 8 }}>Saved Searches</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
-              {bookmarks.map(bm => (
-                <button key={bm} onMouseDown={() => doSearch(bm)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)', padding: '5px 12px', borderRadius: 20, fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                  <BookmarkCheck size={11} color="var(--primary)" /> {bm}
-                </button>
+      {/* Stats strip — floats up over the hero's bottom edge, like a landing panel */}
+      <div style={{ padding: '0 32px', marginTop: -32, position: 'relative', zIndex: 3 }}>
+        <div style={{
+          maxWidth: 860, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
+          background: 'var(--surface-card)', borderRadius: 14, boxShadow: '0 12px 32px rgba(0,0,0,.12)',
+          border: '1px solid var(--surface-border)', overflow: 'hidden',
+        }}>
+          {[
+            { label: 'Published Documents', value: publishedCount, icon: FileText },
+            { label: 'Departments',         value: deptCount,      icon: Building2 },
+            { label: 'Document Types',      value: typeCount,      icon: Layers },
+          ].map((s, i) => (
+            <div key={s.label} style={{ padding: '20px 24px', display: 'flex', alignItems: 'center', gap: 14, borderRight: i < 2 ? '1px solid var(--surface-border)' : 'none' }}>
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(26,86,219,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <s.icon size={18} color="var(--primary)" strokeWidth={1.8} />
+              </div>
+              <div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-heading)', fontFamily: 'var(--mono)', lineHeight: 1 }}>{s.value}</div>
+                <div style={{ ...LABEL, marginTop: 3 }}>{s.label}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Content area */}
+      <div style={{ flex: 1, padding: '28px 32px 40px', maxWidth: 860, margin: '0 auto', width: '100%' }}>
+
+        {/* Loading */}
+        {loading && (
+          <div style={{ textAlign: 'center', padding: '64px 0' }}>
+            <div style={{ display: 'inline-flex', gap: 6, marginBottom: 12 }}>
+              {[0, 1, 2].map(i => (
+                <span key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--primary)', display: 'inline-block', animation: `bounce .8s ease-in-out ${i * .12}s infinite` }} />
               ))}
             </div>
+            <div style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>Searching documents…</div>
           </div>
         )}
-      </Card>
 
-      {/* Loading */}
-      {loading && (
-        <div style={{ textAlign: 'center', padding: '64px 0' }}>
-          <div style={{ display: 'inline-flex', gap: 6, marginBottom: 12 }}>
-            {[0, 1, 2].map(i => (
-              <span key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--primary)', display: 'inline-block', animation: `bounce .8s ease-in-out ${i * .12}s infinite` }} />
+        {/* Error */}
+        {!loading && error && (
+          <Card style={{ textAlign: 'center', padding: '48px 0' }}>
+            <AlertCircle size={36} color="#dc2626" style={{ margin: '0 auto 12px', display: 'block' }} />
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#dc2626', marginBottom: 5 }}>Search Error</div>
+            <div style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>{error}</div>
+          </Card>
+        )}
+
+        {/* Results */}
+        {!loading && searched && !error && (
+          <>
+            {(() => {
+              const groups = groupResults(results);
+              return (
+                <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', marginBottom: 14, fontFamily: 'var(--mono)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>
+                    <strong style={{ color: 'var(--primary)' }}>{groups.length}</strong> document{groups.length !== 1 ? 's' : ''}
+                    {total > groups.length && <> · <strong style={{ color: 'var(--primary)' }}>{total}</strong> total matches</>}
+                    {query && <> for <em style={{ color: 'var(--text-heading)', fontStyle: 'normal' }}>"{query}"</em></>}
+                  </span>
+                  <span style={{ fontSize: 11 }}>Verbatim excerpts · No AI-generated text</span>
+                </div>
+              );
+            })()}
+
+            {results.length === 0 ? (
+              <Card style={{ textAlign: 'center', padding: '72px 0' }}>
+                <Search size={44} color="var(--surface-200)" style={{ margin: '0 auto 14px', display: 'block' }} />
+                <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-color-secondary)', marginBottom: 6 }}>No results found</div>
+                <div style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>Try different keywords or a shorter phrase</div>
+              </Card>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {groupResults(results).map(group => (
+                  <GroupedResultCard
+                    key={group.pdf_id}
+                    group={group}
+                    query={query}
+                    onView={pageNum => openDoc(group, pageNum)}
+                  />
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Idle state — Recently Published */}
+        {!loading && !searched && (
+          <Card>
+            <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 14 }}>Recently Published</div>
+            {recentLoading ? (
+              <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-color-secondary)', fontSize: 13 }}>Loading…</div>
+            ) : recentDocs.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-color-secondary)', fontSize: 13 }}>No documents found.</div>
+            ) : (
+              <div>
+                {recentDocs.map((doc, i) => {
+                  const meta = doc.document_type_name ? DOC_TYPE_META[doc.document_type_name] : null;
+                  return (
+                    <div key={doc.id}
+                      style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 6px', borderBottom: i < recentDocs.length - 1 ? '1px solid var(--surface-border)' : 'none', cursor: 'pointer', borderRadius: 6, transition: 'background .12s' }}
+                      onClick={() => openRecentDoc(doc)}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                      <FileText size={14} color="var(--text-color-secondary)" style={{ flexShrink: 0 }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {doc.document_name || doc.original_filename}
+                        </div>
+                        <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 1 }}>
+                          {[doc.department_name, doc.document_type_name].filter(Boolean).join(' · ')}
+                        </div>
+                      </div>
+                      {meta && (
+                        <span style={{ fontSize: 9.5, fontWeight: 700, padding: '2px 8px', borderRadius: 5, fontFamily: 'var(--mono)', letterSpacing: '.04em', textTransform: 'uppercase', flexShrink: 0, background: meta.bg, color: meta.color, border: `1px solid ${meta.border}` }}>
+                          {doc.document_type_name}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+        )}
+
+        {/* Saved searches quick-access — only when idle and there's something saved */}
+        {!loading && !searched && bookmarks.length > 0 && (
+          <div style={{ marginTop: 16, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
+            <span style={{ ...LABEL }}>Saved:</span>
+            {bookmarks.map(bm => (
+              <button key={bm} onClick={() => doSearch(bm)}
+                style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', color: 'var(--text-color)', padding: '5px 12px', borderRadius: 20, fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                <BookmarkCheck size={11} color="var(--primary)" /> {bm} <ChevronRight size={11} />
+              </button>
             ))}
           </div>
-          <div style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>Searching documents…</div>
-        </div>
-      )}
-
-      {/* Error */}
-      {!loading && error && (
-        <Card style={{ textAlign: 'center', padding: '48px 0' }}>
-          <AlertCircle size={36} color="#dc2626" style={{ margin: '0 auto 12px', display: 'block' }} />
-          <div style={{ fontSize: 14, fontWeight: 600, color: '#dc2626', marginBottom: 5 }}>Search Error</div>
-          <div style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>{error}</div>
-        </Card>
-      )}
-
-      {/* Results */}
-      {!loading && searched && !error && (
-        <>
-          {(() => {
-            const groups = groupResults(results);
-            return (
-              <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', marginBottom: 14, fontFamily: 'var(--mono)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span>
-                  <strong style={{ color: 'var(--primary)' }}>{groups.length}</strong> document{groups.length !== 1 ? 's' : ''}
-                  {total > groups.length && <> · <strong style={{ color: 'var(--primary)' }}>{total}</strong> total matches</>}
-                  {query && <> for <em style={{ color: 'var(--text-heading)', fontStyle: 'normal' }}>"{query}"</em></>}
-                </span>
-                <span style={{ fontSize: 11 }}>Verbatim excerpts · No AI-generated text</span>
-              </div>
-            );
-          })()}
-
-          {results.length === 0 ? (
-            <Card style={{ textAlign: 'center', padding: '72px 0' }}>
-              <Search size={44} color="var(--surface-200)" style={{ margin: '0 auto 14px', display: 'block' }} />
-              <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-color-secondary)', marginBottom: 6 }}>No results found</div>
-              <div style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>Try different keywords or a shorter phrase</div>
-            </Card>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {groupResults(results).map(group => (
-                <GroupedResultCard
-                  key={group.pdf_id}
-                  group={group}
-                  query={query}
-                  onView={pageNum => openDoc(group, pageNum)}
-                />
-              ))}
-            </div>
-          )}
-        </>
-      )}
-
-      {/* Empty / landing state */}
-      {!loading && !searched && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ textAlign: 'center', padding: '52px 0 24px' }}>
-            <div style={{ width: 64, height: 64, borderRadius: 18, background: 'rgba(26,86,219,.08)', border: '1px solid rgba(26,86,219,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-              <Search size={28} color="var(--primary)" strokeWidth={1.5} />
-            </div>
-            <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 6 }}>Find Legal Documents</div>
-            <div style={{ fontSize: 13, color: 'var(--text-color-secondary)', lineHeight: 1.7, maxWidth: 400, margin: '0 auto' }}>
-              Enter keywords, act names, or phrases to search across all published legal documents.
-            </div>
-          </div>
-
-          <Card>
-            <div style={{ ...LABEL, marginBottom: 12 }}>Popular Searches</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {QUICK_SEARCHES.map(s => (
-                <button key={s} onClick={() => doSearch(s)}
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', color: 'var(--text-color)', padding: '7px 14px', borderRadius: 20, fontSize: 12.5, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'all .15s' }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.background = 'rgba(26,86,219,.05)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--surface-border)'; e.currentTarget.style.background = 'var(--surface-ground)'; }}>
-                  <Search size={11} color="var(--text-color-secondary)" /> {s}
-                </button>
-              ))}
-            </div>
-          </Card>
-
-          <Card>
-            <div style={{ ...LABEL, marginBottom: 12 }}>Browse by Type</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-              {Object.entries(DOC_TYPE_META).map(([type, meta]) => (
-                <button key={type} onClick={() => doSearch(type)}
-                  style={{ background: meta.bg, border: `1px solid ${meta.border}`, borderRadius: 8, padding: '12px 10px', cursor: 'pointer', textAlign: 'left', fontFamily: 'var(--font)', transition: 'transform .15s' }}
-                  onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-1px)'}
-                  onMouseLeave={e => e.currentTarget.style.transform = 'none'}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: meta.color, fontFamily: 'var(--mono)', letterSpacing: '.04em' }}>{type}</div>
-                </button>
-              ))}
-            </div>
-          </Card>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
