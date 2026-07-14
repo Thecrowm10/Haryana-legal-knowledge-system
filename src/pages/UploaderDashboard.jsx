@@ -1048,6 +1048,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     setFiles([]); setFileRefs([]); setFileMeta({}); setRelations([]);
     setForm({ act:'',dept:user?.dept||'',type:'',version:'1.0',desc:'',enactmentDate:'',parentAct:'',changeTypes:[] });
     setHierarchy({ act:'', actId: null, chapter:'',section:'',subsection:'' });
+    setLegalAuthorities([{ act: '', sections: [''] }]);
     setAmendmentProvisions([]); setParentActSearch(''); setTypeFields({});
 
     // Move newly uploaded docs from DRAFT to PENDING (queued for approver review)
@@ -1166,7 +1167,15 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
       ? [{ pdf_id: hierarchy.actId, type: 'parent_act' }]
       : [];
 
-    const relationshipsPayload = [...explicitRels, ...hierarchyRel];
+    // For non-Act types: legal authorities selected from API search → 'issued_under' relationship
+    const authorityRels = form.type !== 'Act'
+      ? legalAuthorities
+          .filter(a => a.actId)
+          .filter(a => !explicitRels.some(r => r.pdf_id === a.actId) && !hierarchyRel.some(r => r.pdf_id === a.actId))
+          .map(a => ({ pdf_id: a.actId, type: 'issued_under' }))
+      : [];
+
+    const relationshipsPayload = [...explicitRels, ...hierarchyRel, ...authorityRels];
 
     for (const f of files) {
       let apiDoc = null;
@@ -2881,7 +2890,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--surface-border)' }}>
             <button type="button"
-              onClick={() => { setForm({ act:'',dept:user?.dept||'',type:'',version:'1.0',desc:'',enactmentDate:'',parentAct:'',changeTypes:[] }); setFiles([]); setFileRefs([]); setFileMeta({}); setRelations([]); setHierarchy({ act:'',chapter:'',section:'',subsection:'' }); setAmendmentProvisions([]); setParentActSearch(''); setRelNote(''); setTypeFields({}); setUploadStep(null); setUploadError(''); }}
+              onClick={() => { setForm({ act:'',dept:user?.dept||'',type:'',version:'1.0',desc:'',enactmentDate:'',parentAct:'',changeTypes:[] }); setFiles([]); setFileRefs([]); setFileMeta({}); setRelations([]); setHierarchy({ act:'',chapter:'',section:'',subsection:'' }); setLegalAuthorities([{ act: '', sections: [''] }]); setAmendmentProvisions([]); setParentActSearch(''); setRelNote(''); setTypeFields({}); setUploadStep(null); setUploadError(''); }}
               style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)', padding: '9px 22px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
               onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
               onMouseLeave={e => e.currentTarget.style.background = 'var(--surface-card)'}>
@@ -3060,7 +3069,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                               <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 8, boxShadow: '0 6px 20px rgba(0,0,0,.13)', maxHeight: 220, overflow: 'auto', marginTop: 3 }}>
                                 {actSuggestions.map(a => (
                                   <div key={a.id}
-                                    onMouseDown={() => { setLegalAuthorities(p => p.map((r, idx) => idx === i ? { ...r, act: a.document_name } : r)); setActSuggestions([]); setShowAuthDrop(null); }}
+                                    onMouseDown={() => { setLegalAuthorities(p => p.map((r, idx) => idx === i ? { ...r, act: a.document_name, actId: a.id } : r)); setActSuggestions([]); setShowAuthDrop(null); }}
                                     style={{ padding: '9px 12px', cursor: 'pointer', borderBottom: '1px solid var(--surface-border)' }}
                                     onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
                                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
