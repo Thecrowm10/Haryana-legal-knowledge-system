@@ -44,6 +44,7 @@ export default function App() {
   );
   const [relationships, setRelationships] = useState(SEED_RELATIONS);
   const [taxonomy, setTaxonomy]           = useState(INITIAL_TAXONOMY);
+  const [loginIntent, setLoginIntent]     = useState(null);
 
   useEffect(() => {
     if (user && activePage === null) {
@@ -54,7 +55,15 @@ export default function App() {
       setActivePage(null);
       localStorage.removeItem('activePage');
     }
+    if (user) setLoginIntent(null);
   }, [user]);
+
+  // Citizen guests can jump straight to the official login form from their top bar,
+  // instead of just exiting back to the portal-selection screen.
+  function loginAsOfficer() {
+    setLoginIntent('officer');
+    logout();
+  }
 
   function navigate(page) {
     setActivePage(page);
@@ -96,7 +105,7 @@ export default function App() {
     addAuditLog(`Approved document: ${doc?.title}`);
   }
 
-  if (!user) return <Login onLogin={loginAsRole} loading={loading} authError={authError} />;
+  if (!user) return <Login onLogin={loginAsRole} loading={loading} authError={authError} initialScreen={loginIntent === 'officer' ? 'login' : 'portal'} />;
   if (user.mustChangePassword) return <ChangePasswordScreen user={user} onPasswordChanged={changePass} onLogout={logout} reason={user.passwordExpired ? 'expired' : 'first_login'} />;
   if (activePage === null) return null;
 
@@ -107,7 +116,7 @@ export default function App() {
           <CitizenDashboard
             onAuditLog={addAuditLog}
             documents={documents}
-            onLogout={logout}
+            onLoginAsOfficer={loginAsOfficer}
           />
         );
       case 'uploader':

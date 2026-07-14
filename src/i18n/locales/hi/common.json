@@ -81,8 +81,18 @@
     "decreaseTextSize": "टेक्स्ट आकार घटाएं",
     "increaseTextSize": "टेक्स्ट आकार बढ़ाएं",
     "highContrast": "उच्च कंट्रास्ट",
+    "hideImages": "चित्र छुपाएं",
+    "bigCursor": "बड़ा कर्सर",
     "resetToDefault": "डिफ़ॉल्ट पर रीसेट करें",
-    "screenReaderAccess": "स्क्रीन रीडर सुविधा"
+    "screenReaderAccess": "स्क्रीन रीडर सुविधा",
+    "toolsPanelTitle": "सुगम्यता उपकरण",
+    "contrastAdjustment": "कंट्रास्ट समायोजन",
+    "normal": "सामान्य",
+    "textSizeSection": "टेक्स्ट आकार",
+    "increaseText": "टेक्स्ट बढ़ाएं",
+    "decreaseText": "टेक्स्ट घटाएं",
+    "resetText": "टेक्स्ट रीसेट करें",
+    "others": "अन्य"
   },
   "languageToggle": {
     "english": "EN",

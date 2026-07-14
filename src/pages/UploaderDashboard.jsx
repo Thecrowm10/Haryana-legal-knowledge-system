@@ -1979,11 +1979,11 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
       {duplicateModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
           onClick={() => setDuplicateModal(null)}>
-          <div style={{ background: 'var(--surface-card)', borderRadius: 16, padding: 28, width: '100%', maxWidth: 560, boxShadow: '0 28px 80px rgba(0,0,0,.35)', maxHeight: '85vh', overflowY: 'auto' }}
+          <div style={{ background: 'var(--surface-card)', borderRadius: 16, width: '100%', maxWidth: 560, boxShadow: '0 28px 80px rgba(0,0,0,.35)', maxHeight: '85vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
             onClick={e => e.stopPropagation()}>
 
-            {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+            {/* Header — stays put; only the matches below scroll */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '28px 28px 20px', flexShrink: 0 }}>
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                   <AlertTriangle size={18} color="#d97706" />
@@ -1998,56 +1998,58 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
               </button>
             </div>
 
-            {/* Own-department matches — version upgrade */}
-            {duplicateModal.matches.filter(m => m.match_type === 'own_dept').map(m => (
-              <div key={m.id} style={{ marginBottom: 16, padding: '14px 16px', borderRadius: 10, background: 'rgba(59,130,246,.06)', border: '1px solid rgba(59,130,246,.2)' }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#3b82f6', letterSpacing: '.06em', marginBottom: 8 }}>IN YOUR DEPARTMENT</div>
-                <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-heading)', marginBottom: 4 }}>{m.document_name}</div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12, fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
-                  <span style={{ background: 'rgba(59,130,246,.1)', color: '#3b82f6', padding: '2px 8px', borderRadius: 20, fontWeight: 600 }}>{m.document_type_name}</span>
-                  <span>v{m.version_no || '1.0'}</span>
-                  <span style={{ background: m.status === 'approved' ? 'rgba(34,197,94,.1)' : 'rgba(245,158,11,.1)', color: m.status === 'approved' ? '#16a34a' : '#d97706', padding: '2px 8px', borderRadius: 20, fontWeight: 600, textTransform: 'capitalize' }}>{m.status}</span>
-                  <span>{m.created_at?.split('T')[0]}</span>
+            <div style={{ overflowY: 'auto', padding: '0 28px' }}>
+              {/* Own-department matches — version upgrade */}
+              {duplicateModal.matches.filter(m => m.match_type === 'own_dept').map(m => (
+                <div key={m.id} style={{ marginBottom: 16, padding: '14px 16px', borderRadius: 10, background: 'rgba(59,130,246,.06)', border: '1px solid rgba(59,130,246,.2)' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#3b82f6', letterSpacing: '.06em', marginBottom: 8 }}>IN YOUR DEPARTMENT</div>
+                  <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-heading)', marginBottom: 4 }}>{m.document_name}</div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12, fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
+                    <span style={{ background: 'rgba(59,130,246,.1)', color: '#3b82f6', padding: '2px 8px', borderRadius: 20, fontWeight: 600 }}>{m.document_type_name}</span>
+                    <span>v{m.version_no || '1.0'}</span>
+                    <span style={{ background: m.status === 'approved' ? 'rgba(34,197,94,.1)' : 'rgba(245,158,11,.1)', color: m.status === 'approved' ? '#16a34a' : '#d97706', padding: '2px 8px', borderRadius: 20, fontWeight: 600, textTransform: 'capitalize' }}>{m.status}</span>
+                    <span>{m.created_at?.split('T')[0]}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => {
+                      const nextVer = (parseFloat(m.version_no || '1.0') + 0.1).toFixed(1);
+                      fmt('version', nextVer);
+                      setDuplicateModal(null);
+                    }} style={{ flex: 1, padding: '8px 14px', borderRadius: 8, border: 'none', background: '#3b82f6', color: 'white', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                      Upload as New Version (v{(parseFloat(m.version_no || '1.0') + 0.1).toFixed(1)})
+                    </button>
+                  </div>
                 </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button onClick={() => {
-                    const nextVer = (parseFloat(m.version_no || '1.0') + 0.1).toFixed(1);
-                    fmt('version', nextVer);
-                    setDuplicateModal(null);
-                  }} style={{ flex: 1, padding: '8px 14px', borderRadius: 8, border: 'none', background: '#3b82f6', color: 'white', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                    Upload as New Version (v{(parseFloat(m.version_no || '1.0') + 0.1).toFixed(1)})
-                  </button>
-                </div>
-              </div>
-            ))}
+              ))}
 
-            {/* Other-department matches — link */}
-            {duplicateModal.matches.filter(m => m.match_type === 'other_dept').length > 0 && (
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#d97706', letterSpacing: '.06em', marginBottom: 10 }}>IN OTHER DEPARTMENTS</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {duplicateModal.matches.filter(m => m.match_type === 'other_dept').map(m => (
-                    <div key={m.id} style={{ padding: '14px 16px', borderRadius: 10, background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)' }}>
-                      <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-heading)', marginBottom: 4 }}>{m.document_name}</div>
-                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12, fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
-                        <span style={{ background: 'rgba(245,158,11,.1)', color: '#d97706', padding: '2px 8px', borderRadius: 20, fontWeight: 600 }}>{m.document_type_name}</span>
-                        <span style={{ fontWeight: 600 }}>{m.department_name}</span>
-                        <span style={{ background: m.status === 'approved' ? 'rgba(34,197,94,.1)' : 'rgba(245,158,11,.1)', color: m.status === 'approved' ? '#16a34a' : '#d97706', padding: '2px 8px', borderRadius: 20, fontWeight: 600, textTransform: 'capitalize' }}>{m.status}</span>
-                        <span>{m.created_at?.split('T')[0]}</span>
+              {/* Other-department matches — link */}
+              {duplicateModal.matches.filter(m => m.match_type === 'other_dept').length > 0 && (
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#d97706', letterSpacing: '.06em', marginBottom: 10 }}>IN OTHER DEPARTMENTS</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {duplicateModal.matches.filter(m => m.match_type === 'other_dept').map(m => (
+                      <div key={m.id} style={{ padding: '14px 16px', borderRadius: 10, background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)' }}>
+                        <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-heading)', marginBottom: 4 }}>{m.document_name}</div>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12, fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
+                          <span style={{ background: 'rgba(245,158,11,.1)', color: '#d97706', padding: '2px 8px', borderRadius: 20, fontWeight: 600 }}>{m.document_type_name}</span>
+                          <span style={{ fontWeight: 600 }}>{m.department_name}</span>
+                          <span style={{ background: m.status === 'approved' ? 'rgba(34,197,94,.1)' : 'rgba(245,158,11,.1)', color: m.status === 'approved' ? '#16a34a' : '#d97706', padding: '2px 8px', borderRadius: 20, fontWeight: 600, textTransform: 'capitalize' }}>{m.status}</span>
+                          <span>{m.created_at?.split('T')[0]}</span>
+                        </div>
+                        <button onClick={() => handleLinkDocument(m.id)}
+                          disabled={linkingId === m.id}
+                          style={{ width: '100%', padding: '8px 14px', borderRadius: 8, border: 'none', background: linkingId === m.id ? 'rgba(245,158,11,.4)' : '#d97706', color: 'white', fontSize: 12.5, fontWeight: 700, cursor: linkingId === m.id ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)' }}>
+                          {linkingId === m.id ? 'Sending request…' : 'Link to My Department'}
+                        </button>
                       </div>
-                      <button onClick={() => handleLinkDocument(m.id)}
-                        disabled={linkingId === m.id}
-                        style={{ width: '100%', padding: '8px 14px', borderRadius: 8, border: 'none', background: linkingId === m.id ? 'rgba(245,158,11,.4)' : '#d97706', color: 'white', fontSize: 12.5, fontWeight: 700, cursor: linkingId === m.id ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)' }}>
-                        {linkingId === m.id ? 'Sending request…' : 'Link to My Department'}
-                      </button>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
-            {/* Footer */}
-            <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end' }}>
+            {/* Footer — stays put, always reachable */}
+            <div style={{ padding: '16px 28px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end', flexShrink: 0 }}>
               <button onClick={() => setDuplicateModal(null)}
                 style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'transparent', color: 'var(--text-color-secondary)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                 Continue uploading anyway

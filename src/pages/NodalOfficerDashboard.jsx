@@ -12,6 +12,15 @@ import { getAuditLogs } from '../services/audit';
 
 const LABEL = { fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)' };
 
+// A nodal officer can only create staff below them (uploader/approver/etc) — never another admin or nodal officer.
+const NON_ASSIGNABLE_BY_NODAL = new Set(['admin', 'super_admin', 'nodal_officer']);
+function normalizeRoleName(name) {
+  return name?.trim().toLowerCase().replace(/\s+/g, '_');
+}
+function assignableRoles(roles) {
+  return roles.filter(r => !NON_ASSIGNABLE_BY_NODAL.has(normalizeRoleName(r.name)));
+}
+
 function normalizeUser(u) {
   return {
     id:        u.id,
@@ -470,7 +479,7 @@ export default function NodalOfficerDashboard({ activePage }) {
                   <div>
                     <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Role</label>
                     <SelectField value={addForm.role_id} onChange={e => setAddForm(f => ({ ...f, role_id: e.target.value }))} placeholder="Select Role">
-                      {roles.map(r => (
+                      {assignableRoles(roles).map(r => (
                         <option key={r.id} value={r.id}>{r.name.charAt(0).toUpperCase() + r.name.slice(1)}</option>
                       ))}
                     </SelectField>

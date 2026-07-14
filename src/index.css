@@ -75,6 +75,17 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* Mobile browsers (iOS Safari in particular) apply native rounded-corner
+   button chrome via -webkit-appearance unless explicitly reset, which makes
+   buttons packed flush inside a pill (e.g. the search bar's submit button)
+   look like a separate floating shape instead of blending into the bar. */
+button {
+  -webkit-appearance: none;
+  appearance: none;
+  border-radius: 0;
+  font: inherit;
+}
+
 :root {
   /* Diamond-style surface tokens */
   --surface-0:       #ffffff;
@@ -181,6 +192,13 @@ html[data-contrast="high"] {
   --primary-dark:  #22c55e;
   --primary-light: rgba(74,222,128,0.15);
   --primary-border:rgba(74,222,128,0.35);
+}
+
+html[data-a11y-hide-images="true"] img { opacity: 0 !important; transition: opacity .15s; }
+
+html[data-a11y-big-cursor="true"],
+html[data-a11y-big-cursor="true"] * {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 24 24'%3E%3Cpath d='M3 2l6.8 19 2.3-7.7L20 10.3z' fill='black' stroke='white' stroke-width='1.5'/%3E%3C/svg%3E") 2 2, auto !important;
 }
 
 :lang(hi), [lang="hi"] { font-family: var(--font-devanagari); }

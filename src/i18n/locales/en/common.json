@@ -81,8 +81,18 @@
     "decreaseTextSize": "Decrease text size",
     "increaseTextSize": "Increase text size",
     "highContrast": "High Contrast",
+    "hideImages": "Hide Images",
+    "bigCursor": "Big Cursor",
     "resetToDefault": "Reset to Default",
-    "screenReaderAccess": "Screen Reader Access"
+    "screenReaderAccess": "Screen Reader Access",
+    "toolsPanelTitle": "Accessibility Tools",
+    "contrastAdjustment": "Contrast Adjustment",
+    "normal": "Normal",
+    "textSizeSection": "Text Size",
+    "increaseText": "Increase Text",
+    "decreaseText": "Decrease Text",
+    "resetText": "Reset Text",
+    "others": "Others"
   },
   "languageToggle": {
     "english": "EN",

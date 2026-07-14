@@ -11,6 +11,15 @@ import { getAuditLogs } from '../services/audit';
 
 const LABEL = { fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)' };
 
+// Admin creates/manages every account except other admins — there is only ever one admin, seeded up front.
+const ADMIN_ROLE_NAMES = new Set(['admin', 'super_admin']);
+function normalizeRoleName(name) {
+  return name?.trim().toLowerCase().replace(/\s+/g, '_');
+}
+function assignableRoles(roles) {
+  return roles.filter(r => !ADMIN_ROLE_NAMES.has(normalizeRoleName(r.name)));
+}
+
 function normalizeUser(u) {
   return {
     id:        u.id,
@@ -637,7 +646,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                             onChange={e => setAddForm(f => ({ ...f, role_id: e.target.value, department_id: '', dept_ids: [] }))}
                             placeholder="Select Role"
                           >
-                            {roles.map(r => (
+                            {assignableRoles(roles).map(r => (
                               <option key={r.id} value={r.id}>{r.name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</option>
                             ))}
                           </SelectField>
@@ -752,7 +761,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                             onChange={e => setEditForm(f => ({ ...f, role_id: e.target.value ? Number(e.target.value) : null, department_id: '', dept_ids: [] }))}
                             placeholder="Select Role"
                           >
-                            {roles.map(r => (
+                            {assignableRoles(roles).map(r => (
                               <option key={r.id} value={r.id}>{r.name.charAt(0).toUpperCase() + r.name.slice(1)}</option>
                             ))}
                           </SelectField>

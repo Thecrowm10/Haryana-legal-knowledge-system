@@ -7,10 +7,17 @@ import ForgotPasswordScreen from './ForgotPasswordScreen';
 import AdminOtpLogin from './AdminOtpLogin';
 import Captcha from '../components/Captcha';
 import LanguageToggle from '../components/LanguageToggle';
+import AccessibilityMenu from '../components/citizen/AccessibilityMenu';
 
-export default function Login({ onLogin, loading, authError }) {
+const loginIconStyle = {
+  display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: '50%',
+  background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.18)', color: 'rgba(255,255,255,.85)',
+  cursor: 'pointer',
+};
+
+export default function Login({ onLogin, loading, authError, initialScreen = 'portal' }) {
   const { t } = useTranslation('login');
-  const [screen, setScreen]       = useState('portal'); // 'portal' | 'login' | 'forgot' | 'admin-otp'
+  const [screen, setScreen]       = useState(initialScreen); // 'portal' | 'login' | 'forgot' | 'admin-otp'
   const [username, setUsername]   = useState('');
   const [password, setPassword]   = useState('');
   const [showPass, setShowPass]   = useState(false);
@@ -60,13 +67,15 @@ export default function Login({ onLogin, loading, authError }) {
           style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', zIndex:0, filter:'blur(2px)', transform:'scale(1.02)' }} />
         <div style={{ position:'absolute', inset:0, zIndex:1, background:'linear-gradient(110deg,rgba(2,10,5,.82) 0%,rgba(2,10,5,.62) 45%,rgba(2,10,5,.42) 100%)' }}/>
 
+        <div style={{ position: 'fixed', top: 24, right: 32, zIndex: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <LanguageToggle variant="dark" iconOnly buttonStyle={loginIconStyle} />
+          <AccessibilityMenu iconButtonStyle={loginIconStyle} />
+        </div>
+
         <div style={{ position:'relative', zIndex:2, width:'100%', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'40px 6%', gap:48 }}>
 
           {/* Header */}
           <div className="lk-left" style={{ textAlign:'center', position: 'relative' }}>
-            <div style={{ position: 'absolute', top: 0, right: 0 }}>
-              <LanguageToggle variant="dark" />
-            </div>
             <div style={{ display:'inline-flex', alignItems:'center', gap:10, marginBottom:20 }}>
               <img src={haryanaLogo} alt="Haryana" style={{ width:52, height:52, objectFit:'contain' }} />
               <div style={{ textAlign:'left' }}>
@@ -284,7 +293,10 @@ export default function Login({ onLogin, loading, authError }) {
                 style={{ background:'transparent', border:'none', color:'rgba(255,255,255,.4)', fontSize:11.5, fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', gap:5, padding:0, fontFamily:'Plus Jakarta Sans,sans-serif', letterSpacing:'.04em' }}>
                 {t('backToPortal')}
               </button>
-              <LanguageToggle variant="dark" style={{ padding: '3px 9px', fontSize: 11 }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <LanguageToggle variant="dark" iconOnly buttonStyle={{ ...loginIconStyle, width: 26, height: 26 }} />
+                <AccessibilityMenu iconButtonStyle={{ ...loginIconStyle, width: 26, height: 26 }} />
+              </div>
             </div>
             <h2 style={{ fontSize:21, fontWeight:800, color:'#fff', letterSpacing:'-.02em', marginBottom:3 }}>{t('officialLogin')}</h2>
             <p style={{ fontSize:12.5, color:'rgba(255,255,255,.42)', marginBottom:20 }}>{t('departmentPortalSubtitle')}</p>

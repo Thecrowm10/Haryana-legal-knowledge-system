@@ -4,6 +4,8 @@ import commonEn from './locales/en/common.json';
 import commonHi from './locales/hi/common.json';
 import loginEn from './locales/en/login.json';
 import loginHi from './locales/hi/login.json';
+import citizenEn from './locales/en/citizen.json';
+import citizenHi from './locales/hi/citizen.json';
 
 const STORAGE_KEY = 'hlks-lang';
 
@@ -19,10 +21,10 @@ i18n.use(initReactI18next).init({
   lng: loadStoredLanguage(),
   fallbackLng: 'en',
   defaultNS: 'common',
-  ns: ['common', 'login'],
+  ns: ['common', 'login', 'citizen'],
   resources: {
-    en: { common: commonEn, login: loginEn },
-    hi: { common: commonHi, login: loginHi },
+    en: { common: commonEn, login: loginEn, citizen: citizenEn },
+    hi: { common: commonHi, login: loginHi, citizen: citizenHi },
   },
   interpolation: { escapeValue: false },
   returnEmptyString: false,

@@ -1,47 +1,21 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Accessibility, Contrast, Type, Minus, Plus, RotateCcw, X, Headphones } from 'lucide-react';
+import { Accessibility, Contrast, Type, Minus, Plus, RotateCcw, X, ImageOff, MousePointer2, Headphones } from 'lucide-react';
+import { useA11yPrefs, FONT_SCALE_STEPS, DEFAULT_PREFS } from '../../hooks/useA11yPrefs';
 import ScreenReaderAccessModal from './ScreenReaderAccessModal';
 
-const FONT_SCALE_STEPS = [90, 100, 125, 150, 175, 200];
-const STORAGE_KEY = 'hlks-a11y-prefs';
-const DEFAULT_PREFS = { fontScale: 100, highContrast: false };
-
-function loadPrefs() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return { ...DEFAULT_PREFS, ...JSON.parse(raw) };
-  } catch {
-    // Corrupt/blocked storage — fall back to defaults.
-  }
-  return DEFAULT_PREFS;
-}
-
-function applyPrefs(prefs) {
-  const root = document.documentElement;
-  if (prefs.fontScale === 100) root.style.removeProperty('--a11y-zoom');
-  else root.style.setProperty('--a11y-zoom', prefs.fontScale / 100);
-
-  // Shrinking below 100% needs the zoomed shell to be pre-inflated (via CSS)
-  // so its visual footprint still fills the fixed-height app shell instead of
-  // leaving a gap. Enlarging is left alone — it should overflow into scroll.
-  if (prefs.fontScale < 100) root.setAttribute('data-a11y-shrink', 'true');
-  else root.removeAttribute('data-a11y-shrink');
-
-  if (prefs.highContrast) root.setAttribute('data-contrast', 'high');
-  else root.removeAttribute('data-contrast');
-}
-
+/**
+ * Floating GIGW 3.0 / WCAG 2.1 AA accessibility widget for the authenticated
+ * app shell (Layout.jsx). Provides on-page text-resize (WCAG 1.4.4 / GIGW
+ * 5.2.15), a high-contrast presentation switch (WCAG 1.4.3, 1.4.11 / GIGW
+ * 5.2.14, 5.2.18), hide-images, big-cursor, and a pointer to compatible
+ * screen readers. Preferences persist across sessions via localStorage.
+ */
 export default function AccessibilityToolbar() {
   const { t } = useTranslation('common');
   const [open, setOpen] = useState(false);
   const [srModalOpen, setSrModalOpen] = useState(false);
-  const [prefs, setPrefs] = useState(loadPrefs);
-
-  useEffect(() => {
-    applyPrefs(prefs);
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs)); } catch { /* storage unavailable */ }
-  }, [prefs]);
+  const [prefs, setPrefs] = useA11yPrefs();
 
   const changeFontSize = (dir) => {
     setPrefs(p => {
@@ -51,7 +25,9 @@ export default function AccessibilityToolbar() {
     });
   };
 
-  const toggleContrast = () => setPrefs(p => ({ ...p, highContrast: !p.highContrast }));
+  const toggleContrast   = () => setPrefs(p => ({ ...p, highContrast: !p.highContrast }));
+  const toggleHideImages = () => setPrefs(p => ({ ...p, hideImages: !p.hideImages }));
+  const toggleBigCursor  = () => setPrefs(p => ({ ...p, bigCursor: !p.bigCursor }));
   const reset = () => setPrefs(DEFAULT_PREFS);
 
   return (
@@ -130,33 +106,11 @@ export default function AccessibilityToolbar() {
           </div>
 
           {/* High contrast */}
-          <button
-            type="button"
-            onClick={toggleContrast}
-            aria-pressed={prefs.highContrast}
-            style={{
-              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              padding: '9px 12px', borderRadius: 10, cursor: 'pointer', marginBottom: 14,
-              border: '1px solid var(--surface-border)',
-              background: prefs.highContrast ? 'var(--primary-light)' : 'transparent',
-              color: 'var(--text-color)', fontSize: 12.5,
-            }}
-          >
-            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Contrast size={14} /> {t('a11y.highContrast')}
-            </span>
-            <span aria-hidden="true" style={{
-              width: 34, height: 18, borderRadius: 99, position: 'relative', flexShrink: 0,
-              background: prefs.highContrast ? 'var(--primary)' : 'var(--surface-border)',
-              transition: 'background .15s',
-            }}>
-              <span style={{
-                position: 'absolute', top: 2, left: prefs.highContrast ? 18 : 2,
-                width: 14, height: 14, borderRadius: '50%', background: '#fff',
-                transition: 'left .15s',
-              }} />
-            </span>
-          </button>
+          <ToggleRow icon={Contrast} label={t('a11y.highContrast')} active={prefs.highContrast} onClick={toggleContrast} />
+          {/* Hide images */}
+          <ToggleRow icon={ImageOff} label={t('a11y.hideImages')} active={prefs.hideImages} onClick={toggleHideImages} />
+          {/* Big cursor */}
+          <ToggleRow icon={MousePointer2} label={t('a11y.bigCursor')} active={prefs.bigCursor} onClick={toggleBigCursor} />
 
           <button
             type="button"
@@ -187,6 +141,38 @@ export default function AccessibilityToolbar() {
 
       {srModalOpen && <ScreenReaderAccessModal onClose={() => setSrModalOpen(false)} />}
     </>
+  );
+}
+
+function ToggleRow({ icon: Icon, label, active, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      style={{
+        width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '9px 12px', borderRadius: 10, cursor: 'pointer', marginBottom: 10,
+        border: '1px solid var(--surface-border)',
+        background: active ? 'var(--primary-light)' : 'transparent',
+        color: 'var(--text-color)', fontSize: 12.5,
+      }}
+    >
+      <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Icon size={14} /> {label}
+      </span>
+      <span aria-hidden="true" style={{
+        width: 34, height: 18, borderRadius: 99, position: 'relative', flexShrink: 0,
+        background: active ? 'var(--primary)' : 'var(--surface-border)',
+        transition: 'background .15s',
+      }}>
+        <span style={{
+          position: 'absolute', top: 2, left: active ? 18 : 2,
+          width: 14, height: 14, borderRadius: '50%', background: '#fff',
+          transition: 'left .15s',
+        }} />
+      </span>
+    </button>
   );
 }
 
