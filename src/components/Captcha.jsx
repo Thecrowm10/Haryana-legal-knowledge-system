@@ -10,14 +10,11 @@ function generateCode(length = 5) {
   return code;
 }
 
-// Muted pastel tones — enough colour to stay legible, desaturated enough
-// to blend into the card background instead of popping out in bright,
-// easily colour-segmented neon hues.
+// Plain black/near-black ink — slight lightness jitter only (no hue) so
+// glyphs stay uniform in colour but not perfectly identical pixel values.
 function charColor() {
-  const hue = Math.floor(Math.random() * 360);
-  const sat = 28 + Math.random() * 20;
-  const light = 62 + Math.random() * 14;
-  return `hsl(${hue}, ${sat}%, ${light}%)`;
+  const light = 8 + Math.random() * 15;
+  return `hsl(0, 0%, ${light}%)`;
 }
 
 function draw(canvas, code) {
@@ -26,12 +23,14 @@ function draw(canvas, code) {
   const w = canvas.width, h = canvas.height;
   ctx.clearRect(0, 0, w, h);
 
-  ctx.fillStyle = 'rgba(255,255,255,.06)';
+  // Opaque white background.
+  ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, w, h);
 
   // Curved noise strokes (harder for OCR line-removal than straight lines).
-  for (let i = 0; i < 7; i++) {
-    ctx.strokeStyle = `rgba(255,255,255,${0.14 + Math.random() * 0.22})`;
+  for (let i = 0; i < 10; i++) {
+    const gray = 100 + Math.floor(Math.random() * 90);
+    ctx.strokeStyle = `rgba(${gray},${gray},${gray},${0.3 + Math.random() * 0.25})`;
     ctx.lineWidth = 1 + Math.random() * 1.4;
     ctx.beginPath();
     ctx.moveTo(Math.random() * w, Math.random() * h);
@@ -65,13 +64,13 @@ function draw(canvas, code) {
   ctx.restore();
 
   // Foreground speckle + a few thin overlay lines cutting across the glyphs.
-  for (let i = 0; i < 45; i++) {
-    ctx.fillStyle = `rgba(255,255,255,${Math.random() * 0.4})`;
+  for (let i = 0; i < 70; i++) {
+    ctx.fillStyle = `rgba(40,40,50,${Math.random() * 0.35})`;
     ctx.beginPath();
     ctx.arc(Math.random() * w, Math.random() * h, 0.6 + Math.random() * 1.1, 0, Math.PI * 2);
     ctx.fill();
   }
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 5; i++) {
     ctx.strokeStyle = `rgba(0,0,0,${0.15 + Math.random() * 0.15})`;
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -169,7 +168,7 @@ const Captcha = forwardRef(function Captcha({ label = 'Security Check', style, o
             height={40}
             role="img"
             aria-label="CAPTCHA verification image showing a distorted code. If you cannot read it, use the listen button for an audio version, then type the code in the field below."
-            style={{ borderRadius: 10, border: '1px solid rgba(255,255,255,.18)', background: 'rgba(255,255,255,.06)' }}
+            style={{ borderRadius: 10, border: '1px solid rgba(0,0,0,.14)', background: '#ffffff' }}
           />
           {speechSupported && (
             <button

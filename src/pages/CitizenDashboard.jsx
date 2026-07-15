@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Search, FileText, X, BookOpen, Bookmark, BookmarkCheck,
-  ChevronRight, MapPin, AlertCircle, Shield, Building2, Layers,
+  ChevronRight, MapPin, AlertCircle, Building2, Layers, User,
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import DocViewModal from '../components/DocViewModal';
@@ -358,12 +358,12 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
               onClick={() => setLoginMenuOpen(o => !o)}
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(120,128,140,.3)'}
               onMouseLeave={e => e.currentTarget.style.background = (scrolled ? topBarIconStyleLight : topBarIconStyleDark).background}
-              aria-label={t('officerLoginMenu')}
+              aria-label={t('profileLogin')}
               aria-expanded={loginMenuOpen}
-              title={t('officerLoginMenu')}
+              title={t('profileLogin')}
               style={{ transition: 'background .15s', ...(scrolled ? topBarIconStyleLight : topBarIconStyleDark) }}
             >
-              <Shield size={16} />
+              <User size={16} />
             </button>
 
             {loginMenuOpen && (
@@ -386,7 +386,7 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
                     }}
                     onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                    <Shield size={14} color="var(--primary)" /> {t('loginAsOfficer')}
+                    <User size={14} color="var(--primary)" /> {t('loginAsOfficer')}
                   </button>
                 </div>
               </>
