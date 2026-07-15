@@ -1153,6 +1153,12 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     const explicitRels = relations
       .filter(r => !r.isPending && r.targetId)
       .map(r => {
+        // API-searched docs store targetId as a numeric string (e.g. "5")
+        const numId = parseInt(r.targetId, 10);
+        if (!isNaN(numId) && String(numId) === r.targetId) {
+          return { pdf_id: numId, type: r.label?.toLowerCase().replace(/\s+/g, '_') || 'related' };
+        }
+        // Local session docs store targetId as a UUID string matching documents[].uid
         const doc = documents.find(d => d.uid === r.targetId);
         return {
           pdf_id: typeof doc?.id === 'number' ? doc.id : null,
