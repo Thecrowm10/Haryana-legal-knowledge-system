@@ -80,21 +80,29 @@ const MENU_CONFIG = {
 export default function Sidebar({ user, activePage, onNavigate, collapsed, onToggle }) {
   const { t } = useTranslation('common');
   const groups = MENU_CONFIG[user.role] || [];
-  const w = collapsed ? 64 : 250;
+  const [hovering, setHovering] = useState(false);
+  // Pinned collapsed: reveal on hover, pushing the main content over (not an overlay).
+  const expanded = !collapsed || hovering;
+  const w = expanded ? 250 : 64;
 
   return (
-    <aside style={{
-      width: w, flexShrink: 0, height: '100vh',
-      background: 'var(--surface-card)',
-      borderRight: '1px solid var(--surface-border)',
-      display: 'flex', flexDirection: 'column',
-      transition: 'width .25s cubic-bezier(.4,0,.2,1)',
-      overflow: 'hidden', position: 'relative', zIndex: 10,
-    }}>
+    <div
+      onMouseEnter={() => collapsed && setHovering(true)}
+      onMouseLeave={() => collapsed && setHovering(false)}
+      style={{ width: w, flexShrink: 0, height: '100vh', transition: 'width .2s cubic-bezier(.4,0,.2,1)' }}
+    >
+      <aside style={{
+        width: w, height: '100vh',
+        background: 'var(--surface-card)',
+        borderRight: '1px solid var(--surface-border)',
+        display: 'flex', flexDirection: 'column',
+        transition: 'width .2s cubic-bezier(.4,0,.2,1)',
+        overflow: 'hidden',
+      }}>
       {/* Logo */}
       <div style={{
         height: 60, display: 'flex', alignItems: 'center',
-        padding: collapsed ? '0 14px' : '0 20px',
+        padding: expanded ? '0 20px' : '0 14px',
         borderBottom: '1px solid var(--surface-border)',
         gap: 10, overflow: 'hidden', flexShrink: 0,
       }}>
@@ -109,7 +117,7 @@ export default function Sidebar({ user, activePage, onNavigate, collapsed, onTog
             style={{ width: 42, height: 42, objectFit: 'contain' }}
           />
         </div>
-        {!collapsed && (
+        {expanded && (
           <div style={{ overflow: 'hidden' }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)', whiteSpace: 'nowrap' }}>{t('sidebar.orgName')}</div>
             <div style={{ fontSize: 10, color: 'var(--text-color-secondary)', whiteSpace: 'nowrap' }}>{t('sidebar.orgTagline')}</div>
@@ -121,7 +129,7 @@ export default function Sidebar({ user, activePage, onNavigate, collapsed, onTog
       <nav style={{ flex: 1, overflowY: 'auto', padding: '12px 0' }}>
         {groups.map(group => (
           <div key={group.label}>
-            {!collapsed && (
+            {expanded && (
               <div style={{
                 fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)',
                 letterSpacing: '.08em', textTransform: 'uppercase',
@@ -131,11 +139,11 @@ export default function Sidebar({ user, activePage, onNavigate, collapsed, onTog
             {group.items.map(({ icon: Icon, label, id }) => {
               const active = activePage === id;
               return (
-                <div key={id} onClick={() => onNavigate(id)} title={collapsed ? t(label) : undefined} style={{
+                <div key={id} onClick={() => onNavigate(id)} title={expanded ? undefined : t(label)} style={{
                   display: 'flex', alignItems: 'center',
-                  gap: collapsed ? 0 : 12,
-                  padding: collapsed ? '10px 0' : '9px 16px',
-                  justifyContent: collapsed ? 'center' : 'flex-start',
+                  gap: expanded ? 12 : 0,
+                  padding: expanded ? '9px 16px' : '10px 0',
+                  justifyContent: expanded ? 'flex-start' : 'center',
                   margin: '1px 8px',
                   borderRadius: 8,
                   cursor: 'pointer',
@@ -151,7 +159,7 @@ export default function Sidebar({ user, activePage, onNavigate, collapsed, onTog
                   onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-color-secondary)'; }}}
                 >
                   <Icon size={16} strokeWidth={active ? 2.2 : 1.8} style={{ flexShrink: 0 }} />
-                  {!collapsed && <span style={{ whiteSpace: 'nowrap' }}>{t(label)}</span>}
+                  {expanded && <span style={{ whiteSpace: 'nowrap' }}>{t(label)}</span>}
                 </div>
               );
             })}
@@ -160,7 +168,7 @@ export default function Sidebar({ user, activePage, onNavigate, collapsed, onTog
       </nav>
 
       {/* User footer */}
-      {!collapsed && (
+      {expanded ? (
         <div style={{
           padding: '12px 16px', borderTop: '1px solid var(--surface-border)',
           display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0,
@@ -175,12 +183,12 @@ export default function Sidebar({ user, activePage, onNavigate, collapsed, onTog
             <div style={{ fontSize: 11, color: 'var(--text-color-secondary)' }}>{user.role === 'citizen' ? '' : user.dept}</div>
           </div>
         </div>
-      )}
-      {collapsed && (
+      ) : (
         <div style={{ padding: '12px 0', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'center' }}>
           <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'white' }}>{user.role === 'citizen' ? 'U' : user.name[0]}</div>
         </div>
       )}
-    </aside>
+      </aside>
+    </div>
   );
 }
