@@ -14,7 +14,7 @@ import Badge from '../components/ui/Badge';
 import SelectField from '../components/ui/SelectField';
 import { useAuth } from '../hooks/useAuth';
 import { getDepartments, getDocumentTypes } from '../services/departments';
-import { uploadPdfFile, uploadPdfMetadata, getMyDocuments, searchDocuments, getPdfFile, checkDuplicateDocument, linkDocumentToDepartment, getLinkedDocuments } from '../services/pdf';
+import { uploadPdfFile, uploadPdfMetadata, getMyDocuments, searchDocuments, getPdfFile, checkDuplicateDocument, linkDocumentToDepartment, getLinkedDocuments, getActChildren } from '../services/pdf';
 import { createNotification } from '../services/notifications';
 
 // Constants
@@ -188,6 +188,44 @@ function formatSize(bytes) {
   if (bytes < 1024)        return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+// Pulls the list of documents matching `type` out of a "/pdf/{id}/children" response.
+// Real shape: { act_id, children: { [documentTypeName]: [...] } }. A few other plausible
+// shapes are tolerated too: {results:[...]}, {documents:[...]}, a flat array, {groups:[...]},
+// or an object keyed directly by type name.
+function extractTypeChildren(data, type) {
+  if (!data) return [];
+  const matchesType = d => [d.document_type, d.type, d.document_type_name].includes(type);
+  const byKey = (obj, key) => {
+    if (Array.isArray(obj[key])) return obj[key];
+    const found = Object.keys(obj).find(k => k.toLowerCase() === key.toLowerCase());
+    return found ? obj[found] : undefined;
+  };
+
+  if (data.children && typeof data.children === 'object') {
+    return byKey(data.children, type) || [];
+  }
+
+  const items = Array.isArray(data) ? data
+    : Array.isArray(data.results) ? data.results
+    : Array.isArray(data.documents) ? data.documents
+    : null;
+  if (items) {
+    if (items.some(d => d && Array.isArray(d.documents))) {
+      const group = items.find(matchesType);
+      return group?.documents || [];
+    }
+    return items.filter(matchesType);
+  }
+  if (typeof data === 'object') {
+    const direct = byKey(data, type);
+    if (direct) return direct;
+    if (Array.isArray(data.groups)) {
+      const group = data.groups.find(matchesType);
+      return group?.documents || [];
+    }
+  }
+  return [];
 }
 function isAccepted(f) {
   return (
@@ -850,6 +888,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   const [linkedDocs, setLinkedDocs] = useState([]);
   const [linkingId, setLinkingId] = useState(null); // pdf_id being linked (loading state)
   const [viewingLinkedDoc, setViewingLinkedDoc] = useState(null); // linked doc open in DocViewModal
+  const [viewingActChildDoc, setViewingActChildDoc] = useState(null); // existing-under-this-Act doc open in DocViewModal
 
   // Correction request state
   const [correctionModal, setCorrectionModal] = useState(null); // { doc }
@@ -909,6 +948,44 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
 
   const inputRef     = useRef();
   const uploadsTableRef = useRef();
+  const uploadSectionRef  = useRef(null);
+  const detailsSectionRef = useRef(null);
+  const allFilesChecked = files.length > 0 && files.every(f => fileRefs.some(r => r.fileName === f.name));
+  const typeCompact = files.length > 0;
+  // Non-Act types must be linked to a parent Act / legal authority before the rest of the details unlock.
+  const usesLegalAuthorities = ['Circular', 'Miscellaneous', 'Notification', 'Order / Gazette', 'Policy'].includes(form.type);
+  const actChosen = usesLegalAuthorities ? legalAuthorities.some(a => a.act) : !!hierarchy.act;
+  const detailsLocked = !!form.type && form.type !== 'Act' && !actChosen;
+  const primaryActId = usesLegalAuthorities ? (legalAuthorities.find(a => a.actId)?.actId ?? null) : (hierarchy.actId ?? null);
+  const [actChildren, setActChildren] = useState(null);
+  const [actChildrenLoading, setActChildrenLoading] = useState(false);
+
+  // Auto-scroll to the next step of the upload wizard as it's revealed
+  useEffect(() => {
+    if (!form.type) return;
+    const raf = requestAnimationFrame(() => uploadSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    return () => cancelAnimationFrame(raf);
+  }, [form.type]);
+
+  useEffect(() => {
+    if (!allFilesChecked) return;
+    const raf = requestAnimationFrame(() => detailsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    return () => cancelAnimationFrame(raf);
+  }, [allFilesChecked]);
+
+  // Fetch documents already linked to the chosen parent Act, so the uploader can see existing
+  // documents of the same type (e.g. all Notifications under this Act) before submitting a new one.
+  useEffect(() => {
+    if (!primaryActId || form.type === 'Act') return;
+    let cancelled = false;
+    setActChildrenLoading(true);
+    getActChildren(primaryActId)
+      .then(res => { if (!cancelled) setActChildren(res.data); })
+      .catch(() => { if (!cancelled) setActChildren(null); })
+      .finally(() => { if (!cancelled) setActChildrenLoading(false); });
+    return () => { cancelled = true; };
+  }, [primaryActId, form.type]);
+
   const fmt      = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const approvedDocs = documents.filter(d => d.status === 'approved');
@@ -1078,7 +1155,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         setFileMeta(prev => ({
           ...prev,
           [f.name]: {
-            documentName: prev[f.name]?.documentName ?? f.name.replace(/\.(pdf|docx?)$/i, ''),
+            documentName: prev[f.name]?.documentName ?? '',
             desc:         prev[f.name]?.desc ?? '',
           },
         }));
@@ -1094,7 +1171,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         setFileMeta(prev => ({
           ...prev,
           [f.name]: {
-            documentName: prev[f.name]?.documentName ?? original_filename.replace(/\.(pdf|docx?)$/i, ''),
+            documentName: prev[f.name]?.documentName ?? '',
             desc:         prev[f.name]?.desc ?? (summary || ''),
           },
         }));
@@ -1977,7 +2054,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   }
 
   // Upload page
-  const allFilesChecked = files.length > 0 && files.every(f => fileRefs.some(r => r.fileName === f.name));
   return (
     <div style={{ animation: 'fadeSlideIn .3s ease' }}>
       <Toast toast={toast} onClose={() => setToast(null)} />
@@ -2075,95 +2151,142 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
       )}
 
       {/* ── Unified single-page upload layout ─────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '330px 1fr', gap: 20, alignItems: 'start' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20, justifyContent: form.type ? 'flex-start' : 'center', minHeight: form.type ? 'auto' : 'calc(100vh - 220px)' }}>
 
-        {/* ── LEFT: Type selector + File drop zone ── */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {/* Hidden file input */}
+        <input ref={inputRef} type="file" accept=".pdf,.doc,.docx" multiple style={{ display: 'none' }}
+          onChange={e => { addFiles(e.target.files); e.target.value = ''; }} />
 
-          {/* Hidden file input */}
-          <input ref={inputRef} type="file" accept=".pdf,.doc,.docx" multiple style={{ display: 'none' }}
-            onChange={e => { addFiles(e.target.files); e.target.value = ''; }} />
+        {/* Rejected files alert */}
+        {rejected.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px', borderRadius: 10, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', color: '#dc2626' }}>
+            <AlertCircle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 1 }}>Unsupported file type rejected:</div>
+              <div style={{ fontSize: 11.5, fontFamily: 'var(--mono)' }}>{rejected.join(', ')}</div>
+            </div>
+            <button onClick={() => setRejected([])} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', display: 'flex' }}><X size={13} /></button>
+          </div>
+        )}
 
-          {/* Rejected files alert */}
-          {rejected.length > 0 && (
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px', borderRadius: 10, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', color: '#dc2626' }}>
-              <AlertCircle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 1 }}>Unsupported file type rejected:</div>
-                <div style={{ fontSize: 11.5, fontFamily: 'var(--mono)' }}>{rejected.join(', ')}</div>
+        {/* ── STEP 1: Document Type — big centered picker until chosen; medium header until a file is dropped; then compact ── */}
+        <Card padding={!form.type ? '28px 26px' : typeCompact ? '14px 22px' : '18px 22px'}>
+          {form.type ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: typeCompact ? 10 : 14 }}>
+              <div style={{ ...LABEL, fontSize: typeCompact ? 10.5 : 11.5, color: 'var(--text-heading)', flexShrink: 0 }}>Document Type</div>
+              <div style={{ display: 'flex', gap: typeCompact ? 6 : 8, flexWrap: 'wrap', flex: 1 }}>
+                {TYPES.map(type => {
+                  const c = TYPE_CARD_COLORS[type] || { bg: 'rgba(148,163,184,.08)', accent: '#94a3b8', text: '#64748b' };
+                  const active = form.type === type;
+                  return (
+                    <button key={type} type="button"
+                        onClick={() => { fmt('type', type); setTypeFields({}); setLegalAuthorities([{ act: '', sections: [''] }]); setAmendChanges([{ chapter: '', section: '', subsection: '', changeType: 'Amended', description: '' }]); setHierarchy({ act: '', chapter: '', section: '', subsection: '' }); setRelations([]); setRelType((REL_TYPES_BY_DOCTYPE[type] || REL_TYPES)[0]); setRelDocType(''); setRelTarget(''); setRelSearch(''); }}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: typeCompact ? 6 : 8,
+                          padding: typeCompact ? '6px 10px' : '9px 14px', borderRadius: typeCompact ? 8 : 10,
+                          border: active ? `1.5px solid ${c.accent}` : `1.5px solid ${c.accent}30`,
+                          background: active ? c.bg : 'var(--surface-card)',
+                          opacity: active ? 1 : 0.72,
+                          boxShadow: active ? `0 0 0 3px ${c.accent}15` : 'none',
+                          cursor: 'pointer', transition: 'all .15s', fontFamily: 'var(--font)',
+                        }}
+                        onMouseEnter={e => { if (!active) { e.currentTarget.style.opacity = 1; e.currentTarget.style.borderColor = c.accent + '60'; }}}
+                        onMouseLeave={e => { if (!active) { e.currentTarget.style.opacity = 0.72; e.currentTarget.style.borderColor = c.accent + '30'; }}}>
+                        <FileText size={typeCompact ? 11 : 14} color={c.accent} />
+                        <span style={{ fontSize: typeCompact ? 11.5 : 12.5, fontWeight: active ? 700 : 600, color: active ? c.text : 'var(--text-heading)', whiteSpace: 'nowrap' }}>{type}</span>
+                        {active && <CheckCircle size={typeCompact ? 11 : 13} color={c.accent} />}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-              <button onClick={() => setRejected([])} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', display: 'flex' }}><X size={13} /></button>
-            </div>
-          )}
-
-          {/* Document Type card */}
-          <Card>
-            <div style={{ ...LABEL, marginBottom: 10 }}>Document Type <span style={{ color: '#ef4444' }}>*</span></div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              {TYPES.map(type => {
-                const c = TYPE_CARD_COLORS[type] || { bg: 'rgba(148,163,184,.08)', accent: '#94a3b8', text: '#64748b' };
-                const active = form.type === type;
-                return (
-                  <button key={type} type="button"
-                    onClick={() => { fmt('type', type); setTypeFields({}); setLegalAuthorities([{ act: '', sections: [''] }]); setAmendChanges([{ chapter: '', section: '', subsection: '', changeType: 'Amended', description: '' }]); setHierarchy({ act: '', chapter: '', section: '', subsection: '' }); setRelations([]); setRelType((REL_TYPES_BY_DOCTYPE[type] || REL_TYPES)[0]); setRelDocType(''); setRelTarget(''); setRelSearch(''); }}
-                    style={{
-                      padding: '10px 10px 9px', borderRadius: 10, textAlign: 'left',
-                      border: active ? `2px solid ${c.accent}` : `1.5px solid ${c.accent}30`,
-                      background: active ? c.bg : 'var(--surface-card)',
-                      cursor: 'pointer', transition: 'all .15s', fontFamily: 'var(--font)',
-                      boxShadow: active ? `0 0 0 3px ${c.accent}15` : 'none',
-                    }}
-                    onMouseEnter={e => { if (!active) { e.currentTarget.style.background = c.bg; e.currentTarget.style.borderColor = c.accent + '55'; }}}
-                    onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'var(--surface-card)'; e.currentTarget.style.borderColor = c.accent + '30'; }}}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
-                      <div style={{ width: 22, height: 22, borderRadius: 6, background: c.bg, border: `1px solid ${c.accent}30`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <FileText size={11} color={c.accent} />
-                      </div>
-                      {active && <CheckCircle size={12} color={c.accent} />}
-                    </div>
-                    <div style={{ fontSize: 11.5, fontWeight: 700, color: active ? c.text : 'var(--text-heading)', lineHeight: 1.3 }}>{type}</div>
-                  </button>
-                );
-              })}
-            </div>
+          ) : (
+            <div style={{ maxWidth: 1180, margin: '0 auto' }}>
+              <div style={{ textAlign: 'center', marginBottom: 32 }}>
+                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-heading)', marginBottom: 8 }}>Document Type <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ fontSize: 13.5, color: 'var(--text-color-secondary)' }}>Choose the type of document you're uploading to get started</div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(240px, 1fr))', gap: 20 }}>
+                {TYPES.map(type => {
+                  const c = TYPE_CARD_COLORS[type] || { bg: 'rgba(148,163,184,.08)', accent: '#94a3b8', text: '#64748b' };
+                  return (
+                    <button key={type} type="button"
+                        onClick={() => { fmt('type', type); setTypeFields({}); setLegalAuthorities([{ act: '', sections: [''] }]); setAmendChanges([{ chapter: '', section: '', subsection: '', changeType: 'Amended', description: '' }]); setHierarchy({ act: '', chapter: '', section: '', subsection: '' }); setRelations([]); setRelType((REL_TYPES_BY_DOCTYPE[type] || REL_TYPES)[0]); setRelDocType(''); setRelTarget(''); setRelSearch(''); }}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 16,
+                          padding: '22px 20px', borderRadius: 14, textAlign: 'left',
+                          border: `1.5px solid ${c.accent}30`,
+                          background: 'var(--surface-card)',
+                          cursor: 'pointer', transition: 'all .15s', fontFamily: 'var(--font)',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = c.bg; e.currentTarget.style.borderColor = c.accent + '55'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'var(--surface-card)'; e.currentTarget.style.borderColor = c.accent + '30'; }}>
+                        <div style={{ width: 46, height: 46, borderRadius: 11, background: c.bg, border: `1px solid ${c.accent}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <FileText size={21} color={c.accent} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', lineHeight: 1.3 }}>{type}</div>
+                          <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', lineHeight: 1.45, marginTop: 3 }}>{TYPE_CARD_DESC[type]}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </Card>
 
-          {/* File upload card */}
-          <Card>
-            {files.length === 0 ? (
+          {/* ── STEP 2: File upload — big while active, collapses into a header once files are checked ── */}
+          {form.type && (
+          <div ref={uploadSectionRef}>
+          <Card padding={allFilesChecked ? '14px 22px' : '28px 26px'}>
+            {allFilesChecked ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 26, height: 26, borderRadius: 7, background: 'rgba(22,163,74,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  {fileIcon(files[0])}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ ...LABEL, marginBottom: 2 }}>File{files.length > 1 ? 's' : ''} Uploaded</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {files.length > 1 ? `${files.length} files` : files[0]?.name}
+                  </div>
+                </div>
+                <CheckCircle size={14} color="#16a34a" style={{ flexShrink: 0 }} />
+                <button type="button" onClick={() => inputRef.current?.click()}
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 700, color: 'var(--primary)', background: 'transparent', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '6px 12px', cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+                  <Plus size={12} /> Add file
+                </button>
+                <button type="button" onClick={() => { setFiles([]); setFileRefs([]); setUploadStep(null); setUploadError(''); }}
+                  style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--primary)', background: 'transparent', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '6px 12px', cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+                  Change files
+                </button>
+              </div>
+            ) : files.length === 0 ? (
               <div
-                onClick={() => { if (!form.type) return; inputRef.current?.click(); }}
+                onClick={() => inputRef.current?.click()}
                 onDrop={handleDrop}
-                onDragOver={e => { e.preventDefault(); if (form.type) setDragOver(true); }}
+                onDragOver={e => { e.preventDefault(); setDragOver(true); }}
                 onDragLeave={() => setDragOver(false)}
                 style={{
-                  border: `2px dashed ${!form.type ? 'var(--surface-border)' : dragOver ? (TYPE_CARD_COLORS[form.type]?.accent || 'var(--primary)') : 'var(--surface-border)'}`,
-                  borderRadius: 10, padding: '14px 16px',
-                  cursor: form.type ? 'pointer' : 'not-allowed',
-                  display: 'flex', alignItems: 'center', gap: 14,
-                  background: !form.type ? 'var(--surface-ground)' : dragOver ? (TYPE_CARD_COLORS[form.type]?.bg || 'rgba(26,86,219,.05)') : 'var(--surface-ground)',
-                  opacity: form.type ? 1 : 0.55,
+                  border: `2px dashed ${TYPE_CARD_COLORS[form.type]?.accent || 'var(--primary)'}${dragOver ? '' : '50'}`,
+                  borderRadius: 16, padding: '80px 24px',
+                  cursor: 'pointer',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 18, textAlign: 'center',
+                  background: dragOver ? (TYPE_CARD_COLORS[form.type]?.bg || 'rgba(26,86,219,.05)') : 'var(--surface-card)',
                   transition: 'all .25s',
                   boxShadow: dragOver ? `0 0 0 3px ${TYPE_CARD_COLORS[form.type]?.accent || '#1a56db'}18` : 'none',
                 }}>
-                <div style={{ width: 36, height: 36, borderRadius: 9, flexShrink: 0, background: dragOver ? (TYPE_CARD_COLORS[form.type]?.bg || 'rgba(26,86,219,.12)') : 'var(--surface-card)', border: `1px solid ${dragOver ? (TYPE_CARD_COLORS[form.type]?.accent || 'var(--primary)') + '40' : 'var(--surface-border)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .25s' }}>
-                  <Upload size={16} color={dragOver ? (TYPE_CARD_COLORS[form.type]?.accent || 'var(--primary)') : 'var(--text-color-secondary)'} strokeWidth={1.6} />
+                <div style={{ width: 68, height: 68, borderRadius: 16, flexShrink: 0, background: TYPE_CARD_COLORS[form.type]?.bg || 'rgba(26,86,219,.12)', border: `1px solid ${(TYPE_CARD_COLORS[form.type]?.accent || 'var(--primary)')}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .25s' }}>
+                  <Upload size={30} color={TYPE_CARD_COLORS[form.type]?.accent || 'var(--primary)'} strokeWidth={1.6} />
                 </div>
-                {!form.type ? (
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 2 }}>Select a document type first</div>
-                    <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)' }}>Choose a type above to enable file upload</div>
-                  </div>
-                ) : (
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 2 }}>Drop files here or <span style={{ color: 'var(--primary)' }}>click to browse</span></div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)' }}>PDF or Word · up to 50 MB</span>
+                <div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 8 }}>Drop files here or <span style={{ color: 'var(--primary)' }}>click to browse</span></div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>PDF or Word · up to 50 MB</span>
                       <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--primary)', background: 'rgba(26,86,219,.08)', border: '1px solid rgba(26,86,219,.2)', padding: '2px 7px', borderRadius: 20 }}>.PDF</span>
                       <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: '#2b579a', background: 'rgba(43,87,154,.08)', border: '1px solid rgba(43,87,154,.3)', padding: '2px 7px', borderRadius: 20 }}>.DOC</span>
                     </div>
-                  </div>
-                )}
+                </div>
               </div>
             ) : (
               <>
@@ -2247,84 +2370,14 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
               </>
             )}
           </Card>
+          </div>
+          )}
 
-        </div>
-
-        {/* ── RIGHT: Document Details form ───────────────────────────────────── */}
+        {/* ── STEP 3: Document Details form — only once all files are checked, full width ── */}
+        {allFilesChecked && (
+        <>
+        <div ref={detailsSectionRef}>
         <Card>
-          {files.length > 0 && !allFilesChecked && uploadStep === 'uploading' ? (
-            /* Skeleton — mimics the Document Details form while the OCR eligibility check runs.
-               Shown regardless of whether a document type / file-drop placeholder would otherwise
-               render, so the user always sees that the check is actually in progress. */
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18, paddingBottom: 14, borderBottom: '1px solid var(--surface-border)' }}>
-                <div style={{ width: 28, height: 28, borderRadius: 7, background: 'var(--surface-hover)', border: '1px solid var(--surface-border)', animation: 'pulse2 1.4s ease-in-out infinite' }} />
-                <div style={{ width: 150, height: 15, borderRadius: 4, background: 'var(--surface-hover)', border: '1px solid var(--surface-border)', animation: 'pulse2 1.4s ease-in-out infinite' }} />
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
-                <div style={{ width: 130, height: 9, borderRadius: 3, background: 'var(--surface-hover)', border: '1px solid var(--surface-border)', animation: 'pulse2 1.4s ease-in-out infinite' }} />
-                <div style={{ height: 38, borderRadius: 8, background: 'var(--surface-hover)', border: '1px solid var(--surface-border)', animation: 'pulse2 1.4s ease-in-out infinite' }} />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginBottom: 14 }}>
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <div style={{ width: '55%', height: 9, borderRadius: 3, background: 'var(--surface-hover)', border: '1px solid var(--surface-border)', animation: 'pulse2 1.4s ease-in-out infinite', animationDelay: `${i * 0.07}s` }} />
-                    <div style={{ height: 38, borderRadius: 8, background: 'var(--surface-hover)', border: '1px solid var(--surface-border)', animation: 'pulse2 1.4s ease-in-out infinite', animationDelay: `${i * 0.07}s` }} />
-                  </div>
-                ))}
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 20 }}>
-                <div style={{ width: 170, height: 9, borderRadius: 3, background: 'var(--surface-hover)', border: '1px solid var(--surface-border)', animation: 'pulse2 1.4s ease-in-out infinite' }} />
-                <div style={{ height: 150, borderRadius: 8, background: 'var(--surface-hover)', border: '1px solid var(--surface-border)', animation: 'pulse2 1.4s ease-in-out infinite' }} />
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 12.5, color: 'var(--text-color-secondary)' }}>
-                <Clock size={13} /> Verifying OCR eligibility — this only takes a moment…
-              </div>
-            </div>
-          ) : !form.type ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 460, textAlign: 'center', gap: 14 }}>
-              <div style={{ width: 52, height: 52, borderRadius: 14, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <FileText size={22} color="var(--text-color-secondary)" strokeWidth={1.5} />
-              </div>
-              <div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 6 }}>Select a Document Type</div>
-                <div style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>Choose the document type on the left to see the relevant form fields</div>
-              </div>
-            </div>
-          ) : files.length === 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 460, textAlign: 'center', gap: 14 }}>
-              <div style={{ width: 52, height: 52, borderRadius: 14, background: TYPE_CARD_COLORS[form.type]?.bg || 'var(--surface-ground)', border: `1px solid ${TYPE_CARD_COLORS[form.type]?.accent || 'var(--surface-border)'}30`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Upload size={22} color={TYPE_CARD_COLORS[form.type]?.accent || 'var(--text-color-secondary)'} strokeWidth={1.5} />
-              </div>
-              <div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 6 }}>Drop a {form.type} file</div>
-                <div style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>Select a PDF or Word file on the left to fill in document details</div>
-              </div>
-            </div>
-          ) : !allFilesChecked ? (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 460, textAlign: 'center', gap: 14 }}>
-              <div style={{ width: 52, height: 52, borderRadius: 14, background: uploadStep === 'error' ? 'rgba(239,68,68,.08)' : TYPE_CARD_COLORS[form.type]?.bg || 'var(--surface-ground)', border: `1px solid ${uploadStep === 'error' ? 'rgba(239,68,68,.3)' : (TYPE_CARD_COLORS[form.type]?.accent || 'var(--surface-border)') + '30'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {uploadStep === 'error'
-                  ? <XCircle size={22} color="#ef4444" strokeWidth={1.5} />
-                  : <Upload size={22} color={TYPE_CARD_COLORS[form.type]?.accent || 'var(--text-color-secondary)'} strokeWidth={1.5} />}
-              </div>
-              <div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 6 }}>
-                  {uploadStep === 'error' ? 'Document check failed' : 'Ready to check'}
-                </div>
-                <div style={{ fontSize: 13, color: 'var(--text-color-secondary)', maxWidth: 320 }}>
-                  {uploadStep === 'error'
-                    ? (uploadError || 'The document failed the eligibility check.')
-                    : 'Click "Upload & Check Document" on the left to verify OCR eligibility before entering document details.'}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <>
               {/* Form header */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18, paddingBottom: 14, borderBottom: '1px solid var(--surface-border)' }}>
                 <div style={{ width: 28, height: 28, borderRadius: 7, background: TYPE_CARD_COLORS[form.type]?.bg || 'var(--surface-ground)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -2343,13 +2396,25 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         <form onSubmit={handleSubmit}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
 
+            {/* Act / Legal Authority — must be set first for every type except Act; gates the rest of the form */}
+            {form.type !== 'Act' && (
+              <div style={{ gridColumn: '1 / -1' }}>
+                <div style={{ ...LABEL, marginBottom: 6 }}>
+                  {form.type === 'Amendment' ? 'Parent Act' : 'Legal Authority / Act Reference'} <span style={{ color: '#ef4444' }}>*</span>
+                </div>
+                <HierarchyTag hierarchy={hierarchy} onOpen={() => { setDrawerHierarchy({ ...hierarchy }); setDrawerType('hierarchy'); }} isRef={true} legalAuthorities={usesLegalAuthorities ? legalAuthorities : undefined} />
+                {detailsLocked && (
+                  <div style={{ fontSize: 11.5, color: '#d97706', marginTop: 6 }}>Select the Act this document relates to before filling in the rest of the details.</div>
+                )}
+              </div>
+            )}
+
+            <fieldset disabled={detailsLocked} style={{ display: 'contents', border: 0, margin: 0, padding: 0 }}>
+
             {/* Per-file name + description panels (shown when all files are checked) */}
             {allFilesChecked && files.length > 0 && (
               <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 4 }}>
-                <div style={{ ...LABEL, marginBottom: 2 }}>
-                  Per-File Details
-                  <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-color-secondary)', textTransform: 'none', letterSpacing: 0, marginLeft: 8 }}>Name and description are set per file — other fields below apply to all</span>
-                </div>
+            
                 {files.map(f => (
                   <div key={f.name} style={{ padding: '12px 14px', borderRadius: 10, border: '1.5px solid var(--surface-border)', background: 'var(--surface-ground)', display: 'flex', flexDirection: 'column', gap: 10 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -2392,59 +2457,10 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                           }[form.type] || 'Enter document name')}
                           style={INPUT_BASE} />
                       </div>
-                      <div>
-                        <div style={{ ...LABEL, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-                          Description / Remarks
-                          {fileMeta[f.name]?.desc && (
-                            <span style={{ fontSize: 10, fontWeight: 600, color: '#16a34a', textTransform: 'none', letterSpacing: 0 }}>· auto-filled, you can edit</span>
-                          )}
-                        </div>
-                        <textarea
-                          value={fileMeta[f.name]?.desc ?? ''}
-                          onChange={e => setFileMeta(prev => ({ ...prev, [f.name]: { ...prev[f.name], desc: e.target.value } }))}
-                          onFocus={focusStyle} onBlur={blurStyle}
-                          rows={3}
-                          placeholder="Brief description or upload remarks…"
-                          style={{ ...INPUT_BASE, resize: 'vertical', lineHeight: 1.6 }} />
-                      </div>
                     </div>
                   </div>
                 ))}
               </div>
-            )}
-
-            {/* Shared Document name — only shown when no files are checked yet (single-file fallback) */}
-            {!allFilesChecked && (
-            <div style={{ gridColumn: '1 / -1' }}>
-              <div style={{ ...LABEL, marginBottom: 6 }}>
-                {{
-                  'Act': 'Act / Instrument Name',
-                  'Amendment': 'Amendment Name',
-                  'Notification': 'Notification Title',
-                  'Circular': 'Circular Title',
-                  'Policy': 'Policy Name',
-                  'Rules & Regulations': 'Rules / Regulation Name',
-                  'Order / Gazette': 'Order / Gazette Title',
-                  'Bye Laws': 'Bye Law Name',
-                  'Miscellaneous': 'Document Title',
-                }[form.type] || 'Document Name'}
-                {files.length <= 1 && <span style={{ color: '#ef4444' }}> *</span>}
-              </div>
-              <input value={form.act} onChange={e => fmt('act', e.target.value)} required={files.length <= 1}
-                placeholder={files.length > 1 ? 'Leave blank to use each filename' : ({
-                  'Act': 'e.g. Haryana Municipal Act, 1973',
-                  'Amendment': 'e.g. The XYZ (Amendment) Act, 2022',
-                  'Notification': 'e.g. Gazette Notification No. 123',
-                  'Circular': 'e.g. Circular No. 45/2023',
-                  'Policy': 'e.g. Haryana Industrial Policy 2020',
-                  'Rules & Regulations': 'e.g. Haryana Municipal Rules, 1975',
-                  'Order / Gazette': 'e.g. Government Order No. 12/2021',
-                  'Bye Laws': 'e.g. Municipal Corporation Bye-laws, 2020',
-                  'Miscellaneous': 'e.g. Departmental Guidelines / Reference Manual',
-                }[form.type] || 'Enter document name')}
-                style={INPUT_BASE} onFocus={focusStyle}
-                onBlur={e => { blurStyle(e); if (files.length <= 1) checkDuplicate(); }} />
-            </div>
             )}
 
             {/* ── ACT: all fields inline ── */}
@@ -2455,9 +2471,24 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                   placeholder="e.g. Act No. 12 of 1973" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Year <span style={{ color: '#ef4444' }}>*</span></div>
+                <input value={typeFields.year || ''} onChange={e => setTypeFields(f => ({ ...f, year: e.target.value }))}
+                  placeholder="YYYY" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>Short Title</div>
                 <input value={typeFields.shortTitle || ''} onChange={e => setTypeFields(f => ({ ...f, shortTitle: e.target.value }))}
                   placeholder="e.g. Haryana Municipal Act" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Long Title</div>
+                <input value={typeFields.longTitle || ''} onChange={e => setTypeFields(f => ({ ...f, longTitle: e.target.value }))}
+                  placeholder="Full formal title of the Act" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Regional Title</div>
+                <input value={typeFields.regionalTitle || ''} onChange={e => setTypeFields(f => ({ ...f, regionalTitle: e.target.value }))}
+                  placeholder="Title in the regional / Hindi language" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>Issue Date <span style={{ color: '#ef4444' }}>*</span></div>
@@ -2475,11 +2506,66 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                   placeholder="e.g. Haryana Gazette, 15 Jan 1973" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Notification No.</div>
+                <input value={typeFields.notificationNo || ''} onChange={e => setTypeFields(f => ({ ...f, notificationNo: e.target.value }))}
+                  placeholder="e.g. Notification No. 45/2021" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Act ID <span style={{ fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>(if available)</span></div>
+                <input value={typeFields.actId || ''} onChange={e => setTypeFields(f => ({ ...f, actId: e.target.value }))}
+                  placeholder="Numbers and hyphens only" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>S.O. Reason</div>
+                <input value={typeFields.soReason || ''} onChange={e => setTypeFields(f => ({ ...f, soReason: e.target.value }))}
+                  placeholder="Reason for the statutory order" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+              <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>Department</div>
                 <div style={{ ...INPUT_BASE, color: 'var(--text-color)', opacity: 0.8, userSelect: 'none', display: 'flex', alignItems: 'center', gap: 7 }}>
                   <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0, opacity: 0.7 }} />
                   {user?.dept || form.dept || '—'}
                 </div>
+              </div>
+              <div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Relationships</div>
+                <button type="button" onClick={() => setDrawerType('relationship')}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: relations.length > 0 ? 'var(--primary)' : 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                  <GitBranch size={13} />
+                  {relations.length > 0 ? `${relations.length} Relationship${relations.length !== 1 ? 's' : ''} Added` : 'Add Reference Act'}
+                  <ChevronRight size={12} />
+                </button>
+              </div>
+
+              {/* Linked-instrument counts */}
+              {[
+                ['noOfRules', 'No. of Rules'],
+                ['noOfNotifications', 'No. of Notifications'],
+                ['noOfRegulations', 'No. of Regulations'],
+                ['noOfCirculars', 'No. of Circulars'],
+                ['noOfStatutes', 'No. of Statutes'],
+                ['noOfOrdinances', 'No. of Ordinances'],
+                ['noOfOrder', 'No. of Order'],
+              ].map(([key, label]) => (
+                <div key={key}>
+                  <div style={{ ...LABEL, marginBottom: 6 }}>{label}</div>
+                  <input type="number" min="0" value={typeFields[key] || ''} onChange={e => setTypeFields(f => ({ ...f, [key]: e.target.value }))}
+                    placeholder="Enter only numeric value" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                </div>
+              ))}
+
+              <div style={{ gridColumn: '1 / -1' }}>
+                <div style={{ ...LABEL, marginBottom: 6 }}>Keywords</div>
+                <input value={typeFields.keywords || ''} onChange={e => setTypeFields(f => ({ ...f, keywords: e.target.value }))}
+                  placeholder="Comma-separated search keywords" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              </div>
+
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 12.5, color: 'var(--text-color-secondary)' }}>
+                  <input type="checkbox" checked={!!typeFields.repealed} onChange={e => setTypeFields(f => ({ ...f, repealed: e.target.checked }))}
+                    style={{ width: 15, height: 15, cursor: 'pointer', accentColor: 'var(--primary)' }} />
+                  Check if you want to repeal the Act. This Act will not show anywhere.
+                </label>
               </div>
             </>)}
 
@@ -2511,10 +2597,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                   <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0, opacity: 0.7 }} />
                   {user?.dept || form.dept || '—'}
                 </div>
-              </div>
-              <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Parent Act</div>
-                <HierarchyTag hierarchy={hierarchy} onOpen={() => { setDrawerHierarchy({ ...hierarchy }); setDrawerType('hierarchy'); }} isRef={true} />
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>Relationships</div>
@@ -2552,10 +2634,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 </div>
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Legal Authority</div>
-                <HierarchyTag hierarchy={hierarchy} onOpen={() => setDrawerType('hierarchy')} isRef={true} legalAuthorities={legalAuthorities} />
-              </div>
-              <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>Relationships</div>
                 <button type="button" onClick={() => setDrawerType('relationship')}
                   style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: relations.length > 0 ? 'var(--primary)' : 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
@@ -2589,10 +2667,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                   <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0, opacity: 0.7 }} />
                   {user?.dept || form.dept || '—'}
                 </div>
-              </div>
-              <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Legal Authority</div>
-                <HierarchyTag hierarchy={hierarchy} onOpen={() => setDrawerType('hierarchy')} isRef={true} legalAuthorities={legalAuthorities} />
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>Relationships</div>
@@ -2635,10 +2709,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 </div>
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Legal Authority</div>
-                <HierarchyTag hierarchy={hierarchy} onOpen={() => setDrawerType('hierarchy')} isRef={true} legalAuthorities={legalAuthorities} />
-              </div>
-              <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>Relationships</div>
                 <button type="button" onClick={() => setDrawerType('relationship')}
                   style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: relations.length > 0 ? 'var(--primary)' : 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
@@ -2677,10 +2747,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                   <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0, opacity: 0.7 }} />
                   {user?.dept || form.dept || '—'}
                 </div>
-              </div>
-              <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Legal Authority</div>
-                <HierarchyTag hierarchy={hierarchy} onOpen={() => setDrawerType('hierarchy')} isRef={true} legalAuthorities={legalAuthorities} />
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>Relationships</div>
@@ -2733,10 +2799,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 </div>
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Legal Authority</div>
-                <HierarchyTag hierarchy={hierarchy} onOpen={() => setDrawerType('hierarchy')} isRef={true} legalAuthorities={legalAuthorities} />
-              </div>
-              <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>Relationships</div>
                 <button type="button" onClick={() => setDrawerType('relationship')}
                   style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: relations.length > 0 ? 'var(--primary)' : 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
@@ -2782,10 +2844,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 </div>
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Act Reference</div>
-                <HierarchyTag hierarchy={hierarchy} onOpen={() => { setDrawerHierarchy({ ...hierarchy }); setDrawerType('hierarchy'); }} isRef={true} />
-              </div>
-              <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>Relationships</div>
                 <button type="button" onClick={() => setDrawerType('relationship')}
                   style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: relations.length > 0 ? 'var(--primary)' : 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
@@ -2829,10 +2887,6 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                   <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0, opacity: 0.7 }} />
                   {user?.dept || form.dept || '—'}
                 </div>
-              </div>
-              <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Act Reference</div>
-                <HierarchyTag hierarchy={hierarchy} onOpen={() => { setDrawerHierarchy({ ...hierarchy }); setDrawerType('hierarchy'); }} isRef={true} />
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>Relationships</div>
@@ -2882,18 +2936,36 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
               ))}
             </>)}
 
-            {/* Shared description — only shown when per-file panels are not active */}
-            {!allFilesChecked && (
-            <div style={{ gridColumn: '1 / -1' }}>
-              <div style={{ ...LABEL, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                Description / Remarks
+            {/* Per-file description — shown last, one per file */}
+            {files.length > 0 && (
+              <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ ...LABEL, marginBottom: 2 }}>
+                  Description / Remarks
+                  <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-color-secondary)', textTransform: 'none', letterSpacing: 0, marginLeft: 8 }}>Set per file</span>
+                </div>
+                {files.map(f => (
+                  <div key={f.name}>
+                    {files.length > 1 && (
+                      <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text-heading)', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</div>
+                    )}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                      {fileMeta[f.name]?.desc && (
+                        <span style={{ fontSize: 10, fontWeight: 600, color: '#16a34a', textTransform: 'none', letterSpacing: 0 }}>auto-filled, you can edit</span>
+                      )}
+                    </div>
+                    <textarea
+                      value={fileMeta[f.name]?.desc ?? ''}
+                      onChange={e => setFileMeta(prev => ({ ...prev, [f.name]: { ...prev[f.name], desc: e.target.value } }))}
+                      onFocus={focusStyle} onBlur={blurStyle}
+                      rows={5}
+                      placeholder="Brief description or upload remarks…"
+                      style={{ ...INPUT_BASE, resize: 'vertical', lineHeight: 1.6 }} />
+                  </div>
+                ))}
               </div>
-              <textarea value={form.desc} onChange={e => fmt('desc', e.target.value)} rows={7}
-                placeholder="Brief description or upload remarks…"
-                style={{ ...INPUT_BASE, resize: 'vertical', lineHeight: 1.6, minHeight: 150 }}
-                onFocus={focusStyle} onBlur={blurStyle} />
-            </div>
             )}
+
+            </fieldset>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--surface-border)' }}>
@@ -2905,16 +2977,16 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
               Clear All
             </button>
             <button type="submit"
-              disabled={files.length === 0 || uploadStep === 'uploading' || uploadStep === 'saving' || uploadStep === 'done'}
+              disabled={files.length === 0 || detailsLocked || uploadStep === 'uploading' || uploadStep === 'saving' || uploadStep === 'done'}
               style={{
                 background: uploadStep === 'done' ? '#16a34a'
-                  : files.length > 0 && (!uploadStep || uploadStep === 'ready' || uploadStep === 'error') ? 'var(--primary)'
+                  : files.length > 0 && !detailsLocked && (!uploadStep || uploadStep === 'ready' || uploadStep === 'error') ? 'var(--primary)'
                   : 'var(--surface-200)',
-                color: files.length > 0 && (!uploadStep || uploadStep === 'ready' || uploadStep === 'error' || uploadStep === 'done') ? 'white' : '#94a3b8',
+                color: files.length > 0 && !detailsLocked && (!uploadStep || uploadStep === 'ready' || uploadStep === 'error' || uploadStep === 'done') ? 'white' : '#94a3b8',
                 border: 'none', padding: '10px 28px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700,
-                cursor: files.length > 0 && (!uploadStep || uploadStep === 'ready' || uploadStep === 'error') ? 'pointer' : 'not-allowed',
+                cursor: files.length > 0 && !detailsLocked && (!uploadStep || uploadStep === 'ready' || uploadStep === 'error') ? 'pointer' : 'not-allowed',
                 display: 'flex', alignItems: 'center', gap: 8,
-                boxShadow: files.length > 0 && (!uploadStep || uploadStep === 'ready' || uploadStep === 'error') ? '0 2px 8px rgba(26,86,219,.2)' : 'none',
+                boxShadow: files.length > 0 && !detailsLocked && (!uploadStep || uploadStep === 'ready' || uploadStep === 'error') ? '0 2px 8px rgba(26,86,219,.2)' : 'none',
                 transition: 'all .2s',
               }}>
               {uploadStep === 'uploading' && <><Clock size={14} /> Uploading file…</>}
@@ -2924,9 +2996,81 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
             </button>
           </div>
         </form>
-            </>
-          )}
         </Card>
+        </div>
+
+        {/* Existing documents of this same type already linked to the chosen Act — its own standalone card */}
+        {form.type !== 'Act' && primaryActId && (
+          <Card>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, paddingBottom: 14, borderBottom: '1px solid var(--surface-border)' }}>
+              <div style={{ width: 28, height: 28, borderRadius: 7, background: 'var(--surface-ground)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Layers size={13} color="var(--primary)" />
+              </div>
+              <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>Existing "{form.type}" Documents Under This Act</span>
+            </div>
+            {actChildrenLoading ? (
+              <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', padding: '10px 0' }}>Loading…</div>
+            ) : (() => {
+              const list = extractTypeChildren(actChildren, form.type);
+              return (
+                <div style={{ border: '1px solid var(--surface-border)', borderRadius: 10, overflow: 'hidden' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                    <thead>
+                      <tr style={{ background: 'var(--surface-ground)' }}>
+                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>Document Name</th>
+                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>Reference No.</th>
+                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>Issue Date</th>
+                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>Department</th>
+                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>Version</th>
+                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>Status</th>
+                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>View</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {list.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} style={{ padding: '16px 12px', textAlign: 'center', color: 'var(--text-color-secondary)' }}>
+                            No "{form.type}" documents found under this Act.
+                          </td>
+                        </tr>
+                      ) : list.map((d, i) => (
+                        <tr key={d.id ?? i} style={{ borderTop: '1px solid var(--surface-border)' }}>
+                          <td style={{ padding: '8px 12px', color: 'var(--text-heading)', fontWeight: 600 }}>{d.document_name || '—'}</td>
+                          <td style={{ padding: '8px 12px', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.reference_number || '—'}</td>
+                          <td style={{ padding: '8px 12px', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.issue_date || '—'}</td>
+                          <td style={{ padding: '8px 12px', color: 'var(--text-color-secondary)' }}>{d.department_name || '—'}</td>
+                          <td style={{ padding: '8px 12px', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.version_no || '—'}</td>
+                          <td style={{ padding: '8px 12px', color: 'var(--text-color-secondary)', textTransform: 'capitalize' }}>{d.status || '—'}</td>
+                          <td style={{ padding: '8px 12px' }}>
+                            <button type="button" onClick={() => setViewingActChildDoc({
+                                id:      d.id,
+                                title:   d.document_name || 'Document',
+                                type:    d.document_type_name || form.type,
+                                dept:    d.department_name || '',
+                                year:    d.issue_date ? d.issue_date.split('-')[0] : (d.created_at ? new Date(d.created_at).getFullYear() : '—'),
+                                version: d.version_no || '1.0',
+                                status:  d.status || 'pending',
+                                desc:    '',
+                              })}
+                              disabled={!d.id}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 600, cursor: d.id ? 'pointer' : 'not-allowed', fontFamily: 'var(--font)', opacity: d.id ? 1 : 0.5 }}>
+                              <Eye size={12} /> View
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
+          </Card>
+        )}
+        {viewingActChildDoc && (
+          <DocViewModal doc={viewingActChildDoc} onClose={() => setViewingActChildDoc(null)} />
+        )}
+        </>
+        )}
 
       </div>
 

@@ -4,7 +4,7 @@ import Topbar from './Topbar';
 import AccessibilityToolbar from './AccessibilityToolbar';
 
 export default function Layout({ user, activePage, onNavigate, onLogout, onChangePassword, children }) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--surface-ground)' }}>

@@ -21,3 +21,4 @@ export const getLinkedDocuments        = (link_status)                  => api.g
 export const getDepartmentLinkRequests = (link_status = 'pending')      => api.get('/pdf/department-link-requests', { params: { link_status } });
 export const getAllDepartmentLinks      = (link_status, department_id)   => api.get('/pdf/all-department-links', { params: { ...(link_status ? { link_status } : {}), ...(department_id ? { department_id } : {}) } });
 export const reviewDepartmentLink      = (link_id, action, comments, annotations_json) => api.post('/pdf/review-link', { link_id, action, comments: comments || null, annotations_json: annotations_json || null });
+export const getActChildren            = (pdf_id)                       => api.get(`/pdf/${pdf_id}/children`);
