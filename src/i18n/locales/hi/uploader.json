@@ -1,0 +1,418 @@
+{
+  "docTypes": {
+    "act": "अधिनियम",
+    "amendment": "संशोधन",
+    "notification": "अधिसूचना",
+    "circular": "परिपत्र",
+    "policy": "नीति",
+    "rulesRegulations": "नियम एवं विनियम",
+    "orderGazette": "आदेश / राजपत्र",
+    "byeLaws": "उपविधियाँ",
+    "miscellaneous": "विविध"
+  },
+  "docTypeDesc": {
+    "act": "विधायिका द्वारा अधिनियमित प्राथमिक विधान",
+    "amendment": "किसी मौजूदा अधिनियम या नियम में संशोधन",
+    "notification": "आधिकारिक सरकारी सूचना या घोषणा",
+    "circular": "आंतरिक निर्देश या अनुदेश",
+    "policy": "सरकारी नीति दस्तावेज़ या ढांचा",
+    "rulesRegulations": "किसी अधिनियम के अंतर्गत गौण विधान",
+    "orderGazette": "कार्यकारी आदेश या राजपत्र अधिसूचना",
+    "byeLaws": "नगर निकाय या पंचायत कानून के अंतर्गत स्थानीय निकाय विनियम",
+    "miscellaneous": "अन्य आधिकारिक दस्तावेज़ जो ऊपर सूचीबद्ध नहीं हैं"
+  },
+  "relTypes": {
+    "replaces": "प्रतिस्थापित करता है",
+    "replacedBy": "द्वारा प्रतिस्थापित",
+    "amends": "संशोधित करता है",
+    "amendedBy": "द्वारा संशोधित",
+    "inContinuationOf": "की निरंतरता में",
+    "continuedBy": "द्वारा जारी",
+    "issuedUnder": "के अंतर्गत जारी",
+    "implements": "क्रियान्वित करता है",
+    "implementedBy": "द्वारा क्रियान्वित",
+    "references": "संदर्भित करता है",
+    "referencedBy": "द्वारा संदर्भित",
+    "notifiedUnder": "के अंतर्गत अधिसूचित",
+    "supplementedBy": "द्वारा पूरक",
+    "relatedTo": "से संबंधित"
+  },
+  "amendChangeTypes": {
+    "amended": "संशोधित",
+    "substituted": "प्रतिस्थापित",
+    "inserted": "सम्मिलित",
+    "deleted": "विलोपित",
+    "expanded": "विस्तारित"
+  },
+  "common": {
+    "issueDate": "जारी करने की तिथि",
+    "effectiveFrom": "प्रभावी तिथि",
+    "gazetteReference": "राजपत्र संदर्भ",
+    "validUntil": "वैध तिथि तक",
+    "department": "विभाग",
+    "year": "वर्ष",
+    "type": "प्रकार",
+    "version": "संस्करण",
+    "status": "स्थिति",
+    "description": "विवरण",
+    "relationships": "संबंध",
+    "addRelationship": "संबंध जोड़ें",
+    "relationshipsAdded_one": "{{count}} संबंध जोड़ा गया",
+    "relationshipsAdded_other": "{{count}} संबंध जोड़े गए",
+    "cancel": "रद्द करें",
+    "close": "बंद करें",
+    "view": "देखें",
+    "clear": "साफ़ करें",
+    "loading": "लोड हो रहा है…",
+    "retry": "पुनः प्रयास करें",
+    "reviewerRemarks": "समीक्षक टिप्पणियाँ",
+    "documentDetails": "दस्तावेज़ विवरण",
+    "byName": "द्वारा {{name}}",
+    "referenceNo": "संदर्भ संख्या",
+    "statusApproved": "स्वीकृत",
+    "statusRejected": "अस्वीकृत",
+    "statusPending": "लंबित",
+    "statusWordApproved": "स्वीकृत",
+    "statusWordRejected": "अस्वीकृत",
+    "statusWordPending": "लंबित",
+    "untitledDocument": "शीर्षकहीन दस्तावेज़",
+    "unclassified": "अवर्गीकृत",
+    "unassigned": "अनिर्धारित"
+  },
+  "stats": {
+    "totalUploads": "कुल अपलोड",
+    "approved": "स्वीकृत",
+    "pendingReview": "समीक्षा लंबित",
+    "rejected": "अस्वीकृत"
+  },
+  "bulkEdit": {
+    "button": "थोक संपादन",
+    "title_one": "थोक संपादन — {{count}} प्रारूप दस्तावेज़",
+    "title_other": "थोक संपादन — {{count}} प्रारूप दस्तावेज़",
+    "warning": "केवल प्रारूप (Draft) दस्तावेज़ों को संपादित किया जा सकता है। लंबित और प्रकाशित दस्तावेज़ों के लिए सुधार अनुरोध आवश्यक है।",
+    "keepExisting": "— मौजूदा बनाए रखें —",
+    "leaveBlankPlaceholder": "बनाए रखने के लिए खाली छोड़ें",
+    "applyButton": "{{count}} दस्तावेज़ों पर लागू करें"
+  },
+  "table": {
+    "title": "मेरे अपलोड",
+    "documentCount_one": "{{count}} दस्तावेज़",
+    "documentCount_other": "{{count}} दस्तावेज़",
+    "selectedCount": "{{count}} चयनित",
+    "draftOnly": "· केवल प्रारूप",
+    "clearSelection": "चयन साफ़ करें",
+    "cancelSelection": "चयन रद्द करें",
+    "selectButton": "चयन करें",
+    "auditTrail": "ऑडिट ट्रेल",
+    "searchPlaceholder": "दस्तावेज़ खोजें…",
+    "sortLabel": "क्रमबद्ध करें:",
+    "sortDate": "तिथि",
+    "sortTitle": "शीर्षक",
+    "sortStatus": "स्थिति",
+    "sortType": "प्रकार",
+    "colDocument": "दस्तावेज़",
+    "colUploadedOn": "अपलोड की तिथि",
+    "colActions": "कार्रवाई",
+    "noDocumentsFound": "कोई दस्तावेज़ नहीं मिला।",
+    "remarksButton": "टिप्पणियाँ"
+  },
+  "linkedDocs": {
+    "title": "लिंक किए गए दस्तावेज़",
+    "subtitle": "अन्य विभागों से साझा किए गए दस्तावेज़",
+    "linkedBadge": "लिंक्ड",
+    "linkApproved": "लिंक स्वीकृत",
+    "linkRejected": "लिंक अस्वीकृत",
+    "linkPending": "लिंक लंबित",
+    "linkApprovedTitle": "लिंक स्वीकृत",
+    "linkRejectedTitle": "लिंक अस्वीकृत",
+    "linkPendingTitle": "लिंक समीक्षा लंबित",
+    "rejectionRemarks": "अस्वीकृति टिप्पणियाँ"
+  },
+  "versionModal": {
+    "title": "संस्करण इतिहास — {{title}}",
+    "current": "वर्तमान",
+    "currentBadge": "वर्तमान"
+  },
+  "remarksModal": {
+    "approved": "स्वीकृत",
+    "rejected": "अस्वीकृत",
+    "remarkNumber": "टिप्पणी {{num}}"
+  },
+  "hierarchyTag": {
+    "legalAuthoritiesAdded_one": "{{count}} विधिक प्राधिकरण जोड़ा गया",
+    "legalAuthoritiesAdded_other": "{{count}} विधिक प्राधिकरण जोड़े गए",
+    "setLegalAuthority": "विधिक प्राधिकरण निर्धारित करें",
+    "setActReference": "अधिनियम संदर्भ निर्धारित करें",
+    "setHierarchicalTags": "पदानुक्रमित टैग निर्धारित करें"
+  },
+  "versionConflict": {
+    "title": "संस्करण विरोध पाया गया",
+    "alreadyExists": "⚠️ \"{{title}}\" पहले से मौजूद है",
+    "currentVersion": "वर्तमान संस्करण: v{{version}} · अपलोड किया गया: {{uploadedAt}}",
+    "isNewVersion": "क्या यह मौजूदा दस्तावेज़ का नया संस्करण है?",
+    "uploadAsVersion": "v{{version}} के रूप में अपलोड करें"
+  },
+  "workflowBadge": {
+    "draft": "प्रारूप",
+    "pendingReview": "समीक्षा लंबित",
+    "published": "प्रकाशित"
+  },
+  "docViewModal": {
+    "gazetteRef": "राजपत्र संदर्भ",
+    "legalAuthority": "विधिक प्राधिकरण",
+    "uploadDate": "अपलोड तिथि",
+    "file": "फ़ाइल",
+    "documentPreview": "दस्तावेज़ पूर्वावलोकन",
+    "originalPdf": "मूल PDF",
+    "open": "खोलें",
+    "loadingDocument": "दस्तावेज़ लोड हो रहा है…",
+    "prev": "← पिछला",
+    "next": "अगला →",
+    "of": "में से",
+    "additionalInfo": "अतिरिक्त जानकारी",
+    "documentApproved": "दस्तावेज़ स्वीकृत",
+    "documentRejected": "दस्तावेज़ अस्वीकृत",
+    "pendingReview": "समीक्षा लंबित",
+    "highlights": "हाइलाइट्स ({{count}})",
+    "noComment": "कोई टिप्पणी नहीं"
+  },
+  "wizard": {
+    "step1": {
+      "heading": "दस्तावेज़ प्रकार",
+      "subheading": "आरंभ करने के लिए आप जिस प्रकार का दस्तावेज़ अपलोड कर रहे हैं उसे चुनें",
+      "label": "दस्तावेज़ प्रकार"
+    },
+    "step2": {
+      "filesUploaded_one": "फ़ाइल अपलोड की गई",
+      "filesUploaded_other": "फ़ाइलें अपलोड की गईं",
+      "fileCount_one": "{{count}} फ़ाइल",
+      "fileCount_other": "{{count}} फ़ाइलें",
+      "addFile": "फ़ाइल जोड़ें",
+      "changeFiles": "फ़ाइलें बदलें",
+      "dropHere": "फ़ाइलें यहाँ छोड़ें या",
+      "clickToBrowse": "ब्राउज़ करने के लिए क्लिक करें",
+      "fileTypeHint": "PDF या Word · 50 MB तक",
+      "tryAgain": "पुनः प्रयास करें",
+      "uploadCheckButton": "दस्तावेज़ अपलोड करें और जाँचें",
+      "checkingDocument": "दस्तावेज़ की जाँच हो रही है…",
+      "eligibilityPassed": "पात्रता जाँच सफल — विवरण तैयार है",
+      "moreFiles": "+{{count}} और फ़ाइलें",
+      "unsupportedFileType": "असमर्थित फ़ाइल प्रकार अस्वीकृत:"
+    },
+    "step3": {
+      "appliedToAllFiles": "सभी {{count}} फ़ाइलों पर लागू",
+      "parentActLabel": "मूल अधिनियम",
+      "legalAuthorityLabel": "विधिक प्राधिकरण / अधिनियम संदर्भ",
+      "selectActNotice": "शेष विवरण भरने से पहले वह अधिनियम चुनें जिससे यह दस्तावेज़ संबंधित है।",
+      "descriptionLabel": "विवरण / टिप्पणियाँ",
+      "setPerFile": "प्रति फ़ाइल निर्धारित करें",
+      "autoFilled": "स्वतः भरा गया, आप इसे संपादित कर सकते हैं",
+      "descriptionPlaceholder": "संक्षिप्त विवरण या अपलोड टिप्पणियाँ…",
+      "clearAll": "सभी साफ़ करें",
+      "uploadingFile": "फ़ाइल अपलोड हो रही है…",
+      "savingDetails": "विवरण सहेजा जा रहा है…",
+      "submitted": "सबमिट हो गया!",
+      "submitForApproval": "अनुमोदन हेतु सबमिट करें",
+      "existingDocsUnderAct": "इस अधिनियम के अंतर्गत मौजूदा \"{{type}}\" दस्तावेज़",
+      "noDocsUnderAct": "इस अधिनियम के अंतर्गत कोई \"{{type}}\" दस्तावेज़ नहीं मिला।",
+      "colDocumentName": "दस्तावेज़ का नाम"
+    },
+    "fields": {
+      "generic": {
+        "nameLabel": "दस्तावेज़ का नाम",
+        "actReference": "अधिनियम संदर्भ",
+        "hierarchicalTags": "पदानुक्रमित टैग"
+      },
+      "act": {
+        "nameLabel": "अधिनियम / लिखत का नाम",
+        "number": "अधिनियम संख्या",
+        "shortTitle": "संक्षिप्त शीर्षक",
+        "longTitle": "पूर्ण शीर्षक",
+        "regionalTitle": "क्षेत्रीय शीर्षक",
+        "notificationNo": "अधिसूचना संख्या",
+        "actId": "अधिनियम आईडी",
+        "ifAvailable": "(यदि उपलब्ध हो)",
+        "soReason": "एस.ओ. कारण",
+        "addReferenceAct": "संदर्भ अधिनियम जोड़ें",
+        "noOfRules": "नियमों की संख्या",
+        "noOfNotifications": "अधिसूचनाओं की संख्या",
+        "noOfRegulations": "विनियमों की संख्या",
+        "noOfCirculars": "परिपत्रों की संख्या",
+        "noOfStatutes": "कानूनों की संख्या",
+        "noOfOrdinances": "अध्यादेशों की संख्या",
+        "noOfOrder": "आदेशों की संख्या",
+        "keywords": "मुख्य शब्द",
+        "repealCheckbox": "यदि आप अधिनियम को निरस्त करना चाहते हैं तो जाँचें। यह अधिनियम कहीं भी प्रदर्शित नहीं होगा।"
+      },
+      "amendment": {
+        "nameLabel": "संशोधन का नाम",
+        "number": "संशोधन संख्या"
+      },
+      "notification": {
+        "nameLabel": "अधिसूचना शीर्षक",
+        "number": "अधिसूचना संख्या"
+      },
+      "circular": {
+        "nameLabel": "परिपत्र शीर्षक",
+        "number": "परिपत्र संख्या"
+      },
+      "policy": {
+        "nameLabel": "नीति का नाम",
+        "number": "नीति संख्या / आईडी",
+        "sector": "क्षेत्र / डोमेन",
+        "implementingAgency": "क्रियान्वयन एजेंसी",
+        "reviewDate": "अगली समीक्षा तिथि"
+      },
+      "rulesRegulations": {
+        "nameLabel": "नियम / विनियम का नाम",
+        "number": "नियम संख्या",
+        "authority": "नियम निर्माण प्राधिकरण"
+      },
+      "orderGazette": {
+        "nameLabel": "आदेश / राजपत्र शीर्षक",
+        "number": "आदेश / राजपत्र संख्या"
+      },
+      "byeLaws": {
+        "nameLabel": "उपविधि का नाम",
+        "number": "उपविधि संख्या",
+        "authority": "जारीकर्ता प्राधिकरण"
+      },
+      "miscellaneous": {
+        "nameLabel": "दस्तावेज़ शीर्षक",
+        "referenceNumber": "संदर्भ संख्या"
+      }
+    },
+    "placeholders": {
+      "validUntil": "उदा. 31 मार्च 2025 / अगले आदेश तक",
+      "numericValue": "केवल संख्यात्मक मान दर्ज करें",
+      "generic": {
+        "name": "दस्तावेज़ का नाम दर्ज करें"
+      },
+      "act": {
+        "name": "उदा. हरियाणा नगरपालिका अधिनियम, 1973",
+        "number": "उदा. अधिनियम संख्या 12, 1973",
+        "year": "YYYY",
+        "shortTitle": "उदा. हरियाणा नगरपालिका अधिनियम",
+        "longTitle": "अधिनियम का पूर्ण औपचारिक शीर्षक",
+        "regionalTitle": "क्षेत्रीय / हिंदी भाषा में शीर्षक",
+        "gazetteRef": "उदा. हरियाणा राजपत्र, 15 जनवरी 1973",
+        "notificationNo": "उदा. अधिसूचना संख्या 45/2021",
+        "actId": "केवल संख्याएँ और हाइफ़न",
+        "soReason": "सांविधिक आदेश का कारण",
+        "keywords": "अल्पविराम से अलग किए गए खोज शब्द"
+      },
+      "amendment": {
+        "name": "उदा. एक्सवाईज़ेड (संशोधन) अधिनियम, 2022",
+        "number": "उदा. संशोधन संख्या 3, 2022",
+        "gazetteRef": "उदा. हरियाणा राजपत्र संख्या 45/2022"
+      },
+      "notification": {
+        "name": "उदा. राजपत्र अधिसूचना संख्या 123",
+        "number": "उदा. संख्या 4/12/2022-Rev",
+        "gazetteRef": "उदा. हरियाणा राजपत्र अतिरिक्तांक, 12 जनवरी 2023"
+      },
+      "circular": {
+        "name": "उदा. परिपत्र संख्या 45/2023",
+        "number": "उदा. परिपत्र संख्या 7/2023"
+      },
+      "policy": {
+        "name": "उदा. हरियाणा औद्योगिक नीति 2020",
+        "number": "उदा. HRY-POL-2023-04",
+        "sector": "उदा. कृषि, शहरी विकास",
+        "implementingAgency": "उदा. HSIIDC, HUDA, सभी विभाग"
+      },
+      "rulesRegulations": {
+        "name": "उदा. हरियाणा नगरपालिका नियम, 1975",
+        "number": "उदा. नियम संख्या 5, 2021",
+        "gazetteRef": "उदा. हरियाणा राजपत्र अतिरिक्तांक, भाग I, संख्या 12, 21 जनवरी 2021",
+        "authority": "उदा. हरियाणा के राज्यपाल"
+      },
+      "orderGazette": {
+        "name": "उदा. सरकारी आदेश संख्या 12/2021",
+        "number": "उदा. सरकारी आदेश संख्या 45/2022",
+        "gazetteRef": "उदा. हरियाणा राजपत्र अतिरिक्तांक, भाग I, संख्या 28, 15 मार्च 2022"
+      },
+      "byeLaws": {
+        "name": "उदा. नगर निगम उपविधियाँ, 2020",
+        "number": "उदा. उपविधि संख्या 3, 2020",
+        "gazetteRef": "उदा. हरियाणा राजपत्र अतिरिक्तांक, भाग I, संख्या 8, 4 मार्च 2020",
+        "authority": "उदा. नगर निगम, पंचकूला"
+      },
+      "miscellaneous": {
+        "name": "उदा. विभागीय दिशानिर्देश / संदर्भ मैनुअल",
+        "referenceNumber": "उदा. संदर्भ संख्या 22/2024 (वैकल्पिक)"
+      }
+    }
+  },
+  "drawer": {
+    "titleParentActChanges": "मूल अधिनियम एवं किए गए परिवर्तन",
+    "titleLegalAuthority": "विधिक प्राधिकरण",
+    "titleActReference": "अधिनियम संदर्भ",
+    "titleHierarchicalTags": "पदानुक्रमित टैग",
+    "titleAddRelationship": "संबंध जोड़ें",
+    "subtitleParentActChanges": "संशोधित किए जा रहे मूल अधिनियम का चयन करें और अनुभाग-स्तरीय परिवर्तन दर्ज करें",
+    "subtitleHierarchyTags": "इस दस्तावेज़ को अधिनियम/अध्याय/अनुभाग पदानुक्रम में टैग करें",
+    "subtitleAmendmentRelationship": "संबंधित अधिनियमों, जारी संशोधनों या अन्य दस्तावेज़ों से लिंक करें",
+    "subtitleLinkDocument": "इस दस्तावेज़ को किसी मौजूदा दस्तावेज़ से लिंक करें",
+    "actName": "अधिनियम का नाम",
+    "parentActName": "मूल अधिनियम का नाम",
+    "actRuleName": "अधिनियम / नियम का नाम",
+    "searchActsPlaceholder": "अधिनियम खोजने के लिए टाइप करें…",
+    "legalAuthorities": "विधिक प्राधिकरण",
+    "addAnother": "एक और जोड़ें",
+    "sectionsProvisions": "अनुभाग / प्रावधान",
+    "addSection": "अनुभाग जोड़ें",
+    "pickSectionPlaceholder": "अनुभाग टाइप करें या चुनें…",
+    "sectionExamplePlaceholder": "उदा. अनुभाग {{number}}",
+    "sectionPlaceholderExample": "उदा. अनुभाग 45 — संपत्ति कर",
+    "confirmAuthority": "प्राधिकरण की पुष्टि करें",
+    "authorityNumber": "प्राधिकरण {{number}}",
+    "chapter": "अध्याय",
+    "chapterPlaceholder": "उदा. अध्याय III — कराधान",
+    "section": "अनुभाग",
+    "subsection": "उप-अनुभाग",
+    "subsectionPlaceholder": "उदा. (2)(a)",
+    "changesMade": "किए गए परिवर्तन",
+    "addChange": "परिवर्तन जोड़ें",
+    "changeNumber": "परिवर्तन {{number}}",
+    "changeChapterPlaceholder": "अध्याय III",
+    "changeSectionPlaceholder": "अनुभाग 45",
+    "changeSubsectionPlaceholder": "(2)(a)",
+    "describeChangePlaceholder": "यहाँ विशेष रूप से क्या परिवर्तन हुआ, इसका वर्णन करें…",
+    "relationshipType": "संबंध का प्रकार",
+    "targetDocumentType": "लक्ष्य दस्तावेज़ प्रकार",
+    "selectTypePlaceholder": "प्रकार चुनें",
+    "linkToDocument": "दस्तावेज़ से लिंक करें",
+    "selectTypeFirst": "पहले एक लक्ष्य दस्तावेज़ प्रकार चुनें…",
+    "searchDocType": "{{type}} खोजें…",
+    "pendingBadge": "लंबित",
+    "pendingDocNote": "दस्तावेज़ अभी तक सिस्टम में नहीं है — लंबित के रूप में सहेजें, अपलोड होने पर स्वतः लिंक हो जाएगा",
+    "sectionOfLinkedDoc": "अनुभाग / प्रावधान",
+    "optional": "(वैकल्पिक)",
+    "relSectionPlaceholder": "लिंक किए गए दस्तावेज़ से कोई अनुभाग चुनें या टाइप करें…",
+    "howRelated": "ये कैसे संबंधित हैं?",
+    "howRelatedPlaceholder": "उदा. इस अधिनियम का अनुभाग 45, कर देयता निर्धारित करने हेतु लिंक किए गए दस्तावेज़ के अध्याय III में संदर्भित है…",
+    "addedRelationships": "जोड़े गए संबंध",
+    "saveTags": "टैग सहेजें",
+    "done": "पूर्ण"
+  },
+  "duplicateModal": {
+    "title": "दस्तावेज़ पहले से मौजूद है",
+    "subtitle": "इस नाम और प्रकार का दस्तावेज़ सिस्टम में पहले से मौजूद पाया गया।",
+    "inYourDepartment": "आपके विभाग में",
+    "uploadAsNewVersion": "नए संस्करण (v{{version}}) के रूप में अपलोड करें",
+    "inOtherDepartments": "अन्य विभागों में",
+    "sendingRequest": "अनुरोध भेजा जा रहा है…",
+    "linkToDepartment": "मेरे विभाग से लिंक करें",
+    "continueAnyway": "फिर भी अपलोड जारी रखें"
+  },
+  "toasts": {
+    "documentCheckFailed": "\"{{fileName}}\" के लिए दस्तावेज़ जाँच विफल रही। कृपया फ़ाइल जाँचें और पुनः प्रयास करें।",
+    "uploadFailed": "\"{{fileName}}\" के लिए अपलोड विफल रहा",
+    "saveMetadataFailed": "\"{{fileName}}\" के लिए विवरण सहेजना विफल रहा",
+    "submitSuccessSingle": "\"{{title}}\" सफलतापूर्वक सबमिट किया गया — अनुमोदन लंबित है।",
+    "submitSuccessMulti": "{{count}} दस्तावेज़ सफलतापूर्वक सबमिट किए गए — अनुमोदन लंबित है।",
+    "documentFallback": "दस्तावेज़",
+    "failedToLoadDocuments": "आपके दस्तावेज़ लोड करने में विफल"
+  }
+}

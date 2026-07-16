@@ -97,7 +97,8 @@ export default function Sidebar({ user, activePage, onNavigate, collapsed, onTog
       <div style={{
         height: 60, display: 'flex', alignItems: 'center',
         padding: expanded ? '0 20px' : '0 14px',
-        borderBottom: '1px solid var(--surface-border)',
+        borderBottom: '2px solid var(--primary)',
+        background: 'linear-gradient(180deg, var(--primary-light) 0%, transparent 100%)',
         gap: 10, overflow: 'hidden', flexShrink: 0,
       }}>
         <div style={{
@@ -121,8 +122,8 @@ export default function Sidebar({ user, activePage, onNavigate, collapsed, onTog
 
       {/* Nav groups */}
       <nav style={{ flex: 1, overflowY: 'auto', padding: '12px 0' }}>
-        {groups.map(group => (
-          <div key={group.label}>
+        {groups.map((group, gi) => (
+          <div key={group.label} style={gi > 0 ? { borderTop: '1px solid var(--surface-border)', marginTop: 8, paddingTop: 8 } : undefined}>
             {expanded && (
               <div style={{
                 fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)',
@@ -133,28 +134,37 @@ export default function Sidebar({ user, activePage, onNavigate, collapsed, onTog
             {group.items.map(({ icon: Icon, label, id }) => {
               const active = activePage === id;
               return (
-                <div key={id} onClick={() => onNavigate(id)} title={expanded ? undefined : t(label)} style={{
-                  display: 'flex', alignItems: 'center',
-                  gap: expanded ? 12 : 0,
-                  padding: expanded ? '9px 16px' : '10px 0',
-                  justifyContent: expanded ? 'flex-start' : 'center',
-                  margin: '1px 8px',
-                  borderRadius: 8,
-                  cursor: 'pointer',
-                  background: active ? 'var(--primary-light)' : 'transparent',
-                  borderLeft: active ? `3px solid var(--primary)` : '3px solid transparent',
-                  color: active ? 'var(--primary)' : 'var(--text-color-secondary)',
-                  fontWeight: active ? 600 : 400,
-                  fontSize: 13.5,
-                  transition: 'all .18s',
-                  userSelect: 'none',
-                }}
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => onNavigate(id)}
+                  title={expanded ? undefined : t(label)}
+                  aria-current={active ? 'page' : undefined}
+                  style={{
+                    width: 'calc(100% - 16px)', textAlign: 'left',
+                    display: 'flex', alignItems: 'center',
+                    gap: expanded ? 12 : 0,
+                    padding: expanded ? '9px 16px' : '10px 0',
+                    justifyContent: expanded ? 'flex-start' : 'center',
+                    margin: '1px 8px',
+                    border: 'none',
+                    borderRadius: 8,
+                    cursor: 'pointer',
+                    background: active ? 'var(--primary-light)' : 'transparent',
+                    boxShadow: active ? 'var(--card-shadow)' : 'none',
+                    borderLeft: active ? `3px solid var(--primary)` : '3px solid transparent',
+                    color: active ? 'var(--primary)' : 'var(--text-color-secondary)',
+                    fontWeight: active ? 600 : 400,
+                    fontSize: 13.5,
+                    transition: 'all .18s',
+                    userSelect: 'none',
+                  }}
                   onMouseEnter={e => { if (!active) { e.currentTarget.style.background = 'var(--surface-hover)'; e.currentTarget.style.color = 'var(--text-color)'; }}}
                   onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-color-secondary)'; }}}
                 >
                   <Icon size={16} strokeWidth={active ? 2.2 : 1.8} style={{ flexShrink: 0 }} />
                   {expanded && <span style={{ whiteSpace: 'nowrap' }}>{t(label)}</span>}
-                </div>
+                </button>
               );
             })}
           </div>
@@ -163,18 +173,20 @@ export default function Sidebar({ user, activePage, onNavigate, collapsed, onTog
 
       {/* User footer */}
       {expanded ? (
-        <div style={{
-          padding: '12px 16px', borderTop: '1px solid var(--surface-border)',
-          display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0,
-        }}>
+        <div style={{ padding: 8, borderTop: '1px solid var(--surface-border)', flexShrink: 0 }}>
           <div style={{
-            width: 32, height: 32, borderRadius: '50%', background: 'var(--primary)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 12, fontWeight: 700, color: 'white', flexShrink: 0,
-          }}>{user.role === 'citizen' ? 'U' : user.name[0]}</div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.role === 'citizen' ? t('sidebar.userFallback') : user.name}</div>
-            <div style={{ fontSize: 11, color: 'var(--text-color-secondary)' }}>{user.role === 'citizen' ? '' : user.dept}</div>
+            padding: '9px 10px', borderRadius: 'var(--radius-sm)', background: 'var(--surface-hover)',
+            display: 'flex', alignItems: 'center', gap: 10,
+          }}>
+            <div style={{
+              width: 32, height: 32, borderRadius: '50%', background: 'var(--primary)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 12, fontWeight: 700, color: 'white', flexShrink: 0,
+            }}>{user.role === 'citizen' ? 'U' : user.name[0]}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.role === 'citizen' ? t('sidebar.userFallback') : user.name}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-color-secondary)' }}>{user.role === 'citizen' ? '' : user.dept}</div>
+            </div>
           </div>
         </div>
       ) : (

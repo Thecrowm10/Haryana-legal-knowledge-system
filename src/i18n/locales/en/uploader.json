@@ -1,0 +1,418 @@
+{
+  "docTypes": {
+    "act": "Act",
+    "amendment": "Amendment",
+    "notification": "Notification",
+    "circular": "Circular",
+    "policy": "Policy",
+    "rulesRegulations": "Rules & Regulations",
+    "orderGazette": "Order / Gazette",
+    "byeLaws": "Bye Laws",
+    "miscellaneous": "Miscellaneous"
+  },
+  "docTypeDesc": {
+    "act": "Primary legislation enacted by legislature",
+    "amendment": "Modification to an existing Act or Rule",
+    "notification": "Official government notice or announcement",
+    "circular": "Internal directive or instruction",
+    "policy": "Government policy document or framework",
+    "rulesRegulations": "Subsidiary legislation under an Act",
+    "orderGazette": "Executive order or gazette notification",
+    "byeLaws": "Local body regulations under municipal or panchayat law",
+    "miscellaneous": "Other official documents not covered above"
+  },
+  "relTypes": {
+    "replaces": "Replaces",
+    "replacedBy": "Replaced by",
+    "amends": "Amends",
+    "amendedBy": "Amended by",
+    "inContinuationOf": "In Continuation of",
+    "continuedBy": "Continued by",
+    "issuedUnder": "Issued Under",
+    "implements": "Implements",
+    "implementedBy": "Implemented by",
+    "references": "References",
+    "referencedBy": "Referenced by",
+    "notifiedUnder": "Notified under",
+    "supplementedBy": "Supplemented by",
+    "relatedTo": "Related to"
+  },
+  "amendChangeTypes": {
+    "amended": "Amended",
+    "substituted": "Substituted",
+    "inserted": "Inserted",
+    "deleted": "Deleted",
+    "expanded": "Expanded"
+  },
+  "common": {
+    "issueDate": "Issue Date",
+    "effectiveFrom": "Effective From",
+    "gazetteReference": "Gazette Reference",
+    "validUntil": "Valid Until",
+    "department": "Department",
+    "year": "Year",
+    "type": "Type",
+    "version": "Version",
+    "status": "Status",
+    "description": "Description",
+    "relationships": "Relationships",
+    "addRelationship": "Add Relationship",
+    "relationshipsAdded_one": "{{count}} Relationship Added",
+    "relationshipsAdded_other": "{{count}} Relationships Added",
+    "cancel": "Cancel",
+    "close": "Close",
+    "view": "View",
+    "clear": "Clear",
+    "loading": "Loading…",
+    "retry": "Retry",
+    "reviewerRemarks": "Reviewer Remarks",
+    "documentDetails": "Document Details",
+    "byName": "By {{name}}",
+    "referenceNo": "Reference No.",
+    "statusApproved": "APPROVED",
+    "statusRejected": "REJECTED",
+    "statusPending": "PENDING",
+    "statusWordApproved": "Approved",
+    "statusWordRejected": "Rejected",
+    "statusWordPending": "Pending",
+    "untitledDocument": "Untitled Document",
+    "unclassified": "Unclassified",
+    "unassigned": "Unassigned"
+  },
+  "stats": {
+    "totalUploads": "Total Uploads",
+    "approved": "Approved",
+    "pendingReview": "Pending Review",
+    "rejected": "Rejected"
+  },
+  "bulkEdit": {
+    "button": "Bulk Edit",
+    "title_one": "Bulk Edit — {{count}} Draft Document",
+    "title_other": "Bulk Edit — {{count}} Draft Documents",
+    "warning": "Only Draft documents can be edited. Pending and Published documents require a Correction Request.",
+    "keepExisting": "— Keep existing —",
+    "leaveBlankPlaceholder": "Leave blank to keep",
+    "applyButton": "Apply to {{count}} Documents"
+  },
+  "table": {
+    "title": "My Uploads",
+    "documentCount_one": "{{count}} document",
+    "documentCount_other": "{{count}} documents",
+    "selectedCount": "{{count}} selected",
+    "draftOnly": "· Draft only",
+    "clearSelection": "Clear Selection",
+    "cancelSelection": "Cancel Selection",
+    "selectButton": "Select",
+    "auditTrail": "Audit Trail",
+    "searchPlaceholder": "Search documents…",
+    "sortLabel": "Sort:",
+    "sortDate": "Date",
+    "sortTitle": "Title",
+    "sortStatus": "Status",
+    "sortType": "Type",
+    "colDocument": "Document",
+    "colUploadedOn": "Uploaded On",
+    "colActions": "Actions",
+    "noDocumentsFound": "No documents found.",
+    "remarksButton": "Remarks"
+  },
+  "linkedDocs": {
+    "title": "Linked Documents",
+    "subtitle": "Documents shared from other departments",
+    "linkedBadge": "LINKED",
+    "linkApproved": "LINK APPROVED",
+    "linkRejected": "LINK REJECTED",
+    "linkPending": "LINK PENDING",
+    "linkApprovedTitle": "Link Approved",
+    "linkRejectedTitle": "Link Rejected",
+    "linkPendingTitle": "Link Pending Review",
+    "rejectionRemarks": "REJECTION REMARKS"
+  },
+  "versionModal": {
+    "title": "Version History — {{title}}",
+    "current": "Current",
+    "currentBadge": "CURRENT"
+  },
+  "remarksModal": {
+    "approved": "Approved",
+    "rejected": "Rejected",
+    "remarkNumber": "Remark {{num}}"
+  },
+  "hierarchyTag": {
+    "legalAuthoritiesAdded_one": "{{count}} Legal Authority Added",
+    "legalAuthoritiesAdded_other": "{{count}} Legal Authorities Added",
+    "setLegalAuthority": "Set Legal Authority",
+    "setActReference": "Set Act Reference",
+    "setHierarchicalTags": "Set Hierarchical Tags"
+  },
+  "versionConflict": {
+    "title": "Version Conflict Detected",
+    "alreadyExists": "⚠️ \"{{title}}\" already exists",
+    "currentVersion": "Current version: v{{version}} · Uploaded: {{uploadedAt}}",
+    "isNewVersion": "Is this a new version of the existing document?",
+    "uploadAsVersion": "Upload as v{{version}}"
+  },
+  "workflowBadge": {
+    "draft": "DRAFT",
+    "pendingReview": "PENDING REVIEW",
+    "published": "PUBLISHED"
+  },
+  "docViewModal": {
+    "gazetteRef": "Gazette Ref.",
+    "legalAuthority": "Legal Authority",
+    "uploadDate": "Upload Date",
+    "file": "File",
+    "documentPreview": "Document Preview",
+    "originalPdf": "Original PDF",
+    "open": "Open",
+    "loadingDocument": "Loading document…",
+    "prev": "← Prev",
+    "next": "Next →",
+    "of": "of",
+    "additionalInfo": "Additional Info",
+    "documentApproved": "Document Approved",
+    "documentRejected": "Document Rejected",
+    "pendingReview": "Pending Review",
+    "highlights": "Highlights ({{count}})",
+    "noComment": "No comment"
+  },
+  "wizard": {
+    "step1": {
+      "heading": "Document Type",
+      "subheading": "Choose the type of document you're uploading to get started",
+      "label": "Document Type"
+    },
+    "step2": {
+      "filesUploaded_one": "File Uploaded",
+      "filesUploaded_other": "Files Uploaded",
+      "fileCount_one": "{{count}} file",
+      "fileCount_other": "{{count}} files",
+      "addFile": "Add file",
+      "changeFiles": "Change files",
+      "dropHere": "Drop files here or",
+      "clickToBrowse": "click to browse",
+      "fileTypeHint": "PDF or Word · up to 50 MB",
+      "tryAgain": "Try Again",
+      "uploadCheckButton": "Upload & Check Document",
+      "checkingDocument": "Checking document…",
+      "eligibilityPassed": "Eligibility check passed — details ready",
+      "moreFiles": "+{{count}} more files",
+      "unsupportedFileType": "Unsupported file type rejected:"
+    },
+    "step3": {
+      "appliedToAllFiles": "Applied to all {{count}} files",
+      "parentActLabel": "Parent Act",
+      "legalAuthorityLabel": "Legal Authority / Act Reference",
+      "selectActNotice": "Select the Act this document relates to before filling in the rest of the details.",
+      "descriptionLabel": "Description / Remarks",
+      "setPerFile": "Set per file",
+      "autoFilled": "auto-filled, you can edit",
+      "descriptionPlaceholder": "Brief description or upload remarks…",
+      "clearAll": "Clear All",
+      "uploadingFile": "Uploading file…",
+      "savingDetails": "Saving details…",
+      "submitted": "Submitted!",
+      "submitForApproval": "Submit for Approval",
+      "existingDocsUnderAct": "Existing \"{{type}}\" Documents Under This Act",
+      "noDocsUnderAct": "No \"{{type}}\" documents found under this Act.",
+      "colDocumentName": "Document Name"
+    },
+    "fields": {
+      "generic": {
+        "nameLabel": "Document Name",
+        "actReference": "Act Reference",
+        "hierarchicalTags": "Hierarchical Tags"
+      },
+      "act": {
+        "nameLabel": "Act / Instrument Name",
+        "number": "Act Number",
+        "shortTitle": "Short Title",
+        "longTitle": "Long Title",
+        "regionalTitle": "Regional Title",
+        "notificationNo": "Notification No.",
+        "actId": "Act ID",
+        "ifAvailable": "(if available)",
+        "soReason": "S.O. Reason",
+        "addReferenceAct": "Add Reference Act",
+        "noOfRules": "No. of Rules",
+        "noOfNotifications": "No. of Notifications",
+        "noOfRegulations": "No. of Regulations",
+        "noOfCirculars": "No. of Circulars",
+        "noOfStatutes": "No. of Statutes",
+        "noOfOrdinances": "No. of Ordinances",
+        "noOfOrder": "No. of Order",
+        "keywords": "Keywords",
+        "repealCheckbox": "Check if you want to repeal the Act. This Act will not show anywhere."
+      },
+      "amendment": {
+        "nameLabel": "Amendment Name",
+        "number": "Amendment Number"
+      },
+      "notification": {
+        "nameLabel": "Notification Title",
+        "number": "Notification Number"
+      },
+      "circular": {
+        "nameLabel": "Circular Title",
+        "number": "Circular Number"
+      },
+      "policy": {
+        "nameLabel": "Policy Name",
+        "number": "Policy Number / ID",
+        "sector": "Sector / Domain",
+        "implementingAgency": "Implementing Agency",
+        "reviewDate": "Next Review Date"
+      },
+      "rulesRegulations": {
+        "nameLabel": "Rules / Regulation Name",
+        "number": "Rule Number",
+        "authority": "Rule Making Authority"
+      },
+      "orderGazette": {
+        "nameLabel": "Order / Gazette Title",
+        "number": "Order / Gazette Number"
+      },
+      "byeLaws": {
+        "nameLabel": "Bye Law Name",
+        "number": "Bye Law Number",
+        "authority": "Issuing Authority"
+      },
+      "miscellaneous": {
+        "nameLabel": "Document Title",
+        "referenceNumber": "Reference Number"
+      }
+    },
+    "placeholders": {
+      "validUntil": "e.g. 31 March 2025 / Until further orders",
+      "numericValue": "Enter only numeric value",
+      "generic": {
+        "name": "Enter document name"
+      },
+      "act": {
+        "name": "e.g. Haryana Municipal Act, 1973",
+        "number": "e.g. Act No. 12 of 1973",
+        "year": "YYYY",
+        "shortTitle": "e.g. Haryana Municipal Act",
+        "longTitle": "Full formal title of the Act",
+        "regionalTitle": "Title in the regional / Hindi language",
+        "gazetteRef": "e.g. Haryana Gazette, 15 Jan 1973",
+        "notificationNo": "e.g. Notification No. 45/2021",
+        "actId": "Numbers and hyphens only",
+        "soReason": "Reason for the statutory order",
+        "keywords": "Comma-separated search keywords"
+      },
+      "amendment": {
+        "name": "e.g. The XYZ (Amendment) Act, 2022",
+        "number": "e.g. Amendment No. 3 of 2022",
+        "gazetteRef": "e.g. Haryana Gazette No. 45/2022"
+      },
+      "notification": {
+        "name": "e.g. Gazette Notification No. 123",
+        "number": "e.g. No. 4/12/2022-Rev",
+        "gazetteRef": "e.g. Haryana Gazette Extra., 12 Jan 2023"
+      },
+      "circular": {
+        "name": "e.g. Circular No. 45/2023",
+        "number": "e.g. Circular No. 7/2023"
+      },
+      "policy": {
+        "name": "e.g. Haryana Industrial Policy 2020",
+        "number": "e.g. HRY-POL-2023-04",
+        "sector": "e.g. Agriculture, Urban Development",
+        "implementingAgency": "e.g. HSIIDC, HUDA, All Departments"
+      },
+      "rulesRegulations": {
+        "name": "e.g. Haryana Municipal Rules, 1975",
+        "number": "e.g. Rule No. 5 of 2021",
+        "gazetteRef": "e.g. Haryana Gazette Extra., Part I, No. 12, 21 Jan 2021",
+        "authority": "e.g. Governor of Haryana"
+      },
+      "orderGazette": {
+        "name": "e.g. Government Order No. 12/2021",
+        "number": "e.g. Govt. Order No. 45/2022",
+        "gazetteRef": "e.g. Haryana Gazette Extra., Part I, No. 28, 15 Mar 2022"
+      },
+      "byeLaws": {
+        "name": "e.g. Municipal Corporation Bye-laws, 2020",
+        "number": "e.g. Bye-law No. 3 of 2020",
+        "gazetteRef": "e.g. Haryana Gazette Extra., Part I, No. 8, 4 Mar 2020",
+        "authority": "e.g. Municipal Corporation, Panchkula"
+      },
+      "miscellaneous": {
+        "name": "e.g. Departmental Guidelines / Reference Manual",
+        "referenceNumber": "e.g. Ref No. 22/2024 (optional)"
+      }
+    }
+  },
+  "drawer": {
+    "titleParentActChanges": "Parent Act & Changes Made",
+    "titleLegalAuthority": "Legal Authority",
+    "titleActReference": "Act Reference",
+    "titleHierarchicalTags": "Hierarchical Tags",
+    "titleAddRelationship": "Add Relationship",
+    "subtitleParentActChanges": "Select the parent Act being amended and log section-level changes",
+    "subtitleHierarchyTags": "Tag this document within the act/chapter/section hierarchy",
+    "subtitleAmendmentRelationship": "Link to related Acts, continuing Amendments, or other documents",
+    "subtitleLinkDocument": "Link this document to an existing document",
+    "actName": "Act Name",
+    "parentActName": "Parent Act Name",
+    "actRuleName": "Act / Rule Name",
+    "searchActsPlaceholder": "Type to search Acts…",
+    "legalAuthorities": "Legal Authorities",
+    "addAnother": "Add Another",
+    "sectionsProvisions": "Sections / Provisions",
+    "addSection": "Add Section",
+    "pickSectionPlaceholder": "Type or pick a section…",
+    "sectionExamplePlaceholder": "e.g. Section {{number}}",
+    "sectionPlaceholderExample": "e.g. Section 45 — Property Tax",
+    "confirmAuthority": "Confirm Authority",
+    "authorityNumber": "AUTHORITY {{number}}",
+    "chapter": "Chapter",
+    "chapterPlaceholder": "e.g. Chapter III — Taxation",
+    "section": "Section",
+    "subsection": "Sub-section",
+    "subsectionPlaceholder": "e.g. (2)(a)",
+    "changesMade": "Changes Made",
+    "addChange": "Add Change",
+    "changeNumber": "CHANGE {{number}}",
+    "changeChapterPlaceholder": "Chapter III",
+    "changeSectionPlaceholder": "Section 45",
+    "changeSubsectionPlaceholder": "(2)(a)",
+    "describeChangePlaceholder": "Describe what specifically changed here…",
+    "relationshipType": "Relationship Type",
+    "targetDocumentType": "Target Document Type",
+    "selectTypePlaceholder": "Select Type",
+    "linkToDocument": "Link to Document",
+    "selectTypeFirst": "Select a Target Document Type first…",
+    "searchDocType": "Search {{type}}…",
+    "pendingBadge": "PENDING",
+    "pendingDocNote": "Document not in system yet — save as pending, will auto-link when uploaded",
+    "sectionOfLinkedDoc": "Section / Provision",
+    "optional": "(optional)",
+    "relSectionPlaceholder": "Pick or type a section from the linked document…",
+    "howRelated": "How are these related?",
+    "howRelatedPlaceholder": "e.g. Section 45 of this Act is referenced in Chapter III of the linked document for determining tax liability…",
+    "addedRelationships": "Added Relationships",
+    "saveTags": "Save Tags",
+    "done": "Done"
+  },
+  "duplicateModal": {
+    "title": "Document Already Exists",
+    "subtitle": "A document with this name and type was found in the system.",
+    "inYourDepartment": "IN YOUR DEPARTMENT",
+    "uploadAsNewVersion": "Upload as New Version (v{{version}})",
+    "inOtherDepartments": "IN OTHER DEPARTMENTS",
+    "sendingRequest": "Sending request…",
+    "linkToDepartment": "Link to My Department",
+    "continueAnyway": "Continue uploading anyway"
+  },
+  "toasts": {
+    "documentCheckFailed": "Document check failed for \"{{fileName}}\". Please verify the file and try again.",
+    "uploadFailed": "Upload failed for \"{{fileName}}\"",
+    "saveMetadataFailed": "Failed to save metadata for \"{{fileName}}\"",
+    "submitSuccessSingle": "\"{{title}}\" submitted successfully — pending approval.",
+    "submitSuccessMulti": "{{count}} documents submitted successfully — pending approval.",
+    "documentFallback": "Document",
+    "failedToLoadDocuments": "Failed to load your documents"
+  }
+}

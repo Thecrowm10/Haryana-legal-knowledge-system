@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import DocViewModal from '../components/DocViewModal';
-import AccessibilityMenu from '../components/citizen/AccessibilityMenu';
+import AccessibilityMenu from '../components/AccessibilityMenu';
 import LanguageToggle from '../components/LanguageToggle';
 import haryanaLogo from '../assets/haryana-logo.png';
 import bannerBg from '../assets/banner-1-768x217.png';

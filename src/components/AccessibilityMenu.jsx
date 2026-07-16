@@ -1,15 +1,19 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Accessibility, Moon, Sun, Minus, Plus, RotateCcw, ImageOff, MousePointer2, Headphones, X } from 'lucide-react';
-import { useA11yPrefs, FONT_SCALE_STEPS, DEFAULT_PREFS } from '../../hooks/useA11yPrefs';
-import ScreenReaderAccessModal from '../layout/ScreenReaderAccessModal';
+import { useA11yPrefs, FONT_SCALE_STEPS, DEFAULT_PREFS } from '../hooks/useA11yPrefs';
+import ScreenReaderAccessModal from './layout/ScreenReaderAccessModal';
 
 /**
- * India.gov.in-style accessibility icon + panel, built into the citizen top
- * bar (rather than a floating widget) per GIGW 3.0 / WCAG 2.1 AA. Shares
- * state with the authenticated app shell's widget via useA11yPrefs.
+ * India.gov.in-style accessibility icon + panel, shared by the citizen top
+ * bar and the staff Topbar, per GIGW 3.0 / WCAG 2.1 AA. State is shared via
+ * useA11yPrefs so toggling in one shell is reflected everywhere.
+ *
+ * panelAnchor: 'fixed' (default) keeps the citizen page's fixed top:68/right:32
+ * placement; 'dropdown' anchors under the icon via position:absolute, for
+ * callers that wrap this in their own position:relative container (e.g. Topbar).
  */
-export default function AccessibilityMenu({ iconButtonStyle }) {
+export default function AccessibilityMenu({ iconButtonStyle, panelAnchor = 'fixed', idPrefix = 'citizen' }) {
   const { t } = useTranslation('common');
   const [open, setOpen] = useState(false);
   const [hover, setHover] = useState(false);
@@ -30,6 +34,11 @@ export default function AccessibilityMenu({ iconButtonStyle }) {
 
   const reset = () => setPrefs(DEFAULT_PREFS);
 
+  const panelId = `${idPrefix}-a11y-panel`;
+  const panelStyle = panelAnchor === 'dropdown'
+    ? { position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 60, width: 320 }
+    : { position: 'fixed', top: 68, right: 32, zIndex: 60, width: 320 };
+
   return (
     <>
       <button
@@ -39,7 +48,7 @@ export default function AccessibilityMenu({ iconButtonStyle }) {
         onMouseLeave={() => setHover(false)}
         aria-label={open ? t('a11y.closeLabel') : t('a11y.openLabel')}
         aria-expanded={open}
-        aria-controls="citizen-a11y-panel"
+        aria-controls={panelId}
         title={t('a11y.toolsPanelTitle')}
         style={{ transition: 'background .15s', ...iconButtonStyle, ...(hover && { background: 'rgba(120,128,140,.3)' }) }}
       >
@@ -50,11 +59,11 @@ export default function AccessibilityMenu({ iconButtonStyle }) {
         <>
           <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 55 }} />
           <div
-            id="citizen-a11y-panel"
+            id={panelId}
             role="region"
             aria-label={t('a11y.toolsPanelTitle')}
             style={{
-              position: 'fixed', top: 68, right: 32, zIndex: 60, width: 320,
+              ...panelStyle,
               background: 'var(--surface-card)', color: 'var(--text-color)',
               border: '1px solid var(--surface-border)', borderRadius: 14,
               boxShadow: '0 16px 40px rgba(0,0,0,.3)', padding: 18,

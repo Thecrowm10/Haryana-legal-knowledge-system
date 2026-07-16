@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Upload, FileText, CheckCircle, XCircle, X, TrendingUp, FileType, Download, Clock,
   RotateCcw, AlertCircle, Eye, GitBranch, Plus,
@@ -25,7 +26,7 @@ const DEFAULT_DEPTS = [
   'Health & Family Welfare','Agriculture & Farmers Welfare',
   'Panchayati Raj','General Administration',
 ];
-const DEFAULT_TYPES = ['Act','Amendment','Notification','Circular','Policy','Rules & Regulations','Order / Gazette','Bye Laws','Miscellaneous'];
+const DEFAULT_TYPES = ['Act','Amendment','Notification','Circular','Policy','Rules & Regulations','Order/Gazette','Bye Laws','Miscellaneous'];
 const LANGS  = ['English','Hindi','Bilingual'];
 const REL_TYPES = [
   'Replaces', 'Replaced by', 'Amends', 'Amended by',
@@ -40,7 +41,7 @@ const REL_TYPES_BY_DOCTYPE = {
   'Circular':            ['Issued Under', 'In Continuation of', 'Continued by', 'Replaces', 'Replaced by', 'References', 'Referenced by', 'Supplemented by'],
   'Notification':        ['Issued Under', 'Notified under', 'In Continuation of', 'Continued by', 'Replaces', 'Replaced by', 'References', 'Referenced by'],
   'Policy':              ['Replaces', 'Replaced by', 'Implements', 'Implemented by', 'References', 'Referenced by', 'Related to'],
-  'Order / Gazette':     ['Issued Under', 'Amends', 'Amended by', 'Replaces', 'Replaced by', 'In Continuation of', 'Continued by', 'Implements', 'Implemented by', 'References'],
+  'Order/Gazette':     ['Issued Under', 'Amends', 'Amended by', 'Replaces', 'Replaced by', 'In Continuation of', 'Continued by', 'Implements', 'Implemented by', 'References'],
   'Rules & Regulations': ['Amends', 'Amended by', 'Replaces', 'Replaced by', 'Issued Under', 'References', 'Referenced by'],
   'Bye Laws':            ['Amends', 'Amended by', 'Replaces', 'Replaced by', 'Issued Under', 'References', 'Referenced by'],
   'Miscellaneous':       ['Issued Under', 'In Continuation of', 'Continued by', 'Replaces', 'Replaced by', 'References', 'Referenced by', 'Supplemented by'],
@@ -49,18 +50,37 @@ const REL_TYPES_BY_DOCTYPE = {
 const REL_TARGET_TYPES = {
   'Act':                 ['Act', 'Amendment', 'Rules & Regulations', 'Notification', 'Bye Laws'],
   'Amendment':           ['Act', 'Rules & Regulations', 'Amendment', 'Bye Laws'],
-  'Circular':            ['Circular', 'Act', 'Order / Gazette', 'Policy', 'Notification', 'Rules & Regulations', 'Bye Laws', 'Miscellaneous'],
-  'Notification':        ['Act', 'Rules & Regulations', 'Order / Gazette', 'Notification', 'Circular', 'Policy', 'Bye Laws', 'Miscellaneous'],
-  'Policy':              ['Act', 'Policy', 'Notification', 'Order / Gazette', 'Circular', 'Rules & Regulations', 'Bye Laws', 'Miscellaneous'],
-  'Order / Gazette':     ['Act', 'Order / Gazette', 'Notification', 'Rules & Regulations', 'Policy', 'Bye Laws', 'Miscellaneous'],
+  'Circular':            ['Circular', 'Act', 'Order/Gazette', 'Policy', 'Notification', 'Rules & Regulations', 'Bye Laws', 'Miscellaneous'],
+  'Notification':        ['Act', 'Rules & Regulations', 'Order/Gazette', 'Notification', 'Circular', 'Policy', 'Bye Laws', 'Miscellaneous'],
+  'Policy':              ['Act', 'Policy', 'Notification', 'Order/Gazette', 'Circular', 'Rules & Regulations', 'Bye Laws', 'Miscellaneous'],
+  'Order/Gazette':     ['Act', 'Order/Gazette', 'Notification', 'Rules & Regulations', 'Policy', 'Bye Laws', 'Miscellaneous'],
   'Rules & Regulations': ['Act', 'Rules & Regulations', 'Amendment', 'Notification', 'Policy', 'Bye Laws'],
   'Bye Laws':            ['Act', 'Bye Laws', 'Rules & Regulations', 'Amendment', 'Notification', 'Policy'],
-  'Miscellaneous':       ['Circular', 'Act', 'Order / Gazette', 'Policy', 'Notification', 'Rules & Regulations', 'Bye Laws', 'Miscellaneous'],
+  'Miscellaneous':       ['Circular', 'Act', 'Order/Gazette', 'Policy', 'Notification', 'Rules & Regulations', 'Bye Laws', 'Miscellaneous'],
 };
 
 const AMEND_CHANGE_TYPES = ['Amended', 'Substituted', 'Inserted', 'Deleted', 'Expanded'];
 const AMEND_CHANGE_COLORS = { Amended: '#f59e0b', Substituted: '#3b82f6', Inserted: '#22c55e', Deleted: '#ef4444', Expanded: '#8b5cf6' };
 const EMPTY_PROVISION = () => ({ section: '', chapter: '', subsection: '', page: '', changeType: 'Substituted', before: '', after: '' });
+
+// Display-only lookup maps: map the internal English enum values (used in comparisons,
+// object keys, and API payloads — never changed) to safe i18n key suffixes used purely
+// to look up the translated label via t(). The underlying English strings above stay untouched.
+const DOC_TYPE_KEY = {
+  'Act': 'act', 'Amendment': 'amendment', 'Notification': 'notification', 'Circular': 'circular',
+  'Policy': 'policy', 'Rules & Regulations': 'rulesRegulations', 'Order/Gazette': 'orderGazette',
+  'Bye Laws': 'byeLaws', 'Miscellaneous': 'miscellaneous',
+};
+const REL_TYPE_KEY = {
+  'Replaces': 'replaces', 'Replaced by': 'replacedBy', 'Amends': 'amends', 'Amended by': 'amendedBy',
+  'In Continuation of': 'inContinuationOf', 'Continued by': 'continuedBy', 'Issued Under': 'issuedUnder',
+  'Implements': 'implements', 'Implemented by': 'implementedBy', 'References': 'references',
+  'Referenced by': 'referencedBy', 'Notified under': 'notifiedUnder', 'Supplemented by': 'supplementedBy',
+  'Related to': 'relatedTo',
+};
+const AMEND_CHANGE_KEY = {
+  'Amended': 'amended', 'Substituted': 'substituted', 'Inserted': 'inserted', 'Deleted': 'deleted', 'Expanded': 'expanded',
+};
 
 // Type card colours and descriptions
 const TYPE_CARD_COLORS = {
@@ -70,7 +90,7 @@ const TYPE_CARD_COLORS = {
   'Circular':            { bg: 'rgba(20,184,166,.08)', accent: '#14b8a6', text: '#0f766e' },
   'Policy':              { bg: 'rgba(34,197,94,.08)',  accent: '#22c55e', text: '#16a34a' },
   'Rules & Regulations': { bg: 'rgba(239,68,68,.08)',  accent: '#ef4444', text: '#dc2626' },
-  'Order / Gazette':     { bg: 'rgba(234,179,8,.08)',  accent: '#eab308', text: '#a16207' },
+  'Order/Gazette':     { bg: 'rgba(234,179,8,.08)',  accent: '#eab308', text: '#a16207' },
   'Bye Laws':            { bg: 'rgba(14,165,233,.08)', accent: '#0ea5e9', text: '#0369a1' },
   'Miscellaneous':       { bg: 'rgba(100,116,139,.08)',accent: '#64748b', text: '#475569' },
 };
@@ -81,7 +101,7 @@ const TYPE_CARD_DESC = {
   'Circular':            'Internal directive or instruction',
   'Policy':              'Government policy document or framework',
   'Rules & Regulations': 'Subsidiary legislation under an Act',
-  'Order / Gazette':     'Executive order or gazette notification',
+  'Order/Gazette':     'Executive order or gazette notification',
   'Bye Laws':            'Local body regulations under municipal or panchayat law',
   'Miscellaneous':       'Other official documents not covered above',
 };
@@ -94,7 +114,7 @@ const TYPE_FIELDS = {
   'Circular': [], // handled inline
   'Policy': [], // handled inline
   'Rules & Regulations': [], // handled inline
-  'Order / Gazette': [], // handled inline
+  'Order/Gazette': [], // handled inline
   'Bye Laws': [], // handled inline
   'Miscellaneous': [], // handled inline
 };
@@ -245,6 +265,7 @@ function blurStyle(e) {
 }
 
 function HierarchyTag({ hierarchy, onOpen, isRef, legalAuthorities }) {
+  const { t } = useTranslation('uploader');
   const hasValues = hierarchy?.act || hierarchy?.chapter || hierarchy?.section;
   const authCount = legalAuthorities ? legalAuthorities.filter(a => a.act).length : 0;
 
@@ -255,8 +276,8 @@ function HierarchyTag({ hierarchy, onOpen, isRef, legalAuthorities }) {
         <Layers size={13} style={{ flexShrink: 0 }} />
         <span style={{ flex: 1, minWidth: 0 }}>
           {authCount > 0
-            ? `${authCount} Legal Authorit${authCount !== 1 ? 'ies' : 'y'} Added`
-            : 'Set Legal Authority'}
+            ? t('hierarchyTag.legalAuthoritiesAdded', { count: authCount })
+            : t('hierarchyTag.setLegalAuthority')}
         </span>
         <ChevronRight size={12} style={{ flexShrink: 0 }} />
       </button>
@@ -274,13 +295,14 @@ function HierarchyTag({ hierarchy, onOpen, isRef, legalAuthorities }) {
               : hierarchy.chapter || hierarchy.section
                 ? `${hierarchy.act || '—'} › ${hierarchy.chapter || '—'} › ${hierarchy.section || '—'}`
                 : (hierarchy.act || '—'))
-          : (isRef ? 'Set Act Reference' : 'Set Hierarchical Tags')}
+          : (isRef ? t('hierarchyTag.setActReference') : t('hierarchyTag.setHierarchicalTags'))}
       </span>
       <ChevronRight size={12} style={{ flexShrink: 0 }} />
     </button>
   );
 }
 function VersionConflictModal({ existingDoc, newVersion, onUploadAsNew, onCancel }) {
+  const { t } = useTranslation('uploader');
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ background: 'var(--surface-card)', borderRadius: 14, padding: 28, width: 420, boxShadow: '0 24px 80px rgba(0,0,0,.3)' }}>
@@ -288,27 +310,27 @@ function VersionConflictModal({ existingDoc, newVersion, onUploadAsNew, onCancel
           <div style={{ width: 36, height: 36, borderRadius: 9, background: 'rgba(245,158,11,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <AlertTriangle size={18} color="#d97706" />
           </div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>Version Conflict Detected</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>{t('versionConflict.title')}</div>
         </div>
         <div style={{ padding: '12px 14px', borderRadius: 9, background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)', marginBottom: 18 }}>
           <div style={{ fontSize: 12.5, color: 'var(--text-heading)', fontWeight: 600, marginBottom: 4 }}>
-            ⚠️ "{existingDoc.title}" already exists
+            {t('versionConflict.alreadyExists', { title: existingDoc.title })}
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>
-            Current version: v{existingDoc.version || '1.0'} · Uploaded: {existingDoc.uploadedAt}
+            {t('versionConflict.currentVersion', { version: existingDoc.version || '1.0', uploadedAt: existingDoc.uploadedAt })}
           </div>
         </div>
         <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', marginBottom: 18 }}>
-          Is this a new version of the existing document?
+          {t('versionConflict.isNewVersion')}
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <button onClick={onCancel}
             style={{ flex: 1, padding: '9px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-            Cancel
+            {t('common.cancel')}
           </button>
           <button onClick={() => onUploadAsNew(newVersion)}
             style={{ flex: 1, padding: '9px', borderRadius: 8, border: 'none', background: 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-            Upload as v{newVersion}
+            {t('versionConflict.uploadAsVersion', { version: newVersion })}
           </button>
         </div>
       </div>
@@ -316,10 +338,11 @@ function VersionConflictModal({ existingDoc, newVersion, onUploadAsNew, onCancel
   );
 }
 function WorkflowBadge({ status }) {
+  const { t } = useTranslation('uploader');
   const config = {
-    [WORKFLOW_STATUS.DRAFT]:     { label: 'DRAFT',          bg: 'rgba(148,163,184,.12)', color: '#64748b' },
-    [WORKFLOW_STATUS.PENDING]:   { label: 'PENDING REVIEW', bg: 'rgba(245,158,11,.12)', color: '#d97706' },
-    [WORKFLOW_STATUS.PUBLISHED]: { label: 'PUBLISHED',       bg: 'rgba(34,197,94,.12)',  color: '#16a34a' },
+    [WORKFLOW_STATUS.DRAFT]:     { label: t('workflowBadge.draft'),          bg: 'rgba(148,163,184,.12)', color: '#64748b' },
+    [WORKFLOW_STATUS.PENDING]:   { label: t('workflowBadge.pendingReview'), bg: 'rgba(245,158,11,.12)', color: '#d97706' },
+    [WORKFLOW_STATUS.PUBLISHED]: { label: t('workflowBadge.published'),       bg: 'rgba(34,197,94,.12)',  color: '#16a34a' },
   };
   const c = config[status] || config[WORKFLOW_STATUS.DRAFT];
   return (
@@ -349,6 +372,7 @@ function Toast({ toast, onClose }) {
 }
 
 function DocViewModal({ doc, onClose }) {
+  const { t } = useTranslation('uploader');
   const [blobUrl, setBlobUrl]         = useState(null);
   const [pdfDoc, setPdfDoc]           = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -492,13 +516,13 @@ function DocViewModal({ doc, onClose }) {
   const LS = { fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)' };
 
   const meta = [
-    ['Reference No.',  doc.referenceNumber || null],
-    ['Issue Date',     doc.enactmentDate   || null],
-    ['Effective From', doc.effectiveFrom   || null],
-    ['Gazette Ref.',   doc.gazette         || null],
-    ['Legal Authority',doc.authority       || null],
-    ['Upload Date',    doc.uploadedAt      || null],
-    ['File',           doc.fileName        || null],
+    [t('common.referenceNo'),      doc.referenceNumber || null],
+    [t('common.issueDate'),        doc.enactmentDate   || null],
+    [t('common.effectiveFrom'),    doc.effectiveFrom   || null],
+    [t('docViewModal.gazetteRef'), doc.gazette         || null],
+    [t('docViewModal.legalAuthority'), doc.authority   || null],
+    [t('docViewModal.uploadDate'), doc.uploadedAt      || null],
+    [t('docViewModal.file'),       doc.fileName        || null],
   ].filter(([, v]) => v);
 
   const statusAccent = doc.status === 'approved' ? '#16a34a' : doc.status === 'rejected' ? '#ef4444' : '#f59e0b';
@@ -536,7 +560,7 @@ function DocViewModal({ doc, onClose }) {
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px 6px 10px', borderRadius: 20, background: statusBg, border: `1px solid ${statusAccent}44`, flexShrink: 0 }}>
           <StatusIconV size={13} color={statusAccent} />
           <span style={{ fontSize: 11.5, fontWeight: 700, color: statusAccent, fontFamily: 'var(--mono)', letterSpacing: '.04em' }}>
-            {doc.status === 'approved' ? 'APPROVED' : doc.status === 'rejected' ? 'REJECTED' : 'PENDING'}
+            {doc.status === 'approved' ? t('common.statusApproved') : doc.status === 'rejected' ? t('common.statusRejected') : t('common.statusPending')}
           </span>
         </div>
         {/* Close */}
@@ -544,7 +568,7 @@ function DocViewModal({ doc, onClose }) {
           style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 18px', borderRadius: 9, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0, transition: 'background .15s' }}
           onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
           onMouseLeave={e => e.currentTarget.style.background = 'var(--surface-ground)'}>
-          <X size={14} /> Close
+          <X size={14} /> {t('common.close')}
         </button>
       </div>
 
@@ -557,7 +581,7 @@ function DocViewModal({ doc, onClose }) {
           {/* PDF toolbar */}
           <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10, background: '#2d2f31', flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,.08)' }}>
             <Eye size={14} color="rgba(255,255,255,.7)" />
-            <span style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(255,255,255,.85)', flex: 1 }}>{docxHtml ? 'Document Preview' : 'Original PDF'}</span>
+            <span style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(255,255,255,.85)', flex: 1 }}>{docxHtml ? t('docViewModal.documentPreview') : t('docViewModal.originalPdf')}</span>
 
             {/* Zoom controls */}
             {!docxHtml && (
@@ -594,7 +618,7 @@ function DocViewModal({ doc, onClose }) {
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 7, background: 'rgba(26,86,219,.25)', border: '1px solid rgba(26,86,219,.4)', color: '#93c5fd', textDecoration: 'none', fontSize: 11.5, fontWeight: 600, fontFamily: 'var(--font)', transition: 'background .15s' }}
                 onMouseEnter={e => e.currentTarget.style.background = 'rgba(26,86,219,.4)'}
                 onMouseLeave={e => e.currentTarget.style.background = 'rgba(26,86,219,.25)'}>
-                <ExternalLink size={12} /> Open
+                <ExternalLink size={12} /> {t('docViewModal.open')}
               </a>
             )}
           </div>
@@ -609,7 +633,7 @@ function DocViewModal({ doc, onClose }) {
               {!blobUrl && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 14 }}>
                   <div style={{ width: 36, height: 36, border: '3px solid rgba(255,255,255,.2)', borderTopColor: 'rgba(255,255,255,.8)', borderRadius: '50%', animation: 'spin .7s linear infinite' }} />
-                  <span style={{ fontSize: 13, fontFamily: 'var(--mono)', color: 'rgba(255,255,255,.6)', letterSpacing: '.04em' }}>Loading document…</span>
+                  <span style={{ fontSize: 13, fontFamily: 'var(--mono)', color: 'rgba(255,255,255,.6)', letterSpacing: '.04em' }}>{t('docViewModal.loadingDocument')}</span>
                 </div>
               )}
               {blobUrl && Array.from({ length: totalPages }, (_, i) => (
@@ -643,16 +667,16 @@ function DocViewModal({ doc, onClose }) {
             <div style={{ padding: '10px 20px', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, background: '#2d2f31', flexShrink: 0 }}>
               <button onClick={() => scrollToPage(currentPage - 1)} disabled={currentPage === 1}
                 style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px', borderRadius: 7, border: '1px solid rgba(255,255,255,.12)', background: currentPage === 1 ? 'transparent' : 'rgba(255,255,255,.07)', color: currentPage === 1 ? 'rgba(255,255,255,.25)' : 'rgba(255,255,255,.75)', fontSize: 12, fontWeight: 600, cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', transition: 'background .15s' }}>
-                ← Prev
+                {t('docViewModal.prev')}
               </button>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 14px', borderRadius: 7, background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)' }}>
                 <span style={{ fontSize: 12.5, fontFamily: 'var(--mono)', color: 'rgba(255,255,255,.85)', fontWeight: 600 }}>{currentPage}</span>
-                <span style={{ fontSize: 11, color: 'rgba(255,255,255,.35)' }}>of</span>
+                <span style={{ fontSize: 11, color: 'rgba(255,255,255,.35)' }}>{t('docViewModal.of')}</span>
                 <span style={{ fontSize: 12.5, fontFamily: 'var(--mono)', color: 'rgba(255,255,255,.55)' }}>{totalPages}</span>
               </div>
               <button onClick={() => scrollToPage(currentPage + 1)} disabled={currentPage === totalPages}
                 style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px', borderRadius: 7, border: '1px solid rgba(255,255,255,.12)', background: currentPage === totalPages ? 'transparent' : 'rgba(255,255,255,.07)', color: currentPage === totalPages ? 'rgba(255,255,255,.25)' : 'rgba(255,255,255,.75)', fontSize: 12, fontWeight: 600, cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', transition: 'background .15s' }}>
-                Next →
+                {t('docViewModal.next')}
               </button>
             </div>
           )}
@@ -666,7 +690,7 @@ function DocViewModal({ doc, onClose }) {
             <div style={{ width: 30, height: 30, borderRadius: 8, background: 'rgba(26,86,219,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <FileText size={14} color="var(--primary)" />
             </div>
-            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)' }}>Document Details</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)' }}>{t('common.documentDetails')}</span>
           </div>
 
           {/* Scrollable content */}
@@ -675,10 +699,10 @@ function DocViewModal({ doc, onClose }) {
             {/* Core info strip */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 22 }}>
               {[
-                { label: 'Type',       value: doc.type,           color: typeColor.accent, bg: typeColor.bg },
-                { label: 'Department', value: doc.dept,           color: 'var(--primary)', bg: 'rgba(26,86,219,.07)' },
-                { label: 'Year',       value: String(doc.year),   color: '#64748b',        bg: 'rgba(100,116,139,.08)' },
-                { label: 'Version',    value: `v${doc.version || '1.0'}`, color: '#64748b', bg: 'rgba(100,116,139,.08)' },
+                { label: t('common.type'),       value: doc.type,           color: typeColor.accent, bg: typeColor.bg },
+                { label: t('common.department'), value: doc.dept,           color: 'var(--primary)', bg: 'rgba(26,86,219,.07)' },
+                { label: t('common.year'),       value: String(doc.year),   color: '#64748b',        bg: 'rgba(100,116,139,.08)' },
+                { label: t('common.version'),    value: `v${doc.version || '1.0'}`, color: '#64748b', bg: 'rgba(100,116,139,.08)' },
               ].map(({ label, value, color, bg }) => (
                 <div key={label} style={{ padding: '12px 14px', borderRadius: 10, background: bg, border: '1px solid transparent' }}>
                   <div style={{ fontSize: 10, fontWeight: 700, color, letterSpacing: '.06em', textTransform: 'uppercase', fontFamily: 'var(--mono)', marginBottom: 4, opacity: .8 }}>{label}</div>
@@ -690,7 +714,7 @@ function DocViewModal({ doc, onClose }) {
             {/* Additional metadata */}
             {meta.length > 0 && (
               <div style={{ marginBottom: 22 }}>
-                <div style={{ ...LS, marginBottom: 10 }}>Additional Info</div>
+                <div style={{ ...LS, marginBottom: 10 }}>{t('docViewModal.additionalInfo')}</div>
                 <div style={{ borderRadius: 10, border: '1px solid var(--surface-border)', overflow: 'hidden' }}>
                   {meta.map(([k, v], idx) => (
                     <div key={k} style={{ display: 'flex', alignItems: 'flex-start', gap: 0, borderBottom: idx < meta.length - 1 ? '1px solid var(--surface-border)' : 'none' }}>
@@ -709,7 +733,7 @@ function DocViewModal({ doc, onClose }) {
             {/* Description */}
             {doc.desc && (
               <div style={{ marginBottom: 22 }}>
-                <div style={{ ...LS, marginBottom: 10 }}>Description</div>
+                <div style={{ ...LS, marginBottom: 10 }}>{t('common.description')}</div>
                 <div style={{ padding: '14px 16px', borderRadius: 10, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', fontSize: 13, color: 'var(--text-color)', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>
                   {doc.desc}
                 </div>
@@ -719,7 +743,7 @@ function DocViewModal({ doc, onClose }) {
             {/* Reviewer Remarks */}
             {doc.approval && (
               <div>
-                <div style={{ ...LS, marginBottom: 10 }}>Reviewer Remarks</div>
+                <div style={{ ...LS, marginBottom: 10 }}>{t('common.reviewerRemarks')}</div>
                 <div style={{ borderRadius: 12, border: `1px solid ${statusAccent}44`, overflow: 'hidden' }}>
                   {/* Approver header */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', background: doc.status === 'approved' ? 'rgba(34,197,94,.06)' : doc.status === 'rejected' ? 'rgba(239,68,68,.06)' : 'rgba(245,158,11,.06)', borderBottom: doc.approval.comments ? `1px solid ${statusAccent}22` : 'none' }}>
@@ -728,12 +752,12 @@ function DocViewModal({ doc, onClose }) {
                     </div>
                     <div>
                       <div style={{ fontSize: 13, fontWeight: 700, color: statusAccent }}>
-                        {doc.reviewTitle || (doc.status === 'approved' ? 'Document Approved' : doc.status === 'rejected' ? 'Document Rejected' : 'Pending Review')}
+                        {doc.reviewTitle || (doc.status === 'approved' ? t('docViewModal.documentApproved') : doc.status === 'rejected' ? t('docViewModal.documentRejected') : t('docViewModal.pendingReview'))}
                       </div>
                       <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', marginTop: 3 }}>
-                        By {doc.approval.approver_first_name
+                        {t('common.byName', { name: doc.approval.approver_first_name
                           ? `${doc.approval.approver_first_name} ${doc.approval.approver_last_name || ''}`.trim()
-                          : doc.approval.approver_username || '—'}
+                          : doc.approval.approver_username || '—' })}
                         {doc.approval.acted_at && <> · {doc.approval.acted_at.split('T')[0]}</>}
                       </div>
                     </div>
@@ -758,7 +782,7 @@ function DocViewModal({ doc, onClose }) {
             {/* Highlights from reviewer */}
             {annotations.length > 0 && (
               <div style={{ marginTop: 16 }}>
-                <div style={{ ...LS, marginBottom: 8 }}>Highlights ({annotations.length})</div>
+                <div style={{ ...LS, marginBottom: 8 }}>{t('docViewModal.highlights', { count: annotations.length })}</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {annotations.map(ann => (
                     <div key={ann.id}
@@ -778,13 +802,13 @@ function DocViewModal({ doc, onClose }) {
                           <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, color: 'rgba(0,0,0,.5)', flexShrink: 0, marginTop: 2 }}>T</span>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             {ann.text && <div style={{ fontSize: 10.5, color: 'rgba(0,0,0,.55)', fontStyle: 'italic', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>"{ann.text.slice(0, 45)}{ann.text.length > 45 ? '…' : ''}"</div>}
-                            <div style={{ fontSize: 12, color: 'rgba(0,0,0,.75)', lineHeight: 1.4 }}>{ann.comment || <span style={{ opacity: 0.5 }}>No comment</span>}</div>
+                            <div style={{ fontSize: 12, color: 'rgba(0,0,0,.75)', lineHeight: 1.4 }}>{ann.comment || <span style={{ opacity: 0.5 }}>{t('docViewModal.noComment')}</span>}</div>
                           </div>
                         </>
                       ) : (
                         <>
                           <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, color: 'rgba(0,0,0,.5)', flexShrink: 0, marginTop: 2 }}>P{ann.page}</span>
-                          <span style={{ fontSize: 12.5, color: 'rgba(0,0,0,.75)', lineHeight: 1.5, flex: 1 }}>{ann.comment || <span style={{ opacity: 0.5 }}>No comment</span>}</span>
+                          <span style={{ fontSize: 12.5, color: 'rgba(0,0,0,.75)', lineHeight: 1.5, flex: 1 }}>{ann.comment || <span style={{ opacity: 0.5 }}>{t('docViewModal.noComment')}</span>}</span>
                         </>
                       )}
                     </div>
@@ -802,6 +826,7 @@ function DocViewModal({ doc, onClose }) {
 // Main component
 export default function UploaderDashboard({ activePage, onAuditLog, documents = [], onAddDocument, taxonomy = [] }) {
   const { user } = useAuth();
+  const { t } = useTranslation('uploader');
   const [deptsData, setDeptsData] = useState([]);
   const [typesData, setTypesData] = useState([]);
   const DEPTS = deptsData.length > 0 ? deptsData.map(d => d.name) : DEFAULT_DEPTS;
@@ -834,9 +859,9 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
       uid:             `api-${d.id}`,
       // Metadata (title/type/dept) can be null for drafts uploaded before the tagging step is completed —
       // fall back to the raw filename so search/sort (which call .toLowerCase() on these) never crash on null.
-      title:           d.document_name || d.original_filename || 'Untitled Document',
-      type:            d.document_type_name || 'Unclassified',
-      dept:            d.department_name || 'Unassigned',
+      title:           d.document_name || d.original_filename || t('common.untitledDocument'),
+      type:            d.document_type_name || t('common.unclassified'),
+      dept:            d.department_name || t('common.unassigned'),
       year:            d.issue_date ? new Date(d.issue_date).getFullYear() : new Date(d.created_at).getFullYear(),
       status:          d.status || 'pending',
       workflowStatus:  d.status === 'approved' ? WORKFLOW_STATUS.PUBLISHED : d.status === 'rejected' ? WORKFLOW_STATUS.DRAFT : WORKFLOW_STATUS.PENDING,
@@ -870,7 +895,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
       })
       .catch(err => {
         const detail = err.response?.data?.detail;
-        setMyDocsError(typeof detail === 'string' ? detail : 'Failed to load your documents');
+        setMyDocsError(typeof detail === 'string' ? detail : t('toasts.failedToLoadDocuments'));
       })
       .finally(() => setMyDocsLoading(false));
   }, [activePage]);
@@ -953,7 +978,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   const allFilesChecked = files.length > 0 && files.every(f => fileRefs.some(r => r.fileName === f.name));
   const typeCompact = files.length > 0;
   // Non-Act types must be linked to a parent Act / legal authority before the rest of the details unlock.
-  const usesLegalAuthorities = ['Circular', 'Miscellaneous', 'Notification', 'Order / Gazette', 'Policy'].includes(form.type);
+  const usesLegalAuthorities = ['Circular', 'Miscellaneous', 'Notification', 'Order/Gazette', 'Policy'].includes(form.type);
   const actChosen = usesLegalAuthorities ? legalAuthorities.some(a => a.act) : !!hierarchy.act;
   const detailsLocked = !!form.type && form.type !== 'Act' && !actChosen;
   const primaryActId = usesLegalAuthorities ? (legalAuthorities.find(a => a.actId)?.actId ?? null) : (hierarchy.actId ?? null);
@@ -1177,7 +1202,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         }));
       } catch (err) {
         const detail = err.response?.data?.detail;
-        setUploadError(typeof detail === 'string' ? detail : `Document check failed for "${f.name}". Please verify the file and try again.`);
+        setUploadError(typeof detail === 'string' ? detail : t('toasts.documentCheckFailed', { fileName: f.name }));
         setUploadStep('error');
         return;
       }
@@ -1202,7 +1227,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
       'Amendment':         'amendmentNumber',
       'Circular':          'circularNumber',
       'Notification':      'notificationNumber',
-      'Order / Gazette':   'orderNumber',
+      'Order/Gazette':   'orderNumber',
       'Policy':            'policyNumber',
       'Rules & Regulations': 'ruleNumber',
       'Bye Laws':          'byeLawNumber',
@@ -1276,7 +1301,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
             fileRef = res.data.file_ref;
           } catch (err) {
             const detail = err.response?.data?.detail;
-            const message = typeof detail === 'string' ? detail : `Upload failed for "${f.name}"`;
+            const message = typeof detail === 'string' ? detail : t('toasts.uploadFailed', { fileName: f.name });
             setUploadError(message);
             setUploadStep('error');
             showToast('error', message);
@@ -1344,7 +1369,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
           });
         } catch (err) {
           const detail = err.response?.data?.detail;
-          const message = typeof detail === 'string' ? detail : `Failed to save metadata for "${f.name}"`;
+          const message = typeof detail === 'string' ? detail : t('toasts.saveMetadataFailed', { fileName: f.name });
           setUploadError(message);
           setUploadStep('error');
           showToast('error', message);
@@ -1422,8 +1447,8 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
       setTimeout(() => { setUploadStep(null); }, 2000);
       finalizeUpload(newDocs, relations);
       showToast('success', newDocs.length > 1
-        ? `${newDocs.length} documents submitted successfully — pending approval.`
-        : `"${newDocs[0]?.title || 'Document'}" submitted successfully — pending approval.`);
+        ? t('toasts.submitSuccessMulti', { count: newDocs.length })
+        : t('toasts.submitSuccessSingle', { title: newDocs[0]?.title || t('toasts.documentFallback') }));
     }
   }
   // Called on document-name field blur: checks for cross-department duplicates
@@ -1516,20 +1541,20 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setVersionModal(null)}>
             <div style={{ background: 'var(--surface-card)', borderRadius: 14, padding: 28, minWidth: 360, maxWidth: 480, boxShadow: '0 24px 80px rgba(0,0,0,.3)' }} onClick={e => e.stopPropagation()}>
               <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 18, paddingBottom: 12, borderBottom: '1px solid var(--surface-border)' }}>
-                Version History — {versionModal.title}
+                {t('versionModal.title', { title: versionModal.title })}
               </div>
-              {[{ v: versionModal.version || '1.0', date: versionModal.uploadedAt, note: 'Current' }].map((ver, i, arr) => (
+              {[{ v: versionModal.version || '1.0', date: versionModal.uploadedAt, note: t('versionModal.current') }].map((ver, i, arr) => (
                 <div key={ver.v} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: i === arr.length - 1 ? 'none' : '1px solid var(--surface-border)' }}>
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)', display: 'flex', alignItems: 'center', gap: 8 }}>
                       v{ver.v}
-                      {i === 0 && <span style={{ fontSize: 10, background: 'rgba(26,86,219,.12)', color: 'var(--primary)', padding: '1px 7px', borderRadius: 20, fontWeight: 700 }}>CURRENT</span>}
+                      {i === 0 && <span style={{ fontSize: 10, background: 'rgba(26,86,219,.12)', color: 'var(--primary)', padding: '1px 7px', borderRadius: 20, fontWeight: 700 }}>{t('versionModal.currentBadge')}</span>}
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 2, fontFamily: 'var(--mono)' }}>{ver.date} — {ver.note}</div>
                   </div>
                 </div>
               ))}
-              <button onClick={() => setVersionModal(null)} style={{ marginTop: 18, width: '100%', padding: '9px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontFamily: 'var(--font)', fontSize: 13, cursor: 'pointer' }}>Close</button>
+              <button onClick={() => setVersionModal(null)} style={{ marginTop: 18, width: '100%', padding: '9px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontFamily: 'var(--font)', fontSize: 13, cursor: 'pointer' }}>{t('common.close')}</button>
             </div>
           </div>
         )}
@@ -1544,7 +1569,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
               {/* Header */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, paddingBottom: 12, borderBottom: '1px solid var(--surface-border)' }}>
                 <div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 4 }}>Reviewer Remarks</div>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 4 }}>{t('common.reviewerRemarks')}</div>
                   <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 360 }}>{remarksModal.title}</div>
                 </div>
                 <button onClick={() => setRemarksModal(null)}
@@ -1566,12 +1591,12 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 }
                 <div>
                   <div style={{ fontSize: 12.5, fontWeight: 700, color: remarksModal.status === 'approved' ? '#16a34a' : '#ef4444' }}>
-                    {remarksModal.status === 'approved' ? 'Approved' : 'Rejected'}
+                    {remarksModal.status === 'approved' ? t('remarksModal.approved') : t('remarksModal.rejected')}
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', marginTop: 2 }}>
-                    By {remarksModal.approval.approver_first_name
+                    {t('common.byName', { name: remarksModal.approval.approver_first_name
                       ? `${remarksModal.approval.approver_first_name} ${remarksModal.approval.approver_last_name || ''}`.trim()
-                      : remarksModal.approval.approver_username}
+                      : remarksModal.approval.approver_username })}
                     {' · '}
                     {remarksModal.approval.acted_at?.split('T')[0] || '—'}
                   </div>
@@ -1583,7 +1608,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 {parseDisplayRemarks(remarksModal.approval.comments).map(({ num, text }) => (
                   <div key={num} style={{ display: 'flex', gap: 10, padding: '10px 14px', borderRadius: 8, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', alignItems: 'baseline' }}>
                     <span style={{ fontSize: 10.5, fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--primary)', flexShrink: 0, minWidth: 62 }}>
-                      Remark {num}
+                      {t('remarksModal.remarkNumber', { num })}
                     </span>
                     <span style={{ fontSize: 13, color: 'var(--text-color)', lineHeight: 1.6 }}>{text || '—'}</span>
                   </div>
@@ -1591,7 +1616,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
               </div>
 
               <button onClick={() => setRemarksModal(null)} style={{ marginTop: 20, width: '100%', padding: '9px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontFamily: 'var(--font)', fontSize: 13, cursor: 'pointer' }}>
-                Close
+                {t('common.close')}
               </button>
             </div>
           </div>
@@ -1612,9 +1637,9 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderRadius: 10, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', color: '#dc2626' }}>
             <AlertCircle size={15} style={{ flexShrink: 0 }} />
             <span style={{ fontSize: 13 }}>{myDocsError}</span>
-            <button onClick={() => { setMyDocsError(''); setMyDocsLoading(true); getMyDocuments().then(r => setUploads((r.data.documents||[]).map(mapApiDoc))).catch(e => setMyDocsError(e.response?.data?.detail || 'Failed to load')).finally(() => setMyDocsLoading(false)); }}
+            <button onClick={() => { setMyDocsError(''); setMyDocsLoading(true); getMyDocuments().then(r => setUploads((r.data.documents||[]).map(mapApiDoc))).catch(e => setMyDocsError(e.response?.data?.detail || t('toasts.failedToLoadDocuments'))).finally(() => setMyDocsLoading(false)); }}
               style={{ marginLeft: 'auto', padding: '5px 14px', borderRadius: 7, border: '1px solid rgba(239,68,68,.3)', background: 'transparent', color: '#dc2626', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-              Retry
+              {t('common.retry')}
             </button>
           </div>
         )}
@@ -1622,10 +1647,10 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         {/* Stats row */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
           {[
-            { label: 'Total Uploads',  value: uploads.length, bg: 'rgba(26,86,219,.12)',  color: 'var(--primary)', icon: FileText,    filter: 'all' },
-            { label: 'Approved',       value: approved,        bg: 'rgba(34,197,94,.12)',  color: '#22c55e',        icon: CheckCircle, filter: 'approved' },
-            { label: 'Pending Review', value: pending,         bg: 'rgba(245,158,11,.12)', color: '#f59e0b',        icon: TrendingUp,  filter: 'pending' },
-            { label: 'Rejected',       value: rejected,        bg: 'rgba(239,68,68,.12)',  color: '#ef4444',        icon: XCircle,     filter: 'rejected' },
+            { label: t('stats.totalUploads'),  value: uploads.length, bg: 'rgba(26,86,219,.12)',  color: 'var(--primary)', icon: FileText,    filter: 'all' },
+            { label: t('stats.approved'),       value: approved,        bg: 'rgba(34,197,94,.12)',  color: '#22c55e',        icon: CheckCircle, filter: 'approved' },
+            { label: t('stats.pendingReview'), value: pending,         bg: 'rgba(245,158,11,.12)', color: '#f59e0b',        icon: TrendingUp,  filter: 'pending' },
+            { label: t('stats.rejected'),       value: rejected,        bg: 'rgba(239,68,68,.12)',  color: '#ef4444',        icon: XCircle,     filter: 'rejected' },
           ].map(s => {
             const isActive = filterStatus === s.filter;
             return (
@@ -1647,15 +1672,15 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
 
         {selectedIds.size > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderRadius: 10, background: 'rgba(26,86,219,.06)', border: '1px solid rgba(26,86,219,.2)' }}>
-            <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--primary)' }}>{selectedIds.size} selected</span>
-            <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>· Draft only</span>
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--primary)' }}>{t('table.selectedCount', { count: selectedIds.size })}</span>
+            <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>{t('table.draftOnly')}</span>
             <button onClick={() => setBulkEditOpen(v => !v)}
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 7, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.08)', color: 'var(--primary)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-              <Edit3 size={12} /> Bulk Edit
+              <Edit3 size={12} /> {t('bulkEdit.button')}
             </button>
             <button onClick={() => setSelectedIds(new Set())}
               style={{ padding: '6px 12px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-              Clear Selection
+              {t('table.clearSelection')}
             </button>
           </div>
         )}
@@ -1665,41 +1690,41 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
           <Card>
             <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
               <Tag size={14} color="var(--primary)" />
-              Bulk Edit — {selectedIds.size} Draft Document{selectedIds.size !== 1 ? 's' : ''}
+              {t('bulkEdit.title', { count: selectedIds.size })}
             </div>
             <div style={{ fontSize: 11.5, color: '#d97706', background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 7, padding: '6px 12px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
               <AlertTriangle size={12} color="#d97706" />
-              Only Draft documents can be edited. Pending and Published documents require a Correction Request.
+              {t('bulkEdit.warning')}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
               {[
-                { label: 'Department', key: 'dept', opts: DEPTS },
-                { label: 'Type',       key: 'type', opts: TYPES },
-              ].map(({ label, key, opts }) => (
+                { label: t('common.department'), key: 'dept', opts: DEPTS, translate: false },
+                { label: t('common.type'),       key: 'type', opts: TYPES, translate: true },
+              ].map(({ label, key, opts, translate }) => (
                 <div key={key}>
                   <div style={{ ...LABEL, marginBottom: 6 }}>{label}</div>
                   <select value={bulkFields[key]} onChange={e => setBulkFields(f => ({ ...f, [key]: e.target.value }))}
                     style={{ ...INPUT_BASE, cursor: 'pointer', appearance: 'none' }}
                     onFocus={focusStyle} onBlur={blurStyle}>
-                    <option value="">— Keep existing —</option>
-                    {opts.map(o => <option key={o}>{o}</option>)}
+                    <option value="">{t('bulkEdit.keepExisting')}</option>
+                    {opts.map(o => <option key={o} value={o}>{translate && DOC_TYPE_KEY[o] ? t(`docTypes.${DOC_TYPE_KEY[o]}`) : o}</option>)}
                   </select>
                 </div>
               ))}
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Year</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.year')}</div>
                 <input type="number" value={bulkFields.year} onChange={e => setBulkFields(f => ({ ...f, year: e.target.value }))}
-                  placeholder="Leave blank to keep" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  placeholder={t('bulkEdit.leaveBlankPlaceholder')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
             </div>
             <div style={{ display: 'flex', gap: 10, marginTop: 14, justifyContent: 'flex-end' }}>
               <button onClick={() => setBulkEditOpen(false)}
                 style={{ padding: '8px 18px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                Cancel
+                {t('common.cancel')}
               </button>
               <button onClick={applyBulkEdit}
                 style={{ padding: '8px 18px', borderRadius: 7, border: 'none', background: 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                Apply to {selectedIds.size} Documents
+                {t('bulkEdit.applyButton', { count: selectedIds.size })}
               </button>
             </div>
           </Card>
@@ -1745,25 +1770,25 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
 
           {/* ── Header ── */}
           <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>My Uploads</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>{t('table.title')}</div>
             <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '2px 9px', borderRadius: 20 }}>
-              {filtered.length} document{filtered.length !== 1 ? 's' : ''}
+              {t('table.documentCount', { count: filtered.length })}
             </span>
             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
               {bulkSelectMode ? (
                 <button onClick={() => { setBulkSelectMode(false); setSelectedIds(new Set()); setBulkEditOpen(false); }}
                   style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 7, border: '1px solid rgba(239,68,68,.3)', background: 'rgba(239,68,68,.06)', color: '#dc2626', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                  <X size={12} /> Cancel Selection
+                  <X size={12} /> {t('table.cancelSelection')}
                 </button>
               ) : (
                 <button onClick={() => setBulkSelectMode(true)}
                   style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                  <CheckSquare size={13} /> Select
+                  <CheckSquare size={13} /> {t('table.selectButton')}
                 </button>
               )}
               <button onClick={downloadAuditTrail}
                 style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                <Download size={13} /> Audit Trail
+                <Download size={13} /> {t('table.auditTrail')}
               </button>
             </div>
           </div>
@@ -1774,25 +1799,25 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
               {/* Search */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '7px 12px', flex: 1, maxWidth: 320 }}>
                 <Search size={13} color="var(--text-color-secondary)" />
-                <input value={tableSearch} onChange={e => setTableSearch(e.target.value)} placeholder="Search documents…"
+                <input value={tableSearch} onChange={e => setTableSearch(e.target.value)} placeholder={t('table.searchPlaceholder')}
                   style={{ background: 'transparent', border: 'none', outline: 'none', fontSize: 12.5, color: 'var(--text-color)', width: '100%' }} />
                 {tableSearch && <button onClick={() => setTableSearch('')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', padding: 0 }}><X size={12} /></button>}
               </div>
               {/* Active status filter chip */}
               {filterStatus && filterStatus !== 'all' && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px 5px 12px', borderRadius: 20, background: 'rgba(26,86,219,.08)', border: '1px solid rgba(26,86,219,.2)', fontSize: 12, fontWeight: 600, color: 'var(--primary)', whiteSpace: 'nowrap' }}>
-                  {{ approved: 'Approved', pending: 'Pending Review', rejected: 'Rejected' }[filterStatus]}
+                  {{ approved: t('stats.approved'), pending: t('stats.pendingReview'), rejected: t('stats.rejected') }[filterStatus]}
                   <button onClick={() => setFilterStatus('')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--primary)', display: 'flex', padding: 0, marginLeft: 2 }}><X size={11} /></button>
                 </div>
               )}
               {/* Sort controls */}
               <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5 }}>
-                <span style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', marginRight: 2 }}>Sort:</span>
+                <span style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', marginRight: 2 }}>{t('table.sortLabel')}</span>
                 {[
-                  { col: 'uploadedAt', label: 'Date' },
-                  { col: 'title',      label: 'Title' },
-                  { col: 'status',     label: 'Status' },
-                  { col: 'type',       label: 'Type' },
+                  { col: 'uploadedAt', label: t('table.sortDate') },
+                  { col: 'title',      label: t('table.sortTitle') },
+                  { col: 'status',     label: t('table.sortStatus') },
+                  { col: 'type',       label: t('table.sortType') },
                 ].map(({ col, label }) => {
                   const active = sortCol === col;
                   return (
@@ -1813,7 +1838,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 return (
                   <button key={type} type="button" onClick={() => setFilterType(active ? '' : type)}
                     style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 20, cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 12, fontWeight: 600, transition: 'all .15s', background: active ? c.accent : 'var(--surface-card)', border: `1.5px solid ${active ? c.accent : c.accent + '55'}`, color: active ? 'white' : c.text || c.accent, opacity: count === 0 ? 0.4 : 1 }}>
-                    {type}
+                    {DOC_TYPE_KEY[type] ? t(`docTypes.${DOC_TYPE_KEY[type]}`) : type}
                     <span style={{ fontSize: 10, fontFamily: 'var(--mono)', background: active ? 'rgba(255,255,255,.25)' : 'var(--surface-ground)', color: active ? 'white' : 'var(--text-color-secondary)', padding: '0 5px', borderRadius: 10 }}>{count}</span>
                   </button>
                 );
@@ -1821,7 +1846,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
               {filterType && (
                 <button type="button" onClick={() => setFilterType('')}
                   style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 20, cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 11, fontWeight: 600, background: 'transparent', border: '1.5px dashed var(--surface-border)', color: 'var(--text-color-secondary)' }}>
-                  <X size={10} /> Clear
+                  <X size={10} /> {t('common.clear')}
                 </button>
               )}
             </div>
@@ -1841,17 +1866,17 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                       </button>
                     </div>
                   )}
-                  <div style={{ ...LABEL, padding: '10px 16px 10px 68px' }}>Document</div>
-                  <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Status</div>
-                  <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Uploaded On</div>
-                  <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Actions</div>
+                  <div style={{ ...LABEL, padding: '10px 16px 10px 68px' }}>{t('table.colDocument')}</div>
+                  <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>{t('common.status')}</div>
+                  <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>{t('table.colUploadedOn')}</div>
+                  <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>{t('table.colActions')}</div>
                 </div>
 
                 {/* ── Document rows ── */}
                 <div>
                   {filtered.length === 0 && (
                     <div style={{ padding: '52px 0', textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>
-                      No documents found.
+                      {t('table.noDocumentsFound')}
                     </div>
                   )}
                   {filtered.map(doc => {
@@ -1901,7 +1926,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 5, flexWrap: 'wrap' }}>
                               <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: typeColor.bg, color: typeColor.text || typeColor.accent }}>
-                                {doc.type}
+                                {DOC_TYPE_KEY[doc.type] ? t(`docTypes.${DOC_TYPE_KEY[doc.type]}`) : doc.type}
                               </span>
                               <span style={{ fontSize: 11, color: 'var(--text-color-secondary)' }}>{doc.dept}</span>
                               <span style={{ fontSize: 10.5, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '1px 7px', borderRadius: 20 }}>{doc.year}</span>
@@ -1914,7 +1939,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px 4px 8px', borderRadius: 20, background: statusBg, border: `1px solid ${statusBorder}`, alignSelf: 'flex-start' }}>
                             <StatusIcon size={11} color={statusAccent} />
                             <span style={{ fontSize: 10.5, fontWeight: 700, color: statusAccent, fontFamily: 'var(--mono)', letterSpacing: '.05em' }}>
-                              {doc.status === 'approved' ? 'APPROVED' : doc.status === 'rejected' ? 'REJECTED' : 'PENDING'}
+                              {doc.status === 'approved' ? t('common.statusApproved') : doc.status === 'rejected' ? t('common.statusRejected') : t('common.statusPending')}
                             </span>
                           </div>
                           {approverName && (
@@ -1936,12 +1961,12 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                             style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 7, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', whiteSpace: 'nowrap', transition: 'background .15s' }}
                             onMouseEnter={e => e.currentTarget.style.background = 'rgba(26,86,219,.14)'}
                             onMouseLeave={e => e.currentTarget.style.background = 'rgba(26,86,219,.07)'}>
-                            <Eye size={13} /> View
+                            <Eye size={13} /> {t('common.view')}
                           </button>
                           {doc.approval?.comments && (
                             <button onClick={() => setRemarksModal(doc)}
                               style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 7, border: `1px solid ${statusBorder}`, background: statusBg, color: statusAccent, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', whiteSpace: 'nowrap', transition: 'opacity .15s' }}>
-                              <MessageSquare size={13} /> Remarks
+                              <MessageSquare size={13} /> {t('table.remarksButton')}
                             </button>
                           )}
                           <button onClick={() => setVersionModal(doc)}
@@ -1965,11 +1990,11 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         {linkedDocs.length > 0 && (
           <Card padding="0">
             <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>Linked Documents</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>{t('linkedDocs.title')}</div>
               <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: '#d97706', background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.25)', padding: '2px 9px', borderRadius: 20 }}>
                 {linkedDocs.length}
               </span>
-              <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginLeft: 4 }}>Documents shared from other departments</span>
+              <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginLeft: 4 }}>{t('linkedDocs.subtitle')}</span>
             </div>
             {linkedDocs.map(l => {
               const typeColor   = TYPE_CARD_COLORS[l.document_type_name] || { accent: '#94a3b8', bg: 'rgba(148,163,184,.1)', text: '#64748b' };
@@ -1978,7 +2003,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
               const linkAccent  = isApproved ? '#16a34a' : isRejected ? '#dc2626' : '#d97706';
               const linkBg      = isApproved ? 'rgba(34,197,94,.07)' : isRejected ? 'rgba(239,68,68,.07)' : 'rgba(245,158,11,.07)';
               const linkBorder  = isApproved ? 'rgba(34,197,94,.25)' : isRejected ? 'rgba(239,68,68,.25)' : 'rgba(245,158,11,.25)';
-              const linkLabel   = isApproved ? 'LINK APPROVED' : isRejected ? 'LINK REJECTED' : 'LINK PENDING';
+              const linkLabel   = isApproved ? t('linkedDocs.linkApproved') : isRejected ? t('linkedDocs.linkRejected') : t('linkedDocs.linkPending');
               const LinkIcon    = isApproved ? CheckCircle : isRejected ? XCircle : Clock;
               const mapLinkedDocForViewer = () => {
                 const hasLinkReview = l.link_reviewed_by_username || l.link_reviewed_by_first_name || l.review_comments || l.link_annotations_json;
@@ -1990,7 +2015,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                   year:        l.created_at ? new Date(l.created_at).getFullYear() : '—',
                   version:     l.version_no || '1.0',
                   status:      l.link_status || 'pending',
-                  reviewTitle: l.link_status === 'approved' ? 'Link Approved' : l.link_status === 'rejected' ? 'Link Rejected' : 'Link Pending Review',
+                  reviewTitle: l.link_status === 'approved' ? t('linkedDocs.linkApprovedTitle') : l.link_status === 'rejected' ? t('linkedDocs.linkRejectedTitle') : t('linkedDocs.linkPendingTitle'),
                   desc:        '',
                   fileName:    l.original_filename || '',
                   uploadedAt:  l.created_at?.split('T')[0] || '',
@@ -2019,10 +2044,10 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                           <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {l.document_name || l.original_filename}
                           </span>
-                          <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 20, background: 'rgba(245,158,11,.12)', color: '#d97706', flexShrink: 0, letterSpacing: '.05em' }}>LINKED</span>
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 20, background: 'rgba(245,158,11,.12)', color: '#d97706', flexShrink: 0, letterSpacing: '.05em' }}>{t('linkedDocs.linkedBadge')}</span>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
-                          <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: typeColor.bg, color: typeColor.text || typeColor.accent }}>{l.document_type_name}</span>
+                          <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: typeColor.bg, color: typeColor.text || typeColor.accent }}>{DOC_TYPE_KEY[l.document_type_name] ? t(`docTypes.${DOC_TYPE_KEY[l.document_type_name]}`) : l.document_type_name}</span>
                           <span style={{ fontSize: 11, color: 'var(--text-color-secondary)' }}>{l.department_name}</span>
                         </div>
                       </div>
@@ -2039,7 +2064,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                         style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 7, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'background .15s' }}
                         onMouseEnter={e => e.currentTarget.style.background = 'rgba(26,86,219,.14)'}
                         onMouseLeave={e => e.currentTarget.style.background = 'rgba(26,86,219,.07)'}>
-                        <Eye size={12} /> View
+                        <Eye size={12} /> {t('common.view')}
                       </button>
                     </div>
                     <div style={{ padding: '14px 16px', borderLeft: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', fontFamily: 'var(--mono)', fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
@@ -2051,7 +2076,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                     <div style={{ marginLeft: 4, padding: '8px 16px 12px', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                       <XCircle size={13} color="#dc2626" style={{ flexShrink: 0, marginTop: 2 }} />
                       <div>
-                        <div style={{ fontSize: 10.5, fontWeight: 700, color: '#dc2626', fontFamily: 'var(--mono)', marginBottom: 3 }}>REJECTION REMARKS</div>
+                        <div style={{ fontSize: 10.5, fontWeight: 700, color: '#dc2626', fontFamily: 'var(--mono)', marginBottom: 3 }}>{t('linkedDocs.rejectionRemarks')}</div>
                         <div style={{ fontSize: 12, color: 'var(--text-color-secondary)', lineHeight: 1.6 }}>{l.review_comments}</div>
                       </div>
                     </div>
@@ -2094,10 +2119,10 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                   <AlertTriangle size={18} color="#d97706" />
-                  <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)' }}>Document Already Exists</span>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)' }}>{t('duplicateModal.title')}</span>
                 </div>
                 <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)' }}>
-                  A document with this name and type was found in the system.
+                  {t('duplicateModal.subtitle')}
                 </div>
               </div>
               <button onClick={() => setDuplicateModal(null)} style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '5px 8px', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex' }}>
@@ -2109,12 +2134,12 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
               {/* Own-department matches — version upgrade */}
               {duplicateModal.matches.filter(m => m.match_type === 'own_dept').map(m => (
                 <div key={m.id} style={{ marginBottom: 16, padding: '14px 16px', borderRadius: 10, background: 'rgba(59,130,246,.06)', border: '1px solid rgba(59,130,246,.2)' }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#3b82f6', letterSpacing: '.06em', marginBottom: 8 }}>IN YOUR DEPARTMENT</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#3b82f6', letterSpacing: '.06em', marginBottom: 8 }}>{t('duplicateModal.inYourDepartment')}</div>
                   <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-heading)', marginBottom: 4 }}>{m.document_name}</div>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12, fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
-                    <span style={{ background: 'rgba(59,130,246,.1)', color: '#3b82f6', padding: '2px 8px', borderRadius: 20, fontWeight: 600 }}>{m.document_type_name}</span>
+                    <span style={{ background: 'rgba(59,130,246,.1)', color: '#3b82f6', padding: '2px 8px', borderRadius: 20, fontWeight: 600 }}>{DOC_TYPE_KEY[m.document_type_name] ? t(`docTypes.${DOC_TYPE_KEY[m.document_type_name]}`) : m.document_type_name}</span>
                     <span>v{m.version_no || '1.0'}</span>
-                    <span style={{ background: m.status === 'approved' ? 'rgba(34,197,94,.1)' : 'rgba(245,158,11,.1)', color: m.status === 'approved' ? '#16a34a' : '#d97706', padding: '2px 8px', borderRadius: 20, fontWeight: 600, textTransform: 'capitalize' }}>{m.status}</span>
+                    <span style={{ background: m.status === 'approved' ? 'rgba(34,197,94,.1)' : 'rgba(245,158,11,.1)', color: m.status === 'approved' ? '#16a34a' : '#d97706', padding: '2px 8px', borderRadius: 20, fontWeight: 600, textTransform: 'capitalize' }}>{{ approved: t('common.statusWordApproved'), pending: t('common.statusWordPending'), rejected: t('common.statusWordRejected') }[m.status] || m.status}</span>
                     <span>{m.created_at?.split('T')[0]}</span>
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
@@ -2123,7 +2148,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                       fmt('version', nextVer);
                       setDuplicateModal(null);
                     }} style={{ flex: 1, padding: '8px 14px', borderRadius: 8, border: 'none', background: '#3b82f6', color: 'white', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                      Upload as New Version (v{(parseFloat(m.version_no || '1.0') + 0.1).toFixed(1)})
+                      {t('duplicateModal.uploadAsNewVersion', { version: (parseFloat(m.version_no || '1.0') + 0.1).toFixed(1) })}
                     </button>
                   </div>
                 </div>
@@ -2132,21 +2157,21 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
               {/* Other-department matches — link */}
               {duplicateModal.matches.filter(m => m.match_type === 'other_dept').length > 0 && (
                 <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#d97706', letterSpacing: '.06em', marginBottom: 10 }}>IN OTHER DEPARTMENTS</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#d97706', letterSpacing: '.06em', marginBottom: 10 }}>{t('duplicateModal.inOtherDepartments')}</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     {duplicateModal.matches.filter(m => m.match_type === 'other_dept').map(m => (
                       <div key={m.id} style={{ padding: '14px 16px', borderRadius: 10, background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)' }}>
                         <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-heading)', marginBottom: 4 }}>{m.document_name}</div>
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12, fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
-                          <span style={{ background: 'rgba(245,158,11,.1)', color: '#d97706', padding: '2px 8px', borderRadius: 20, fontWeight: 600 }}>{m.document_type_name}</span>
+                          <span style={{ background: 'rgba(245,158,11,.1)', color: '#d97706', padding: '2px 8px', borderRadius: 20, fontWeight: 600 }}>{DOC_TYPE_KEY[m.document_type_name] ? t(`docTypes.${DOC_TYPE_KEY[m.document_type_name]}`) : m.document_type_name}</span>
                           <span style={{ fontWeight: 600 }}>{m.department_name}</span>
-                          <span style={{ background: m.status === 'approved' ? 'rgba(34,197,94,.1)' : 'rgba(245,158,11,.1)', color: m.status === 'approved' ? '#16a34a' : '#d97706', padding: '2px 8px', borderRadius: 20, fontWeight: 600, textTransform: 'capitalize' }}>{m.status}</span>
+                          <span style={{ background: m.status === 'approved' ? 'rgba(34,197,94,.1)' : 'rgba(245,158,11,.1)', color: m.status === 'approved' ? '#16a34a' : '#d97706', padding: '2px 8px', borderRadius: 20, fontWeight: 600, textTransform: 'capitalize' }}>{{ approved: t('common.statusWordApproved'), pending: t('common.statusWordPending'), rejected: t('common.statusWordRejected') }[m.status] || m.status}</span>
                           <span>{m.created_at?.split('T')[0]}</span>
                         </div>
                         <button onClick={() => handleLinkDocument(m.id)}
                           disabled={linkingId === m.id}
                           style={{ width: '100%', padding: '8px 14px', borderRadius: 8, border: 'none', background: linkingId === m.id ? 'rgba(245,158,11,.4)' : '#d97706', color: 'white', fontSize: 12.5, fontWeight: 700, cursor: linkingId === m.id ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)' }}>
-                          {linkingId === m.id ? 'Sending request…' : 'Link to My Department'}
+                          {linkingId === m.id ? t('duplicateModal.sendingRequest') : t('duplicateModal.linkToDepartment')}
                         </button>
                       </div>
                     ))}
@@ -2159,7 +2184,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
             <div style={{ padding: '16px 28px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end', flexShrink: 0 }}>
               <button onClick={() => setDuplicateModal(null)}
                 style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'transparent', color: 'var(--text-color-secondary)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                Continue uploading anyway
+                {t('duplicateModal.continueAnyway')}
               </button>
             </div>
           </div>
@@ -2178,7 +2203,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px', borderRadius: 10, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', color: '#dc2626' }}>
             <AlertCircle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 1 }}>Unsupported file type rejected:</div>
+              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 1 }}>{t('wizard.step2.unsupportedFileType')}</div>
               <div style={{ fontSize: 11.5, fontFamily: 'var(--mono)' }}>{rejected.join(', ')}</div>
             </div>
             <button onClick={() => setRejected([])} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', display: 'flex' }}><X size={13} /></button>
@@ -2189,7 +2214,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         <Card padding={!form.type ? '28px 26px' : typeCompact ? '14px 22px' : '18px 22px'}>
           {form.type ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: typeCompact ? 10 : 14 }}>
-              <div style={{ ...LABEL, fontSize: typeCompact ? 10.5 : 11.5, color: 'var(--text-heading)', flexShrink: 0 }}>Document Type</div>
+              <div style={{ ...LABEL, fontSize: typeCompact ? 10.5 : 11.5, color: 'var(--text-heading)', flexShrink: 0 }}>{t('wizard.step1.label')}</div>
               <div style={{ display: 'flex', gap: typeCompact ? 6 : 8, flexWrap: 'wrap', flex: 1 }}>
                 {TYPES.map(type => {
                   const c = TYPE_CARD_COLORS[type] || { bg: 'rgba(148,163,184,.08)', accent: '#94a3b8', text: '#64748b' };
@@ -2209,7 +2234,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                         onMouseEnter={e => { if (!active) { e.currentTarget.style.opacity = 1; e.currentTarget.style.borderColor = c.accent + '60'; }}}
                         onMouseLeave={e => { if (!active) { e.currentTarget.style.opacity = 0.72; e.currentTarget.style.borderColor = c.accent + '30'; }}}>
                         <FileText size={typeCompact ? 11 : 14} color={c.accent} />
-                        <span style={{ fontSize: typeCompact ? 11.5 : 12.5, fontWeight: active ? 700 : 600, color: active ? c.text : 'var(--text-heading)', whiteSpace: 'nowrap' }}>{type}</span>
+                        <span style={{ fontSize: typeCompact ? 11.5 : 12.5, fontWeight: active ? 700 : 600, color: active ? c.text : 'var(--text-heading)', whiteSpace: 'nowrap' }}>{DOC_TYPE_KEY[type] ? t(`docTypes.${DOC_TYPE_KEY[type]}`) : type}</span>
                         {active && <CheckCircle size={typeCompact ? 11 : 13} color={c.accent} />}
                       </button>
                     );
@@ -2219,8 +2244,8 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
           ) : (
             <div style={{ maxWidth: 1180, margin: '0 auto' }}>
               <div style={{ textAlign: 'center', marginBottom: 32 }}>
-                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-heading)', marginBottom: 8 }}>Document Type <span style={{ color: '#ef4444' }}>*</span></div>
-                <div style={{ fontSize: 13.5, color: 'var(--text-color-secondary)' }}>Choose the type of document you're uploading to get started</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-heading)', marginBottom: 8 }}>{t('wizard.step1.heading')} <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ fontSize: 13.5, color: 'var(--text-color-secondary)' }}>{t('wizard.step1.subheading')}</div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(240px, 1fr))', gap: 20 }}>
                 {TYPES.map(type => {
@@ -2241,8 +2266,8 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                           <FileText size={21} color={c.accent} />
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', lineHeight: 1.3 }}>{type}</div>
-                          <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', lineHeight: 1.45, marginTop: 3 }}>{TYPE_CARD_DESC[type]}</div>
+                          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', lineHeight: 1.3 }}>{DOC_TYPE_KEY[type] ? t(`docTypes.${DOC_TYPE_KEY[type]}`) : type}</div>
+                          <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', lineHeight: 1.45, marginTop: 3 }}>{DOC_TYPE_KEY[type] ? t(`docTypeDesc.${DOC_TYPE_KEY[type]}`) : TYPE_CARD_DESC[type]}</div>
                         </div>
                       </button>
                     );
@@ -2262,19 +2287,19 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                   {fileIcon(files[0])}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ ...LABEL, marginBottom: 2 }}>File{files.length > 1 ? 's' : ''} Uploaded</div>
+                  <div style={{ ...LABEL, marginBottom: 2 }}>{t('wizard.step2.filesUploaded', { count: files.length })}</div>
                   <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {files.length > 1 ? `${files.length} files` : files[0]?.name}
+                    {files.length > 1 ? t('wizard.step2.fileCount', { count: files.length }) : files[0]?.name}
                   </div>
                 </div>
                 <CheckCircle size={14} color="#16a34a" style={{ flexShrink: 0 }} />
                 <button type="button" onClick={() => inputRef.current?.click()}
                   style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 700, color: 'var(--primary)', background: 'transparent', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '6px 12px', cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
-                  <Plus size={12} /> Add file
+                  <Plus size={12} /> {t('wizard.step2.addFile')}
                 </button>
                 <button type="button" onClick={() => { setFiles([]); setFileRefs([]); setUploadStep(null); setUploadError(''); }}
                   style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--primary)', background: 'transparent', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '6px 12px', cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
-                  Change files
+                  {t('wizard.step2.changeFiles')}
                 </button>
               </div>
             ) : files.length === 0 ? (
@@ -2296,9 +2321,9 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                   <Upload size={30} color={TYPE_CARD_COLORS[form.type]?.accent || 'var(--primary)'} strokeWidth={1.6} />
                 </div>
                 <div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 8 }}>Drop files here or <span style={{ color: 'var(--primary)' }}>click to browse</span></div>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 8 }}>{t('wizard.step2.dropHere')} <span style={{ color: 'var(--primary)' }}>{t('wizard.step2.clickToBrowse')}</span></div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>PDF or Word · up to 50 MB</span>
+                      <span style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>{t('wizard.step2.fileTypeHint')}</span>
                       <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--primary)', background: 'rgba(26,86,219,.08)', border: '1px solid rgba(26,86,219,.2)', padding: '2px 7px', borderRadius: 20 }}>.PDF</span>
                       <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: '#2b579a', background: 'rgba(43,87,154,.08)', border: '1px solid rgba(43,87,154,.3)', padding: '2px 7px', borderRadius: 20 }}>.DOC</span>
                     </div>
@@ -2337,7 +2362,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                     );
                   })}
                   {files.length > 4 && (
-                    <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', fontWeight: 600, paddingLeft: 4 }}>+{files.length - 4} more files</div>
+                    <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', fontWeight: 600, paddingLeft: 4 }}>{t('wizard.step2.moreFiles', { count: files.length - 4 })}</div>
                   )}
                 </div>
 
@@ -2350,7 +2375,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                     </div>
                     <button type="button" onClick={checkFiles}
                       style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%', padding: '9px 0', borderRadius: 8, border: 'none', background: 'var(--primary)', color: 'white', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                      <RotateCcw size={13} /> Try Again
+                      <RotateCcw size={13} /> {t('wizard.step2.tryAgain')}
                     </button>
                   </>
                 ) : !allFilesChecked ? (
@@ -2363,11 +2388,11 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                       fontSize: 12.5, fontWeight: 700, fontFamily: 'var(--font)',
                       cursor: uploadStep === 'uploading' ? 'not-allowed' : 'pointer',
                     }}>
-                    {uploadStep === 'uploading' ? <><Clock size={13} /> Checking document…</> : <><Upload size={13} /> Upload &amp; Check Document</>}
+                    {uploadStep === 'uploading' ? <><Clock size={13} /> {t('wizard.step2.checkingDocument')}</> : <><Upload size={13} /> {t('wizard.step2.uploadCheckButton')}</>}
                   </button>
                 ) : (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '2px 2px 4px', fontSize: 12, fontWeight: 600, color: '#16a34a' }}>
-                    <CheckCircle size={13} /> Eligibility check passed — details ready
+                    <CheckCircle size={13} /> {t('wizard.step2.eligibilityPassed')}
                   </div>
                 )}
 
@@ -2399,8 +2424,8 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 <div style={{ width: 28, height: 28, borderRadius: 7, background: TYPE_CARD_COLORS[form.type]?.bg || 'var(--surface-ground)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <FileText size={13} color={TYPE_CARD_COLORS[form.type]?.accent || 'var(--primary)'} />
                 </div>
-                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>Document Details</span>
-                {files.length > 1 && <span style={{ fontSize: 11, fontWeight: 600, background: 'rgba(59,130,246,.1)', color: '#3b82f6', padding: '2px 9px', borderRadius: 20 }}>Applied to all {files.length} files</span>}
+                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>{t('common.documentDetails')}</span>
+                {files.length > 1 && <span style={{ fontSize: 11, fontWeight: 600, background: 'rgba(59,130,246,.1)', color: '#3b82f6', padding: '2px 9px', borderRadius: 20 }}>{t('wizard.step3.appliedToAllFiles', { count: files.length })}</span>}
               </div>
               {uploadError && uploadStep === 'error' && (
                 <div style={{ marginBottom: 14, padding: '10px 14px', borderRadius: 8, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -2416,11 +2441,11 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
             {form.type !== 'Act' && (
               <div style={{ gridColumn: '1 / -1' }}>
                 <div style={{ ...LABEL, marginBottom: 6 }}>
-                  {form.type === 'Amendment' ? 'Parent Act' : 'Legal Authority / Act Reference'} <span style={{ color: '#ef4444' }}>*</span>
+                  {form.type === 'Amendment' ? t('wizard.step3.parentActLabel') : t('wizard.step3.legalAuthorityLabel')} <span style={{ color: '#ef4444' }}>*</span>
                 </div>
                 <HierarchyTag hierarchy={hierarchy} onOpen={() => { setDrawerHierarchy({ ...hierarchy }); setDrawerType('hierarchy'); }} isRef={true} legalAuthorities={usesLegalAuthorities ? legalAuthorities : undefined} />
                 {detailsLocked && (
-                  <div style={{ fontSize: 11.5, color: '#d97706', marginTop: 6 }}>Select the Act this document relates to before filling in the rest of the details.</div>
+                  <div style={{ fontSize: 11.5, color: '#d97706', marginTop: 6 }}>{t('wizard.step3.selectActNotice')}</div>
                 )}
               </div>
             )}
@@ -2443,34 +2468,14 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8 }}>
                       <div>
                         <div style={{ ...LABEL, marginBottom: 4 }}>
-                          {{
-                            'Act': 'Act / Instrument Name',
-                            'Amendment': 'Amendment Name',
-                            'Notification': 'Notification Title',
-                            'Circular': 'Circular Title',
-                            'Policy': 'Policy Name',
-                            'Rules & Regulations': 'Rules / Regulation Name',
-                            'Order / Gazette': 'Order / Gazette Title',
-                            'Bye Laws': 'Bye Law Name',
-                            'Miscellaneous': 'Document Title',
-                          }[form.type] || 'Document Name'} <span style={{ color: '#ef4444' }}>*</span>
+                          {(DOC_TYPE_KEY[form.type] && t(`wizard.fields.${DOC_TYPE_KEY[form.type]}.nameLabel`, { defaultValue: '' })) || t('wizard.fields.generic.nameLabel')} <span style={{ color: '#ef4444' }}>*</span>
                         </div>
                         <input
                           value={fileMeta[f.name]?.documentName ?? ''}
                           onChange={e => setFileMeta(prev => ({ ...prev, [f.name]: { ...prev[f.name], documentName: e.target.value } }))}
                           onFocus={focusStyle}
                           onBlur={e => { blurStyle(e); checkDuplicate(e.target.value); }}
-                          placeholder={({
-                            'Act': 'e.g. Haryana Municipal Act, 1973',
-                            'Amendment': 'e.g. The XYZ (Amendment) Act, 2022',
-                            'Notification': 'e.g. Gazette Notification No. 123',
-                            'Circular': 'e.g. Circular No. 45/2023',
-                            'Policy': 'e.g. Haryana Industrial Policy 2020',
-                            'Rules & Regulations': 'e.g. Haryana Municipal Rules, 1975',
-                            'Order / Gazette': 'e.g. Government Order No. 12/2021',
-                            'Bye Laws': 'e.g. Municipal Corporation Bye-laws, 2020',
-                            'Miscellaneous': 'e.g. Departmental Guidelines / Reference Manual',
-                          }[form.type] || 'Enter document name')}
+                          placeholder={(DOC_TYPE_KEY[form.type] && t(`wizard.placeholders.${DOC_TYPE_KEY[form.type]}.name`, { defaultValue: '' })) || t('wizard.placeholders.generic.name')}
                           style={INPUT_BASE} />
                       </div>
                     </div>
@@ -2482,105 +2487,105 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
             {/* ── ACT: all fields inline ── */}
             {form.type === 'Act' && (<>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Act Number <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.act.number')} <span style={{ color: '#ef4444' }}>*</span></div>
                 <input value={typeFields.actNumber || ''} onChange={e => setTypeFields(f => ({ ...f, actNumber: e.target.value }))}
-                  placeholder="e.g. Act No. 12 of 1973" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  placeholder={t('wizard.placeholders.act.number')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Year <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.year')} <span style={{ color: '#ef4444' }}>*</span></div>
                 <input value={typeFields.year || ''} onChange={e => setTypeFields(f => ({ ...f, year: e.target.value }))}
-                  placeholder="YYYY" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  placeholder={t('wizard.placeholders.act.year')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Short Title</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.act.shortTitle')}</div>
                 <input value={typeFields.shortTitle || ''} onChange={e => setTypeFields(f => ({ ...f, shortTitle: e.target.value }))}
-                  placeholder="e.g. Haryana Municipal Act" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  placeholder={t('wizard.placeholders.act.shortTitle')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div style={{ gridColumn: '1 / -1' }}>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Long Title</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.act.longTitle')}</div>
                 <input value={typeFields.longTitle || ''} onChange={e => setTypeFields(f => ({ ...f, longTitle: e.target.value }))}
-                  placeholder="Full formal title of the Act" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  placeholder={t('wizard.placeholders.act.longTitle')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div style={{ gridColumn: '1 / -1' }}>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Regional Title</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.act.regionalTitle')}</div>
                 <input value={typeFields.regionalTitle || ''} onChange={e => setTypeFields(f => ({ ...f, regionalTitle: e.target.value }))}
-                  placeholder="Title in the regional / Hindi language" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  placeholder={t('wizard.placeholders.act.regionalTitle')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Issue Date <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#ef4444' }}>*</span></div>
                 <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
                   style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Effective From</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.effectiveFrom')}</div>
                 <input type="date" value={typeFields.commencementDate || ''} onChange={e => setTypeFields(f => ({ ...f, commencementDate: e.target.value }))}
                   style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Gazette Reference</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.gazetteReference')}</div>
                 <input value={typeFields.gazetteRef || ''} onChange={e => setTypeFields(f => ({ ...f, gazetteRef: e.target.value }))}
-                  placeholder="e.g. Haryana Gazette, 15 Jan 1973" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  placeholder={t('wizard.placeholders.act.gazetteRef')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Notification No.</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.act.notificationNo')}</div>
                 <input value={typeFields.notificationNo || ''} onChange={e => setTypeFields(f => ({ ...f, notificationNo: e.target.value }))}
-                  placeholder="e.g. Notification No. 45/2021" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  placeholder={t('wizard.placeholders.act.notificationNo')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Act ID <span style={{ fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>(if available)</span></div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.act.actId')} <span style={{ fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>{t('wizard.fields.act.ifAvailable')}</span></div>
                 <input value={typeFields.actId || ''} onChange={e => setTypeFields(f => ({ ...f, actId: e.target.value }))}
-                  placeholder="Numbers and hyphens only" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  placeholder={t('wizard.placeholders.act.actId')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>S.O. Reason</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.act.soReason')}</div>
                 <input value={typeFields.soReason || ''} onChange={e => setTypeFields(f => ({ ...f, soReason: e.target.value }))}
-                  placeholder="Reason for the statutory order" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  placeholder={t('wizard.placeholders.act.soReason')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Department</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.department')}</div>
                 <div style={{ ...INPUT_BASE, color: 'var(--text-color)', opacity: 0.8, userSelect: 'none', display: 'flex', alignItems: 'center', gap: 7 }}>
                   <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0, opacity: 0.7 }} />
                   {user?.dept || form.dept || '—'}
                 </div>
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Relationships</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.relationships')}</div>
                 <button type="button" onClick={() => setDrawerType('relationship')}
                   style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: relations.length > 0 ? 'var(--primary)' : 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                   <GitBranch size={13} />
-                  {relations.length > 0 ? `${relations.length} Relationship${relations.length !== 1 ? 's' : ''} Added` : 'Add Reference Act'}
+                  {relations.length > 0 ? t('common.relationshipsAdded', { count: relations.length }) : t('wizard.fields.act.addReferenceAct')}
                   <ChevronRight size={12} />
                 </button>
               </div>
 
               {/* Linked-instrument counts */}
               {[
-                ['noOfRules', 'No. of Rules'],
-                ['noOfNotifications', 'No. of Notifications'],
-                ['noOfRegulations', 'No. of Regulations'],
-                ['noOfCirculars', 'No. of Circulars'],
-                ['noOfStatutes', 'No. of Statutes'],
-                ['noOfOrdinances', 'No. of Ordinances'],
-                ['noOfOrder', 'No. of Order'],
+                ['noOfRules', t('wizard.fields.act.noOfRules')],
+                ['noOfNotifications', t('wizard.fields.act.noOfNotifications')],
+                ['noOfRegulations', t('wizard.fields.act.noOfRegulations')],
+                ['noOfCirculars', t('wizard.fields.act.noOfCirculars')],
+                ['noOfStatutes', t('wizard.fields.act.noOfStatutes')],
+                ['noOfOrdinances', t('wizard.fields.act.noOfOrdinances')],
+                ['noOfOrder', t('wizard.fields.act.noOfOrder')],
               ].map(([key, label]) => (
                 <div key={key}>
                   <div style={{ ...LABEL, marginBottom: 6 }}>{label}</div>
                   <input type="number" min="0" value={typeFields[key] || ''} onChange={e => setTypeFields(f => ({ ...f, [key]: e.target.value }))}
-                    placeholder="Enter only numeric value" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                    placeholder={t('wizard.placeholders.numericValue')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
                 </div>
               ))}
 
               <div style={{ gridColumn: '1 / -1' }}>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Keywords</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.act.keywords')}</div>
                 <input value={typeFields.keywords || ''} onChange={e => setTypeFields(f => ({ ...f, keywords: e.target.value }))}
-                  placeholder="Comma-separated search keywords" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  placeholder={t('wizard.placeholders.act.keywords')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
 
               <div style={{ gridColumn: '1 / -1' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 12.5, color: 'var(--text-color-secondary)' }}>
                   <input type="checkbox" checked={!!typeFields.repealed} onChange={e => setTypeFields(f => ({ ...f, repealed: e.target.checked }))}
                     style={{ width: 15, height: 15, cursor: 'pointer', accentColor: 'var(--primary)' }} />
-                  Check if you want to repeal the Act. This Act will not show anywhere.
+                  {t('wizard.fields.act.repealCheckbox')}
                 </label>
               </div>
             </>)}
@@ -2588,38 +2593,38 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
             {/* ── Amendment: unified inline fields ── */}
             {form.type === 'Amendment' && (<>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Amendment Number <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.amendment.number')} <span style={{ color: '#ef4444' }}>*</span></div>
                 <input value={typeFields.amendmentNumber || ''} onChange={e => setTypeFields(f => ({ ...f, amendmentNumber: e.target.value }))}
-                  placeholder="e.g. Amendment No. 3 of 2022" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  placeholder={t('wizard.placeholders.amendment.number')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Issue Date <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#ef4444' }}>*</span></div>
                 <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
                   style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Effective From</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.effectiveFrom')}</div>
                 <input type="date" value={typeFields.commencementDate || ''} onChange={e => setTypeFields(f => ({ ...f, commencementDate: e.target.value }))}
                   style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Gazette Reference</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.gazetteReference')}</div>
                 <input value={typeFields.gazetteRef || ''} onChange={e => setTypeFields(f => ({ ...f, gazetteRef: e.target.value }))}
-                  placeholder="e.g. Haryana Gazette No. 45/2022" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  placeholder={t('wizard.placeholders.amendment.gazetteRef')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Department</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.department')}</div>
                 <div style={{ ...INPUT_BASE, color: 'var(--text-color)', opacity: 0.8, userSelect: 'none', display: 'flex', alignItems: 'center', gap: 7 }}>
                   <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0, opacity: 0.7 }} />
                   {user?.dept || form.dept || '—'}
                 </div>
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Relationships</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.relationships')}</div>
                 <button type="button" onClick={() => setDrawerType('relationship')}
                   style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: relations.length > 0 ? 'var(--primary)' : 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                   <GitBranch size={13} />
-                  {relations.length > 0 ? `${relations.length} Relationship${relations.length !== 1 ? 's' : ''} Added` : 'Add Relationship'}
+                  {relations.length > 0 ? t('common.relationshipsAdded', { count: relations.length }) : t('common.addRelationship')}
                   <ChevronRight size={12} />
                 </button>
               </div>
@@ -2628,33 +2633,33 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
             {/* ── Circular: unified inline fields ── */}
             {form.type === 'Circular' && (<>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Circular Number <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.circular.number')} <span style={{ color: '#ef4444' }}>*</span></div>
                 <input value={typeFields.circularNumber || ''} onChange={e => setTypeFields(f => ({ ...f, circularNumber: e.target.value }))}
-                  placeholder="e.g. Circular No. 7/2023" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  placeholder={t('wizard.placeholders.circular.number')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Issue Date <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#ef4444' }}>*</span></div>
                 <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
                   style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Valid Until</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.validUntil')}</div>
                 <input type="date" value={typeFields.validity || ''} onChange={e => setTypeFields(f => ({ ...f, validity: e.target.value }))}
-                  placeholder="e.g. 31 March 2025 / Until further orders" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  placeholder={t('wizard.placeholders.validUntil')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Department</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.department')}</div>
                 <div style={{ ...INPUT_BASE, color: 'var(--text-color)', opacity: 0.8, userSelect: 'none', display: 'flex', alignItems: 'center', gap: 7 }}>
                   <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0, opacity: 0.7 }} />
                   {user?.dept || form.dept || '—'}
                 </div>
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Relationships</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.relationships')}</div>
                 <button type="button" onClick={() => setDrawerType('relationship')}
                   style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: relations.length > 0 ? 'var(--primary)' : 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                   <GitBranch size={13} />
-                  {relations.length > 0 ? `${relations.length} Relationship${relations.length !== 1 ? 's' : ''} Added` : 'Add Relationship'}
+                  {relations.length > 0 ? t('common.relationshipsAdded', { count: relations.length }) : t('common.addRelationship')}
                   <ChevronRight size={12} />
                 </button>
               </div>
@@ -2663,33 +2668,33 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
             {/* ── Miscellaneous: mirrors Circular's field set ── */}
             {form.type === 'Miscellaneous' && (<>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Reference Number</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.miscellaneous.referenceNumber')}</div>
                 <input value={typeFields.miscNumber || ''} onChange={e => setTypeFields(f => ({ ...f, miscNumber: e.target.value }))}
-                  placeholder="e.g. Ref No. 22/2024 (optional)" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  placeholder={t('wizard.placeholders.miscellaneous.referenceNumber')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Issue Date <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#ef4444' }}>*</span></div>
                 <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
                   style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Valid Until</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.validUntil')}</div>
                 <input type="date" value={typeFields.validity || ''} onChange={e => setTypeFields(f => ({ ...f, validity: e.target.value }))}
-                  placeholder="e.g. 31 March 2025 / Until further orders" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  placeholder={t('wizard.placeholders.validUntil')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Department</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.department')}</div>
                 <div style={{ ...INPUT_BASE, color: 'var(--text-color)', opacity: 0.8, userSelect: 'none', display: 'flex', alignItems: 'center', gap: 7 }}>
                   <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0, opacity: 0.7 }} />
                   {user?.dept || form.dept || '—'}
                 </div>
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Relationships</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.relationships')}</div>
                 <button type="button" onClick={() => setDrawerType('relationship')}
                   style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: relations.length > 0 ? 'var(--primary)' : 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                   <GitBranch size={13} />
-                  {relations.length > 0 ? `${relations.length} Relationship${relations.length !== 1 ? 's' : ''} Added` : 'Add Relationship'}
+                  {relations.length > 0 ? t('common.relationshipsAdded', { count: relations.length }) : t('common.addRelationship')}
                   <ChevronRight size={12} />
                 </button>
               </div>
@@ -2698,78 +2703,78 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
             {/* ── Notification: unified inline fields ── */}
             {form.type === 'Notification' && (<>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Notification Number <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.notification.number')} <span style={{ color: '#ef4444' }}>*</span></div>
                 <input value={typeFields.notificationNumber || ''} onChange={e => setTypeFields(f => ({ ...f, notificationNumber: e.target.value }))}
-                  placeholder="e.g. No. 4/12/2022-Rev" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  placeholder={t('wizard.placeholders.notification.number')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Issue Date <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#ef4444' }}>*</span></div>
                 <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
                   style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Effective From</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.effectiveFrom')}</div>
                 <input type="date" value={typeFields.commencementDate || ''} onChange={e => setTypeFields(f => ({ ...f, commencementDate: e.target.value }))}
                   style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Gazette Reference</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.gazetteReference')}</div>
                 <input value={typeFields.gazetteRef || ''} onChange={e => setTypeFields(f => ({ ...f, gazetteRef: e.target.value }))}
-                  placeholder="e.g. Haryana Gazette Extra., 12 Jan 2023" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  placeholder={t('wizard.placeholders.notification.gazetteRef')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Department</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.department')}</div>
                 <div style={{ ...INPUT_BASE, color: 'var(--text-color)', opacity: 0.8, userSelect: 'none', display: 'flex', alignItems: 'center', gap: 7 }}>
                   <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0, opacity: 0.7 }} />
                   {user?.dept || form.dept || '—'}
                 </div>
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Relationships</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.relationships')}</div>
                 <button type="button" onClick={() => setDrawerType('relationship')}
                   style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: relations.length > 0 ? 'var(--primary)' : 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                   <GitBranch size={13} />
-                  {relations.length > 0 ? `${relations.length} Relationship${relations.length !== 1 ? 's' : ''} Added` : 'Add Relationship'}
+                  {relations.length > 0 ? t('common.relationshipsAdded', { count: relations.length }) : t('common.addRelationship')}
                   <ChevronRight size={12} />
                 </button>
               </div>
             </>)}
 
-            {/* ── Order / Gazette: unified inline fields ── */}
-            {form.type === 'Order / Gazette' && (<>
+            {/* ── Order/Gazette: unified inline fields ── */}
+            {form.type === 'Order/Gazette' && (<>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Order / Gazette Number <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.orderGazette.number')} <span style={{ color: '#ef4444' }}>*</span></div>
                 <input value={typeFields.orderNumber || ''} onChange={e => setTypeFields(f => ({ ...f, orderNumber: e.target.value }))}
-                  placeholder="e.g. Govt. Order No. 45/2022" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  placeholder={t('wizard.placeholders.orderGazette.number')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Issue Date <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#ef4444' }}>*</span></div>
                 <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
                   style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Effective From</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.effectiveFrom')}</div>
                 <input type="date" value={typeFields.commencementDate || ''} onChange={e => setTypeFields(f => ({ ...f, commencementDate: e.target.value }))}
                   style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Gazette Reference</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.gazetteReference')}</div>
                 <input value={typeFields.gazetteRef || ''} onChange={e => setTypeFields(f => ({ ...f, gazetteRef: e.target.value }))}
-                  placeholder="e.g. Haryana Gazette Extra., Part I, No. 28, 15 Mar 2022" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  placeholder={t('wizard.placeholders.orderGazette.gazetteRef')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Department</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.department')}</div>
                 <div style={{ ...INPUT_BASE, color: 'var(--text-color)', opacity: 0.8, userSelect: 'none', display: 'flex', alignItems: 'center', gap: 7 }}>
                   <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0, opacity: 0.7 }} />
                   {user?.dept || form.dept || '—'}
                 </div>
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Relationships</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.relationships')}</div>
                 <button type="button" onClick={() => setDrawerType('relationship')}
                   style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: relations.length > 0 ? 'var(--primary)' : 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                   <GitBranch size={13} />
-                  {relations.length > 0 ? `${relations.length} Relationship${relations.length !== 1 ? 's' : ''} Added` : 'Add Relationship'}
+                  {relations.length > 0 ? t('common.relationshipsAdded', { count: relations.length }) : t('common.addRelationship')}
                   <ChevronRight size={12} />
                 </button>
               </div>
@@ -2778,48 +2783,48 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
             {/* ── Policy ── */}
             {form.type === 'Policy' && (<>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Policy Number / ID <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.policy.number')} <span style={{ color: '#ef4444' }}>*</span></div>
                 <input value={typeFields.policyNumber || ''} onChange={e => setTypeFields(f => ({ ...f, policyNumber: e.target.value }))}
-                  placeholder="e.g. HRY-POL-2023-04" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  placeholder={t('wizard.placeholders.policy.number')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Issue Date <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#ef4444' }}>*</span></div>
                 <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
                   style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Effective From</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.effectiveFrom')}</div>
                 <input type="date" value={typeFields.effectiveFrom || ''} onChange={e => setTypeFields(f => ({ ...f, effectiveFrom: e.target.value }))}
                   style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Sector / Domain</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.policy.sector')}</div>
                 <input value={typeFields.sector || ''} onChange={e => setTypeFields(f => ({ ...f, sector: e.target.value }))}
-                  placeholder="e.g. Agriculture, Urban Development" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  placeholder={t('wizard.placeholders.policy.sector')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Implementing Agency</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.policy.implementingAgency')}</div>
                 <input value={typeFields.implementingAgency || ''} onChange={e => setTypeFields(f => ({ ...f, implementingAgency: e.target.value }))}
-                  placeholder="e.g. HSIIDC, HUDA, All Departments" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  placeholder={t('wizard.placeholders.policy.implementingAgency')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Next Review Date</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.policy.reviewDate')}</div>
                 <input type="date" value={typeFields.reviewDate || ''} onChange={e => setTypeFields(f => ({ ...f, reviewDate: e.target.value }))}
                   style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Department</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.department')}</div>
                 <div style={{ ...INPUT_BASE, color: 'var(--text-color)', opacity: 0.8, userSelect: 'none', display: 'flex', alignItems: 'center', gap: 7 }}>
                   <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0, opacity: 0.7 }} />
                   {user?.dept || form.dept || '—'}
                 </div>
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Relationships</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.relationships')}</div>
                 <button type="button" onClick={() => setDrawerType('relationship')}
                   style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: relations.length > 0 ? 'var(--primary)' : 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                   <GitBranch size={13} />
-                  {relations.length > 0 ? `${relations.length} Relationship${relations.length !== 1 ? 's' : ''} Added` : 'Add Relationship'}
+                  {relations.length > 0 ? t('common.relationshipsAdded', { count: relations.length }) : t('common.addRelationship')}
                   <ChevronRight size={12} />
                 </button>
               </div>
@@ -2828,43 +2833,43 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
             {/* ── Rules & Regulations ── */}
             {form.type === 'Rules & Regulations' && (<>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Rule Number <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.rulesRegulations.number')} <span style={{ color: '#ef4444' }}>*</span></div>
                 <input value={typeFields.ruleNumber || ''} onChange={e => setTypeFields(f => ({ ...f, ruleNumber: e.target.value }))}
-                  placeholder="e.g. Rule No. 5 of 2021" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  placeholder={t('wizard.placeholders.rulesRegulations.number')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Issue Date <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#ef4444' }}>*</span></div>
                 <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
                   style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Effective From</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.effectiveFrom')}</div>
                 <input type="date" value={typeFields.effectiveFrom || ''} onChange={e => setTypeFields(f => ({ ...f, effectiveFrom: e.target.value }))}
                   style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Gazette Reference</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.gazetteReference')}</div>
                 <input value={typeFields.gazetteRef || ''} onChange={e => setTypeFields(f => ({ ...f, gazetteRef: e.target.value }))}
-                  placeholder="e.g. Haryana Gazette Extra., Part I, No. 12, 21 Jan 2021" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  placeholder={t('wizard.placeholders.rulesRegulations.gazetteRef')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Rule Making Authority</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.rulesRegulations.authority')}</div>
                 <input value={typeFields.ruleAuthority || ''} onChange={e => setTypeFields(f => ({ ...f, ruleAuthority: e.target.value }))}
-                  placeholder="e.g. Governor of Haryana" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  placeholder={t('wizard.placeholders.rulesRegulations.authority')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Department</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.department')}</div>
                 <div style={{ ...INPUT_BASE, color: 'var(--text-color)', opacity: 0.8, userSelect: 'none', display: 'flex', alignItems: 'center', gap: 7 }}>
                   <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0, opacity: 0.7 }} />
                   {user?.dept || form.dept || '—'}
                 </div>
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Relationships</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.relationships')}</div>
                 <button type="button" onClick={() => setDrawerType('relationship')}
                   style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: relations.length > 0 ? 'var(--primary)' : 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                   <GitBranch size={13} />
-                  {relations.length > 0 ? `${relations.length} Relationship${relations.length !== 1 ? 's' : ''} Added` : 'Add Relationship'}
+                  {relations.length > 0 ? t('common.relationshipsAdded', { count: relations.length }) : t('common.addRelationship')}
                   <ChevronRight size={12} />
                 </button>
               </div>
@@ -2873,72 +2878,72 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
             {/* ── Bye Laws: mirrors Rules & Regulations' field set ── */}
             {form.type === 'Bye Laws' && (<>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Bye Law Number <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.byeLaws.number')} <span style={{ color: '#ef4444' }}>*</span></div>
                 <input value={typeFields.byeLawNumber || ''} onChange={e => setTypeFields(f => ({ ...f, byeLawNumber: e.target.value }))}
-                  placeholder="e.g. Bye-law No. 3 of 2020" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  placeholder={t('wizard.placeholders.byeLaws.number')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Issue Date <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#ef4444' }}>*</span></div>
                 <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
                   style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Effective From</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.effectiveFrom')}</div>
                 <input type="date" value={typeFields.effectiveFrom || ''} onChange={e => setTypeFields(f => ({ ...f, effectiveFrom: e.target.value }))}
                   style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Gazette Reference</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.gazetteReference')}</div>
                 <input value={typeFields.gazetteRef || ''} onChange={e => setTypeFields(f => ({ ...f, gazetteRef: e.target.value }))}
-                  placeholder="e.g. Haryana Gazette Extra., Part I, No. 8, 4 Mar 2020" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  placeholder={t('wizard.placeholders.byeLaws.gazetteRef')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Issuing Authority</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.byeLaws.authority')}</div>
                 <input value={typeFields.ruleAuthority || ''} onChange={e => setTypeFields(f => ({ ...f, ruleAuthority: e.target.value }))}
-                  placeholder="e.g. Municipal Corporation, Panchkula" style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  placeholder={t('wizard.placeholders.byeLaws.authority')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Department</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.department')}</div>
                 <div style={{ ...INPUT_BASE, color: 'var(--text-color)', opacity: 0.8, userSelect: 'none', display: 'flex', alignItems: 'center', gap: 7 }}>
                   <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0, opacity: 0.7 }} />
                   {user?.dept || form.dept || '—'}
                 </div>
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Relationships</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.relationships')}</div>
                 <button type="button" onClick={() => setDrawerType('relationship')}
                   style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: relations.length > 0 ? 'var(--primary)' : 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                   <GitBranch size={13} />
-                  {relations.length > 0 ? `${relations.length} Relationship${relations.length !== 1 ? 's' : ''} Added` : 'Add Relationship'}
+                  {relations.length > 0 ? t('common.relationshipsAdded', { count: relations.length }) : t('common.addRelationship')}
                   <ChevronRight size={12} />
                 </button>
               </div>
             </>)}
 
             {/* ── All other non-Act, non-Amendment, non-Circular, non-Notification types ── */}
-            {!['Act', 'Amendment', 'Circular', 'Notification', 'Order / Gazette', 'Policy', 'Rules & Regulations', 'Bye Laws', 'Miscellaneous'].includes(form.type) && (<>
+            {!['Act', 'Amendment', 'Circular', 'Notification', 'Order/Gazette', 'Policy', 'Rules & Regulations', 'Bye Laws', 'Miscellaneous'].includes(form.type) && (<>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Issue Date <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#ef4444' }}>*</span></div>
                 <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
                   style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Department</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.department')}</div>
                 <div style={{ ...INPUT_BASE, color: 'var(--text-color)', opacity: 0.8, userSelect: 'none', display: 'flex', alignItems: 'center', gap: 7 }}>
                   <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0, opacity: 0.7 }} />
                   {user?.dept || form.dept || '—'}
                 </div>
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>{['Circular', 'Notification', 'Policy', 'Order / Gazette'].includes(form.type) ? 'Act Reference' : 'Hierarchical Tags'}</div>
-                <HierarchyTag hierarchy={hierarchy} onOpen={() => { setDrawerHierarchy({ ...hierarchy }); setDrawerType('hierarchy'); }} isRef={['Circular', 'Notification', 'Policy', 'Order / Gazette'].includes(form.type)} />
+                <div style={{ ...LABEL, marginBottom: 6 }}>{['Circular', 'Notification', 'Policy', 'Order/Gazette'].includes(form.type) ? t('wizard.fields.generic.actReference') : t('wizard.fields.generic.hierarchicalTags')}</div>
+                <HierarchyTag hierarchy={hierarchy} onOpen={() => { setDrawerHierarchy({ ...hierarchy }); setDrawerType('hierarchy'); }} isRef={['Circular', 'Notification', 'Policy', 'Order/Gazette'].includes(form.type)} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>Relationships</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.relationships')}</div>
                 <button type="button" onClick={() => setDrawerType('relationship')}
                   style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: relations.length > 0 ? 'var(--primary)' : 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                   <GitBranch size={13} />
-                  {relations.length > 0 ? `${relations.length} Relationship${relations.length !== 1 ? 's' : ''} Added` : 'Add Relationship'}
+                  {relations.length > 0 ? t('common.relationshipsAdded', { count: relations.length }) : t('common.addRelationship')}
                   <ChevronRight size={12} />
                 </button>
               </div>
@@ -2956,8 +2961,8 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
             {files.length > 0 && (
               <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ ...LABEL, marginBottom: 2 }}>
-                  Description / Remarks
-                  <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-color-secondary)', textTransform: 'none', letterSpacing: 0, marginLeft: 8 }}>Set per file</span>
+                  {t('wizard.step3.descriptionLabel')}
+                  <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-color-secondary)', textTransform: 'none', letterSpacing: 0, marginLeft: 8 }}>{t('wizard.step3.setPerFile')}</span>
                 </div>
                 {files.map(f => (
                   <div key={f.name}>
@@ -2966,7 +2971,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                     )}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                       {fileMeta[f.name]?.desc && (
-                        <span style={{ fontSize: 10, fontWeight: 600, color: '#16a34a', textTransform: 'none', letterSpacing: 0 }}>auto-filled, you can edit</span>
+                        <span style={{ fontSize: 10, fontWeight: 600, color: '#16a34a', textTransform: 'none', letterSpacing: 0 }}>{t('wizard.step3.autoFilled')}</span>
                       )}
                     </div>
                     <textarea
@@ -2974,7 +2979,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                       onChange={e => setFileMeta(prev => ({ ...prev, [f.name]: { ...prev[f.name], desc: e.target.value } }))}
                       onFocus={focusStyle} onBlur={blurStyle}
                       rows={5}
-                      placeholder="Brief description or upload remarks…"
+                      placeholder={t('wizard.step3.descriptionPlaceholder')}
                       style={{ ...INPUT_BASE, resize: 'vertical', lineHeight: 1.6 }} />
                   </div>
                 ))}
@@ -2990,7 +2995,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
               style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)', padding: '9px 22px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
               onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
               onMouseLeave={e => e.currentTarget.style.background = 'var(--surface-card)'}>
-              Clear All
+              {t('wizard.step3.clearAll')}
             </button>
             <button type="submit"
               disabled={files.length === 0 || detailsLocked || uploadStep === 'uploading' || uploadStep === 'saving' || uploadStep === 'done'}
@@ -3005,10 +3010,10 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 boxShadow: files.length > 0 && !detailsLocked && (!uploadStep || uploadStep === 'ready' || uploadStep === 'error') ? '0 2px 8px rgba(26,86,219,.2)' : 'none',
                 transition: 'all .2s',
               }}>
-              {uploadStep === 'uploading' && <><Clock size={14} /> Uploading file…</>}
-              {uploadStep === 'saving'    && <><Clock size={14} /> Saving details…</>}
-              {uploadStep === 'done'      && <><CheckCircle size={14} /> Submitted!</>}
-              {(!uploadStep || uploadStep === 'ready' || uploadStep === 'error') && <><CheckCircle size={14} /> Submit for Approval</>}
+              {uploadStep === 'uploading' && <><Clock size={14} /> {t('wizard.step3.uploadingFile')}</>}
+              {uploadStep === 'saving'    && <><Clock size={14} /> {t('wizard.step3.savingDetails')}</>}
+              {uploadStep === 'done'      && <><CheckCircle size={14} /> {t('wizard.step3.submitted')}</>}
+              {(!uploadStep || uploadStep === 'ready' || uploadStep === 'error') && <><CheckCircle size={14} /> {t('wizard.step3.submitForApproval')}</>}
             </button>
           </div>
         </form>
@@ -3022,10 +3027,10 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
               <div style={{ width: 28, height: 28, borderRadius: 7, background: 'var(--surface-ground)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <Layers size={13} color="var(--primary)" />
               </div>
-              <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>Existing "{form.type}" Documents Under This Act</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>{t('wizard.step3.existingDocsUnderAct', { type: DOC_TYPE_KEY[form.type] ? t(`docTypes.${DOC_TYPE_KEY[form.type]}`) : form.type })}</span>
             </div>
             {actChildrenLoading ? (
-              <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', padding: '10px 0' }}>Loading…</div>
+              <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', padding: '10px 0' }}>{t('common.loading')}</div>
             ) : (() => {
               const list = extractTypeChildren(actChildren, form.type);
               return (
@@ -3033,20 +3038,20 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
                     <thead>
                       <tr style={{ background: 'var(--surface-ground)' }}>
-                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>Document Name</th>
-                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>Reference No.</th>
-                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>Issue Date</th>
-                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>Department</th>
-                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>Version</th>
-                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>Status</th>
-                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>View</th>
+                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('wizard.step3.colDocumentName')}</th>
+                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.referenceNo')}</th>
+                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.issueDate')}</th>
+                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.department')}</th>
+                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.version')}</th>
+                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.status')}</th>
+                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.view')}</th>
                       </tr>
                     </thead>
                     <tbody>
                       {list.length === 0 ? (
                         <tr>
                           <td colSpan={7} style={{ padding: '16px 12px', textAlign: 'center', color: 'var(--text-color-secondary)' }}>
-                            No "{form.type}" documents found under this Act.
+                            {t('wizard.step3.noDocsUnderAct', { type: DOC_TYPE_KEY[form.type] ? t(`docTypes.${DOC_TYPE_KEY[form.type]}`) : form.type })}
                           </td>
                         </tr>
                       ) : list.map((d, i) => (
@@ -3056,11 +3061,11 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                           <td style={{ padding: '8px 12px', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.issue_date || '—'}</td>
                           <td style={{ padding: '8px 12px', color: 'var(--text-color-secondary)' }}>{d.department_name || '—'}</td>
                           <td style={{ padding: '8px 12px', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.version_no || '—'}</td>
-                          <td style={{ padding: '8px 12px', color: 'var(--text-color-secondary)', textTransform: 'capitalize' }}>{d.status || '—'}</td>
+                          <td style={{ padding: '8px 12px', color: 'var(--text-color-secondary)', textTransform: 'capitalize' }}>{{ approved: t('common.statusWordApproved'), pending: t('common.statusWordPending'), rejected: t('common.statusWordRejected') }[d.status] || d.status || '—'}</td>
                           <td style={{ padding: '8px 12px' }}>
                             <button type="button" onClick={() => setViewingActChildDoc({
                                 id:      d.id,
-                                title:   d.document_name || 'Document',
+                                title:   d.document_name || t('toasts.documentFallback'),
                                 type:    d.document_type_name || form.type,
                                 dept:    d.department_name || '',
                                 year:    d.issue_date ? d.issue_date.split('-')[0] : (d.created_at ? new Date(d.created_at).getFullYear() : '—'),
@@ -3070,7 +3075,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                               })}
                               disabled={!d.id}
                               style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 600, cursor: d.id ? 'pointer' : 'not-allowed', fontFamily: 'var(--font)', opacity: d.id ? 1 : 0.5 }}>
-                              <Eye size={12} /> View
+                              <Eye size={12} /> {t('common.view')}
                             </button>
                           </td>
                         </tr>
@@ -3116,17 +3121,17 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)' }}>
                   {drawerType === 'hierarchy'
-  ? (form.type === 'Amendment' ? 'Parent Act & Changes Made'
-      : ['Circular', 'Notification', 'Order / Gazette', 'Miscellaneous'].includes(form.type) ? 'Legal Authority'
-      : ['Policy', 'Rules & Regulations', 'Bye Laws'].includes(form.type) ? 'Act Reference'
-      : 'Hierarchical Tags')
-  : 'Add Relationship'}
+  ? (form.type === 'Amendment' ? t('drawer.titleParentActChanges')
+      : ['Circular', 'Notification', 'Order/Gazette', 'Miscellaneous'].includes(form.type) ? t('drawer.titleLegalAuthority')
+      : ['Policy', 'Rules & Regulations', 'Bye Laws'].includes(form.type) ? t('drawer.titleActReference')
+      : t('drawer.titleHierarchicalTags'))
+  : t('drawer.titleAddRelationship')}
                 </div>
                 <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 1 }}>
                   {drawerType === 'hierarchy'
-                    ? (form.type === 'Amendment' ? 'Select the parent Act being amended and log section-level changes'
-                        : 'Tag this document within the act/chapter/section hierarchy')
-                    : (form.type === 'Amendment' ? 'Link to related Acts, continuing Amendments, or other documents' : 'Link this document to an existing document')}
+                    ? (form.type === 'Amendment' ? t('drawer.subtitleParentActChanges')
+                        : t('drawer.subtitleHierarchyTags'))
+                    : (form.type === 'Amendment' ? t('drawer.subtitleAmendmentRelationship') : t('drawer.subtitleLinkDocument'))}
                 </div>
               </div>
               <button onClick={closeDrawer}
@@ -3142,17 +3147,17 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
               {drawerType === 'hierarchy' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                   {/* Act Name / Parent Act Name — only for Amendment; other types get their own Act/Rule Name field below (multi-legal-authority list or Act/Chapter/Section block) */}
-                  {!['Circular', 'Notification', 'Order / Gazette', 'Policy', 'Miscellaneous', 'Rules & Regulations', 'Bye Laws'].includes(form.type) && (
+                  {!['Circular', 'Notification', 'Order/Gazette', 'Policy', 'Miscellaneous', 'Rules & Regulations', 'Bye Laws'].includes(form.type) && (
                     <div>
                       <div style={{ ...LABEL, marginBottom: 6 }}>
-                        {form.type === 'Amendment' ? 'Parent Act Name' : 'Act Name'}
+                        {form.type === 'Amendment' ? t('drawer.parentActName') : t('drawer.actName')}
                       </div>
                       <div style={{ position: 'relative' }}>
                         <input value={drawerHierarchy.act}
                           onChange={e => { setDrawerHierarchy(v => ({ ...v, act: e.target.value, actId: null })); fetchDocSuggestions('Act', e.target.value); }}
                           onFocus={e => { focusStyle(e); if (drawerHierarchy.act) fetchDocSuggestions('Act', drawerHierarchy.act); setShowHierActDrop(true); }}
                           onBlur={e => { blurStyle(e); setTimeout(() => setShowHierActDrop(false), 180); }}
-                          placeholder="Type to search Acts…" style={{ ...INPUT_BASE, width: '100%' }}
+                          placeholder={t('drawer.searchActsPlaceholder')} style={{ ...INPUT_BASE, width: '100%' }}
                         />
                         {actSearching && <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 10, color: 'var(--text-color-secondary)' }}>…</div>}
                         {showHierActDrop && actSuggestions.length > 0 && (
@@ -3174,13 +3179,13 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                   )}
 
                   {/* Circular / Notification / Order / Policy: dynamic multiple legal authorities */}
-                  {['Circular', 'Notification', 'Order / Gazette', 'Policy', 'Miscellaneous'].includes(form.type) && (<>
+                  {['Circular', 'Notification', 'Order/Gazette', 'Policy', 'Miscellaneous'].includes(form.type) && (<>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span style={{ ...LABEL }}>Legal Authorities</span>
+                      <span style={{ ...LABEL }}>{t('drawer.legalAuthorities')}</span>
                       <button type="button"
                         onClick={() => { setLegalAuthorities(p => [...p, { act: '', sections: [''], confirmed: false }]); setEditingAuthIdx(legalAuthorities.length); }}
                         style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: 'var(--primary)', background: 'var(--primary-light)', border: '1px solid var(--primary-border)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                        <Plus size={12} /> Add Another
+                        <Plus size={12} /> {t('drawer.addAnother')}
                       </button>
                     </div>
                     {legalAuthorities.map((auth, i) => {
@@ -3216,7 +3221,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                       return (
                       <div key={i} style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', display: 'flex', flexDirection: 'column', gap: 10 }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>AUTHORITY {i + 1}</span>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>{t('drawer.authorityNumber', { number: i + 1 })}</span>
                           {legalAuthorities.length > 1 && (
                             <button type="button" onClick={() => { setLegalAuthorities(p => p.filter((_, idx) => idx !== i)); setEditingAuthIdx(null); }}
                               style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)' }}>
@@ -3225,13 +3230,13 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                           )}
                         </div>
                         <div>
-                          <div style={{ ...LABEL, marginBottom: 5 }}>Act / Rule Name</div>
+                          <div style={{ ...LABEL, marginBottom: 5 }}>{t('drawer.actRuleName')}</div>
                           <div style={{ position: 'relative' }}>
                             <input value={auth.act}
                               onChange={e => { setEditingAuthIdx(i); setLegalAuthorities(p => p.map((r, idx) => idx === i ? { ...r, act: e.target.value } : r)); fetchDocSuggestions('Act', e.target.value); }}
                               onFocus={e => { focusStyle(e); setEditingAuthIdx(i); setShowAuthDrop(i); if (auth.act) fetchDocSuggestions('Act', auth.act); }}
                               onBlur={e => { blurStyle(e); setTimeout(() => setShowAuthDrop(null), 180); }}
-                              placeholder="Type to search Acts…" style={{ ...INPUT_BASE, fontSize: 12 }} />
+                              placeholder={t('drawer.searchActsPlaceholder')} style={{ ...INPUT_BASE, fontSize: 12 }} />
                             {showAuthDrop === i && actSearching && <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 10, color: 'var(--text-color-secondary)' }}>…</div>}
                             {showAuthDrop === i && actSuggestions.length > 0 && (
                               <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 200, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 8, boxShadow: '0 6px 20px rgba(0,0,0,.13)', maxHeight: 220, overflow: 'auto', marginTop: 3 }}>
@@ -3251,11 +3256,11 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                         </div>
                         <div>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                            <div style={{ ...LABEL }}>Sections / Provisions</div>
+                            <div style={{ ...LABEL }}>{t('drawer.sectionsProvisions')}</div>
                             <button type="button"
                               onClick={() => setLegalAuthorities(p => p.map((r, idx) => idx === i ? { ...r, sections: [...(r.sections || ['']), ''] } : r))}
                               style={{ fontSize: 11, fontWeight: 600, color: 'var(--primary)', background: 'var(--primary-light)', border: '1px solid var(--primary-border)', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                              <Plus size={10} /> Add Section
+                              <Plus size={10} /> {t('drawer.addSection')}
                             </button>
                           </div>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -3270,7 +3275,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                                   onChange={e => setLegalAuthorities(p => p.map((r, idx) => idx === i ? { ...r, sections: (r.sections || ['']).map((s, sIdx) => sIdx === si ? e.target.value : s) } : r))}
                                   onFocus={e => { focusStyle(e); setShowSectionDrop(dropKey); }}
                                   onBlur={e => { blurStyle(e); setTimeout(() => setShowSectionDrop(null), 180); }}
-                                  placeholder={auth.act ? `Type or pick a section…` : `e.g. Section ${si === 0 ? '4' : '17'}`}
+                                  placeholder={auth.act ? t('drawer.pickSectionPlaceholder') : t('drawer.sectionExamplePlaceholder', { number: si === 0 ? '4' : '17' })}
                                   style={{ ...INPUT_BASE, fontSize: 12, width: '100%' }} />
                                 {dropOpen && secOptions.length > 0 && (
                                   <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 300, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 8, boxShadow: '0 6px 20px rgba(0,0,0,.13)', maxHeight: 180, overflow: 'auto', marginTop: 3 }}>
@@ -3301,7 +3306,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                           disabled={!auth.act}
                           onClick={() => { setLegalAuthorities(p => p.map((r, idx) => idx === i ? { ...r, confirmed: true } : r)); setEditingAuthIdx(null); }}
                           style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '8px', borderRadius: 8, border: 'none', background: auth.act ? '#16a34a' : 'var(--surface-200)', color: auth.act ? '#fff' : '#94a3b8', fontSize: 12.5, fontWeight: 700, cursor: auth.act ? 'pointer' : 'not-allowed', fontFamily: 'var(--font)' }}>
-                          <CheckCircle size={14} /> Confirm Authority
+                          <CheckCircle size={14} /> {t('drawer.confirmAuthority')}
                         </button>
                       </div>
                       );
@@ -3310,16 +3315,16 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
 
 
                   {/* Act / Rules & Regulations: Act name + Chapter/Section/Sub-section with dropdowns */}
-                  {!['Circular', 'Notification', 'Policy', 'Order / Gazette', 'Amendment', 'Miscellaneous'].includes(form.type) && (<>
+                  {!['Circular', 'Notification', 'Policy', 'Order/Gazette', 'Amendment', 'Miscellaneous'].includes(form.type) && (<>
                     {/* Act Name — search-acts API */}
                     <div>
-                      <div style={{ ...LABEL, marginBottom: 6 }}>Act / Rule Name</div>
+                      <div style={{ ...LABEL, marginBottom: 6 }}>{t('drawer.actRuleName')}</div>
                       <div style={{ position: 'relative' }}>
                         <input value={drawerHierarchy.act}
                           onChange={e => { setDrawerHierarchy(v => ({ ...v, act: e.target.value, actId: null, section: '', chapter: '' })); fetchDocSuggestions('Act', e.target.value); }}
                           onFocus={e => { focusStyle(e); if (drawerHierarchy.act) fetchDocSuggestions('Act', drawerHierarchy.act); setShowHierActDrop(true); }}
                           onBlur={e => { blurStyle(e); setTimeout(() => setShowHierActDrop(false), 180); }}
-                          placeholder="Type to search Acts…" style={{ ...INPUT_BASE, width: '100%' }} />
+                          placeholder={t('drawer.searchActsPlaceholder')} style={{ ...INPUT_BASE, width: '100%' }} />
                         {actSearching && <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 10, color: 'var(--text-color-secondary)' }}>…</div>}
                         {showHierActDrop && actSuggestions.length > 0 && (
                           <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 400, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 8, boxShadow: '0 6px 20px rgba(0,0,0,.13)', maxHeight: 220, overflow: 'auto', marginTop: 3 }}>
@@ -3340,22 +3345,22 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
 
                     {/* Chapter — plain input */}
                     <div>
-                      <div style={{ ...LABEL, marginBottom: 6 }}>Chapter</div>
+                      <div style={{ ...LABEL, marginBottom: 6 }}>{t('drawer.chapter')}</div>
                       <input value={drawerHierarchy.chapter}
                         onChange={e => setDrawerHierarchy(v => ({ ...v, chapter: e.target.value }))}
-                        placeholder="e.g. Chapter III — Taxation" style={{ ...INPUT_BASE, width: '100%' }}
+                        placeholder={t('drawer.chapterPlaceholder')} style={{ ...INPUT_BASE, width: '100%' }}
                         onFocus={focusStyle} onBlur={blurStyle} />
                     </div>
 
                     {/* Section — dropdown from selected act */}
                     <div>
-                      <div style={{ ...LABEL, marginBottom: 6 }}>Section</div>
+                      <div style={{ ...LABEL, marginBottom: 6 }}>{t('drawer.section')}</div>
                       <div style={{ position: 'relative' }}>
                         <input value={drawerHierarchy.section}
                           onChange={e => setDrawerHierarchy(v => ({ ...v, section: e.target.value }))}
                           onFocus={e => { focusStyle(e); setShowHierSecDrop(true); }}
                           onBlur={e => { blurStyle(e); setTimeout(() => setShowHierSecDrop(false), 180); }}
-                          placeholder={drawerHierarchy.act ? 'Type or pick a section…' : 'e.g. Section 45 — Property Tax'}
+                          placeholder={drawerHierarchy.act ? t('drawer.pickSectionPlaceholder') : t('drawer.sectionPlaceholderExample')}
                           style={{ ...INPUT_BASE, width: '100%' }} />
                         {showHierSecDrop && getSectionsFromDoc(drawerHierarchy.act).filter(s => !drawerHierarchy.section || s.toLowerCase().includes(drawerHierarchy.section.toLowerCase())).length > 0 && (
                           <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 300, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 8, boxShadow: '0 6px 20px rgba(0,0,0,.13)', maxHeight: 200, overflow: 'auto', marginTop: 3 }}>
@@ -3375,10 +3380,10 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
 
                     {/* Sub-section — plain input */}
                     <div>
-                      <div style={{ ...LABEL, marginBottom: 6 }}>Sub-section</div>
+                      <div style={{ ...LABEL, marginBottom: 6 }}>{t('drawer.subsection')}</div>
                       <input value={drawerHierarchy.subsection}
                         onChange={e => setDrawerHierarchy(v => ({ ...v, subsection: e.target.value }))}
-                        placeholder="e.g. (2)(a)" style={{ ...INPUT_BASE, width: '100%' }}
+                        placeholder={t('drawer.subsectionPlaceholder')} style={{ ...INPUT_BASE, width: '100%' }}
                         onFocus={focusStyle} onBlur={blurStyle} />
                     </div>
                   </>)}
@@ -3389,19 +3394,19 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 4, borderTop: '1px solid var(--surface-border)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <Edit3 size={12} color="var(--primary)" />
-                          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-heading)' }}>Changes Made</span>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-heading)' }}>{t('drawer.changesMade')}</span>
                         </div>
                         <button type="button"
                           onClick={() => setAmendChanges(p => [...p, { chapter: '', section: '', subsection: '', changeType: 'Amended', description: '' }])}
                           style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 600, color: 'var(--primary)', background: 'var(--primary-light)', border: '1px solid var(--primary-border)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                          <Plus size={12} /> Add Change
+                          <Plus size={12} /> {t('drawer.addChange')}
                         </button>
                       </div>
 
                       {amendChanges.map((ch, i) => (
                         <div key={i} style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', display: 'flex', flexDirection: 'column', gap: 10 }}>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>CHANGE {i + 1}</span>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>{t('drawer.changeNumber', { number: i + 1 })}</span>
                             {amendChanges.length > 1 && (
                               <button type="button" onClick={() => setAmendChanges(p => p.filter((_, idx) => idx !== i))}
                                 style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)' }}>
@@ -3411,9 +3416,9 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                           </div>
                           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
                             {[
-                              { key: 'chapter', ph: 'Chapter III' },
-                              { key: 'section', ph: 'Section 45' },
-                              { key: 'subsection', ph: '(2)(a)' },
+                              { key: 'chapter', ph: t('drawer.changeChapterPlaceholder') },
+                              { key: 'section', ph: t('drawer.changeSectionPlaceholder') },
+                              { key: 'subsection', ph: t('drawer.changeSubsectionPlaceholder') },
                             ].map(({ key, ph }) => (
                               <input key={key} value={ch[key]}
                                 onChange={e => setAmendChanges(p => p.map((r, idx) => idx === i ? { ...r, [key]: e.target.value } : r))}
@@ -3423,11 +3428,11 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                           </div>
                           <SelectField value={ch.changeType}
                             onChange={e => setAmendChanges(p => p.map((r, idx) => idx === i ? { ...r, changeType: e.target.value } : r))}>
-                            {AMEND_CHANGE_TYPES.map(o => <option key={o}>{o}</option>)}
+                            {AMEND_CHANGE_TYPES.map(o => <option key={o} value={o}>{t(`amendChangeTypes.${AMEND_CHANGE_KEY[o]}`)}</option>)}
                           </SelectField>
                           <textarea value={ch.description}
                             onChange={e => setAmendChanges(p => p.map((r, idx) => idx === i ? { ...r, description: e.target.value } : r))}
-                            rows={2} placeholder="Describe what specifically changed here…"
+                            rows={2} placeholder={t('drawer.describeChangePlaceholder')}
                             style={{ ...INPUT_BASE, resize: 'vertical', lineHeight: 1.6, fontSize: 12 }}
                             onFocus={focusStyle} onBlur={blurStyle} />
                         </div>
@@ -3444,19 +3449,19 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                   {/* Relationship add form */}
                   {(<>
                     <div>
-                      <div style={{ ...LABEL, marginBottom: 6 }}>Relationship Type</div>
+                      <div style={{ ...LABEL, marginBottom: 6 }}>{t('drawer.relationshipType')}</div>
                       <SelectField value={relType} onChange={e => setRelType(e.target.value)}>
-                        {(REL_TYPES_BY_DOCTYPE[form.type] || REL_TYPES).map(r => <option key={r}>{r}</option>)}
+                        {(REL_TYPES_BY_DOCTYPE[form.type] || REL_TYPES).map(r => <option key={r} value={r}>{t(`relTypes.${REL_TYPE_KEY[r]}`)}</option>)}
                       </SelectField>
                     </div>
                     <div>
-                      <div style={{ ...LABEL, marginBottom: 6 }}>Target Document Type</div>
-                      <SelectField value={relDocType} onChange={e => { setRelDocType(e.target.value); setRelTarget(''); setRelSearch(''); }} placeholder="Select Type">
-                        {(REL_TARGET_TYPES[form.type] || Object.keys(TYPE_CARD_COLORS)).map(t => <option key={t}>{t}</option>)}
+                      <div style={{ ...LABEL, marginBottom: 6 }}>{t('drawer.targetDocumentType')}</div>
+                      <SelectField value={relDocType} onChange={e => { setRelDocType(e.target.value); setRelTarget(''); setRelSearch(''); }} placeholder={t('drawer.selectTypePlaceholder')}>
+                        {(REL_TARGET_TYPES[form.type] || Object.keys(TYPE_CARD_COLORS)).map(docType => <option key={docType} value={docType}>{DOC_TYPE_KEY[docType] ? t(`docTypes.${DOC_TYPE_KEY[docType]}`) : docType}</option>)}
                       </SelectField>
                     </div>
                     <div>
-                      <div style={{ ...LABEL, marginBottom: 6 }}>Link to Document</div>
+                      <div style={{ ...LABEL, marginBottom: 6 }}>{t('drawer.linkToDocument')}</div>
                       <div style={{ position: 'relative' }}>
                         <input
                           disabled={!relDocType}
@@ -3467,7 +3472,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                           }}
                           onFocus={() => { setShowRelDrop(true); if (relDocType && relSearch) fetchRelDocSuggestions(relDocType, relSearch); }}
                           onBlur={() => setTimeout(() => setShowRelDrop(false), 150)}
-                          placeholder={!relDocType ? 'Select a Target Document Type first…' : `Search ${relDocType}…`}
+                          placeholder={!relDocType ? t('drawer.selectTypeFirst') : t('drawer.searchDocType', { type: relDocType })}
                           style={{ ...INPUT_BASE, width: '100%', ...(!relDocType ? { background: 'var(--surface-100)', cursor: 'not-allowed', color: 'var(--text-color-secondary)' } : {}) }}
                           onFocus={focusStyle} onBlur={blurStyle}
                         />
@@ -3489,10 +3494,10 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                                 onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
                                 onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                  <span style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', background: 'rgba(245,158,11,.1)', border: '1px solid rgba(245,158,11,.3)', borderRadius: 20, padding: '1px 8px', fontFamily: 'var(--mono)' }}>PENDING</span>
+                                  <span style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', background: 'rgba(245,158,11,.1)', border: '1px solid rgba(245,158,11,.3)', borderRadius: 20, padding: '1px 8px', fontFamily: 'var(--mono)' }}>{t('drawer.pendingBadge')}</span>
                                   <span style={{ fontWeight: 600, color: 'var(--text-heading)' }}>"{relSearch.trim()}"</span>
                                 </div>
-                                <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 3 }}>Document not in system yet — save as pending, will auto-link when uploaded</div>
+                                <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 3 }}>{t('drawer.pendingDocNote')}</div>
                               </div>
                             )}
                           </div>
@@ -3502,13 +3507,13 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                     {/* Section of linked document — shows only when a document is selected */}
                     {relTarget && !relTarget.startsWith('__pending__:') && (
                       <div>
-                        <div style={{ ...LABEL, marginBottom: 6 }}>Section / Provision <span style={{ color: 'var(--text-color-secondary)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span></div>
+                        <div style={{ ...LABEL, marginBottom: 6 }}>{t('drawer.sectionOfLinkedDoc')} <span style={{ color: 'var(--text-color-secondary)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>{t('drawer.optional')}</span></div>
                         <div style={{ position: 'relative' }}>
                           <input value={relSection}
                             onChange={e => setRelSection(e.target.value)}
                             onFocus={e => { focusStyle(e); setShowRelSecDrop(true); }}
                             onBlur={e => { blurStyle(e); setTimeout(() => setShowRelSecDrop(false), 180); }}
-                            placeholder="Pick or type a section from the linked document…"
+                            placeholder={t('drawer.relSectionPlaceholder')}
                             style={{ ...INPUT_BASE, width: '100%' }} />
                           {showRelSecDrop && getSectionsFromDoc(documents.find(d => d.uid === relTarget)?.title).filter(s => !relSection || s.toLowerCase().includes(relSection.toLowerCase())).length > 0 && (
                             <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 300, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 8, boxShadow: '0 6px 20px rgba(0,0,0,.13)', maxHeight: 180, overflow: 'auto', marginTop: 3 }}>
@@ -3527,32 +3532,32 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                       </div>
                     )}
                     <div>
-                      <div style={{ ...LABEL, marginBottom: 6 }}>How are these related? <span style={{ color: 'var(--text-color-secondary)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(optional)</span></div>
+                      <div style={{ ...LABEL, marginBottom: 6 }}>{t('drawer.howRelated')} <span style={{ color: 'var(--text-color-secondary)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>{t('drawer.optional')}</span></div>
                       <textarea
                         value={relNote}
                         onChange={e => setRelNote(e.target.value)}
                         rows={3}
-                        placeholder="e.g. Section 45 of this Act is referenced in Chapter III of the linked document for determining tax liability…"
+                        placeholder={t('drawer.howRelatedPlaceholder')}
                         style={{ ...INPUT_BASE, resize: 'vertical', lineHeight: 1.6, fontSize: 12.5 }}
                         onFocus={focusStyle} onBlur={blurStyle}
                       />
                     </div>
                     <button type="button" onClick={addRelation} disabled={!relTarget}
                       style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '9px', borderRadius: 8, border: 'none', background: relTarget ? (relTarget.startsWith('__pending__:') ? '#f59e0b' : 'var(--primary)') : 'var(--surface-200)', color: relTarget ? 'white' : '#94a3b8', cursor: relTarget ? 'pointer' : 'not-allowed', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700, width: '100%' }}>
-                      <Plus size={14} /> Add Relationship
+                      <Plus size={14} /> {t('common.addRelationship')}
                     </button>
                   </>)}
 
                   {relations.length > 0 && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                      <div style={{ ...LABEL }}>Added Relationships</div>
+                      <div style={{ ...LABEL }}>{t('drawer.addedRelationships')}</div>
                       {relations.map((r, i) => (
                         <div key={i} style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(26,86,219,.05)', border: '1px solid rgba(26,86,219,.15)' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <GitBranch size={12} color="var(--primary)" style={{ flexShrink: 0 }} />
-                            <span style={{ fontSize: 12, fontWeight: 700, color: r.isPending ? '#f59e0b' : 'var(--primary)', fontFamily: 'var(--mono)' }}>{r.label}</span>
-                            {r.targetType && <span style={{ fontSize: 10.5, fontWeight: 600, color: TYPE_CARD_COLORS[r.targetType]?.text || 'var(--text-color-secondary)', background: TYPE_CARD_COLORS[r.targetType]?.bg || 'rgba(148,163,184,.1)', padding: '1px 7px', borderRadius: 20, flexShrink: 0 }}>{r.targetType}</span>}
-                            {r.isPending && <span style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', background: 'rgba(245,158,11,.1)', border: '1px solid rgba(245,158,11,.3)', borderRadius: 20, padding: '1px 8px', fontFamily: 'var(--mono)', flexShrink: 0 }}>PENDING</span>}
+                            <span style={{ fontSize: 12, fontWeight: 700, color: r.isPending ? '#f59e0b' : 'var(--primary)', fontFamily: 'var(--mono)' }}>{REL_TYPE_KEY[r.label] ? t(`relTypes.${REL_TYPE_KEY[r.label]}`) : r.label}</span>
+                            {r.targetType && <span style={{ fontSize: 10.5, fontWeight: 600, color: TYPE_CARD_COLORS[r.targetType]?.text || 'var(--text-color-secondary)', background: TYPE_CARD_COLORS[r.targetType]?.bg || 'rgba(148,163,184,.1)', padding: '1px 7px', borderRadius: 20, flexShrink: 0 }}>{DOC_TYPE_KEY[r.targetType] ? t(`docTypes.${DOC_TYPE_KEY[r.targetType]}`) : r.targetType}</span>}
+                            {r.isPending && <span style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', background: 'rgba(245,158,11,.1)', border: '1px solid rgba(245,158,11,.3)', borderRadius: 20, padding: '1px 8px', fontFamily: 'var(--mono)', flexShrink: 0 }}>{t('drawer.pendingBadge')}</span>}
                             <span style={{ fontSize: 12.5, color: 'var(--text-heading)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>→ {r.targetTitle}{r.section ? ` · ${r.section}` : ''}</span>
                             <button type="button" onClick={() => removeRelation(i)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', flexShrink: 0 }}><X size={12} /></button>
                           </div>
@@ -3573,7 +3578,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
             <div style={{ padding: '16px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
               <button type="button" onClick={closeDrawer}
                 style={{ padding: '9px 20px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                Cancel
+                {t('common.cancel')}
               </button>
               <button type="button"
                 onClick={() => {
@@ -3581,7 +3586,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                   closeDrawer();
                 }}
                 style={{ padding: '9px 24px', borderRadius: 8, border: 'none', background: 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                {drawerType === 'hierarchy' ? 'Save Tags' : 'Done'}
+                {drawerType === 'hierarchy' ? t('drawer.saveTags') : t('drawer.done')}
               </button>
             </div>
           </div>

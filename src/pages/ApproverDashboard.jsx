@@ -22,7 +22,7 @@ const TYPE_COLORS = {
   'Circular':            { accent: '#14b8a6', bg: 'rgba(20,184,166,.08)', text: '#0f766e' },
   'Policy':              { accent: '#22c55e', bg: 'rgba(34,197,94,.08)',  text: '#16a34a' },
   'Rules & Regulations': { accent: '#ef4444', bg: 'rgba(239,68,68,.08)',  text: '#dc2626' },
-  'Order / Gazette':     { accent: '#eab308', bg: 'rgba(234,179,8,.08)',  text: '#a16207' },
+  'Order/Gazette':     { accent: '#eab308', bg: 'rgba(234,179,8,.08)',  text: '#a16207' },
   'Bye Laws':            { accent: '#0ea5e9', bg: 'rgba(14,165,233,.08)', text: '#0369a1' },
   'Miscellaneous':       { accent: '#64748b', bg: 'rgba(100,116,139,.08)',text: '#475569' },
 };
@@ -1048,6 +1048,22 @@ function mapApiDoc(d) {
       ...(d.implementing_agency    ? { implementingAgency:  d.implementing_agency }    : {}),
       ...(d.next_review_date       ? { reviewDate:          d.next_review_date }       : {}),
       ...(d.rule_making_authority  ? { ruleAuthority:       d.rule_making_authority }  : {}),
+      // Act-specific extended fields
+      ...(d.act_year               ? { actYear:            d.act_year }               : {}),
+      ...(d.long_title             ? { longTitle:          d.long_title }             : {}),
+      ...(d.regional_title         ? { regionalTitle:      d.regional_title }         : {}),
+      ...(d.notification_no        ? { notificationNo:     d.notification_no }        : {}),
+      ...(d.act_code               ? { actCode:            d.act_code }               : {}),
+      ...(d.so_reason              ? { soReason:           d.so_reason }              : {}),
+      ...(d.no_of_rules            ? { noOfRules:          d.no_of_rules }            : {}),
+      ...(d.no_of_notifications    ? { noOfNotifications:  d.no_of_notifications }    : {}),
+      ...(d.no_of_regulations      ? { noOfRegulations:     d.no_of_regulations }      : {}),
+      ...(d.no_of_circulars        ? { noOfCirculars:      d.no_of_circulars }        : {}),
+      ...(d.no_of_statutes         ? { noOfStatutes:       d.no_of_statutes }         : {}),
+      ...(d.no_of_ordinances       ? { noOfOrdinances:      d.no_of_ordinances }       : {}),
+      ...(d.no_of_orders           ? { noOfOrders:          d.no_of_orders }           : {}),
+      ...(d.keywords               ? { keywords:            d.keywords }               : {}),
+      ...(d.is_repealed            ? { repealed:            'Yes' }                    : {}),
     },
     ...(() => {
       const raw = d.description || '';

@@ -7,7 +7,7 @@ import ForgotPasswordScreen from './ForgotPasswordScreen';
 import AdminOtpLogin from './AdminOtpLogin';
 import Captcha from '../components/Captcha';
 import LanguageToggle from '../components/LanguageToggle';
-import AccessibilityMenu from '../components/citizen/AccessibilityMenu';
+import AccessibilityMenu from '../components/AccessibilityMenu';
 
 const loginIconStyle = {
   display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: '50%',

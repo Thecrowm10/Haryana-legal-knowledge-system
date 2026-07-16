@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
-import AccessibilityToolbar from './AccessibilityToolbar';
 
 export default function Layout({ user, activePage, onNavigate, onLogout, onChangePassword, children }) {
   const [collapsed, setCollapsed] = useState(true);
@@ -34,10 +33,6 @@ export default function Layout({ user, activePage, onNavigate, onLogout, onChang
           </main>
         </div>
       </div>
-      {/* Outside .a11y-zoom-scope: a fixed-position overlay must not inherit
-          the content zoom, or its viewport-anchored offsets drift.
-          Citizen guests get an equivalent menu built into their top bar instead. */}
-      {user.role !== 'citizen' && <AccessibilityToolbar />}
     </div>
   );
 }
