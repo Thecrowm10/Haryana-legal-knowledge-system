@@ -521,6 +521,7 @@ function DocViewModal({ doc, onClose }) {
     [t('common.effectiveFrom'),    doc.effectiveFrom   || null],
     [t('docViewModal.gazetteRef'), doc.gazette         || null],
     [t('docViewModal.legalAuthority'), doc.authority   || null],
+    [t('docViewModal.uploader'),   doc.uploader        || null],
     [t('docViewModal.uploadDate'), doc.uploadedAt      || null],
     [t('docViewModal.file'),       doc.fileName        || null],
   ].filter(([, v]) => v);
@@ -771,6 +772,16 @@ function DocViewModal({ doc, onClose }) {
               </div>
             )}
 
+            {/* Summary */}
+            {/* {doc.summary && (
+              <div style={{ marginBottom: 22 }}>
+                <div style={{ ...LS, marginBottom: 10 }}>{t('docViewModal.summary')}</div>
+                <div style={{ padding: '14px 16px', borderRadius: 10, background: 'rgba(26,86,219,.04)', border: '1px solid rgba(26,86,219,.15)', fontSize: 13, color: 'var(--text-color)', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>
+                  {doc.summary}
+                </div>
+              </div>
+            )} */}
+
             {/* Hierarchy Tags */}
             {(doc.hierarchy?.act || doc.hierarchy?.chapter || doc.hierarchy?.section) && (
               <div style={{ marginBottom: 22 }}>
@@ -997,8 +1008,12 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
       fileName:        d.original_filename,
       fileSize:        d.file_size,
       desc:            rawDesc.replace(/\n?__PROVISIONS__:.+$/s, '').trim(),
+      // summary:         d.summary || '',
       amendmentProvisions,
       uploadedAt:      d.created_at?.split('T')[0] || '',
+      uploader:        (d.uploader_first_name || d.uploader_last_name)
+                          ? `${d.uploader_first_name || ''} ${d.uploader_last_name || ''}`.trim()
+                          : (d.uploader_username || ''),
       ocrStatus:       'completed',
       gazette:         d.gazette_reference || '',
       authority:       d.legal_authority || '',
@@ -1447,9 +1462,12 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
       })
       .filter(r => r.pdf_id !== null);
 
-    // For Amendment: auto-include hierarchy Act as parent_act if selected from API search
+    // For Amendment: auto-include hierarchy Act as parent_act if selected from API search.
+    // Dedup by (pdf_id, type) — not pdf_id alone — since the same target document can
+    // legitimately carry both an explicit relation (e.g. "In Continuation of") and the
+    // auto-derived parent_act relation at the same time.
     const hierarchyRel = (form.type === 'Amendment' && hierarchy.actId &&
-      !explicitRels.some(r => r.pdf_id === hierarchy.actId))
+      !explicitRels.some(r => r.pdf_id === hierarchy.actId && r.type === 'parent_act'))
       ? [{ pdf_id: hierarchy.actId, type: 'parent_act' }]
       : [];
 
@@ -1457,7 +1475,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     const authorityRels = form.type !== 'Act'
       ? legalAuthorities
           .filter(a => a.actId)
-          .filter(a => !explicitRels.some(r => r.pdf_id === a.actId) && !hierarchyRel.some(r => r.pdf_id === a.actId))
+          .filter(a => !explicitRels.some(r => r.pdf_id === a.actId && r.type === 'issued_under') && !hierarchyRel.some(r => r.pdf_id === a.actId))
           .map(a => ({ pdf_id: a.actId, type: 'issued_under' }))
       : [];
 
@@ -3241,16 +3259,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                           <td style={{ padding: '8px 12px', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.version_no || '—'}</td>
                           <td style={{ padding: '8px 12px', color: 'var(--text-color-secondary)', textTransform: 'capitalize' }}>{{ approved: t('common.statusWordApproved'), pending: t('common.statusWordPending'), rejected: t('common.statusWordRejected') }[d.status] || d.status || '—'}</td>
                           <td style={{ padding: '8px 12px' }}>
-                            <button type="button" onClick={() => setViewingActChildDoc({
-                                id:      d.id,
-                                title:   d.document_name || t('toasts.documentFallback'),
-                                type:    d.document_type_name || form.type,
-                                dept:    d.department_name || '',
-                                year:    d.issue_date ? d.issue_date.split('-')[0] : (d.created_at ? new Date(d.created_at).getFullYear() : '—'),
-                                version: d.version_no || '1.0',
-                                status:  d.status || 'pending',
-                                desc:    '',
-                              })}
+                            <button type="button" onClick={() => setViewingActChildDoc(mapApiDoc(d))}
                               disabled={!d.id}
                               style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 600, cursor: d.id ? 'pointer' : 'not-allowed', fontFamily: 'var(--font)', opacity: d.id ? 1 : 0.5 }}>
                               <Eye size={12} /> {t('common.view')}
@@ -3307,16 +3316,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                         <td style={{ padding: '8px 12px', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.version_no || '—'}</td>
                         <td style={{ padding: '8px 12px', color: 'var(--text-color-secondary)', textTransform: 'capitalize' }}>{{ approved: t('common.statusWordApproved'), pending: t('common.statusWordPending'), rejected: t('common.statusWordRejected') }[d.status] || d.status || '—'}</td>
                         <td style={{ padding: '8px 12px' }}>
-                          <button type="button" onClick={() => setViewingActChildDoc({
-                              id:      d.id,
-                              title:   d.document_name || t('toasts.documentFallback'),
-                              type:    d.document_type_name || 'Act',
-                              dept:    d.department_name || '',
-                              year:    d.issue_date ? d.issue_date.split('-')[0] : (d.created_at ? new Date(d.created_at).getFullYear() : '—'),
-                              version: d.version_no || '1.0',
-                              status:  d.status || 'pending',
-                              desc:    '',
-                            })}
+                          <button type="button" onClick={() => setViewingActChildDoc(mapApiDoc(d))}
                             disabled={!d.id}
                             style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 600, cursor: d.id ? 'pointer' : 'not-allowed', fontFamily: 'var(--font)', opacity: d.id ? 1 : 0.5 }}>
                             <Eye size={12} /> {t('common.view')}

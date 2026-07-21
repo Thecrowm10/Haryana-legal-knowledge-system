@@ -160,6 +160,8 @@
   "docViewModal": {
     "gazetteRef": "Gazette Ref.",
     "legalAuthority": "Legal Authority",
+    "uploader": "Uploader",
+    "summary": "Summary",
     "uploadDate": "Upload Date",
     "file": "File",
     "documentPreview": "Document Preview",

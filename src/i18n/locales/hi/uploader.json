@@ -160,6 +160,8 @@
   "docViewModal": {
     "gazetteRef": "राजपत्र संदर्भ",
     "legalAuthority": "विधिक प्राधिकरण",
+    "uploader": "अपलोडकर्ता",
+    "summary": "सारांश",
     "uploadDate": "अपलोड तिथि",
     "file": "फ़ाइल",
     "documentPreview": "दस्तावेज़ पूर्वावलोकन",
