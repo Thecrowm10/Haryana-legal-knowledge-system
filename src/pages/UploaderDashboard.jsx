@@ -1129,12 +1129,12 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   const [editSaving, setEditSaving]   = useState(false);
   const [editError, setEditError]     = useState('');
 
-  // Fetch the documents of the chosen type in the uploader's department once a type is picked
-  useEffect(() => {
-    if (activePage !== 'editdocument' || !editType) return;
-    if (!localStorage.getItem('token')) return;
+  // Loads (or reloads) the current type's document table from the API.
+  // Shared by the effect below and by saveEditDoc so the table reflects an edit immediately.
+  function refreshEditList() {
+    if (!editType) return;
     const typeId = typesData.find(d => d.name === editType)?.id;
-    if (!typeId) { setEditList([]); return; }
+    if (!typeId) { setEditList([]); return () => {}; }
     let cancelled = false;
     setEditListLoading(true);
     setEditListError('');
@@ -1152,6 +1152,13 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
       })
       .finally(() => { if (!cancelled) setEditListLoading(false); });
     return () => { cancelled = true; };
+  }
+
+  // Fetch the documents of the chosen type in the uploader's department once a type is picked
+  useEffect(() => {
+    if (activePage !== 'editdocument' || !editType) return;
+    if (!localStorage.getItem('token')) return;
+    return refreshEditList();
   }, [activePage, editType, typesData]);
 
   function openEditDoc(doc) {
@@ -1222,6 +1229,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
       await updatePdfMetadata(editingDoc.id, payload);
       showToast('success', t('editDocument.updateSuccess', { name: editForm.document_name }));
       closeEditDoc();
+      refreshEditList();
       setMyDocsLoading(true);
       getMyDocuments()
         .then(r => setUploads((r.data.documents || []).map(mapApiDoc)))
@@ -2024,14 +2032,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         {/* Full-screen document viewer */}
         {viewDoc && <DocViewModal doc={viewDoc} onClose={() => setViewDoc(null)} />}
 
-        {/* API loading / error */}
-        {myDocsLoading && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {[1, 2, 3].map(i => (
-              <div key={i} style={{ height: 52, borderRadius: 10, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', animation: 'pulse 1.4s ease-in-out infinite', opacity: 1 - i * 0.15 }} />
-            ))}
-          </div>
-        )}
+        {/* API error */}
         {myDocsError && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderRadius: 10, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', color: '#dc2626' }}>
             <AlertCircle size={15} style={{ flexShrink: 0 }} />
@@ -2043,7 +2044,15 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
           </div>
         )}
 
-        {/* Stats row */}
+        {/* Stats + table . */}
+        {myDocsLoading && uploads.length === 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {[1, 2, 3].map(i => (
+              <div key={i} style={{ height: 52, borderRadius: 10, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', animation: 'pulse 1.4s ease-in-out infinite', opacity: 1 - i * 0.15 }} />
+            ))}
+          </div>
+        ) : (
+        <>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
           {[
             { label: t('stats.totalUploads'),  value: uploads.length, bg: 'rgba(26,86,219,.12)',  color: 'var(--primary)', icon: FileText,    filter: 'all' },
@@ -2384,6 +2393,8 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         </div>
           );
         })()}
+        </>
+        )}
 
         {/* ── Linked Documents section ── */}
         {linkedDocs.length > 0 && (
@@ -2496,7 +2507,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   // Edit Document page: pick a type → table of that type's docs → edit form
   if (activePage === 'editdocument') {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease', justifyContent: editType ? 'flex-start' : 'center', minHeight: editType ? 'auto' : 'calc(100vh - 220px)' }}>
         <Toast toast={toast} onClose={() => setToast(null)} />
 
         {!editType ? (
