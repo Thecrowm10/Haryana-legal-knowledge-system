@@ -5,6 +5,7 @@ import {
   RotateCcw, AlertCircle, Eye, GitBranch, Plus,
   Layers, ChevronRight, AlertTriangle, CheckSquare, Square,
   Edit3, Tag, Search, MessageSquare, MessageCircle, ZoomIn, ZoomOut, RotateCw, ExternalLink,
+  Save, ArrowLeft,
 } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
@@ -15,7 +16,7 @@ import Badge from '../components/ui/Badge';
 import SelectField from '../components/ui/SelectField';
 import { useAuth } from '../hooks/useAuth';
 import { getDepartments, getDocumentTypes } from '../services/departments';
-import { uploadPdfFile, uploadPdfMetadata, getMyDocuments, searchDocuments, getPdfFile, checkDuplicateDocument, linkDocumentToDepartment, getLinkedDocuments, getActChildren, getMyDepartmentActs } from '../services/pdf';
+import { uploadPdfFile, uploadPdfMetadata, updatePdfMetadata, getMyDocuments, searchDocuments, getPdfFile, checkDuplicateDocument, linkDocumentToDepartment, getLinkedDocuments, getActChildren, getMyDepartmentActs } from '../services/pdf';
 import { createNotification } from '../services/notifications';
 
 // Constants
@@ -117,6 +118,45 @@ const TYPE_FIELDS = {
   'Order/Gazette': [], // handled inline
   'Bye Laws': [], // handled inline
   'Miscellaneous': [], // handled inline
+};
+
+// camelCase field key → Title Case label, e.g. 'noOfRules' → 'No Of Rules'
+function fieldLabel(k) {
+  return k.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase()).trim();
+}
+
+// Extra type-specific fields shown in the Edit Document form, per document type.
+// Keys mirror the typeFields naming already used by mapApiDoc/DocViewModal.
+const EDIT_TYPE_FIELD_KEYS = {
+  'Act': [
+    { key: 'actYear', inputType: 'number' },
+    { key: 'longTitle', inputType: 'text' },
+    { key: 'regionalTitle', inputType: 'text' },
+    { key: 'notificationNo', inputType: 'text' },
+    { key: 'actCode', inputType: 'text' },
+    { key: 'soReason', inputType: 'text' },
+    { key: 'noOfRules', inputType: 'number' },
+    { key: 'noOfNotifications', inputType: 'number' },
+    { key: 'noOfRegulations', inputType: 'number' },
+    { key: 'noOfCirculars', inputType: 'number' },
+    { key: 'noOfStatutes', inputType: 'number' },
+    { key: 'noOfOrdinances', inputType: 'number' },
+    { key: 'noOfOrders', inputType: 'number' },
+    { key: 'keywords', inputType: 'text' },
+    { key: 'repealed', inputType: 'checkbox' },
+  ],
+  'Amendment': [],
+  'Circular': [{ key: 'validity', inputType: 'date' }],
+  'Notification': [],
+  'Order/Gazette': [],
+  'Policy': [
+    { key: 'sector', inputType: 'text' },
+    { key: 'implementingAgency', inputType: 'text' },
+    { key: 'reviewDate', inputType: 'date' },
+  ],
+  'Rules & Regulations': [{ key: 'ruleAuthority', inputType: 'text' }],
+  'Bye Laws': [{ key: 'ruleAuthority', inputType: 'text' }],
+  'Miscellaneous': [{ key: 'validity', inputType: 'date' }],
 };
 
 // Workflow statuses: DRAFT → PENDING_REVIEW → PUBLISHED
@@ -536,7 +576,6 @@ function DocViewModal({ doc, onClose }) {
   const typeExtra = doc.typeFields
     ? Object.entries(doc.typeFields).filter(([k, v]) => v && !TYPEEXTRA_SKIP.has(k))
     : [];
-  const fieldLabel = k => k.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase()).trim();
 
   const statusAccent = doc.status === 'approved' ? '#16a34a' : doc.status === 'rejected' ? '#ef4444' : '#f59e0b';
   const statusBg     = doc.status === 'approved' ? 'rgba(34,197,94,.1)'  : doc.status === 'rejected' ? 'rgba(239,68,68,.1)'  : 'rgba(245,158,11,.1)';
@@ -1062,7 +1101,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   }
 
   useEffect(() => {
-    if (activePage !== 'myuploads') return;
+    if (activePage !== 'myuploads' && activePage !== 'editdocument') return;
     if (!localStorage.getItem('token')) return;
     setMyDocsLoading(true);
     setMyDocsError('');
@@ -1077,6 +1116,89 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
       })
       .finally(() => setMyDocsLoading(false));
   }, [activePage]);
+
+  // Edit Document page: pick a type → table of that type's docs → edit form for one doc
+  const [editType, setEditType]       = useState(null);
+  const [editingDoc, setEditingDoc]   = useState(null);
+  const [editForm, setEditForm]       = useState(null);
+  const [editSaving, setEditSaving]   = useState(false);
+  const [editError, setEditError]     = useState('');
+
+  function openEditDoc(doc) {
+    setEditingDoc(doc);
+    setEditForm({
+      document_name:     doc.title || '',
+      reference_number:  doc.referenceNumber || '',
+      issue_date:        doc.enactmentDate || '',
+      effective_from:    doc.effectiveFrom || '',
+      gazette_reference: doc.gazette || '',
+      legal_authority:   doc.authority || '',
+      short_title:       doc.shortTitle || '',
+      version_no:        doc.version || '1.0',
+      description:       doc.desc || '',
+      typeFields:        { ...(doc.typeFields || {}) },
+    });
+    setEditError('');
+  }
+
+  function closeEditDoc() {
+    setEditingDoc(null);
+    setEditForm(null);
+    setEditError('');
+  }
+
+  async function saveEditDoc() {
+    if (!editingDoc || !editForm) return;
+    setEditSaving(true);
+    setEditError('');
+    const tf = editForm.typeFields || {};
+    const payload = {
+      document_name:         editForm.document_name,
+      reference_number:      editForm.reference_number,
+      issue_date:             editForm.issue_date || null,
+      effective_from:         editForm.effective_from || null,
+      gazette_reference:      editForm.gazette_reference,
+      legal_authority:        editForm.legal_authority,
+      short_title:            editForm.short_title,
+      version_no:             editForm.version_no || '1.0',
+      description:            editForm.description,
+      valid_until:            tf.validity || null,
+      sector_domain:          tf.sector || '',
+      implementing_agency:    tf.implementingAgency || '',
+      next_review_date:       tf.reviewDate || null,
+      rule_making_authority:  tf.ruleAuthority || '',
+      act_year:               tf.actYear ? parseInt(tf.actYear, 10) || null : null,
+      long_title:             tf.longTitle || '',
+      regional_title:         tf.regionalTitle || '',
+      notification_no:        tf.notificationNo || '',
+      act_code:                tf.actCode || '',
+      so_reason:               tf.soReason || '',
+      no_of_rules:             tf.noOfRules ? parseInt(tf.noOfRules, 10) || null : null,
+      no_of_notifications:     tf.noOfNotifications ? parseInt(tf.noOfNotifications, 10) || null : null,
+      no_of_regulations:       tf.noOfRegulations ? parseInt(tf.noOfRegulations, 10) || null : null,
+      no_of_circulars:         tf.noOfCirculars ? parseInt(tf.noOfCirculars, 10) || null : null,
+      no_of_statutes:          tf.noOfStatutes ? parseInt(tf.noOfStatutes, 10) || null : null,
+      no_of_ordinances:        tf.noOfOrdinances ? parseInt(tf.noOfOrdinances, 10) || null : null,
+      no_of_orders:            tf.noOfOrders ? parseInt(tf.noOfOrders, 10) || null : null,
+      keywords:                tf.keywords || '',
+      is_repealed:             !!tf.repealed,
+    };
+    try {
+      await updatePdfMetadata(editingDoc.id, payload);
+      showToast('success', t('editDocument.updateSuccess', { name: editForm.document_name }));
+      closeEditDoc();
+      setMyDocsLoading(true);
+      getMyDocuments()
+        .then(r => setUploads((r.data.documents || []).map(mapApiDoc)))
+        .catch(() => {})
+        .finally(() => setMyDocsLoading(false));
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      setEditError(typeof detail === 'string' ? detail : t('editDocument.updateFailed'));
+    } finally {
+      setEditSaving(false);
+    }
+  }
 
   const [files, setFiles]           = useState([]);
   const [dragOver, setDragOver]     = useState(false);
@@ -2286,6 +2408,253 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
       {viewingLinkedDoc && (
         <DocViewModal doc={viewingLinkedDoc} onClose={() => setViewingLinkedDoc(null)} />
       )}
+      </div>
+    );
+  }
+
+  // Edit Document page: pick a type → table of that type's docs → edit form
+  if (activePage === 'editdocument') {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
+        <Toast toast={toast} onClose={() => setToast(null)} />
+
+        {!editType ? (
+          <Card padding="28px 26px">
+            <div style={{ maxWidth: 1180, margin: '0 auto' }}>
+              <div style={{ textAlign: 'center', marginBottom: 32 }}>
+                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-heading)', marginBottom: 8 }}>{t('editDocument.pickTypeHeading')}</div>
+                <div style={{ fontSize: 13.5, color: 'var(--text-color-secondary)' }}>{t('editDocument.pickTypeSubheading')}</div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(240px, 1fr))', gap: 20 }}>
+                {TYPES.map(type => {
+                  const c = TYPE_CARD_COLORS[type] || { bg: 'rgba(148,163,184,.08)', accent: '#94a3b8', text: '#64748b' };
+                  return (
+                    <button key={type} type="button"
+                        onClick={() => setEditType(type)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 16,
+                          padding: '22px 20px', borderRadius: 14, textAlign: 'left',
+                          border: `1.5px solid ${c.accent}30`,
+                          background: 'var(--surface-card)',
+                          cursor: 'pointer', transition: 'all .15s', fontFamily: 'var(--font)',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = c.bg; e.currentTarget.style.borderColor = c.accent + '55'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'var(--surface-card)'; e.currentTarget.style.borderColor = c.accent + '30'; }}>
+                        <div style={{ width: 46, height: 46, borderRadius: 11, background: c.bg, border: `1px solid ${c.accent}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <FileText size={21} color={c.accent} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', lineHeight: 1.3 }}>{DOC_TYPE_KEY[type] ? t(`docTypes.${DOC_TYPE_KEY[type]}`) : type}</div>
+                          <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', lineHeight: 1.45, marginTop: 3 }}>{DOC_TYPE_KEY[type] ? t(`docTypeDesc.${DOC_TYPE_KEY[type]}`) : TYPE_CARD_DESC[type]}</div>
+                        </div>
+                      </button>
+                  );
+                })}
+              </div>
+            </div>
+          </Card>
+        ) : (
+          <Card>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, paddingBottom: 14, borderBottom: '1px solid var(--surface-border)' }}>
+              <button type="button" onClick={() => setEditType(null)}
+                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+                <ArrowLeft size={13} /> {t('editDocument.back')}
+              </button>
+              <div style={{ width: 28, height: 28, borderRadius: 7, background: 'var(--surface-ground)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Edit3 size={13} color="var(--primary)" />
+              </div>
+              <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>
+                {t('editDocument.tableHeading', { type: DOC_TYPE_KEY[editType] ? t(`docTypes.${DOC_TYPE_KEY[editType]}`) : editType })}
+              </span>
+            </div>
+            {myDocsLoading ? (
+              <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', padding: '10px 0' }}>{t('common.loading')}</div>
+            ) : (() => {
+              const list = uploads.filter(d => d.type === editType);
+              return (
+                <div style={{ border: '1px solid var(--surface-border)', borderRadius: 10, overflow: 'hidden' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                    <thead>
+                      <tr style={{ background: 'var(--surface-ground)' }}>
+                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('wizard.step3.colDocumentName')}</th>
+                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.referenceNo')}</th>
+                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.issueDate')}</th>
+                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.department')}</th>
+                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.version')}</th>
+                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.status')}</th>
+                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('editDocument.action')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {list.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} style={{ padding: '16px 12px', textAlign: 'center', color: 'var(--text-color-secondary)' }}>
+                            {t('editDocument.noDocsOfType', { type: DOC_TYPE_KEY[editType] ? t(`docTypes.${DOC_TYPE_KEY[editType]}`) : editType })}
+                          </td>
+                        </tr>
+                      ) : list.map(d => {
+                        const editable = d.status !== 'approved';
+                        return (
+                          <tr key={d.id} style={{ borderTop: '1px solid var(--surface-border)' }}>
+                            <td style={{ padding: '8px 12px', color: 'var(--text-heading)', fontWeight: 600 }}>{d.title || '—'}</td>
+                            <td style={{ padding: '8px 12px', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.referenceNumber || '—'}</td>
+                            <td style={{ padding: '8px 12px', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.enactmentDate || '—'}</td>
+                            <td style={{ padding: '8px 12px', color: 'var(--text-color-secondary)' }}>{d.dept || '—'}</td>
+                            <td style={{ padding: '8px 12px', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.version || '—'}</td>
+                            <td style={{ padding: '8px 12px', color: 'var(--text-color-secondary)', textTransform: 'capitalize' }}>
+                              {{ approved: t('common.statusWordApproved'), pending: t('common.statusWordPending'), rejected: t('common.statusWordRejected') }[d.status] || d.status || '—'}
+                            </td>
+                            <td style={{ padding: '8px 12px' }}>
+                              {editable ? (
+                                <button type="button" onClick={() => openEditDoc(d)}
+                                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                                  <Edit3 size={12} /> {t('editDocument.editButton')}
+                                </button>
+                              ) : (
+                                <span title={t('editDocument.lockedHint')}
+                                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 11.5, fontWeight: 600, fontFamily: 'var(--font)', opacity: 0.7 }}>
+                                  {t('editDocument.locked')}
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
+          </Card>
+        )}
+
+        {/* Edit form drawer */}
+        {editingDoc && editForm && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 1500, display: 'flex', justifyContent: 'flex-end' }} onClick={closeEditDoc}>
+            <div style={{ width: 520, maxWidth: '100%', height: '100%', background: 'var(--surface-card)', boxShadow: '-8px 0 32px rgba(0,0,0,.18)', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+              <div style={{ padding: '18px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t('editDocument.editHeading')}</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{editingDoc.title}</div>
+                </div>
+                <button type="button" onClick={closeEditDoc}
+                  style={{ width: 30, height: 30, borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-color-secondary)', flexShrink: 0 }}>
+                  <X size={14} />
+                </button>
+              </div>
+
+              <div style={{ flex: 1, overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {editError && (
+                  <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', color: '#dc2626', fontSize: 12.5 }}>
+                    {editError}
+                  </div>
+                )}
+
+                <div>
+                  <div style={{ ...LABEL, marginBottom: 6 }}>{t('editDocument.documentName')} <span style={{ color: '#ef4444' }}>*</span></div>
+                  <input value={editForm.document_name}
+                    onChange={e => setEditForm(f => ({ ...f, document_name: e.target.value }))}
+                    style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                </div>
+
+                <div>
+                  <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.referenceNo')}</div>
+                  <input value={editForm.reference_number}
+                    onChange={e => setEditForm(f => ({ ...f, reference_number: e.target.value }))}
+                    style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')}</div>
+                    <input type="date" value={editForm.issue_date || ''}
+                      onChange={e => setEditForm(f => ({ ...f, issue_date: e.target.value }))}
+                      style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  </div>
+                  <div>
+                    <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.effectiveFrom')}</div>
+                    <input type="date" value={editForm.effective_from || ''}
+                      onChange={e => setEditForm(f => ({ ...f, effective_from: e.target.value }))}
+                      style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.gazetteReference')}</div>
+                  <input value={editForm.gazette_reference}
+                    onChange={e => setEditForm(f => ({ ...f, gazette_reference: e.target.value }))}
+                    style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                </div>
+
+                <div>
+                  <div style={{ ...LABEL, marginBottom: 6 }}>{t('docViewModal.legalAuthority')}</div>
+                  <input value={editForm.legal_authority}
+                    onChange={e => setEditForm(f => ({ ...f, legal_authority: e.target.value }))}
+                    style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <div style={{ ...LABEL, marginBottom: 6 }}>{t('editDocument.shortTitle')}</div>
+                    <input value={editForm.short_title}
+                      onChange={e => setEditForm(f => ({ ...f, short_title: e.target.value }))}
+                      style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  </div>
+                  <div>
+                    <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.version')}</div>
+                    <input value={editForm.version_no}
+                      onChange={e => setEditForm(f => ({ ...f, version_no: e.target.value }))}
+                      style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.description')}</div>
+                  <textarea value={editForm.description} rows={5}
+                    onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+                    style={{ ...INPUT_BASE, resize: 'vertical', fontFamily: 'var(--font)' }} onFocus={focusStyle} onBlur={blurStyle} />
+                </div>
+
+                {(EDIT_TYPE_FIELD_KEYS[editingDoc.type] || []).length > 0 && (
+                  <div>
+                    <div style={{ ...LABEL, marginBottom: 10 }}>{t('editDocument.typeSpecificFields')}</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      {EDIT_TYPE_FIELD_KEYS[editingDoc.type].map(({ key, inputType }) => (
+                        <div key={key}>
+                          {inputType === 'checkbox' ? (
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--text-color)', cursor: 'pointer' }}>
+                              <input type="checkbox" checked={!!editForm.typeFields[key]}
+                                onChange={e => setEditForm(f => ({ ...f, typeFields: { ...f.typeFields, [key]: e.target.checked } }))} />
+                              {fieldLabel(key)}
+                            </label>
+                          ) : (
+                            <>
+                              <div style={{ ...LABEL, marginBottom: 6 }}>{fieldLabel(key)}</div>
+                              <input type={inputType} value={editForm.typeFields[key] || ''}
+                                onChange={e => setEditForm(f => ({ ...f, typeFields: { ...f.typeFields, [key]: e.target.value } }))}
+                                style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ padding: '16px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end', gap: 10, flexShrink: 0 }}>
+                <button type="button" onClick={closeEditDoc}
+                  style={{ padding: '9px 18px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'transparent', color: 'var(--text-color-secondary)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                  {t('common.cancel')}
+                </button>
+                <button type="button" onClick={saveEditDoc} disabled={editSaving}
+                  style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 20px', borderRadius: 8, border: 'none', background: editSaving ? 'rgba(26,86,219,.5)' : 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: editSaving ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)' }}>
+                  <Save size={14} /> {editSaving ? t('editDocument.saving') : t('editDocument.saveChanges')}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }

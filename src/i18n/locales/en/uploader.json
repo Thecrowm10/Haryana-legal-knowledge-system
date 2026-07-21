@@ -190,6 +190,25 @@
     "amendedDefault": "Amended",
     "parentAct": "Parent Act"
   },
+  "editDocument": {
+    "pickTypeHeading": "Select Document Type to Edit",
+    "pickTypeSubheading": "Choose the type of document whose details you want to update",
+    "tableHeading": "{{type}} Documents",
+    "noDocsOfType": "No {{type}} documents found to edit.",
+    "back": "Back",
+    "action": "Action",
+    "editButton": "Edit",
+    "locked": "Locked",
+    "lockedHint": "Approved documents can't be edited directly",
+    "editHeading": "Edit Document Details",
+    "documentName": "Document Name",
+    "shortTitle": "Short Title",
+    "typeSpecificFields": "Type-Specific Fields",
+    "saveChanges": "Save Changes",
+    "saving": "Saving…",
+    "updateSuccess": "\"{{name}}\" updated successfully",
+    "updateFailed": "Failed to update document"
+  },
   "wizard": {
     "step1": {
       "heading": "Document Type",

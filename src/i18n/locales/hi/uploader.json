@@ -190,6 +190,25 @@
     "amendedDefault": "संशोधित",
     "parentAct": "मूल अधिनियम"
   },
+  "editDocument": {
+    "pickTypeHeading": "संपादित करने हेतु दस्तावेज़ प्रकार चुनें",
+    "pickTypeSubheading": "उस दस्तावेज़ प्रकार को चुनें जिसका विवरण आप अपडेट करना चाहते हैं",
+    "tableHeading": "{{type}} दस्तावेज़",
+    "noDocsOfType": "संपादित करने के लिए कोई {{type}} दस्तावेज़ नहीं मिला।",
+    "back": "वापस",
+    "action": "कार्रवाई",
+    "editButton": "संपादित करें",
+    "locked": "लॉक्ड",
+    "lockedHint": "स्वीकृत दस्तावेज़ सीधे संपादित नहीं किए जा सकते",
+    "editHeading": "दस्तावेज़ विवरण संपादित करें",
+    "documentName": "दस्तावेज़ का नाम",
+    "shortTitle": "संक्षिप्त शीर्षक",
+    "typeSpecificFields": "प्रकार-विशिष्ट फ़ील्ड",
+    "saveChanges": "परिवर्तन सहेजें",
+    "saving": "सहेजा जा रहा है…",
+    "updateSuccess": "\"{{name}}\" सफलतापूर्वक अपडेट किया गया",
+    "updateFailed": "दस्तावेज़ अपडेट करने में विफल"
+  },
   "wizard": {
     "step1": {
       "heading": "दस्तावेज़ प्रकार",

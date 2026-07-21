@@ -28,6 +28,7 @@ const ROLE_META = {
 
 const BREADCRUMBS = {
   upload: ['topbar.crumbs.documents', 'topbar.crumbs.upload'], myuploads: ['topbar.crumbs.documents', 'topbar.crumbs.myUploads'],
+  editdocument: ['topbar.crumbs.documents', 'topbar.crumbs.editDocument'],
   pending: ['topbar.crumbs.review', 'topbar.crumbs.pendingApprovals'], reviewed: ['topbar.crumbs.review', 'topbar.crumbs.reviewed'],
   analytics: ['topbar.crumbs.analytics', 'topbar.crumbs.dashboard'], graph: ['topbar.crumbs.analytics', 'topbar.crumbs.knowledgeGraph'], audit: ['topbar.crumbs.analytics', 'topbar.crumbs.misReport'],
   users: ['topbar.crumbs.admin', 'topbar.crumbs.userManagement'], logs: ['topbar.crumbs.admin', 'topbar.crumbs.systemLogs'],

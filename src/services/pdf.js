@@ -8,6 +8,9 @@ export const verifyAdminOtp        = (mobile_number, otp) => api.post('/admin/au
 // Content-Type is left unset — axios/the browser auto-generates it with the
 export const uploadPdfFile     = (formData) => api.post('/pdf/upload-file', formData);
 export const uploadPdfMetadata = (data)     => api.post('/pdf/upload', data);
+// NOTE: assumes a REST-style update endpoint (PUT /pdf/{id}) mirroring the upload payload shape.
+// Confirm the actual path/method with the backend team and adjust here if it differs.
+export const updatePdfMetadata = (id, data) => api.put(`/pdf/${id}`, data);
 export const getMyDocuments    = ()         => api.get('/pdf/my-documents');
 export const searchDocuments      = (document_type, q, limit = 20) => api.get('/pdf/search-documents', { params: { document_type, q, limit } });
 export const fullTextSearch       = (q, skip = 0, limit = 50)      => publicApi.get('/pdf/search', { params: { q, skip, limit } });
