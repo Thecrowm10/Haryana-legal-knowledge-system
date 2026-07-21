@@ -5,7 +5,7 @@ import {
   RotateCcw, AlertCircle, Eye, GitBranch, Plus,
   Layers, ChevronRight, AlertTriangle, CheckSquare, Square,
   Edit3, Tag, Search, MessageSquare, MessageCircle, ZoomIn, ZoomOut, RotateCw, ExternalLink,
-  Save, ArrowLeft,
+  Save,
 } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
@@ -1300,6 +1300,30 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   const [sortCol,     setSortCol]     = useState('uploadedAt');
   const [sortDir,     setSortDir]     = useState('desc');
 
+  // Each of the 3 sidebar pages resets to its starting state on every fresh visit —
+  // clicking a sidebar item never resumes wherever the page was left mid-session.
+  useEffect(() => {
+    if (activePage === 'upload') resetUploadForm();
+  }, [activePage]);
+
+  useEffect(() => {
+    if (activePage === 'myuploads') {
+      setTableSearch('');
+      setFilterType('');
+      setFilterStatus('');
+      setSortCol('uploadedAt');
+      setSortDir('desc');
+      setSelectedIds(new Set());
+      setBulkSelectMode(false);
+      setBulkEditOpen(false);
+      setBulkFields({ dept: '', type: '', year: '' });
+    }
+  }, [activePage]);
+
+  useEffect(() => {
+    if (activePage === 'editdocument') setEditType(null);
+  }, [activePage]);
+
   const inputRef     = useRef();
   const uploadsTableRef = useRef();
   const uploadSectionRef  = useRef(null);
@@ -1505,6 +1529,21 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     }, 1800);
 
     onAuditLog?.(`Uploaded ${docsWithWorkflow.length} document(s): ${docsWithWorkflow.map(d => d.title).join(', ')}`);
+  }
+
+  // Full reset of the upload wizard back to its starting (no type chosen) state.
+  function resetUploadForm() {
+    setForm({ act: '', dept: user?.dept || '', type: '', version: '1.0', desc: '', enactmentDate: '', parentAct: '', changeTypes: [] });
+    setFiles([]); setFileRefs([]); setFileMeta({});
+    setRelations([]);
+    setHierarchy({ act: '', chapter: '', section: '', subsection: '' });
+    setLegalAuthorities([{ act: '', sections: [''] }]);
+    setAmendmentProvisions([]);
+    setParentActSearch('');
+    setRelNote('');
+    setTypeFields({});
+    setUploadStep(null);
+    setUploadError('');
   }
 
   // Runs the OCR eligibility check (POST /pdf/upload-file) for any files not yet checked.
@@ -2448,6 +2487,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         <Toast toast={toast} onClose={() => setToast(null)} />
 
         {!editType ? (
+          /* Starting state — big centered type picker, identical to the Upload wizard's Step 1 */
           <Card padding="28px 26px">
             <div style={{ maxWidth: 1180, margin: '0 auto' }}>
               <div style={{ textAlign: 'center', marginBottom: 32 }}>
@@ -2483,12 +2523,41 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
             </div>
           </Card>
         ) : (
+          <>
+          {/* Once a type is picked, it moves to the compact pill row at the top — same style as the Upload wizard's compact header */}
+          <Card padding="18px 22px">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{ ...LABEL, fontSize: 11.5, color: 'var(--text-heading)', flexShrink: 0 }}>{t('wizard.step1.label')}</div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flex: 1 }}>
+                {TYPES.map(type => {
+                  const c = TYPE_CARD_COLORS[type] || { bg: 'rgba(148,163,184,.08)', accent: '#94a3b8', text: '#64748b' };
+                  const active = editType === type;
+                  return (
+                    <button key={type} type="button"
+                        onClick={() => setEditType(type)}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 8,
+                          padding: '9px 14px', borderRadius: 10,
+                          border: active ? `1.5px solid ${c.accent}` : `1.5px solid ${c.accent}30`,
+                          background: active ? c.bg : 'var(--surface-card)',
+                          opacity: active ? 1 : 0.72,
+                          boxShadow: active ? `0 0 0 3px ${c.accent}15` : 'none',
+                          cursor: 'pointer', transition: 'all .15s', fontFamily: 'var(--font)',
+                        }}
+                        onMouseEnter={e => { if (!active) { e.currentTarget.style.opacity = 1; e.currentTarget.style.borderColor = c.accent + '60'; }}}
+                        onMouseLeave={e => { if (!active) { e.currentTarget.style.opacity = 0.72; e.currentTarget.style.borderColor = c.accent + '30'; }}}>
+                        <FileText size={14} color={c.accent} />
+                        <span style={{ fontSize: 12.5, fontWeight: active ? 700 : 600, color: active ? c.text : 'var(--text-heading)', whiteSpace: 'nowrap' }}>{DOC_TYPE_KEY[type] ? t(`docTypes.${DOC_TYPE_KEY[type]}`) : type}</span>
+                        {active && <CheckCircle size={13} color={c.accent} />}
+                      </button>
+                  );
+                })}
+              </div>
+            </div>
+          </Card>
+
           <Card>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, paddingBottom: 14, borderBottom: '1px solid var(--surface-border)' }}>
-              <button type="button" onClick={() => setEditType(null)}
-                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
-                <ArrowLeft size={13} /> {t('editDocument.back')}
-              </button>
               <div style={{ width: 28, height: 28, borderRadius: 7, background: 'var(--surface-ground)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <Edit3 size={13} color="var(--primary)" />
               </div>
@@ -2564,6 +2633,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
               </div>
             )}
           </Card>
+          </>
         )}
 
         {viewingEditDoc && (
@@ -3598,7 +3668,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--surface-border)' }}>
             <button type="button"
-              onClick={() => { setForm({ act:'',dept:user?.dept||'',type:'',version:'1.0',desc:'',enactmentDate:'',parentAct:'',changeTypes:[] }); setFiles([]); setFileRefs([]); setFileMeta({}); setRelations([]); setHierarchy({ act:'',chapter:'',section:'',subsection:'' }); setLegalAuthorities([{ act: '', sections: [''] }]); setAmendmentProvisions([]); setParentActSearch(''); setRelNote(''); setTypeFields({}); setUploadStep(null); setUploadError(''); }}
+              onClick={resetUploadForm}
               style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)', padding: '9px 22px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
               onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
               onMouseLeave={e => e.currentTarget.style.background = 'var(--surface-card)'}>
