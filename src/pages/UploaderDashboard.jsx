@@ -1039,6 +1039,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
       // fall back to the raw filename so search/sort (which call .toLowerCase() on these) never crash on null.
       title:           d.document_name || d.original_filename || t('common.untitledDocument'),
       type:            d.document_type_name || t('common.unclassified'),
+      docTypeId:       d.document_type_id ?? null,
       dept:            d.department_name || t('common.unassigned'),
       year:            d.issue_date ? new Date(d.issue_date).getFullYear() : new Date(d.created_at).getFullYear(),
       status:          d.status || 'pending',
@@ -1181,7 +1182,9 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     setEditSaving(true);
     setEditError('');
     const tf = editForm.typeFields || {};
+    const typeId = typesData.find(d => d.name === editingDoc.type)?.id ?? null;
     const payload = {
+      document_type_id:      typeId,
       document_name:         editForm.document_name,
       reference_number:      editForm.reference_number,
       issue_date:             editForm.issue_date || null,
@@ -1211,6 +1214,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
       no_of_orders:            tf.noOfOrders ? parseInt(tf.noOfOrders, 10) || null : null,
       keywords:                tf.keywords || '',
       is_repealed:             !!tf.repealed,
+      tag_ids:                 [],
     };
     try {
       await updatePdfMetadata(editingDoc.id, payload);
@@ -1223,7 +1227,14 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
         .finally(() => setMyDocsLoading(false));
     } catch (err) {
       const detail = err.response?.data?.detail;
-      setEditError(typeof detail === 'string' ? detail : t('editDocument.updateFailed'));
+      let message = t('editDocument.updateFailed');
+      if (typeof detail === 'string') {
+        message = detail;
+      } else if (Array.isArray(detail)) {
+        // FastAPI validation errors: [{ loc: ['body','field'], msg: '...' }, ...]
+        message = detail.map(e => `${(e.loc || []).slice(1).join('.')}: ${e.msg}`).join('; ') || message;
+      }
+      setEditError(message);
     } finally {
       setEditSaving(false);
     }
