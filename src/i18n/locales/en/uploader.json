@@ -174,7 +174,19 @@
     "documentRejected": "Document Rejected",
     "pendingReview": "Pending Review",
     "highlights": "Highlights ({{count}})",
-    "noComment": "No comment"
+    "noComment": "No comment",
+    "typeSpecificFields": "Type-Specific Fields",
+    "hierarchyTags": "Hierarchy Tags",
+    "legalAuthorities": "Legal Authorities",
+    "relationships": "Relationships · {{count}}",
+    "pendingSuffix": "PENDING",
+    "amendmentProvisions": "Amendment Provisions",
+    "sectionLabel": "Section {{section}}",
+    "chapterSuffix": "Ch. {{chapter}}",
+    "before": "Before: {{value}}",
+    "after": "After: {{value}}",
+    "amendedDefault": "Amended",
+    "parentAct": "Parent Act"
   },
   "wizard": {
     "step1": {
@@ -215,7 +227,9 @@
       "submitForApproval": "Submit for Approval",
       "existingDocsUnderAct": "Existing \"{{type}}\" Documents Under This Act",
       "noDocsUnderAct": "No \"{{type}}\" documents found under this Act.",
-      "colDocumentName": "Document Name"
+      "colDocumentName": "Document Name",
+      "existingActsInDept": "Acts Already Uploaded in Your Department",
+      "noActsInDept": "No Acts found in your department yet."
     },
     "fields": {
       "generic": {

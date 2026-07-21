@@ -15,7 +15,7 @@ import Badge from '../components/ui/Badge';
 import SelectField from '../components/ui/SelectField';
 import { useAuth } from '../hooks/useAuth';
 import { getDepartments, getDocumentTypes } from '../services/departments';
-import { uploadPdfFile, uploadPdfMetadata, getMyDocuments, searchDocuments, getPdfFile, checkDuplicateDocument, linkDocumentToDepartment, getLinkedDocuments, getActChildren } from '../services/pdf';
+import { uploadPdfFile, uploadPdfMetadata, getMyDocuments, searchDocuments, getPdfFile, checkDuplicateDocument, linkDocumentToDepartment, getLinkedDocuments, getActChildren, getMyDepartmentActs } from '../services/pdf';
 import { createNotification } from '../services/notifications';
 
 // Constants
@@ -525,6 +525,18 @@ function DocViewModal({ doc, onClose }) {
     [t('docViewModal.file'),       doc.fileName        || null],
   ].filter(([, v]) => v);
 
+  // Fields already shown in meta — exclude from typeExtra to avoid duplication
+  const TYPEEXTRA_SKIP = new Set([
+    'effectiveFrom', 'commencementDate',
+    'gazetteRef',
+    'actNumber', 'amendmentNumber', 'circularNumber',
+    'notificationNumber', 'orderNumber', 'policyNumber', 'ruleNumber',
+  ]);
+  const typeExtra = doc.typeFields
+    ? Object.entries(doc.typeFields).filter(([k, v]) => v && !TYPEEXTRA_SKIP.has(k))
+    : [];
+  const fieldLabel = k => k.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase()).trim();
+
   const statusAccent = doc.status === 'approved' ? '#16a34a' : doc.status === 'rejected' ? '#ef4444' : '#f59e0b';
   const statusBg     = doc.status === 'approved' ? 'rgba(34,197,94,.1)'  : doc.status === 'rejected' ? 'rgba(239,68,68,.1)'  : 'rgba(245,158,11,.1)';
   const StatusIconV  = doc.status === 'approved' ? CheckCircle : doc.status === 'rejected' ? XCircle : Clock;
@@ -730,12 +742,121 @@ function DocViewModal({ doc, onClose }) {
               </div>
             )}
 
+            {/* Type-Specific Fields */}
+            {typeExtra.length > 0 && (
+              <div style={{ marginBottom: 22 }}>
+                <div style={{ ...LS, marginBottom: 10 }}>{t('docViewModal.typeSpecificFields')}</div>
+                <div style={{ borderRadius: 10, border: '1px solid var(--surface-border)', overflow: 'hidden' }}>
+                  {typeExtra.map(([k, v], idx) => (
+                    <div key={k} style={{ display: 'flex', alignItems: 'flex-start', gap: 0, borderBottom: idx < typeExtra.length - 1 ? '1px solid var(--surface-border)' : 'none' }}>
+                      <div style={{ padding: '10px 14px', minWidth: 128, flexShrink: 0, background: 'var(--surface-50)', fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', fontWeight: 600, borderRight: '1px solid var(--surface-border)' }}>
+                        {fieldLabel(k)}
+                      </div>
+                      <div style={{ padding: '10px 14px', fontSize: 12.5, color: 'var(--text-heading)', fontWeight: 500, flex: 1, wordBreak: 'break-word' }}>
+                        {String(v)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Description */}
             {doc.desc && (
               <div style={{ marginBottom: 22 }}>
                 <div style={{ ...LS, marginBottom: 10 }}>{t('common.description')}</div>
                 <div style={{ padding: '14px 16px', borderRadius: 10, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', fontSize: 13, color: 'var(--text-color)', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>
                   {doc.desc}
+                </div>
+              </div>
+            )}
+
+            {/* Hierarchy Tags */}
+            {(doc.hierarchy?.act || doc.hierarchy?.chapter || doc.hierarchy?.section) && (
+              <div style={{ marginBottom: 22 }}>
+                <div style={{ ...LS, marginBottom: 10 }}>{t('docViewModal.hierarchyTags')}</div>
+                <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(26,86,219,.04)', border: '1px solid rgba(26,86,219,.15)', fontSize: 12, color: 'var(--text-color-secondary)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2, lineHeight: 1.8 }}>
+                  {doc.hierarchy.act && <span style={{ color: 'var(--primary)', fontWeight: 700 }}>{doc.hierarchy.act}</span>}
+                  {doc.hierarchy.chapter && (<><ChevronRight size={11} color="#94a3b8" style={{ flexShrink: 0 }} /><span>{doc.hierarchy.chapter}</span></>)}
+                  {doc.hierarchy.section && (<><ChevronRight size={11} color="#94a3b8" style={{ flexShrink: 0 }} /><span>{doc.hierarchy.section}</span></>)}
+                  {doc.hierarchy.subsection && (<><ChevronRight size={11} color="#94a3b8" style={{ flexShrink: 0 }} /><span>{doc.hierarchy.subsection}</span></>)}
+                </div>
+              </div>
+            )}
+
+            {/* Legal Authorities */}
+            {doc.legalAuthorities?.length > 0 && (
+              <div style={{ marginBottom: 22 }}>
+                <div style={{ ...LS, marginBottom: 10 }}>{t('docViewModal.legalAuthorities')}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {doc.legalAuthorities.map((a, i) => (
+                    <div key={i} style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(26,86,219,.04)', border: '1px solid rgba(26,86,219,.15)' }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--primary)', marginBottom: a.sections?.some(s => s) ? 4 : 0 }}>{a.act}</div>
+                      {a.sections?.filter(s => s).length > 0 && (
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+                          {a.sections.filter(s => s).map((s, j) => (
+                            <span key={j} style={{ fontSize: 10.5, fontFamily: 'var(--mono)', background: 'rgba(26,86,219,.1)', color: 'var(--primary)', padding: '2px 8px', borderRadius: 12 }}>{s}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Document Relationships */}
+            {doc.docRelations?.length > 0 && (
+              <div style={{ marginBottom: 22 }}>
+                <div style={{ ...LS, marginBottom: 10 }}>{t('docViewModal.relationships', { count: doc.docRelations.length })}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {doc.docRelations.map((r, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 12px', borderRadius: 8,
+                      background: r.isPending ? 'rgba(245,158,11,.05)' : 'rgba(34,197,94,.05)',
+                      border: `1px solid ${r.isPending ? 'rgba(245,158,11,.2)' : 'rgba(34,197,94,.2)'}` }}>
+                      <div style={{ width: 20, height: 20, borderRadius: '50%', background: r.isPending ? 'rgba(245,158,11,.15)' : 'rgba(34,197,94,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
+                        <span style={{ fontSize: 9, color: r.isPending ? '#d97706' : '#16a34a', fontWeight: 900 }}>↔</span>
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 10.5, fontFamily: 'var(--mono)', color: r.isPending ? '#d97706' : '#16a34a', fontWeight: 700, marginBottom: 2 }}>
+                          {r.label}{r.targetType ? ` · ${r.targetType}` : ''}{r.isPending ? ` · ${t('docViewModal.pendingSuffix')}` : ''}
+                        </div>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.targetTitle}</div>
+                        {r.section && <div style={{ fontSize: 10.5, fontFamily: 'var(--mono)', color: 'var(--primary)', marginTop: 2 }}>{r.section}</div>}
+                        {r.note && <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 2, fontStyle: 'italic' }}>{r.note}</div>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Amendment Provisions */}
+            {doc.amendmentProvisions?.length > 0 && (
+              <div style={{ marginBottom: 22 }}>
+                <div style={{ ...LS, marginBottom: 10 }}>{t('docViewModal.amendmentProvisions')}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {doc.amendmentProvisions.map((p, i) => (
+                    <div key={i} style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: p.before || p.after || p.description ? 6 : 0 }}>
+                        <span style={{ fontFamily: 'var(--mono)', color: '#d97706', fontWeight: 700, fontSize: 10.5, background: 'rgba(245,158,11,.15)', padding: '2px 7px', borderRadius: 10 }}>{p.changeType || t('docViewModal.amendedDefault')}</span>
+                        {p.section && <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text-heading)' }}>{t('docViewModal.sectionLabel', { section: p.section })}{p.chapter ? ` · ${t('docViewModal.chapterSuffix', { chapter: p.chapter })}` : ''}{p.subsection ? ` (${p.subsection})` : ''}</span>}
+                      </div>
+                      {p.description && <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', lineHeight: 1.5 }}>{p.description}</div>}
+                      {p.before && <div style={{ fontSize: 11, color: '#dc2626', fontFamily: 'var(--mono)', marginTop: 4, background: 'rgba(239,68,68,.05)', padding: '4px 8px', borderRadius: 5, borderLeft: '3px solid rgba(239,68,68,.4)' }}>{t('docViewModal.before', { value: p.before })}</div>}
+                      {p.after  && <div style={{ fontSize: 11, color: '#16a34a', fontFamily: 'var(--mono)', marginTop: 4, background: 'rgba(34,197,94,.05)',  padding: '4px 8px', borderRadius: 5, borderLeft: '3px solid rgba(34,197,94,.4)' }}>{t('docViewModal.after', { value: p.after })}</div>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Parent Act */}
+            {doc.parentAct && (
+              <div style={{ marginBottom: 22 }}>
+                <div style={{ ...LS, marginBottom: 10 }}>{t('docViewModal.parentAct')}</div>
+                <div style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(26,86,219,.04)', border: '1px solid rgba(26,86,219,.15)', fontSize: 12, fontWeight: 600, color: 'var(--primary)' }}>
+                  {doc.parentAct}
                 </div>
               </div>
             )}
@@ -854,6 +975,13 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   const [viewDoc,       setViewDoc]       = useState(null);
 
   function mapApiDoc(d) {
+    // Amendment provisions ride along inside description as a hidden __PROVISIONS__ JSON
+    // suffix (see the upload flow below) — strip it back out before displaying the description.
+    const rawDesc = d.description || '';
+    const provisionsMatch = rawDesc.match(/\n?__PROVISIONS__:(.+)$/s);
+    let amendmentProvisions = [];
+    if (provisionsMatch) { try { amendmentProvisions = JSON.parse(provisionsMatch[1]); } catch {} }
+
     return {
       id:              d.id,
       uid:             `api-${d.id}`,
@@ -868,7 +996,8 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
       version:         d.version_no || '1.0',
       fileName:        d.original_filename,
       fileSize:        d.file_size,
-      desc:            d.description || '',
+      desc:            rawDesc.replace(/\n?__PROVISIONS__:.+$/s, '').trim(),
+      amendmentProvisions,
       uploadedAt:      d.created_at?.split('T')[0] || '',
       ocrStatus:       'completed',
       gazette:         d.gazette_reference || '',
@@ -879,6 +1008,40 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
       shortTitle:      d.short_title || '',
       tags:            d.tags || [],
       relationships:   d.relationships || [],
+      docRelations:    (d.relationships || [])
+        .filter(r => r.type !== 'parent_act')
+        .map(r => ({
+          label:       (r.type || 'references').replace(/_/g, ' '),
+          targetId:    r.pdf_id ? `api-${r.pdf_id}` : null,
+          targetTitle: r.document_name || `Document #${r.pdf_id}`,
+          targetType:  r.document_type_name || '',
+          note:        '',
+          section:     '',
+          isPending:   false,
+        })),
+      typeFields: {
+        ...(d.valid_until            ? { validity:            d.valid_until }            : {}),
+        ...(d.sector_domain          ? { sector:              d.sector_domain }          : {}),
+        ...(d.implementing_agency    ? { implementingAgency:  d.implementing_agency }    : {}),
+        ...(d.next_review_date       ? { reviewDate:          d.next_review_date }       : {}),
+        ...(d.rule_making_authority  ? { ruleAuthority:       d.rule_making_authority }  : {}),
+        // Act-specific extended fields
+        ...(d.act_year               ? { actYear:            d.act_year }               : {}),
+        ...(d.long_title             ? { longTitle:          d.long_title }             : {}),
+        ...(d.regional_title         ? { regionalTitle:      d.regional_title }         : {}),
+        ...(d.notification_no        ? { notificationNo:     d.notification_no }        : {}),
+        ...(d.act_code               ? { actCode:            d.act_code }               : {}),
+        ...(d.so_reason              ? { soReason:           d.so_reason }              : {}),
+        ...(d.no_of_rules            ? { noOfRules:          d.no_of_rules }            : {}),
+        ...(d.no_of_notifications    ? { noOfNotifications:  d.no_of_notifications }    : {}),
+        ...(d.no_of_regulations      ? { noOfRegulations:     d.no_of_regulations }      : {}),
+        ...(d.no_of_circulars        ? { noOfCirculars:      d.no_of_circulars }        : {}),
+        ...(d.no_of_statutes         ? { noOfStatutes:       d.no_of_statutes }         : {}),
+        ...(d.no_of_ordinances       ? { noOfOrdinances:      d.no_of_ordinances }       : {}),
+        ...(d.no_of_orders           ? { noOfOrders:          d.no_of_orders }           : {}),
+        ...(d.keywords               ? { keywords:            d.keywords }               : {}),
+        ...(d.is_repealed            ? { repealed:            'Yes' }                    : {}),
+      },
       approval:        d.latest_approval || null,
     };
   }
@@ -984,6 +1147,8 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   const primaryActId = usesLegalAuthorities ? (legalAuthorities.find(a => a.actId)?.actId ?? null) : (hierarchy.actId ?? null);
   const [actChildren, setActChildren] = useState(null);
   const [actChildrenLoading, setActChildrenLoading] = useState(false);
+  const [departmentActs, setDepartmentActs] = useState(null);
+  const [departmentActsLoading, setDepartmentActsLoading] = useState(false);
 
   // Auto-scroll to the next step of the upload wizard as it's revealed
   useEffect(() => {
@@ -1010,6 +1175,19 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
       .finally(() => { if (!cancelled) setActChildrenLoading(false); });
     return () => { cancelled = true; };
   }, [primaryActId, form.type]);
+
+  // Fetch Acts already uploaded in the current user's department, so the uploader can see what
+  // already exists before submitting a new Act (helps avoid duplicates).
+  useEffect(() => {
+    if (form.type !== 'Act') return;
+    let cancelled = false;
+    setDepartmentActsLoading(true);
+    getMyDepartmentActs()
+      .then(res => { if (!cancelled) setDepartmentActs(res.data?.documents || res.data?.results || (Array.isArray(res.data) ? res.data : [])); })
+      .catch(() => { if (!cancelled) setDepartmentActs(null); })
+      .finally(() => { if (!cancelled) setDepartmentActsLoading(false); });
+    return () => { cancelled = true; };
+  }, [form.type]);
 
   const fmt      = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -3085,6 +3263,71 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 </div>
               );
             })()}
+          </Card>
+        )}
+
+        {/* Acts already uploaded in the uploader's department — shown while uploading a new Act */}
+        {form.type === 'Act' && (
+          <Card>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, paddingBottom: 14, borderBottom: '1px solid var(--surface-border)' }}>
+              <div style={{ width: 28, height: 28, borderRadius: 7, background: 'var(--surface-ground)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Layers size={13} color="var(--primary)" />
+              </div>
+              <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>{t('wizard.step3.existingActsInDept')}</span>
+            </div>
+            {departmentActsLoading ? (
+              <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', padding: '10px 0' }}>{t('common.loading')}</div>
+            ) : (
+              <div style={{ border: '1px solid var(--surface-border)', borderRadius: 10, overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                  <thead>
+                    <tr style={{ background: 'var(--surface-ground)' }}>
+                      <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('wizard.step3.colDocumentName')}</th>
+                      <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.referenceNo')}</th>
+                      <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.issueDate')}</th>
+                      <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.department')}</th>
+                      <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.version')}</th>
+                      <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.status')}</th>
+                      <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.view')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {!departmentActs || departmentActs.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} style={{ padding: '16px 12px', textAlign: 'center', color: 'var(--text-color-secondary)' }}>
+                          {t('wizard.step3.noActsInDept')}
+                        </td>
+                      </tr>
+                    ) : departmentActs.map((d, i) => (
+                      <tr key={d.id ?? i} style={{ borderTop: '1px solid var(--surface-border)' }}>
+                        <td style={{ padding: '8px 12px', color: 'var(--text-heading)', fontWeight: 600 }}>{d.document_name || '—'}</td>
+                        <td style={{ padding: '8px 12px', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.reference_number || '—'}</td>
+                        <td style={{ padding: '8px 12px', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.issue_date || '—'}</td>
+                        <td style={{ padding: '8px 12px', color: 'var(--text-color-secondary)' }}>{d.department_name || '—'}</td>
+                        <td style={{ padding: '8px 12px', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.version_no || '—'}</td>
+                        <td style={{ padding: '8px 12px', color: 'var(--text-color-secondary)', textTransform: 'capitalize' }}>{{ approved: t('common.statusWordApproved'), pending: t('common.statusWordPending'), rejected: t('common.statusWordRejected') }[d.status] || d.status || '—'}</td>
+                        <td style={{ padding: '8px 12px' }}>
+                          <button type="button" onClick={() => setViewingActChildDoc({
+                              id:      d.id,
+                              title:   d.document_name || t('toasts.documentFallback'),
+                              type:    d.document_type_name || 'Act',
+                              dept:    d.department_name || '',
+                              year:    d.issue_date ? d.issue_date.split('-')[0] : (d.created_at ? new Date(d.created_at).getFullYear() : '—'),
+                              version: d.version_no || '1.0',
+                              status:  d.status || 'pending',
+                              desc:    '',
+                            })}
+                            disabled={!d.id}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 600, cursor: d.id ? 'pointer' : 'not-allowed', fontFamily: 'var(--font)', opacity: d.id ? 1 : 0.5 }}>
+                            <Eye size={12} /> {t('common.view')}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </Card>
         )}
         {viewingActChildDoc && (

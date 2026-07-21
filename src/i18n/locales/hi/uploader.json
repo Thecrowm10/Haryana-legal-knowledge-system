@@ -174,7 +174,19 @@
     "documentRejected": "दस्तावेज़ अस्वीकृत",
     "pendingReview": "समीक्षा लंबित",
     "highlights": "हाइलाइट्स ({{count}})",
-    "noComment": "कोई टिप्पणी नहीं"
+    "noComment": "कोई टिप्पणी नहीं",
+    "typeSpecificFields": "प्रकार-विशिष्ट फ़ील्ड",
+    "hierarchyTags": "पदानुक्रम टैग",
+    "legalAuthorities": "विधिक प्राधिकरण",
+    "relationships": "संबंध · {{count}}",
+    "pendingSuffix": "लंबित",
+    "amendmentProvisions": "संशोधन प्रावधान",
+    "sectionLabel": "अनुभाग {{section}}",
+    "chapterSuffix": "अध्याय {{chapter}}",
+    "before": "पहले: {{value}}",
+    "after": "बाद में: {{value}}",
+    "amendedDefault": "संशोधित",
+    "parentAct": "मूल अधिनियम"
   },
   "wizard": {
     "step1": {
@@ -215,7 +227,9 @@
       "submitForApproval": "अनुमोदन हेतु सबमिट करें",
       "existingDocsUnderAct": "इस अधिनियम के अंतर्गत मौजूदा \"{{type}}\" दस्तावेज़",
       "noDocsUnderAct": "इस अधिनियम के अंतर्गत कोई \"{{type}}\" दस्तावेज़ नहीं मिला।",
-      "colDocumentName": "दस्तावेज़ का नाम"
+      "colDocumentName": "दस्तावेज़ का नाम",
+      "existingActsInDept": "आपके विभाग में पहले से अपलोड किए गए अधिनियम",
+      "noActsInDept": "आपके विभाग में अभी तक कोई अधिनियम नहीं मिला।"
     },
     "fields": {
       "generic": {

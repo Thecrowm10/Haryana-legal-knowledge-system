@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect, useRef, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   CheckCircle, XCircle, FileText, ChevronDown, Search, Clock,
   Check, X, Eye, Link, ChevronRight,
@@ -25,6 +26,20 @@ const TYPE_COLORS = {
   'Order/Gazette':     { accent: '#eab308', bg: 'rgba(234,179,8,.08)',  text: '#a16207' },
   'Bye Laws':            { accent: '#0ea5e9', bg: 'rgba(14,165,233,.08)', text: '#0369a1' },
   'Miscellaneous':       { accent: '#64748b', bg: 'rgba(100,116,139,.08)',text: '#475569' },
+};
+
+// Maps a raw document-type string (as used for filtering/comparison, e.g. d.type === type)
+// to its docTypes.* translation key — display label only, never the underlying value.
+const TYPE_LABEL_KEY = {
+  'Act':                 'act',
+  'Amendment':           'amendment',
+  'Notification':        'notification',
+  'Circular':            'circular',
+  'Policy':              'policy',
+  'Rules & Regulations': 'rulesRegulations',
+  'Order/Gazette':       'orderGazette',
+  'Bye Laws':            'byeLaws',
+  'Miscellaneous':       'miscellaneous',
 };
 
 const LABEL = {
@@ -61,18 +76,19 @@ function getDocPageData(doc) {
 // Both PDF and OCR panels share the same currentPage state (lifted to ThreePanelReview)
 // so they scroll together.
 function PageNav({ currentPage, totalPages, onPageChange }) {
+  const { t } = useTranslation('approver');
   return (
     <div style={{ padding: '8px 14px', borderTop: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, background: 'var(--surface-50)', flexShrink: 0 }}>
       <button onClick={() => onPageChange(p => Math.max(1, p - 1))} disabled={currentPage === 1}
         style={{ padding: '4px 12px', borderRadius: 6, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: currentPage === 1 ? '#94a3b8' : 'var(--text-color-secondary)', fontSize: 11, cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)' }}>
-        ← Prev
+        {t('common.prev')}
       </button>
       <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>
         {currentPage} / {totalPages}
       </span>
       <button onClick={() => onPageChange(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
         style={{ padding: '4px 12px', borderRadius: 6, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: currentPage === totalPages ? '#94a3b8' : 'var(--text-color-secondary)', fontSize: 11, cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)' }}>
-        Next →
+        {t('common.next')}
       </button>
     </div>
   );
@@ -82,6 +98,7 @@ function PageNav({ currentPage, totalPages, onPageChange }) {
 // Renders real PDFs as stacked canvases (pdfjs-dist) so scroll can be detected
 // and synced with OcrTextPanel. Mock docs use the styled layout fallback.
 function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, rotation, onRotate, blobUrl, onTotalPagesChange, annotations = [], onAnnotationsChange, highlightMode = false, onHighlightModeChange, onScrollRef, docxHtml = null }) {
+  const { t } = useTranslation('approver');
   const [zoom, setZoom]     = useState(100);
   const containerRef        = useRef(null);
   const canvasRefs          = useRef([]);
@@ -326,16 +343,16 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
       {/* Toolbar */}
       <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surface-50)', flexShrink: 0 }}>
         <Eye size={13} color="var(--primary)" />
-        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-heading)', flex: 1 }}>{docxHtml ? 'Document Preview' : 'Original PDF'}</span>
+        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-heading)', flex: 1 }}>{docxHtml ? t('pdfViewer.documentPreview') : t('pdfViewer.originalPdf')}</span>
         {blobUrl && !docxHtml && (
-          <a href={blobUrl} target="_blank" rel="noreferrer" title="Open in new tab"
+          <a href={blobUrl} target="_blank" rel="noreferrer" title={t('pdfViewer.openInNewTab')}
             style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 9px', borderRadius: 5, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)', textDecoration: 'none', fontSize: 11, fontWeight: 600, fontFamily: 'var(--font)' }}>
-            <ExternalLink size={11} /> Open
+            <ExternalLink size={11} /> {t('common.open')}
           </a>
         )}
         {!docxHtml && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <button onClick={onRotate} title="Rotate 90°"
+            <button onClick={onRotate} title={t('pdfViewer.rotate')}
               style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 5, width: 24, height: 24, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-color-secondary)' }}>
               <RotateCw size={11} />
             </button>
@@ -354,13 +371,13 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 6 }}>
           <button
             onClick={() => onHighlightModeChange?.(!highlightMode)}
-            title={highlightMode ? 'Exit highlight mode' : docxHtml ? 'Select text to highlight' : 'Draw highlight on PDF'}
+            title={highlightMode ? t('pdfViewer.exitHighlightMode') : docxHtml ? t('pdfViewer.selectTextToHighlight') : t('pdfViewer.drawHighlightOnPdf')}
             style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 5, border: highlightMode ? '1.5px solid #f59e0b' : '1px solid var(--surface-border)', background: highlightMode ? 'rgba(245,158,11,.12)' : 'var(--surface-ground)', color: highlightMode ? '#b45309' : 'var(--text-color-secondary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'all .15s' }}>
             <Highlighter size={11} />
-            {highlightMode ? 'Exit Highlight' : 'Highlight'}
+            {highlightMode ? t('pdfViewer.exitHighlight') : t('pdfViewer.highlight')}
           </button>
           {highlightMode && ['rgba(253,224,71,.55)', 'rgba(134,239,172,.55)', 'rgba(147,197,253,.55)', 'rgba(249,168,212,.55)'].map(c => (
-            <button key={c} onClick={() => setSelectedColor(c)} title="Pick color"
+            <button key={c} onClick={() => setSelectedColor(c)} title={t('pdfViewer.pickColor')}
               style={{ width: 18, height: 18, borderRadius: '50%', background: c, border: selectedColor === c ? '2.5px solid #374151' : '1px solid rgba(0,0,0,.2)', cursor: 'pointer', padding: 0, flexShrink: 0 }} />
           ))}
         </div>
@@ -379,7 +396,7 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
           {!pdfDoc && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 12 }}>
               <div style={{ width: 28, height: 28, border: '3px solid rgba(255,255,255,.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin .7s linear infinite' }} />
-              <span style={{ fontSize: 12, fontFamily: 'var(--mono)', color: 'rgba(255,255,255,.7)' }}>Loading PDF…</span>
+              <span style={{ fontSize: 12, fontFamily: 'var(--mono)', color: 'rgba(255,255,255,.7)' }}>{t('pdfViewer.loadingPdf')}</span>
             </div>
           )}
           {Array.from({ length: numPages }, (_, i) => (
@@ -430,17 +447,17 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
             fontFamily: 'Georgia, "Times New Roman", serif',
           }}>
             <div style={{ textAlign: 'center', borderBottom: '2px solid #111', paddingBottom: 14, marginBottom: 20 }}>
-              <div style={{ fontSize: 10, color: '#555', letterSpacing: '.12em', textTransform: 'uppercase', marginBottom: 6 }}>Government of Haryana</div>
+              <div style={{ fontSize: 10, color: '#555', letterSpacing: '.12em', textTransform: 'uppercase', marginBottom: 6 }}>{t('pdfViewer.governmentOfHaryana')}</div>
               <div style={{ fontSize: 16, fontWeight: 700, color: '#111', lineHeight: 1.35, marginBottom: 6 }}>{doc.title}</div>
-              <div style={{ fontSize: 11, color: '#444', fontFamily: 'Arial, sans-serif' }}>{doc.dept}&nbsp;·&nbsp;Year: {doc.year}&nbsp;·&nbsp;{doc.type}</div>
+              <div style={{ fontSize: 11, color: '#444', fontFamily: 'Arial, sans-serif' }}>{doc.dept}&nbsp;·&nbsp;{t('pdfViewer.yearLabel')}: {doc.year}&nbsp;·&nbsp;{doc.type}</div>
             </div>
             <div style={{ borderTop: '1px solid #bbb', marginBottom: 20 }} />
             <div style={{ fontSize: 13, color: '#1a1a1a', lineHeight: 1.95, whiteSpace: 'pre-wrap', textAlign: 'justify' }}>
-              {pageData?.text || 'Document content not available.'}
+              {pageData?.text || t('pdfViewer.documentContentNotAvailable')}
             </div>
             <div style={{ marginTop: 40, borderTop: '1px solid #ccc', paddingTop: 10, display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#777', fontFamily: 'Arial, sans-serif' }}>
-              <span>v{doc.version || '1.0'}&nbsp;·&nbsp;{doc.legalStatus || 'active'}</span>
-              <span>Page {currentPage} of {totalPages}</span>
+              <span>v{doc.version || '1.0'}&nbsp;·&nbsp;{doc.legalStatus || t('documentDetails.activeStatus')}</span>
+              <span>{t('pdfViewer.pageOf', { current: currentPage, total: totalPages })}</span>
               <span>{doc.uploader || '—'}</span>
             </div>
           </div>
@@ -458,8 +475,8 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
             display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ fontSize: 10.5, fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', letterSpacing: '.07em' }}>
               {pendingDocxText
-                ? `HIGHLIGHT — "${pendingDocxText.slice(0, 35)}${pendingDocxText.length > 35 ? '…' : ''}"`
-                : `ADD COMMENT — Page ${pendingRect?.page}`}
+                ? t('pdfViewer.highlightPreview', { text: `${pendingDocxText.slice(0, 35)}${pendingDocxText.length > 35 ? '…' : ''}` })
+                : t('pdfViewer.addCommentPage', { page: pendingRect?.page })}
             </div>
             <div style={{ width: '100%', height: 10, borderRadius: 4, background: selectedColor, border: '1px solid rgba(0,0,0,.15)' }} />
             <textarea
@@ -470,19 +487,19 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
                 if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) pendingDocxText ? confirmDocxAnnotation() : confirmAnnotation();
                 if (e.key === 'Escape') { setDrawState('idle'); setPendingRect(null); setPendingDocxText(null); setDragStart(null); }
               }}
-              placeholder="Describe the issue…"
+              placeholder={t('pdfViewer.describeIssuePlaceholder')}
               rows={3}
               style={{ resize: 'none', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 7, color: 'var(--text-color)', fontFamily: 'var(--font)', fontSize: 13, padding: '8px 10px', outline: 'none', width: '100%', boxSizing: 'border-box' }}
             />
-            <div style={{ fontSize: 10, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>Ctrl+Enter to save</div>
+            <div style={{ fontSize: 10, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>{t('pdfViewer.ctrlEnterToSave')}</div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => { setDrawState('idle'); setPendingRect(null); setPendingDocxText(null); setDragStart(null); }}
                 style={{ flex: 1, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '7px 0', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', color: 'var(--text-color-secondary)', fontFamily: 'var(--font)' }}>
-                Cancel
+                {t('common.cancel')}
               </button>
               <button onClick={pendingDocxText ? confirmDocxAnnotation : confirmAnnotation}
                 style={{ flex: 1, background: '#f59e0b', color: 'white', border: 'none', borderRadius: 7, padding: '7px 0', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                Save
+                {t('common.save')}
               </button>
             </div>
           </div>
@@ -502,7 +519,7 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
               display: 'flex', flexDirection: 'column', gap: 10 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ fontSize: 10.5, fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', letterSpacing: '.07em' }}>
-                  {ann.isDocx ? 'TEXT HIGHLIGHT' : `HIGHLIGHT — PAGE ${ann.page}`}
+                  {ann.isDocx ? t('pdfViewer.textHighlight') : t('pdfViewer.highlightPage', { page: ann.page })}
                 </div>
                 <button onClick={() => setActiveAnnotId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex' }}><X size={14} /></button>
               </div>
@@ -512,11 +529,11 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
                 </div>
               )}
               <div style={{ padding: '8px 10px', borderRadius: 7, background: ann.color, border: '1px solid rgba(0,0,0,.12)', fontSize: 13, color: 'rgba(0,0,0,.75)', lineHeight: 1.5, minHeight: 40 }}>
-                {ann.comment || <span style={{ opacity: 0.5 }}>No comment</span>}
+                {ann.comment || <span style={{ opacity: 0.5 }}>{t('common.noComment')}</span>}
               </div>
               <button onClick={() => { onAnnotationsChange?.(annotations.filter(a => a.id !== activeAnnotId)); setActiveAnnotId(null); }}
                 style={{ background: 'rgba(239,68,68,.07)', border: '1px solid rgba(239,68,68,.25)', color: '#dc2626', borderRadius: 7, padding: '7px 0', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                Delete Highlight
+                {t('pdfViewer.deleteHighlight')}
               </button>
             </div>
           </>
@@ -531,22 +548,23 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
 // Shows every field the uploader filled in: metadata, description, hierarchy,
 // type-specific fields, legal authorities, relationships, amendment provisions.
 function DocumentDetailsPanel({ doc, reviewAnnotations = [], onScrollToAnnotation }) {
+  const { t } = useTranslation('approver');
   const meta = [
-    ['Title',           doc.title],
-    ['Type',            doc.type],
-    ['Department',      doc.dept],
-    ['Year',            doc.year ? String(doc.year) : null],
-    ['Version',         doc.version || '1.0'],
-    ['Reference No.',   doc.referenceNumber || null],
-    ['Issue Date',      doc.enactmentDate || null],
-    ['Effective From',  doc.effectiveFrom || null],
-    ['Gazette Ref.',    doc.gazette || null],
-    ['Legal Authority', doc.authority || null],
-    ['Uploader',        doc.uploader || null],
-    ['Upload Date',     doc.uploadedAt || null],
-    ['Pages',           doc.pages ? `${doc.pages} pages` : null],
-    ['Legal Status',    doc.legalStatus || 'active'],
-    ['File Name',       doc.fileName || null],
+    [t('documentDetails.fields.title'),           doc.title],
+    [t('documentDetails.fields.type'),            doc.type],
+    [t('documentDetails.fields.department'),      doc.dept],
+    [t('documentDetails.fields.year'),            doc.year ? String(doc.year) : null],
+    [t('documentDetails.fields.version'),         doc.version || '1.0'],
+    [t('documentDetails.fields.referenceNo'),     doc.referenceNumber || null],
+    [t('documentDetails.fields.issueDate'),       doc.enactmentDate || null],
+    [t('documentDetails.fields.effectiveFrom'),   doc.effectiveFrom || null],
+    [t('documentDetails.fields.gazetteRef'),      doc.gazette || null],
+    [t('documentDetails.fields.legalAuthority'),  doc.authority || null],
+    [t('documentDetails.fields.uploader'),        doc.uploader || null],
+    [t('documentDetails.fields.uploadDate'),      doc.uploadedAt || null],
+    [t('documentDetails.fields.pages'),           doc.pages ? t('documentDetails.pagesValue', { count: doc.pages }) : null],
+    [t('documentDetails.fields.legalStatus'),     doc.legalStatus || t('documentDetails.activeStatus')],
+    [t('documentDetails.fields.fileName'),        doc.fileName || null],
   ].filter(([, v]) => v);
 
   // Fields already shown in meta — exclude from typeExtra to avoid duplication
@@ -569,9 +587,9 @@ function DocumentDetailsPanel({ doc, reviewAnnotations = [], onScrollToAnnotatio
       {/* Header */}
       <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surface-50)', flexShrink: 0 }}>
         <FileText size={13} color="var(--primary)" />
-        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-heading)', flex: 1 }}>Document Details</span>
+        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-heading)', flex: 1 }}>{t('documentDetails.heading')}</span>
         <span style={{ fontSize: 10.5, fontFamily: 'var(--mono)', color: 'var(--primary)', fontWeight: 700, background: 'rgba(26,86,219,.1)', padding: '2px 8px', borderRadius: 20 }}>
-          UPLOADER INFO
+          {t('documentDetails.uploaderInfoBadge')}
         </span>
       </div>
 
@@ -579,7 +597,7 @@ function DocumentDetailsPanel({ doc, reviewAnnotations = [], onScrollToAnnotatio
 
         {/* ── Core Metadata ── */}
         <div>
-          <div style={{ ...LABEL, marginBottom: 8 }}>Metadata</div>
+          <div style={{ ...LABEL, marginBottom: 8 }}>{t('documentDetails.metadata')}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             {meta.map(([k, v]) => (
               <div key={k} style={{ display: 'flex', gap: 8, padding: '7px 10px', borderRadius: 7, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)' }}>
@@ -593,7 +611,7 @@ function DocumentDetailsPanel({ doc, reviewAnnotations = [], onScrollToAnnotatio
         {/* ── Type-Specific Fields ── */}
         {typeExtra.length > 0 && (
           <div>
-            <div style={{ ...LABEL, marginBottom: 8 }}>Type-Specific Fields</div>
+            <div style={{ ...LABEL, marginBottom: 8 }}>{t('documentDetails.typeSpecificFields')}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
               {typeExtra.map(([k, v]) => (
                 <div key={k} style={{ display: 'flex', gap: 8, padding: '7px 10px', borderRadius: 7, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)' }}>
@@ -611,14 +629,14 @@ function DocumentDetailsPanel({ doc, reviewAnnotations = [], onScrollToAnnotatio
           if (!parent) return null;
           return (
             <div>
-              <div style={{ ...LABEL, marginBottom: 8 }}>Parent Hierarchy</div>
+              <div style={{ ...LABEL, marginBottom: 8 }}>{t('documentDetails.parentHierarchy')}</div>
               <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(26,86,219,.04)', border: '1px solid rgba(26,86,219,.2)', display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 9.5, fontFamily: 'var(--mono)', fontWeight: 700, letterSpacing: '.07em', color: '#1a56db', background: 'rgba(26,86,219,.12)', padding: '2px 7px', borderRadius: 10, flexShrink: 0 }}>
-                    {parent.type === 'parent_act' ? 'PARENT ACT' : 'AMENDS'}
+                    {parent.type === 'parent_act' ? t('documentDetails.parentActBadge') : t('documentDetails.amendsBadge')}
                   </span>
                   <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {parent.document_name || `Document #${parent.pdf_id}`}
+                    {parent.document_name || t('documentDetails.documentFallback', { id: parent.pdf_id })}
                   </span>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingLeft: 2 }}>
@@ -627,14 +645,14 @@ function DocumentDetailsPanel({ doc, reviewAnnotations = [], onScrollToAnnotatio
                     {doc.title}
                   </span>
                   <span style={{ fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '1px 6px', borderRadius: 8 }}>
-                    Amendment
+                    {t('documentDetails.amendmentBadge')}
                   </span>
                 </div>
 
                 {/* Changes made per section */}
                 {doc.amendmentProvisions?.length > 0 && (
                   <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <div style={{ fontSize: 9.5, fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', letterSpacing: '.07em' }}>CHANGES MADE</div>
+                    <div style={{ fontSize: 9.5, fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', letterSpacing: '.07em' }}>{t('documentDetails.changesMade')}</div>
                     {doc.amendmentProvisions.map((p, i) => {
                       const CHANGE_COLORS = { Amended: '#f59e0b', Substituted: '#3b82f6', Inserted: '#22c55e', Deleted: '#ef4444', Expanded: '#8b5cf6' };
                       const color = CHANGE_COLORS[p.changeType] || '#94a3b8';
@@ -642,7 +660,7 @@ function DocumentDetailsPanel({ doc, reviewAnnotations = [], onScrollToAnnotatio
                         <div key={i} style={{ padding: '8px 10px', borderRadius: 7, background: 'var(--surface-ground)', border: `1px solid ${color}33` }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: p.description ? 5 : 0 }}>
                             <span style={{ fontSize: 10, fontWeight: 700, fontFamily: 'var(--mono)', color, background: `${color}18`, padding: '1px 7px', borderRadius: 8 }}>
-                              {p.changeType || 'Amended'}
+                              {p.changeType || t('documentDetails.amendedDefault')}
                             </span>
                             {[p.chapter, p.section, p.subsection].filter(Boolean).map((v, j, arr) => (
                               <span key={j} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -667,7 +685,7 @@ function DocumentDetailsPanel({ doc, reviewAnnotations = [], onScrollToAnnotatio
         {/* ── Description ── */}
         {doc.desc && (
           <div>
-            <div style={{ ...LABEL, marginBottom: 8 }}>Description</div>
+            <div style={{ ...LABEL, marginBottom: 8 }}>{t('documentDetails.description')}</div>
             <div style={{ padding: '10px 12px', borderRadius: 8, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', fontSize: 12, color: 'var(--text-color)', lineHeight: 1.75, whiteSpace: 'pre-wrap' }}>
               {doc.desc}
             </div>
@@ -677,7 +695,7 @@ function DocumentDetailsPanel({ doc, reviewAnnotations = [], onScrollToAnnotatio
         {/* ── Hierarchy Tags ── */}
         {(doc.hierarchy?.act || doc.hierarchy?.chapter || doc.hierarchy?.section) && (
           <div>
-            <div style={{ ...LABEL, marginBottom: 8 }}>Hierarchy Tags</div>
+            <div style={{ ...LABEL, marginBottom: 8 }}>{t('documentDetails.hierarchyTags')}</div>
             <div style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(26,86,219,.04)', border: '1px solid rgba(26,86,219,.15)', fontSize: 11.5, color: 'var(--text-color-secondary)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2, lineHeight: 1.8 }}>
               {doc.hierarchy.act && <span style={{ color: 'var(--primary)', fontWeight: 700 }}>{doc.hierarchy.act}</span>}
               {doc.hierarchy.chapter && (<><ChevronRight size={11} color="#94a3b8" style={{ flexShrink: 0 }} /><span>{doc.hierarchy.chapter}</span></>)}
@@ -690,7 +708,7 @@ function DocumentDetailsPanel({ doc, reviewAnnotations = [], onScrollToAnnotatio
         {/* ── Legal Authorities ── */}
         {doc.legalAuthorities?.length > 0 && (
           <div>
-            <div style={{ ...LABEL, marginBottom: 8 }}>Legal Authorities</div>
+            <div style={{ ...LABEL, marginBottom: 8 }}>{t('documentDetails.legalAuthorities')}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {doc.legalAuthorities.map((a, i) => (
                 <div key={i} style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(26,86,219,.04)', border: '1px solid rgba(26,86,219,.15)' }}>
@@ -711,7 +729,7 @@ function DocumentDetailsPanel({ doc, reviewAnnotations = [], onScrollToAnnotatio
         {/* ── Document Relationships ── */}
         {doc.docRelations?.length > 0 && (
           <div>
-            <div style={{ ...LABEL, marginBottom: 8 }}>Relationships · {doc.docRelations.length}</div>
+            <div style={{ ...LABEL, marginBottom: 8 }}>{t('documentDetails.relationships', { count: doc.docRelations.length })}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {doc.docRelations.map((r, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 12px', borderRadius: 8,
@@ -722,7 +740,7 @@ function DocumentDetailsPanel({ doc, reviewAnnotations = [], onScrollToAnnotatio
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 10.5, fontFamily: 'var(--mono)', color: r.isPending ? '#d97706' : '#16a34a', fontWeight: 700, marginBottom: 2 }}>
-                      {r.label}{r.targetType ? ` · ${r.targetType}` : ''}{r.isPending ? ' · PENDING' : ''}
+                      {r.label}{r.targetType ? ` · ${r.targetType}` : ''}{r.isPending ? ` · ${t('documentDetails.pendingSuffix')}` : ''}
                     </div>
                     <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.targetTitle}</div>
                     {r.section && <div style={{ fontSize: 10.5, fontFamily: 'var(--mono)', color: 'var(--primary)', marginTop: 2 }}>{r.section}</div>}
@@ -737,17 +755,17 @@ function DocumentDetailsPanel({ doc, reviewAnnotations = [], onScrollToAnnotatio
         {/* ── Amendment Provisions ── */}
         {doc.amendmentProvisions?.length > 0 && (
           <div>
-            <div style={{ ...LABEL, marginBottom: 8 }}>Amendment Provisions</div>
+            <div style={{ ...LABEL, marginBottom: 8 }}>{t('documentDetails.amendmentProvisions')}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {doc.amendmentProvisions.map((p, i) => (
                 <div key={i} style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: p.before || p.after || p.description ? 6 : 0 }}>
-                    <span style={{ fontFamily: 'var(--mono)', color: '#d97706', fontWeight: 700, fontSize: 10.5, background: 'rgba(245,158,11,.15)', padding: '2px 7px', borderRadius: 10 }}>{p.changeType || 'Amended'}</span>
-                    {p.section && <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text-heading)' }}>Section {p.section}{p.chapter ? ` · Ch. ${p.chapter}` : ''}{p.subsection ? ` (${p.subsection})` : ''}</span>}
+                    <span style={{ fontFamily: 'var(--mono)', color: '#d97706', fontWeight: 700, fontSize: 10.5, background: 'rgba(245,158,11,.15)', padding: '2px 7px', borderRadius: 10 }}>{p.changeType || t('documentDetails.amendedDefault')}</span>
+                    {p.section && <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text-heading)' }}>{t('documentDetails.sectionLabel', { section: p.section })}{p.chapter ? ` · ${t('documentDetails.chapterSuffix', { chapter: p.chapter })}` : ''}{p.subsection ? ` (${p.subsection})` : ''}</span>}
                   </div>
                   {p.description && <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', lineHeight: 1.5 }}>{p.description}</div>}
-                  {p.before && <div style={{ fontSize: 11, color: '#dc2626', fontFamily: 'var(--mono)', marginTop: 4, background: 'rgba(239,68,68,.05)', padding: '4px 8px', borderRadius: 5, borderLeft: '3px solid rgba(239,68,68,.4)' }}>Before: {p.before}</div>}
-                  {p.after  && <div style={{ fontSize: 11, color: '#16a34a', fontFamily: 'var(--mono)', marginTop: 4, background: 'rgba(34,197,94,.05)',  padding: '4px 8px', borderRadius: 5, borderLeft: '3px solid rgba(34,197,94,.4)' }}>After: {p.after}</div>}
+                  {p.before && <div style={{ fontSize: 11, color: '#dc2626', fontFamily: 'var(--mono)', marginTop: 4, background: 'rgba(239,68,68,.05)', padding: '4px 8px', borderRadius: 5, borderLeft: '3px solid rgba(239,68,68,.4)' }}>{t('documentDetails.before', { value: p.before })}</div>}
+                  {p.after  && <div style={{ fontSize: 11, color: '#16a34a', fontFamily: 'var(--mono)', marginTop: 4, background: 'rgba(34,197,94,.05)',  padding: '4px 8px', borderRadius: 5, borderLeft: '3px solid rgba(34,197,94,.4)' }}>{t('documentDetails.after', { value: p.after })}</div>}
                 </div>
               ))}
             </div>
@@ -757,7 +775,7 @@ function DocumentDetailsPanel({ doc, reviewAnnotations = [], onScrollToAnnotatio
         {/* ── Parent Act ── */}
         {doc.parentAct && (
           <div>
-            <div style={{ ...LABEL, marginBottom: 8 }}>Parent Act</div>
+            <div style={{ ...LABEL, marginBottom: 8 }}>{t('documentDetails.parentAct')}</div>
             <div style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(26,86,219,.04)', border: '1px solid rgba(26,86,219,.15)', fontSize: 12, fontWeight: 600, color: 'var(--primary)' }}>
               {doc.parentAct}
             </div>
@@ -767,7 +785,7 @@ function DocumentDetailsPanel({ doc, reviewAnnotations = [], onScrollToAnnotatio
         {/* ── Highlights ── */}
         {reviewAnnotations.length > 0 && (
           <div>
-            <div style={{ ...LABEL, marginBottom: 8 }}>Highlights ({reviewAnnotations.length})</div>
+            <div style={{ ...LABEL, marginBottom: 8 }}>{t('documentDetails.highlights', { count: reviewAnnotations.length })}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {reviewAnnotations.map(ann => (
                 <div key={ann.id} onClick={() => onScrollToAnnotation?.(ann)}
@@ -779,13 +797,13 @@ function DocumentDetailsPanel({ doc, reviewAnnotations = [], onScrollToAnnotatio
                       <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, color: 'rgba(0,0,0,.5)', flexShrink: 0, marginTop: 2 }}>T</span>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         {ann.text && <div style={{ fontSize: 10.5, color: 'rgba(0,0,0,.55)', fontStyle: 'italic', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>"{ann.text.slice(0, 45)}{ann.text.length > 45 ? '…' : ''}"</div>}
-                        <div style={{ fontSize: 12, color: 'rgba(0,0,0,.75)', lineHeight: 1.4 }}>{ann.comment || <span style={{ opacity: 0.5 }}>No comment</span>}</div>
+                        <div style={{ fontSize: 12, color: 'rgba(0,0,0,.75)', lineHeight: 1.4 }}>{ann.comment || <span style={{ opacity: 0.5 }}>{t('common.noComment')}</span>}</div>
                       </div>
                     </>
                   ) : (
                     <>
                       <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, color: 'rgba(0,0,0,.5)', flexShrink: 0, marginTop: 2 }}>P{ann.page}</span>
-                      <span style={{ fontSize: 12.5, color: 'rgba(0,0,0,.75)', lineHeight: 1.5, flex: 1 }}>{ann.comment || <span style={{ opacity: 0.5 }}>No comment</span>}</span>
+                      <span style={{ fontSize: 12.5, color: 'rgba(0,0,0,.75)', lineHeight: 1.5, flex: 1 }}>{ann.comment || <span style={{ opacity: 0.5 }}>{t('common.noComment')}</span>}</span>
                     </>
                   )}
                 </div>
@@ -802,6 +820,7 @@ function DocumentDetailsPanel({ doc, reviewAnnotations = [], onScrollToAnnotatio
 // 2-Panel Review View
 // PDF on the left, uploader-filled document details on the right.
 function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, activePage, deciding }) {
+  const { t } = useTranslation('approver');
   const [currentPage, setCurrentPage]   = useState(1);
   const [rotation, setRotation]         = useState(0);
   const [blobUrl, setBlobUrl]           = useState(null);
@@ -911,12 +930,12 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, activePage,
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {remarkLines.map((remark, idx) => (
               <div key={idx}>
-                <div style={{ ...LABEL, marginBottom: 5 }}>Remark {idx + 1}</div>
+                <div style={{ ...LABEL, marginBottom: 5 }}>{t('common.remarkNumber', { num: idx + 1 })}</div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <input
                     value={remark}
                     onChange={e => updateRemark(idx, e.target.value)}
-                    placeholder={`Enter remark ${idx + 1}…`}
+                    placeholder={t('common.enterRemarkPlaceholder', { num: idx + 1 })}
                     style={{
                       flex: 1, background: 'var(--surface-ground)',
                       border: '1px solid var(--surface-border)', borderRadius: 8,
@@ -953,20 +972,20 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, activePage,
               }}
               onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.background = 'rgba(26,86,219,.05)'; }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--surface-border)'; e.currentTarget.style.background = 'transparent'; }}>
-              <Plus size={13} /> Add Remark
+              <Plus size={13} /> {t('common.addRemark')}
             </button>
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={() => onDecide('rejected', annotations)} disabled={!!deciding}
                 style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.3)', color: '#b91c1c', padding: '9px 18px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 600, cursor: deciding ? 'not-allowed' : 'pointer', opacity: deciding && deciding !== 'rejected' ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
                 onMouseEnter={e => { if (!deciding) e.currentTarget.style.background = 'rgba(239,68,68,.15)'; }}
                 onMouseLeave={e => { if (!deciding) e.currentTarget.style.background = 'rgba(239,68,68,.08)'; }}>
-                <X size={14} /> {deciding === 'rejected' ? 'Rejecting…' : 'Reject'}
+                <X size={14} /> {deciding === 'rejected' ? t('common.rejecting') : t('common.reject')}
               </button>
               <button onClick={() => onDecide('approved', annotations)} disabled={!!deciding}
                 style={{ background: 'rgba(34,197,94,.1)', border: '1px solid rgba(34,197,94,.3)', color: '#1e40af', padding: '9px 20px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700, cursor: deciding ? 'not-allowed' : 'pointer', opacity: deciding && deciding !== 'approved' ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
                 onMouseEnter={e => { if (!deciding) e.currentTarget.style.background = 'rgba(34,197,94,.18)'; }}
                 onMouseLeave={e => { if (!deciding) e.currentTarget.style.background = 'rgba(34,197,94,.1)'; }}>
-                <Check size={14} /> {deciding === 'approved' ? 'Approving…' : 'Approve'}
+                <Check size={14} /> {deciding === 'approved' ? t('common.approving') : t('common.approve')}
               </button>
             </div>
           </div>
@@ -987,12 +1006,12 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, activePage,
             }
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 11, fontWeight: 700, fontFamily: 'var(--mono)', color: doc.status === 'approved' ? '#16a34a' : '#ef4444', marginBottom: 6 }}>
-                {doc.status === 'approved' ? 'APPROVED' : 'REJECTED'} — REVIEWER REMARKS
+                {doc.status === 'approved' ? t('review.approvedHeader') : t('review.rejectedHeader')}
               </div>
               {parseDisplayRemarks(doc.remarks).map(({ num, text }) => (
                 <div key={num} style={{ display: 'flex', gap: 8, marginBottom: 4, alignItems: 'baseline' }}>
                   <span style={{ fontSize: 10.5, fontFamily: 'var(--mono)', fontWeight: 700, color: doc.status === 'approved' ? '#16a34a' : '#ef4444', flexShrink: 0, minWidth: 62 }}>
-                    Remark {num}
+                    {t('common.remarkNumber', { num })}
                   </span>
                   <span style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', lineHeight: 1.5 }}>{text || '—'}</span>
                 </div>
@@ -1081,6 +1100,7 @@ function mapApiDoc(d) {
 // Link Request Review Panel
 // Shows the PDF + document details for a pending link request with Approve/Reject actions.
 function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
+  const { t } = useTranslation('approver');
   const isReadOnly = lr.link_status !== 'pending';
 
   const [blobUrl, setBlobUrl]             = useState(null);
@@ -1154,7 +1174,7 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
   const typeColor    = TYPE_COLORS[lr.document_type_name] || TYPE_COLORS['Miscellaneous'];
   const requesterName = lr.requested_by_first_name
     ? `${lr.requested_by_first_name} ${lr.requested_by_last_name || ''}`.trim()
-    : lr.requested_by_username || 'Unknown';
+    : lr.requested_by_username || t('common.unknown');
 
   function InfoRow({ label, value, mono }) {
     return (
@@ -1171,14 +1191,14 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 20px', borderBottom: '1px solid var(--surface-border)', flexShrink: 0 }}>
         <button onClick={onBack}
           style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 7, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
-          ← Back to Requests
+          {t('linkReview.backToRequests')}
         </button>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {lr.document_name}
           </div>
           <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 2 }}>
-            Requested by <strong style={{ color: 'var(--text-color)' }}>{requesterName}</strong> · {lr.requested_at?.split('T')[0]}
+            {t('linkReview.requestedByPrefix')} <strong style={{ color: 'var(--text-color)' }}>{requesterName}</strong> · {lr.requested_at?.split('T')[0]}
           </div>
         </div>
         <span style={{ background: typeColor.bg, color: typeColor.text, padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
@@ -1220,16 +1240,16 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
 
           {/* Document Info card */}
           <div style={{ padding: '14px 16px', borderRadius: 10, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)' }}>
-            <div style={{ ...LABEL, marginBottom: 12 }}>Document Information</div>
+            <div style={{ ...LABEL, marginBottom: 12 }}>{t('linkReview.documentInformation')}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <InfoRow label="Document Name" value={lr.document_name} />
-              <InfoRow label="Type" value={
+              <InfoRow label={t('linkReview.documentName')} value={lr.document_name} />
+              <InfoRow label={t('linkReview.type')} value={
                 <span style={{ background: typeColor.bg, color: typeColor.text, padding: '2px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
                   {lr.document_type_name}
                 </span>
               } />
-              {lr.version_no && <InfoRow label="Version" value={`v${lr.version_no}`} mono />}
-              <InfoRow label="Document Status" value={
+              {lr.version_no && <InfoRow label={t('linkReview.version')} value={`v${lr.version_no}`} mono />}
+              <InfoRow label={t('linkReview.documentStatus')} value={
                 <span style={{
                   background: lr.document_status === 'approved' ? 'rgba(34,197,94,.12)' : lr.document_status === 'rejected' ? 'rgba(239,68,68,.1)' : 'rgba(245,158,11,.1)',
                   color: lr.document_status === 'approved' ? '#16a34a' : lr.document_status === 'rejected' ? '#dc2626' : '#d97706',
@@ -1238,18 +1258,18 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
                   {lr.document_status}
                 </span>
               } />
-              <InfoRow label="Original Department" value={lr.original_department_name || '—'} />
+              <InfoRow label={t('linkReview.originalDepartment')} value={lr.original_department_name || '—'} />
             </div>
           </div>
 
           {/* Link Request card */}
           <div style={{ padding: '14px 16px', borderRadius: 10, background: 'rgba(245,158,11,.04)', border: '1px solid rgba(245,158,11,.2)' }}>
-            <div style={{ ...LABEL, marginBottom: 12, color: '#d97706' }}>Link Request</div>
+            <div style={{ ...LABEL, marginBottom: 12, color: '#d97706' }}>{t('linkReview.linkRequest')}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <InfoRow label="Requested By" value={requesterName} />
-              {lr.requested_by_username && <InfoRow label="Username" value={lr.requested_by_username} mono />}
-              <InfoRow label="Requested At" value={lr.requested_at?.split('T')[0]} mono />
-              <InfoRow label="Status" value={
+              <InfoRow label={t('linkReview.requestedBy')} value={requesterName} />
+              {lr.requested_by_username && <InfoRow label={t('linkReview.username')} value={lr.requested_by_username} mono />}
+              <InfoRow label={t('linkReview.requestedAt')} value={lr.requested_at?.split('T')[0]} mono />
+              <InfoRow label={t('linkReview.status')} value={
                 <span style={{
                   background: lr.link_status === 'approved' ? 'rgba(34,197,94,.12)' : lr.link_status === 'rejected' ? 'rgba(239,68,68,.1)' : 'rgba(245,158,11,.12)',
                   color: lr.link_status === 'approved' ? '#16a34a' : lr.link_status === 'rejected' ? '#dc2626' : '#d97706',
@@ -1264,7 +1284,7 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
           {/* Annotations */}
           {displayAnnotations.length > 0 && (
             <div>
-              <div style={{ ...LABEL, marginBottom: 8 }}>Highlights · {displayAnnotations.length}</div>
+              <div style={{ ...LABEL, marginBottom: 8 }}>{t('linkReview.highlights', { count: displayAnnotations.length })}</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {displayAnnotations.map((ann, i) => (
                   <div key={ann.id || i}
@@ -1277,13 +1297,13 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
                         <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, color: 'rgba(0,0,0,.5)', flexShrink: 0, marginTop: 2 }}>T</span>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           {ann.text && <div style={{ fontSize: 10.5, color: 'rgba(0,0,0,.55)', fontStyle: 'italic', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>"{ann.text.slice(0, 45)}{ann.text.length > 45 ? '…' : ''}"</div>}
-                          <div style={{ fontSize: 12, color: 'rgba(0,0,0,.75)', lineHeight: 1.4 }}>{ann.comment || <span style={{ opacity: 0.5 }}>No comment</span>}</div>
+                          <div style={{ fontSize: 12, color: 'rgba(0,0,0,.75)', lineHeight: 1.4 }}>{ann.comment || <span style={{ opacity: 0.5 }}>{t('common.noComment')}</span>}</div>
                         </div>
                       </>
                     ) : (
                       <>
                         <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, color: 'rgba(0,0,0,.5)', flexShrink: 0, marginTop: 2 }}>P{ann.page}</span>
-                        <span style={{ fontSize: 12.5, color: 'rgba(0,0,0,.75)', lineHeight: 1.5, flex: 1 }}>{ann.comment || <span style={{ opacity: 0.5 }}>No comment</span>}</span>
+                        <span style={{ fontSize: 12.5, color: 'rgba(0,0,0,.75)', lineHeight: 1.5, flex: 1 }}>{ann.comment || <span style={{ opacity: 0.5 }}>{t('common.noComment')}</span>}</span>
                       </>
                     )}
                   </div>
@@ -1308,20 +1328,20 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
           const ReviewerIcon = isApproved ? CheckCircle : XCircle;
           const reviewerName = lr.reviewed_by_first_name
             ? `${lr.reviewed_by_first_name} ${lr.reviewed_by_last_name || ''}`.trim()
-            : lr.reviewed_by_username || 'Reviewer';
+            : lr.reviewed_by_username || t('linkReview.reviewerFallback');
           const parsedRemarks = parseDisplayRemarks(lr.review_comments);
           return (
             <div style={{ padding: '16px 20px', borderTop: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ ...LABEL }}>Review Details</div>
+              <div style={{ ...LABEL }}>{t('linkReview.reviewDetails')}</div>
               {/* Status banner */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 10, background: accentBg, border: `1px solid ${accentBorder}` }}>
                 <ReviewerIcon size={22} color={accent} style={{ flexShrink: 0 }} />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13, fontWeight: 700, color: accent }}>
-                    Link {isApproved ? 'Approved' : 'Rejected'}
+                    {isApproved ? t('linkReview.linkApproved') : t('linkReview.linkRejected')}
                   </div>
                   <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 2 }}>
-                    By <strong style={{ color: 'var(--text-color)' }}>{reviewerName}</strong>
+                    {t('linkReview.byPrefix')} <strong style={{ color: 'var(--text-color)' }}>{reviewerName}</strong>
                     {lr.reviewed_at && <> · {lr.reviewed_at.split('T')[0]}</>}
                   </div>
                 </div>
@@ -1340,7 +1360,7 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
                 </div>
               ) : (
                 <div style={{ fontSize: 13, color: 'var(--text-color-secondary)', fontStyle: 'italic', padding: '8px 0' }}>
-                  No remarks were provided.
+                  {t('linkReview.noRemarksProvided')}
                 </div>
               )}
             </div>
@@ -1354,12 +1374,12 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {remarkLines.map((remark, idx) => (
               <div key={idx}>
-                <div style={{ ...LABEL, marginBottom: 5 }}>Remark {idx + 1}</div>
+                <div style={{ ...LABEL, marginBottom: 5 }}>{t('common.remarkNumber', { num: idx + 1 })}</div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <input
                     value={remark}
                     onChange={e => updateRemark(idx, e.target.value)}
-                    placeholder={`Enter remark ${idx + 1}…`}
+                    placeholder={t('common.enterRemarkPlaceholder', { num: idx + 1 })}
                     style={{
                       flex: 1, background: 'var(--surface-ground)',
                       border: '1px solid var(--surface-border)', borderRadius: 8,
@@ -1396,23 +1416,23 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
               }}
               onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.background = 'rgba(26,86,219,.05)'; }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--surface-border)'; e.currentTarget.style.background = 'transparent'; }}>
-              <Plus size={13} /> Add Remark
+              <Plus size={13} /> {t('common.addRemark')}
             </button>
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={() => onReview(lr.link_id, 'rejected', buildComments(), buildAnnotationsJson())}
                 disabled={deciding === lr.link_id || !hasRemarks}
-                title={!hasRemarks ? 'Enter at least one remark before rejecting' : undefined}
+                title={!hasRemarks ? t('linkReview.enterRemarkBeforeRejecting') : undefined}
                 style={{ background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.3)', color: '#b91c1c', padding: '9px 18px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 600, cursor: (deciding === lr.link_id || !hasRemarks) ? 'not-allowed' : 'pointer', opacity: (deciding === lr.link_id || !hasRemarks) ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
                 onMouseEnter={e => { if (!deciding && hasRemarks) e.currentTarget.style.background = 'rgba(239,68,68,.15)'; }}
                 onMouseLeave={e => { if (!deciding) e.currentTarget.style.background = 'rgba(239,68,68,.08)'; }}>
-                <X size={14} /> {deciding === lr.link_id ? 'Rejecting…' : 'Reject'}
+                <X size={14} /> {deciding === lr.link_id ? t('common.rejecting') : t('common.reject')}
               </button>
               <button onClick={() => onReview(lr.link_id, 'approved', buildComments(), buildAnnotationsJson())}
                 disabled={deciding === lr.link_id}
                 style={{ background: 'rgba(34,197,94,.1)', border: '1px solid rgba(34,197,94,.3)', color: '#1e40af', padding: '9px 20px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700, cursor: deciding === lr.link_id ? 'not-allowed' : 'pointer', opacity: deciding === lr.link_id ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
                 onMouseEnter={e => { if (!deciding) e.currentTarget.style.background = 'rgba(34,197,94,.18)'; }}
                 onMouseLeave={e => { if (!deciding) e.currentTarget.style.background = 'rgba(34,197,94,.1)'; }}>
-                <Check size={14} /> {deciding === lr.link_id ? 'Approving…' : 'Approve'}
+                <Check size={14} /> {deciding === lr.link_id ? t('common.approving') : t('common.approve')}
               </button>
             </div>
           </div>
@@ -1423,6 +1443,7 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
 }
 
 export default function ApproverDashboard({ activePage, onAuditLog, documents, onApprove }) {
+  const { t } = useTranslation('approver');
   const [docs, setDocs]           = useState([]);
   const [loading, setLoading]     = useState(false);
   const [apiError, setApiError]   = useState('');
@@ -1450,7 +1471,7 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
     setApiError('');
     getApproverDocuments()
       .then(res => setDocs((res.data.documents || []).map(mapApiDoc)))
-      .catch(err => setApiError(err.response?.data?.detail || 'Failed to load documents'))
+      .catch(err => setApiError(err.response?.data?.detail || t('dashboard.failedToLoadDocuments')))
       .finally(() => setLoading(false));
   }
 
@@ -1564,12 +1585,12 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
         ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)' }}>Department Link Requests</span>
+            <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)' }}>{t('linkRequests.heading')}</span>
             <div style={{ display: 'flex', background: 'var(--surface-ground)', borderRadius: 8, padding: 3, gap: 2, border: '1px solid var(--surface-border)', marginLeft: 'auto' }}>
               {[
-                { key: 'pending',  label: 'Pending',  color: '#d97706', bg: 'rgba(245,158,11,.12)' },
-                { key: 'approved', label: 'Approved', color: '#16a34a', bg: 'rgba(34,197,94,.12)' },
-                { key: 'rejected', label: 'Rejected', color: '#dc2626', bg: 'rgba(239,68,68,.1)' },
+                { key: 'pending',  label: t('linkRequests.tabs.pending'),  color: '#d97706', bg: 'rgba(245,158,11,.12)' },
+                { key: 'approved', label: t('linkRequests.tabs.approved'), color: '#16a34a', bg: 'rgba(34,197,94,.12)' },
+                { key: 'rejected', label: t('linkRequests.tabs.rejected'), color: '#dc2626', bg: 'rgba(239,68,68,.1)' },
               ].map(tab => {
                 const active = linkFilter === tab.key;
                 return (
@@ -1599,10 +1620,10 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
             <Card style={{ textAlign: 'center', padding: '64px 0' }}>
               <CheckCircle size={44} color="var(--surface-200)" style={{ margin: '0 auto 14px', display: 'block' }} />
               <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-color-secondary)', marginBottom: 6 }}>
-                No {linkFilter} link requests
+                {t('linkRequests.noRequestsOfType', { status: t(`linkRequests.statusLower.${linkFilter}`) })}
               </div>
               <div style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>
-                {linkFilter === 'pending' ? 'When a department requests to link a shared document, it will appear here.' : `No ${linkFilter} link requests to show.`}
+                {linkFilter === 'pending' ? t('linkRequests.pendingHint') : t('linkRequests.genericHint', { status: t(`linkRequests.statusLower.${linkFilter}`) })}
               </div>
             </Card>
           )}
@@ -1631,19 +1652,19 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
                     <span style={{ background: 'rgba(245,158,11,.1)', color: '#d97706', padding: '2px 8px', borderRadius: 20, fontWeight: 600, fontSize: 10.5 }}>{lr.document_type_name}</span>
-                    <span>Originally from <strong style={{ color: 'var(--text-color)' }}>{lr.original_department_name || 'Unknown'}</strong></span>
+                    <span>{t('linkRequests.originallyFromPrefix')} <strong style={{ color: 'var(--text-color)' }}>{lr.original_department_name || t('common.unknown')}</strong></span>
                     <span>·</span>
-                    <span>Requested by <strong style={{ color: 'var(--text-color)' }}>
+                    <span>{t('linkRequests.requestedByPrefix')} <strong style={{ color: 'var(--text-color)' }}>
                       {lr.requested_by_first_name
                         ? `${lr.requested_by_first_name} ${lr.requested_by_last_name || ''}`.trim()
-                        : lr.requested_by_username || 'Unknown'}
+                        : lr.requested_by_username || t('common.unknown')}
                     </strong></span>
                     <span>·</span>
                     <span style={{ fontFamily: 'var(--mono)', fontSize: 11 }}>{lr.requested_at?.split('T')[0]}</span>
                     {reviewerName && (
                       <>
                         <span>·</span>
-                        <span>{lr.link_status === 'approved' ? 'Approved' : 'Rejected'} by <strong style={{ color: lsColor }}>{reviewerName}</strong></span>
+                        <span>{lr.link_status === 'approved' ? t('linkRequests.approvedByPrefix') : t('linkRequests.rejectedByPrefix')} <strong style={{ color: lsColor }}>{reviewerName}</strong></span>
                         {lr.reviewed_at && <span style={{ fontFamily: 'var(--mono)', fontSize: 11 }}>{lr.reviewed_at.split('T')[0]}</span>}
                       </>
                     )}
@@ -1659,18 +1680,18 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
                     style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}
                     onMouseEnter={e => { e.currentTarget.style.background = 'var(--surface-hover)'; e.currentTarget.style.color = 'var(--primary)'; e.currentTarget.style.borderColor = 'var(--primary)'; }}
                     onMouseLeave={e => { e.currentTarget.style.background = 'var(--surface-ground)'; e.currentTarget.style.color = 'var(--text-color-secondary)'; e.currentTarget.style.borderColor = 'var(--surface-border)'; }}>
-                    <Eye size={13} /> View Document
+                    <Eye size={13} /> {t('linkRequests.viewDocument')}
                   </button>
                   {lr.link_status === 'pending' && (<>
                     <button onClick={() => handleReviewLink(lr.link_id, 'rejected')}
                       disabled={linkDeciding === lr.link_id}
                       style={{ padding: '7px 16px', borderRadius: 8, border: '1px solid rgba(239,68,68,.3)', background: 'rgba(239,68,68,.06)', color: '#dc2626', fontSize: 12.5, fontWeight: 700, cursor: linkDeciding === lr.link_id ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: linkDeciding === lr.link_id ? 0.6 : 1 }}>
-                      Reject
+                      {t('common.reject')}
                     </button>
                     <button onClick={() => handleReviewLink(lr.link_id, 'approved')}
                       disabled={linkDeciding === lr.link_id}
                       style={{ padding: '7px 16px', borderRadius: 8, border: 'none', background: linkDeciding === lr.link_id ? 'rgba(34,197,94,.5)' : '#16a34a', color: 'white', fontSize: 12.5, fontWeight: 700, cursor: linkDeciding === lr.link_id ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)' }}>
-                      {linkDeciding === lr.link_id ? 'Processing…' : 'Approve'}
+                      {linkDeciding === lr.link_id ? t('linkRequests.processing') : t('common.approve')}
                     </button>
                   </>)}
                 </div>
@@ -1698,7 +1719,7 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
           <span style={{ fontSize: 13, flex: 1 }}>{apiError}</span>
           <button onClick={fetchDocs}
             style={{ padding: '5px 14px', borderRadius: 7, border: '1px solid rgba(239,68,68,.3)', background: 'transparent', color: '#dc2626', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-            Retry
+            {t('common.retry')}
           </button>
         </div>
       )}
@@ -1707,14 +1728,14 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
       {activePage !== 'pending' && activePage !== 'links' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
           {[
-            { icon: Clock,       label: 'Pending',  value: pending.length,                                       bg: 'rgba(245,158,11,.12)', color: '#f59e0b', key: 'pending'  },
-            { icon: CheckCircle, label: 'Approved', value: reviewed.filter(d => d.status === 'approved').length, bg: 'rgba(34,197,94,.12)',  color: '#22c55e', key: 'approved' },
-            { icon: XCircle,     label: 'Rejected', value: reviewed.filter(d => d.status === 'rejected').length, bg: 'rgba(239,68,68,.12)',  color: '#ef4444', key: 'rejected' },
-            { icon: FileText,    label: 'Total',    value: docs.length,                                          bg: 'rgba(26,86,219,.12)',  color: 'var(--primary)', key: 'all' },
+            { icon: Clock,       label: t('dashboard.summary.pending'),  value: pending.length,                                       bg: 'rgba(245,158,11,.12)', color: '#f59e0b', key: 'pending'  },
+            { icon: CheckCircle, label: t('dashboard.summary.approved'), value: reviewed.filter(d => d.status === 'approved').length, bg: 'rgba(34,197,94,.12)',  color: '#22c55e', key: 'approved' },
+            { icon: XCircle,     label: t('dashboard.summary.rejected'), value: reviewed.filter(d => d.status === 'rejected').length, bg: 'rgba(239,68,68,.12)',  color: '#ef4444', key: 'rejected' },
+            { icon: FileText,    label: t('dashboard.summary.total'),    value: docs.length,                                          bg: 'rgba(26,86,219,.12)',  color: 'var(--primary)', key: 'all' },
           ].map(s => {
             const isActive = cardFilter === s.key;
             return (
-            <Card key={s.label} onClick={() => { setCardFilter(f => f === s.key ? null : s.key); setTimeout(() => tableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); }}
+            <Card key={s.key} onClick={() => { setCardFilter(f => f === s.key ? null : s.key); setTimeout(() => tableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); }}
               style={{ cursor: 'pointer', outline: isActive ? `2px solid ${s.color}` : '2px solid transparent', transition: 'all .2s' }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
                 <div>
@@ -1735,18 +1756,18 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '6px 12px', flex: 1, maxWidth: 300 }}>
             <Search size={13} color="var(--text-color-secondary)" />
-            <input value={searchQ} onChange={e => setSearchQ(e.target.value)} placeholder="Search by title…"
+            <input value={searchQ} onChange={e => setSearchQ(e.target.value)} placeholder={t('dashboard.searchPlaceholder')}
               style={{ background: 'transparent', border: 'none', outline: 'none', fontSize: 12.5, color: 'var(--text-color)', width: '100%' }} />
             {searchQ && <button onClick={() => setSearchQ('')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', padding: 0 }}><X size={12} /></button>}
           </div>
           {cardFilter && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px 5px 12px', borderRadius: 20, background: 'rgba(34,197,94,.1)', border: '1px solid rgba(34,197,94,.3)', fontSize: 12.5, fontWeight: 600, color: '#16a34a', whiteSpace: 'nowrap' }}>
-              {{ all: 'All', pending: 'Pending', approved: 'Approved', rejected: 'Rejected' }[cardFilter]}
+              {t(`dashboard.filterChip.${cardFilter}`)}
               <button onClick={() => setCardFilter(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#16a34a', display: 'flex', padding: 0, marginLeft: 2 }}><X size={11} /></button>
             </div>
           )}
           <span style={{ marginLeft: 'auto', fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '2px 9px', borderRadius: 20 }}>
-            {`${list.length} document${list.length !== 1 ? 's' : ''}`}
+            {t('dashboard.documentCount', { count: list.length })}
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
@@ -1765,7 +1786,7 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
                   color: active ? 'white' : c.text || c.accent,
                   opacity: count === 0 ? 0.4 : 1,
                 }}>
-                {type}
+                {TYPE_LABEL_KEY[type] ? t(`docTypes.${TYPE_LABEL_KEY[type]}`) : type}
                 <span style={{ fontSize: 10, fontFamily: 'var(--mono)', background: active ? 'rgba(255,255,255,.25)' : 'var(--surface-ground)', color: active ? 'white' : 'var(--text-color-secondary)', padding: '0px 5px', borderRadius: 10 }}>{count}</span>
               </button>
             );
@@ -1773,7 +1794,7 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
           {filter && (
             <button onClick={() => setFilter('')}
               style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px', borderRadius: 20, cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 11, fontWeight: 600, background: 'transparent', border: '1.5px dashed var(--surface-border)', color: 'var(--text-color-secondary)' }}>
-              <X size={10} /> Clear
+              <X size={10} /> {t('common.clear')}
             </button>
           )}
         </div>
@@ -1784,10 +1805,10 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
         <Card style={{ textAlign: 'center', padding: '64px 0' }}>
           <CheckCircle size={44} color="var(--surface-200)" style={{ margin: '0 auto 14px', display: 'block' }} />
           <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-color-secondary)', marginBottom: 6 }}>
-            {activePage === 'pending' ? 'All caught up!' : 'No reviewed documents'}
+            {activePage === 'pending' ? t('dashboard.emptyState.allCaughtUp') : t('dashboard.emptyState.noReviewedDocuments')}
           </div>
           <div style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>
-            {activePage === 'pending' ? 'No pending submissions to review.' : 'Reviewed documents will appear here.'}
+            {activePage === 'pending' ? t('dashboard.emptyState.noPendingSubmissions') : t('dashboard.emptyState.reviewedWillAppear')}
           </div>
         </Card>
       )}
@@ -1805,7 +1826,7 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
                 style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '16px 20px', cursor: 'pointer' }}>
                 <div style={{ width: 38, height: 44, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, flexShrink: 0 }}>
                   <FileText size={14} color="var(--primary)" />
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: 7, color: 'var(--primary)', fontWeight: 700 }}>PDF</span>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 7, color: 'var(--primary)', fontWeight: 700 }}>{t('dashboard.pdfBadge')}</span>
                 </div>
 
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -1815,8 +1836,8 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
                       doc.type,
                       doc.dept,
                       String(doc.year),
-                      doc.pages ? `${doc.pages} pages` : null,
-                      doc.uploader ? `By: ${doc.uploader}` : null,
+                      doc.pages ? t('dashboard.pagesValue', { count: doc.pages }) : null,
+                      doc.uploader ? t('dashboard.byUploader', { name: doc.uploader }) : null,
                       doc.uploadedAt || null,
                     ].filter(Boolean).map((v, i) => (
                       <span key={i} style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)' }}>{v}</span>
@@ -1828,8 +1849,8 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
                     return (
                       <div style={{ marginTop: 4, fontSize: 11.5, color: 'var(--text-color-secondary)', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 460 }}>
                         {parsed.length <= 1
-                          ? `Remark 1: "${parsed[0]?.text ?? doc.remarks}"`
-                          : `${parsed.length} remarks — Remark 1: "${parsed[0].text}"`
+                          ? t('dashboard.remarkSummarySingle', { text: parsed[0]?.text ?? doc.remarks })
+                          : t('dashboard.remarkSummaryMulti', { count: parsed.length, text: parsed[0].text })
                         }
                       </div>
                     );
@@ -1841,7 +1862,7 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
                   {!isOpen && doc.status === 'pending' && (
                     <div style={{ display: 'flex', gap: 6 }}>
                       {[
-                        { icon: Eye, color: '#1a56db', label: 'PDF' },
+                        { icon: Eye, color: '#1a56db', label: t('dashboard.pdfBadge') },
                       ].map(({ icon: Icon, color, label }) => (
                         <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '3px 8px', borderRadius: 20, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)' }}>
                           <Icon size={10} color={color} />
