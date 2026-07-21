@@ -1,4 +1,4 @@
-# Haryana Legal Repository
+# Haryana Digital Repository
 
 Role-based legal document management and semantic search portal for Government of Haryana.
 Built for HARTRON TOR reference: **TOR-CSO/2026-27/03**

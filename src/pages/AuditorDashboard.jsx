@@ -214,7 +214,7 @@ export default function AuditorDashboard({ activePage }) {
             </button>
           </div>
           <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', lineHeight: 1.8 }}>
-            This report certifies that the Haryana Legal Repository has operated in full compliance with the <strong>Zero Generation Constraint</strong> (TOR Module B, Requirement B-04 to B-08). All search results returned during the audit period contained exclusively verbatim document pointers with no AI-generated textual content.
+            This report certifies that the Haryana Digital Repository has operated in full compliance with the <strong>Zero Generation Constraint</strong> (TOR Module B, Requirement B-04 to B-08). All search results returned during the audit period contained exclusively verbatim document pointers with no AI-generated textual content.
           </div>
           <div style={{ marginTop: 16, display: 'flex', gap: 24 }}>
             {[['Audit Period','Feb – May 2026'],['Total Queries Reviewed','978'],['AI Violations Found','0'],['Compliance Rate','100%']].map(([k,v]) => (
