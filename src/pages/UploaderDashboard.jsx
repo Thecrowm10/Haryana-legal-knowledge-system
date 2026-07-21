@@ -16,7 +16,7 @@ import Badge from '../components/ui/Badge';
 import SelectField from '../components/ui/SelectField';
 import { useAuth } from '../hooks/useAuth';
 import { getDepartments, getDocumentTypes } from '../services/departments';
-import { uploadPdfFile, uploadPdfMetadata, updatePdfMetadata, getMyDocuments, searchDocuments, getPdfFile, checkDuplicateDocument, linkDocumentToDepartment, getLinkedDocuments, getActChildren, getMyDepartmentActs } from '../services/pdf';
+import { uploadPdfFile, uploadPdfMetadata, updatePdfMetadata, getMyDocuments, searchDocuments, getPdfFile, checkDuplicateDocument, linkDocumentToDepartment, getLinkedDocuments, getActChildren, getMyDepartmentActs, getMyDepartmentDocsByType } from '../services/pdf';
 import { createNotification } from '../services/notifications';
 
 // Constants
@@ -1101,7 +1101,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   }
 
   useEffect(() => {
-    if (activePage !== 'myuploads' && activePage !== 'editdocument') return;
+    if (activePage !== 'myuploads') return;
     if (!localStorage.getItem('token')) return;
     setMyDocsLoading(true);
     setMyDocsError('');
@@ -1118,11 +1118,40 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   }, [activePage]);
 
   // Edit Document page: pick a type → table of that type's docs → edit form for one doc
-  const [editType, setEditType]       = useState(null);
+  const [editType, setEditType]             = useState(null);
+  const [editList, setEditList]             = useState([]);
+  const [editListLoading, setEditListLoading] = useState(false);
+  const [editListError, setEditListError]   = useState('');
+  const [viewingEditDoc, setViewingEditDoc] = useState(null); // doc open in DocViewModal (read-only "View")
   const [editingDoc, setEditingDoc]   = useState(null);
   const [editForm, setEditForm]       = useState(null);
   const [editSaving, setEditSaving]   = useState(false);
   const [editError, setEditError]     = useState('');
+
+  // Fetch the documents of the chosen type in the uploader's department once a type is picked
+  useEffect(() => {
+    if (activePage !== 'editdocument' || !editType) return;
+    if (!localStorage.getItem('token')) return;
+    const typeId = typesData.find(d => d.name === editType)?.id;
+    if (!typeId) { setEditList([]); return; }
+    let cancelled = false;
+    setEditListLoading(true);
+    setEditListError('');
+    getMyDepartmentDocsByType(typeId, null, 0, 200)
+      .then(res => {
+        if (cancelled) return;
+        const list = res.data?.documents || res.data?.results || (Array.isArray(res.data) ? res.data : []);
+        setEditList(list.map(mapApiDoc));
+      })
+      .catch(err => {
+        if (cancelled) return;
+        const detail = err.response?.data?.detail;
+        setEditListError(typeof detail === 'string' ? detail : t('toasts.failedToLoadDocuments'));
+        setEditList([]);
+      })
+      .finally(() => { if (!cancelled) setEditListLoading(false); });
+    return () => { cancelled = true; };
+  }, [activePage, editType, typesData]);
 
   function openEditDoc(doc) {
     setEditingDoc(doc);
@@ -2467,44 +2496,53 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 {t('editDocument.tableHeading', { type: DOC_TYPE_KEY[editType] ? t(`docTypes.${DOC_TYPE_KEY[editType]}`) : editType })}
               </span>
             </div>
-            {myDocsLoading ? (
+            {editListError && (
+              <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', color: '#dc2626', fontSize: 12.5, marginBottom: 14 }}>
+                {editListError}
+              </div>
+            )}
+            {editListLoading ? (
               <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', padding: '10px 0' }}>{t('common.loading')}</div>
-            ) : (() => {
-              const list = uploads.filter(d => d.type === editType);
-              return (
-                <div style={{ border: '1px solid var(--surface-border)', borderRadius: 10, overflow: 'hidden' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
-                    <thead>
-                      <tr style={{ background: 'var(--surface-ground)' }}>
-                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('wizard.step3.colDocumentName')}</th>
-                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.referenceNo')}</th>
-                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.issueDate')}</th>
-                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.department')}</th>
-                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.version')}</th>
-                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.status')}</th>
-                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('editDocument.action')}</th>
+            ) : (
+              <div style={{ border: '1px solid var(--surface-border)', borderRadius: 10, overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                  <thead>
+                    <tr style={{ background: 'var(--surface-ground)' }}>
+                      <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('wizard.step3.colDocumentName')}</th>
+                      <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.referenceNo')}</th>
+                      <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.issueDate')}</th>
+                      <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.department')}</th>
+                      <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.version')}</th>
+                      <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.status')}</th>
+                      <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('editDocument.action')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {editList.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} style={{ padding: '16px 12px', textAlign: 'center', color: 'var(--text-color-secondary)' }}>
+                          {t('editDocument.noDocsOfType', { type: DOC_TYPE_KEY[editType] ? t(`docTypes.${DOC_TYPE_KEY[editType]}`) : editType })}
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {list.length === 0 ? (
-                        <tr>
-                          <td colSpan={7} style={{ padding: '16px 12px', textAlign: 'center', color: 'var(--text-color-secondary)' }}>
-                            {t('editDocument.noDocsOfType', { type: DOC_TYPE_KEY[editType] ? t(`docTypes.${DOC_TYPE_KEY[editType]}`) : editType })}
+                    ) : editList.map(d => {
+                      const editable = d.status !== 'approved';
+                      return (
+                        <tr key={d.id} style={{ borderTop: '1px solid var(--surface-border)' }}>
+                          <td style={{ padding: '8px 12px', color: 'var(--text-heading)', fontWeight: 600 }}>{d.title || '—'}</td>
+                          <td style={{ padding: '8px 12px', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.referenceNumber || '—'}</td>
+                          <td style={{ padding: '8px 12px', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.enactmentDate || '—'}</td>
+                          <td style={{ padding: '8px 12px', color: 'var(--text-color-secondary)' }}>{d.dept || '—'}</td>
+                          <td style={{ padding: '8px 12px', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.version || '—'}</td>
+                          <td style={{ padding: '8px 12px', color: 'var(--text-color-secondary)', textTransform: 'capitalize' }}>
+                            {{ approved: t('common.statusWordApproved'), pending: t('common.statusWordPending'), rejected: t('common.statusWordRejected') }[d.status] || d.status || '—'}
                           </td>
-                        </tr>
-                      ) : list.map(d => {
-                        const editable = d.status !== 'approved';
-                        return (
-                          <tr key={d.id} style={{ borderTop: '1px solid var(--surface-border)' }}>
-                            <td style={{ padding: '8px 12px', color: 'var(--text-heading)', fontWeight: 600 }}>{d.title || '—'}</td>
-                            <td style={{ padding: '8px 12px', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.referenceNumber || '—'}</td>
-                            <td style={{ padding: '8px 12px', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.enactmentDate || '—'}</td>
-                            <td style={{ padding: '8px 12px', color: 'var(--text-color-secondary)' }}>{d.dept || '—'}</td>
-                            <td style={{ padding: '8px 12px', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.version || '—'}</td>
-                            <td style={{ padding: '8px 12px', color: 'var(--text-color-secondary)', textTransform: 'capitalize' }}>
-                              {{ approved: t('common.statusWordApproved'), pending: t('common.statusWordPending'), rejected: t('common.statusWordRejected') }[d.status] || d.status || '—'}
-                            </td>
-                            <td style={{ padding: '8px 12px' }}>
+                          <td style={{ padding: '8px 12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <button type="button" onClick={() => setViewingEditDoc(d)} title={t('common.view')}
+                                disabled={!d.id}
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 600, cursor: d.id ? 'pointer' : 'not-allowed', fontFamily: 'var(--font)', opacity: d.id ? 1 : 0.5 }}>
+                                <Eye size={12} /> {t('common.view')}
+                              </button>
                               {editable ? (
                                 <button type="button" onClick={() => openEditDoc(d)}
                                   style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
@@ -2516,16 +2554,20 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                                   {t('editDocument.locked')}
                                 </span>
                               )}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              );
-            })()}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </Card>
+        )}
+
+        {viewingEditDoc && (
+          <DocViewModal doc={viewingEditDoc} onClose={() => setViewingEditDoc(null)} />
         )}
 
         {/* Edit form drawer */}

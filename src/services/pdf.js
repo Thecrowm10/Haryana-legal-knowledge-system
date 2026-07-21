@@ -26,3 +26,4 @@ export const getAllDepartmentLinks      = (link_status, department_id)   => api.
 export const reviewDepartmentLink      = (link_id, action, comments, annotations_json) => api.post('/pdf/review-link', { link_id, action, comments: comments || null, annotations_json: annotations_json || null });
 export const getActChildren            = (pdf_id)                       => api.get(`/pdf/${pdf_id}/children`);
 export const getMyDepartmentActs       = (status, skip = 0, limit = 20)  => api.get('/pdf/my-department/acts', { params: { skip, limit, ...(status ? { status } : {}) } });
+export const getMyDepartmentDocsByType = (doc_type_id, status, skip = 0, limit = 20) => api.get('/pdf/my-department/by-type', { params: { doc_type_id, skip, limit, ...(status ? { status } : {}) } });
