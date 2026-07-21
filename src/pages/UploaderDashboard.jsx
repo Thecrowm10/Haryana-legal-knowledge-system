@@ -1182,7 +1182,9 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     setEditSaving(true);
     setEditError('');
     const tf = editForm.typeFields || {};
-    const typeId = typesData.find(d => d.name === editingDoc.type)?.id ?? null;
+    // Prefer the id the document already carries from the API (reliable); only fall back to
+    // matching on the display name if that's somehow missing (e.g. an older cached row).
+    const typeId = editingDoc.docTypeId ?? typesData.find(d => d.name === editingDoc.type)?.id ?? null;
     const payload = {
       document_type_id:      typeId,
       document_name:         editForm.document_name,
