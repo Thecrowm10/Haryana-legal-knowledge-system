@@ -1,22 +1,9 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Upload, FileText, CheckSquare, Eye, BarChart2, GitBranch, ClipboardList, ChevronDown, Users, Settings, Activity, FileSearch, BarChart, Layers, Link2, Edit3 } from 'lucide-react';
+import { BarChart2, GitBranch, ClipboardList, ChevronDown, Users, Settings, Activity, FileSearch, BarChart, Layers, Link2 } from 'lucide-react';
 import haryanaLogo from '../../assets/haryana-logo.png';
 const MENU_CONFIG = {
-  uploader: [
-    { label: 'sidebar.groups.documents', items: [
-      { icon: Upload,   label: 'sidebar.items.uploadDocument', id: 'upload' },
-      { icon: FileText, label: 'sidebar.items.myUploads',      id: 'myuploads' },
-      { icon: Edit3,    label: 'sidebar.items.editDocument',   id: 'editdocument' },
-    ]},
-  ],
-  approver: [
-    { label: 'sidebar.groups.reviewQueue', items: [
-      { icon: CheckSquare, label: 'sidebar.items.pendingApprovals', id: 'pending' },
-      { icon: Eye,         label: 'sidebar.items.reviewed',         id: 'reviewed' },
-      { icon: Link2,       label: 'sidebar.items.linkRequests',     id: 'links' },
-    ]},
-  ],
+  // uploader and approver have no sidebar — see Layout.jsx (single-page dashboard instead)
   csoffice: [
     { label: 'sidebar.groups.analytics', items: [
       { icon: BarChart2, label: 'sidebar.items.dashboard',       id: 'analytics' },

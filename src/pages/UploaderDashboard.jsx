@@ -5,7 +5,7 @@ import {
   RotateCcw, AlertCircle, Eye, GitBranch, Plus,
   Layers, ChevronRight, AlertTriangle, CheckSquare, Square,
   Edit3, Tag, Search, MessageSquare, MessageCircle, ZoomIn, ZoomOut, RotateCw, ExternalLink,
-  Save,
+  Save, ArrowRight,
 } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
@@ -169,7 +169,7 @@ const LABEL = {
 const INPUT_BASE = {
   background: 'var(--surface-ground)', border: '1px solid var(--surface-border)',
   borderRadius: 8, color: 'var(--text-color)', fontFamily: 'var(--font)',
-  fontSize: 13, padding: '10px 14px', outline: 'none', width: '100%',
+  fontSize: 13, padding: '8px 12px', outline: 'none', width: '100%',
   transition: 'border-color .2s, box-shadow .2s',
 };
 
@@ -995,7 +995,7 @@ function DocViewModal({ doc, onClose }) {
 }
 
 // Main component
-export default function UploaderDashboard({ activePage, onAuditLog, documents = [], onAddDocument, taxonomy = [] }) {
+export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, documents = [], onAddDocument, taxonomy = [] }) {
   const { user } = useAuth();
   const { t } = useTranslation('uploader');
   const [deptsData, setDeptsData] = useState([]);
@@ -1102,7 +1102,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   }
 
   useEffect(() => {
-    if (activePage !== 'myuploads') return;
+    if (activePage !== 'dashboard') return;
     if (!localStorage.getItem('token')) return;
     setMyDocsLoading(true);
     setMyDocsError('');
@@ -1321,14 +1321,14 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
   const [sortCol,     setSortCol]     = useState('uploadedAt');
   const [sortDir,     setSortDir]     = useState('desc');
 
-  // Each of the 3 sidebar pages resets to its starting state on every fresh visit —
-  // clicking a sidebar item never resumes wherever the page was left mid-session.
+  // The Upload and Edit flows reset to their starting state on every fresh visit —
+  // navigating there from the dashboard never resumes wherever it was left mid-session.
   useEffect(() => {
     if (activePage === 'upload') resetUploadForm();
   }, [activePage]);
 
   useEffect(() => {
-    if (activePage === 'myuploads') {
+    if (activePage === 'dashboard') {
       setTableSearch('');
       setFilterType('');
       setFilterStatus('');
@@ -1931,8 +1931,8 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
     URL.revokeObjectURL(url);
   }
 
-  // My Uploads page
-  if (activePage === 'myuploads') {
+  // Dashboard — single landing page: quick actions + stats + My Uploads table
+  if (activePage === 'dashboard') {
     const approved  = uploads.filter(d => d.status === 'approved').length;
     const pending   = uploads.filter(d => d.status === 'pending').length;
     const rejected  = uploads.filter(d => d.status === 'rejected').length;
@@ -1942,6 +1942,51 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
 
         <Toast toast={toast} onClose={() => setToast(null)} />
+
+        {/* Welcome header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 21, fontWeight: 800, color: 'var(--text-heading)', letterSpacing: '-.01em' }}>
+              {t('dashboard.greeting', { name: user?.name || '' })}
+            </div>
+            <div style={{ fontSize: 13.5, color: 'var(--text-color-secondary)', marginTop: 4 }}>
+              {t('dashboard.subtitle')}
+            </div>
+          </div>
+          {user?.dept && (
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 11.5, color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '5px 12px', borderRadius: 20 }}>
+              {user.dept}
+            </span>
+          )}
+        </div>
+
+        {/* Quick actions */}
+        <div>
+          <div style={{ ...LABEL, marginBottom: 10 }}>{t('dashboard.quickActionsLabel')}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            {[
+              { key: 'upload', icon: Upload, title: t('dashboard.quickActions.uploadTitle'), desc: t('dashboard.quickActions.uploadDesc'), accent: '#1a56db', bg: 'rgba(26,86,219,.08)' },
+              { key: 'editdocument', icon: Edit3, title: t('dashboard.quickActions.editTitle'), desc: t('dashboard.quickActions.editDesc'), accent: '#f59e0b', bg: 'rgba(245,158,11,.08)' },
+            ].map(action => (
+              <Card key={action.key} onClick={() => onNavigate?.(action.key)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 18, cursor: 'pointer',
+                  borderLeft: `3px solid ${action.accent}`, transition: 'all .15s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = action.bg; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'var(--surface-card)'; e.currentTarget.style.transform = 'none'; }}>
+                <div style={{ width: 48, height: 48, borderRadius: 12, background: action.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <action.icon size={21} color={action.accent} strokeWidth={1.8} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', lineHeight: 1.3 }}>{action.title}</div>
+                  <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', lineHeight: 1.45, marginTop: 3 }}>{action.desc}</div>
+                </div>
+                <ArrowRight size={16} color={action.accent} style={{ flexShrink: 0, opacity: .8 }} />
+              </Card>
+            ))}
+          </div>
+        </div>
 
         {/* Version history modal */}
         {versionModal && (
@@ -2053,6 +2098,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
           </div>
         ) : (
         <>
+        <div style={{ ...LABEL }}>{t('dashboard.overviewLabel')}</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
           {[
             { label: t('stats.totalUploads'),  value: uploads.length, bg: 'rgba(26,86,219,.12)',  color: 'var(--primary)', icon: FileText,    filter: 'all' },
@@ -2537,7 +2583,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                           <FileText size={21} color={c.accent} />
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', lineHeight: 1.3 }}>{DOC_TYPE_KEY[type] ? t(`docTypes.${DOC_TYPE_KEY[type]}`) : type}</div>
+                          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', lineHeight: 1.3 }}>{t('editDocument.editPrefix', { defaultValue: 'Edit' })} {DOC_TYPE_KEY[type] ? t(`docTypes.${DOC_TYPE_KEY[type]}`) : type}</div>
                           <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', lineHeight: 1.45, marginTop: 3 }}>{DOC_TYPE_KEY[type] ? t(`docTypeDesc.${DOC_TYPE_KEY[type]}`) : TYPE_CARD_DESC[type]}</div>
                         </div>
                       </button>
@@ -2548,11 +2594,13 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
           </Card>
         ) : (
           <>
-          {/* Once a type is picked, it moves to the compact pill row at the top — same style as the Upload wizard's compact header */}
-          <Card padding="18px 22px">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-              <div style={{ ...LABEL, fontSize: 11.5, color: 'var(--text-heading)', flexShrink: 0 }}>{t('wizard.step1.label')}</div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flex: 1 }}>
+          {/* Once a type is picked, it moves to the compact pill row at the top — same fully-collapsed
+              size as the Upload wizard uses once a file is checked (its "typeCompact" state), so both
+              flows shrink the same way once there's content below the picker. */}
+          <Card padding="14px 22px" style={{ animation: 'fadeSlideIn .25s ease' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ ...LABEL, fontSize: 10.5, color: 'var(--text-heading)', flexShrink: 0 }}>{t('wizard.step1.label')}</div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flex: 1 }}>
                 {TYPES.map(type => {
                   const c = TYPE_CARD_COLORS[type] || { bg: 'rgba(148,163,184,.08)', accent: '#94a3b8', text: '#64748b' };
                   const active = editType === type;
@@ -2560,8 +2608,8 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                     <button key={type} type="button"
                         onClick={() => setEditType(type)}
                         style={{
-                          display: 'flex', alignItems: 'center', gap: 8,
-                          padding: '9px 14px', borderRadius: 10,
+                          display: 'flex', alignItems: 'center', gap: 6,
+                          padding: '6px 10px', borderRadius: 8,
                           border: active ? `1.5px solid ${c.accent}` : `1.5px solid ${c.accent}30`,
                           background: active ? c.bg : 'var(--surface-card)',
                           opacity: active ? 1 : 0.72,
@@ -2570,9 +2618,9 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                         }}
                         onMouseEnter={e => { if (!active) { e.currentTarget.style.opacity = 1; e.currentTarget.style.borderColor = c.accent + '60'; }}}
                         onMouseLeave={e => { if (!active) { e.currentTarget.style.opacity = 0.72; e.currentTarget.style.borderColor = c.accent + '30'; }}}>
-                        <FileText size={14} color={c.accent} />
-                        <span style={{ fontSize: 12.5, fontWeight: active ? 700 : 600, color: active ? c.text : 'var(--text-heading)', whiteSpace: 'nowrap' }}>{DOC_TYPE_KEY[type] ? t(`docTypes.${DOC_TYPE_KEY[type]}`) : type}</span>
-                        {active && <CheckCircle size={13} color={c.accent} />}
+                        <FileText size={11} color={c.accent} />
+                        <span style={{ fontSize: 11.5, fontWeight: active ? 700 : 600, color: active ? c.text : 'var(--text-heading)', whiteSpace: 'nowrap' }}>{DOC_TYPE_KEY[type] ? t(`docTypes.${DOC_TYPE_KEY[type]}`) : type}</span>
+                        {active && <CheckCircle size={11} color={c.accent} />}
                       </button>
                   );
                 })}
@@ -2911,10 +2959,66 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
           </div>
         )}
 
+        {/* ── STEP 1 + 2 merged: once the type is picked AND every file is checked, show one compact
+             card instead of two stacked ones — less scrolling, less wasted space. ── */}
+        {form.type && allFilesChecked ? (
+          <Card padding="12px 22px" style={{ animation: 'fadeSlideIn .25s ease' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ ...LABEL, fontSize: 10.5, color: 'var(--text-heading)', flexShrink: 0 }}>{t('wizard.step1.label')}</div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flex: 1 }}>
+                {TYPES.map(type => {
+                  const c = TYPE_CARD_COLORS[type] || { bg: 'rgba(148,163,184,.08)', accent: '#94a3b8', text: '#64748b' };
+                  const active = form.type === type;
+                  return (
+                    <button key={type} type="button"
+                        onClick={() => { fmt('type', type); setTypeFields({}); setLegalAuthorities([{ act: '', sections: [''] }]); setAmendChanges([{ chapter: '', section: '', subsection: '', changeType: 'Amended', description: '' }]); setHierarchy({ act: '', chapter: '', section: '', subsection: '' }); setRelations([]); setRelType((REL_TYPES_BY_DOCTYPE[type] || REL_TYPES)[0]); setRelDocType(''); setRelTarget(''); setRelSearch(''); }}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 6,
+                          padding: '6px 10px', borderRadius: 8,
+                          border: active ? `1.5px solid ${c.accent}` : `1.5px solid ${c.accent}30`,
+                          background: active ? c.bg : 'var(--surface-card)',
+                          opacity: active ? 1 : 0.72,
+                          boxShadow: active ? `0 0 0 3px ${c.accent}15` : 'none',
+                          cursor: 'pointer', transition: 'all .15s', fontFamily: 'var(--font)',
+                        }}
+                        onMouseEnter={e => { if (!active) { e.currentTarget.style.opacity = 1; e.currentTarget.style.borderColor = c.accent + '60'; }}}
+                        onMouseLeave={e => { if (!active) { e.currentTarget.style.opacity = 0.72; e.currentTarget.style.borderColor = c.accent + '30'; }}}>
+                        <FileText size={11} color={c.accent} />
+                        <span style={{ fontSize: 11.5, fontWeight: active ? 700 : 600, color: active ? c.text : 'var(--text-heading)', whiteSpace: 'nowrap' }}>{DOC_TYPE_KEY[type] ? t(`docTypes.${DOC_TYPE_KEY[type]}`) : type}</span>
+                        {active && <CheckCircle size={11} color={c.accent} />}
+                      </button>
+                    );
+                  })}
+              </div>
+            </div>
+            <div style={{ height: 1, background: 'var(--surface-border)', margin: '10px 0' }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 26, height: 26, borderRadius: 7, background: 'rgba(22,163,74,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                {fileIcon(files[0])}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ ...LABEL, marginBottom: 2 }}>{t('wizard.step2.filesUploaded', { count: files.length })}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {files.length > 1 ? t('wizard.step2.fileCount', { count: files.length }) : files[0]?.name}
+                </div>
+              </div>
+              <CheckCircle size={14} color="#16a34a" style={{ flexShrink: 0 }} />
+              <button type="button" onClick={() => inputRef.current?.click()}
+                style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 700, color: 'var(--primary)', background: 'transparent', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '6px 12px', cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+                <Plus size={12} /> {t('wizard.step2.addFile')}
+              </button>
+              <button type="button" onClick={() => { setFiles([]); setFileRefs([]); setUploadStep(null); setUploadError(''); }}
+                style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--primary)', background: 'transparent', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '6px 12px', cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+                {t('wizard.step2.changeFiles')}
+              </button>
+            </div>
+          </Card>
+        ) : (
+        <>
         {/* ── STEP 1: Document Type — big centered picker until chosen; medium header until a file is dropped; then compact ── */}
         <Card padding={!form.type ? '28px 26px' : typeCompact ? '14px 22px' : '18px 22px'}>
           {form.type ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: typeCompact ? 10 : 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: typeCompact ? 10 : 14, animation: 'fadeSlideIn .25s ease' }}>
               <div style={{ ...LABEL, fontSize: typeCompact ? 10.5 : 11.5, color: 'var(--text-heading)', flexShrink: 0 }}>{t('wizard.step1.label')}</div>
               <div style={{ display: 'flex', gap: typeCompact ? 6 : 8, flexWrap: 'wrap', flex: 1 }}>
                 {TYPES.map(type => {
@@ -3114,14 +3218,16 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
           </Card>
           </div>
           )}
+        </>
+        )}
 
         {/* ── STEP 3: Document Details form — only once all files are checked, full width ── */}
         {allFilesChecked && (
         <>
         <div ref={detailsSectionRef}>
-        <Card>
+        <Card padding="16px 18px">
               {/* Form header */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18, paddingBottom: 14, borderBottom: '1px solid var(--surface-border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, paddingBottom: 10, borderBottom: '1px solid var(--surface-border)' }}>
                 <div style={{ width: 28, height: 28, borderRadius: 7, background: TYPE_CARD_COLORS[form.type]?.bg || 'var(--surface-ground)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <FileText size={13} color={TYPE_CARD_COLORS[form.type]?.accent || 'var(--primary)'} />
                 </div>
@@ -3136,7 +3242,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 </div>
               )}
         <form onSubmit={handleSubmit}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
 
             {/* Act / Legal Authority — must be set first for every type except Act; gates the rest of the form */}
             {form.type !== 'Act' && (
@@ -3155,30 +3261,27 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
 
             {/* Per-file name + description panels (shown when all files are checked) */}
             {allFilesChecked && files.length > 0 && (
-              <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 4 }}>
-            
+              <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 2 }}>
                 {files.map(f => (
-                  <div key={f.name} style={{ padding: '12px 14px', borderRadius: 10, border: '1.5px solid var(--surface-border)', background: 'var(--surface-ground)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div key={f.name} style={{ padding: '9px 12px', borderRadius: 10, border: '1.5px solid var(--surface-border)', background: 'var(--surface-ground)', display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{ width: 26, height: 26, borderRadius: 6, background: 'rgba(26,86,219,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <div style={{ width: 22, height: 22, borderRadius: 6, background: 'rgba(26,86,219,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         {fileIcon(f)}
                       </div>
                       <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>{f.name}</span>
                       <span style={{ fontSize: 10.5, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', flexShrink: 0 }}>{formatSize(f.size)}</span>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8 }}>
-                      <div>
-                        <div style={{ ...LABEL, marginBottom: 4 }}>
-                          {(DOC_TYPE_KEY[form.type] && t(`wizard.fields.${DOC_TYPE_KEY[form.type]}.nameLabel`, { defaultValue: '' })) || t('wizard.fields.generic.nameLabel')} <span style={{ color: '#ef4444' }}>*</span>
-                        </div>
-                        <input
-                          value={fileMeta[f.name]?.documentName ?? ''}
-                          onChange={e => setFileMeta(prev => ({ ...prev, [f.name]: { ...prev[f.name], documentName: e.target.value } }))}
-                          onFocus={focusStyle}
-                          onBlur={e => { blurStyle(e); checkDuplicate(e.target.value); }}
-                          placeholder={(DOC_TYPE_KEY[form.type] && t(`wizard.placeholders.${DOC_TYPE_KEY[form.type]}.name`, { defaultValue: '' })) || t('wizard.placeholders.generic.name')}
-                          style={INPUT_BASE} />
+                    <div>
+                      <div style={{ ...LABEL, marginBottom: 3 }}>
+                        {(DOC_TYPE_KEY[form.type] && t(`wizard.fields.${DOC_TYPE_KEY[form.type]}.nameLabel`, { defaultValue: '' })) || t('wizard.fields.generic.nameLabel')} <span style={{ color: '#ef4444' }}>*</span>
                       </div>
+                      <input
+                        value={fileMeta[f.name]?.documentName ?? ''}
+                        onChange={e => setFileMeta(prev => ({ ...prev, [f.name]: { ...prev[f.name], documentName: e.target.value } }))}
+                        onFocus={focusStyle}
+                        onBlur={e => { blurStyle(e); checkDuplicate(e.target.value); }}
+                        placeholder={(DOC_TYPE_KEY[form.type] && t(`wizard.placeholders.${DOC_TYPE_KEY[form.type]}.name`, { defaultValue: '' })) || t('wizard.placeholders.generic.name')}
+                        style={INPUT_BASE} />
                     </div>
                   </div>
                 ))}
@@ -3202,15 +3305,17 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
                 <input value={typeFields.shortTitle || ''} onChange={e => setTypeFields(f => ({ ...f, shortTitle: e.target.value }))}
                   placeholder={t('wizard.placeholders.act.shortTitle')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
-              <div style={{ gridColumn: '1 / -1' }}>
-                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.act.longTitle')}</div>
-                <input value={typeFields.longTitle || ''} onChange={e => setTypeFields(f => ({ ...f, longTitle: e.target.value }))}
-                  placeholder={t('wizard.placeholders.act.longTitle')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
-              </div>
-              <div style={{ gridColumn: '1 / -1' }}>
-                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.act.regionalTitle')}</div>
-                <input value={typeFields.regionalTitle || ''} onChange={e => setTypeFields(f => ({ ...f, regionalTitle: e.target.value }))}
-                  placeholder={t('wizard.placeholders.act.regionalTitle')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div>
+                  <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.act.longTitle')}</div>
+                  <input value={typeFields.longTitle || ''} onChange={e => setTypeFields(f => ({ ...f, longTitle: e.target.value }))}
+                    placeholder={t('wizard.placeholders.act.longTitle')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                </div>
+                <div>
+                  <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.act.regionalTitle')}</div>
+                  <input value={typeFields.regionalTitle || ''} onChange={e => setTypeFields(f => ({ ...f, regionalTitle: e.target.value }))}
+                    placeholder={t('wizard.placeholders.act.regionalTitle')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                </div>
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#ef4444' }}>*</span></div>
@@ -3660,26 +3765,26 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
 
             {/* Per-file description — shown last, one per file */}
             {files.length > 0 && (
-              <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div style={{ ...LABEL, marginBottom: 2 }}>
+              <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ ...LABEL, marginBottom: 0 }}>
                   {t('wizard.step3.descriptionLabel')}
                   <span style={{ fontSize: 10, fontWeight: 500, color: 'var(--text-color-secondary)', textTransform: 'none', letterSpacing: 0, marginLeft: 8 }}>{t('wizard.step3.setPerFile')}</span>
                 </div>
                 {files.map(f => (
                   <div key={f.name}>
                     {files.length > 1 && (
-                      <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text-heading)', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</div>
+                      <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text-heading)', marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</div>
                     )}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                      {fileMeta[f.name]?.desc && (
+                    {fileMeta[f.name]?.desc && (
+                      <div style={{ marginBottom: 3 }}>
                         <span style={{ fontSize: 10, fontWeight: 600, color: '#16a34a', textTransform: 'none', letterSpacing: 0 }}>{t('wizard.step3.autoFilled')}</span>
-                      )}
-                    </div>
+                      </div>
+                    )}
                     <textarea
                       value={fileMeta[f.name]?.desc ?? ''}
                       onChange={e => setFileMeta(prev => ({ ...prev, [f.name]: { ...prev[f.name], desc: e.target.value } }))}
                       onFocus={focusStyle} onBlur={blurStyle}
-                      rows={5}
+                      rows={3}
                       placeholder={t('wizard.step3.descriptionPlaceholder')}
                       style={{ ...INPUT_BASE, resize: 'vertical', lineHeight: 1.6 }} />
                   </div>
@@ -3690,7 +3795,7 @@ export default function UploaderDashboard({ activePage, onAuditLog, documents = 
             </fieldset>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--surface-border)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 14, paddingTop: 10, borderTop: '1px solid var(--surface-border)' }}>
             <button type="button"
               onClick={resetUploadForm}
               style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)', padding: '9px 22px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}

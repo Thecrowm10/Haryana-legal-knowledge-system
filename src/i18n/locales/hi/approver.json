@@ -147,7 +147,7 @@
   },
   "dashboard": {
     "failedToLoadDocuments": "दस्तावेज़ लोड करने में विफल",
-    "greeting": "दस्तावेज़ समीक्षा",
+    "greeting": "स्वागत है, {{name}}",
     "subtitle": "लंबित सबमिशन की समीक्षा करें और विभागीय लिंक अनुरोध प्रबंधित करें",
     "quickActionsLabel": "त्वरित कार्रवाइयाँ",
     "quickActions": {

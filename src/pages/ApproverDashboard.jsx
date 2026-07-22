@@ -2,7 +2,7 @@
 import { useTranslation } from 'react-i18next';
 import {
   CheckCircle, XCircle, FileText, ChevronDown, Search, Clock,
-  Check, X, Eye, Link, ChevronRight,
+  Check, X, Eye, Link, ChevronRight, ArrowRight,
   ZoomIn, ZoomOut, RotateCw, ExternalLink, Plus, Highlighter, MessageCircle,
 } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -11,6 +11,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl;
 import mammoth from 'mammoth';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
+import { useAuth } from '../hooks/useAuth';
 import { getApproverDocuments, getPdfFile, reviewDocument, getDepartmentLinkRequests, reviewDepartmentLink } from '../services/pdf';
 import { createNotification } from '../services/notifications';
 
@@ -819,7 +820,7 @@ function DocumentDetailsPanel({ doc, reviewAnnotations = [], onScrollToAnnotatio
 
 // 2-Panel Review View
 // PDF on the left, uploader-filled document details on the right.
-function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, activePage, deciding }) {
+function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, deciding }) {
   const { t } = useTranslation('approver');
   const [currentPage, setCurrentPage]   = useState(1);
   const [rotation, setRotation]         = useState(0);
@@ -923,7 +924,7 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, activePage,
       </div>
 
       {/* Approve / Reject — only for pending docs */}
-      {activePage === 'pending' && doc.status === 'pending' && (
+      {doc.status === 'pending' && (
         <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
 
           {/* Numbered remark fields */}
@@ -1442,7 +1443,8 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
   );
 }
 
-export default function ApproverDashboard({ activePage, onAuditLog, documents, onApprove }) {
+export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, documents, onApprove }) {
+  const { user } = useAuth();
   const { t } = useTranslation('approver');
   const [docs, setDocs]           = useState([]);
   const [loading, setLoading]     = useState(false);
@@ -1457,7 +1459,7 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
   const [linkFilter, setLinkFilter]       = useState('pending'); // 'pending' | 'approved' | 'rejected'
   const [filter, setFilter]       = useState('');
   const [searchQ, setSearchQ]     = useState('');
-  const [cardFilter, setCardFilter] = useState(null);
+  const [cardFilter, setCardFilter] = useState('pending'); // 'pending' | 'approved' | 'rejected' | 'all' — always one of these on the merged dashboard
   const tableRef  = useRef(null);
   const expandedRef = useRef(null);
 
@@ -1554,9 +1556,7 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
 
   const validTypes = new Set(Object.keys(TYPE_COLORS));
 
-  const base = cardFilter
-    ? (cardFilter === 'all' ? docs : docs.filter(d => d.status === cardFilter))
-    : (activePage === 'pending' ? pending : reviewed);
+  const base = cardFilter === 'all' ? docs : docs.filter(d => d.status === cardFilter);
 
   const allFiltered = base.filter(d => {
     const mType = validTypes.has(d.type);          // hide unknown types
@@ -1703,6 +1703,45 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
         )
       )}
 
+      {/* Welcome header */}
+      {activePage !== 'links' && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 21, fontWeight: 800, color: 'var(--text-heading)', letterSpacing: '-.01em' }}>
+              {t('dashboard.greeting', { name: user?.name || '' })}
+            </div>
+            <div style={{ fontSize: 13.5, color: 'var(--text-color-secondary)', marginTop: 4 }}>
+              {t('dashboard.subtitle')}
+            </div>
+          </div>
+          {user?.dept && (
+            <span style={{ fontFamily: 'var(--mono)', fontSize: 11.5, color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '5px 12px', borderRadius: 20 }}>
+              {user.dept}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Quick actions */}
+      {activePage !== 'links' && (
+        <div>
+          <div style={{ ...LABEL, marginBottom: 10 }}>{t('dashboard.quickActionsLabel')}</div>
+          <Card onClick={() => onNavigate?.('links')}
+            style={{ display: 'flex', alignItems: 'center', gap: 18, cursor: 'pointer', borderLeft: '3px solid #8b5cf6', transition: 'all .15s' }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(139,92,246,.08)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'var(--surface-card)'; e.currentTarget.style.transform = 'none'; }}>
+            <div style={{ width: 48, height: 48, borderRadius: 12, background: 'rgba(139,92,246,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Link size={21} color="#8b5cf6" strokeWidth={1.8} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', lineHeight: 1.3 }}>{t('dashboard.quickActions.linkRequestsTitle')}</div>
+              <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', lineHeight: 1.45, marginTop: 3 }}>{t('dashboard.quickActions.linkRequestsDesc')}</div>
+            </div>
+            <ArrowRight size={16} color="#8b5cf6" style={{ flexShrink: 0, opacity: .8 }} />
+          </Card>
+        </div>
+      )}
+
       {/* Loading skeleton */}
       {activePage !== 'links' && loading && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -1724,9 +1763,11 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
         </div>
       )}
 
-      {/* Summary strip — only on Reviewed tab */}
-      {activePage !== 'pending' && activePage !== 'links' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+      {/* Overview / summary strip — doubles as the status filter for the list below */}
+      {activePage !== 'links' && (
+        <div>
+          <div style={{ ...LABEL, marginBottom: 10 }}>{t('dashboard.overviewLabel')}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
           {[
             { icon: Clock,       label: t('dashboard.summary.pending'),  value: pending.length,                                       bg: 'rgba(245,158,11,.12)', color: '#f59e0b', key: 'pending'  },
             { icon: CheckCircle, label: t('dashboard.summary.approved'), value: reviewed.filter(d => d.status === 'approved').length, bg: 'rgba(34,197,94,.12)',  color: '#22c55e', key: 'approved' },
@@ -1735,7 +1776,7 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
           ].map(s => {
             const isActive = cardFilter === s.key;
             return (
-            <Card key={s.key} onClick={() => { setCardFilter(f => f === s.key ? null : s.key); setTimeout(() => tableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); }}
+            <Card key={s.key} onClick={() => { setCardFilter(s.key); setTimeout(() => tableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); }}
               style={{ cursor: 'pointer', outline: isActive ? `2px solid ${s.color}` : '2px solid transparent', transition: 'all .2s' }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
                 <div>
@@ -1748,6 +1789,7 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
               </div>
             </Card>
           );})}
+          </div>
         </div>
       )}
 
@@ -1760,12 +1802,6 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
               style={{ background: 'transparent', border: 'none', outline: 'none', fontSize: 12.5, color: 'var(--text-color)', width: '100%' }} />
             {searchQ && <button onClick={() => setSearchQ('')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', padding: 0 }}><X size={12} /></button>}
           </div>
-          {cardFilter && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px 5px 12px', borderRadius: 20, background: 'rgba(34,197,94,.1)', border: '1px solid rgba(34,197,94,.3)', fontSize: 12.5, fontWeight: 600, color: '#16a34a', whiteSpace: 'nowrap' }}>
-              {t(`dashboard.filterChip.${cardFilter}`)}
-              <button onClick={() => setCardFilter(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#16a34a', display: 'flex', padding: 0, marginLeft: 2 }}><X size={11} /></button>
-            </div>
-          )}
           <span style={{ marginLeft: 'auto', fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '2px 9px', borderRadius: 20 }}>
             {t('dashboard.documentCount', { count: list.length })}
           </span>
@@ -1805,10 +1841,10 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
         <Card style={{ textAlign: 'center', padding: '64px 0' }}>
           <CheckCircle size={44} color="var(--surface-200)" style={{ margin: '0 auto 14px', display: 'block' }} />
           <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-color-secondary)', marginBottom: 6 }}>
-            {activePage === 'pending' ? t('dashboard.emptyState.allCaughtUp') : t('dashboard.emptyState.noReviewedDocuments')}
+            {cardFilter === 'pending' ? t('dashboard.emptyState.allCaughtUp') : t('dashboard.emptyState.noReviewedDocuments')}
           </div>
           <div style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>
-            {activePage === 'pending' ? t('dashboard.emptyState.noPendingSubmissions') : t('dashboard.emptyState.reviewedWillAppear')}
+            {cardFilter === 'pending' ? t('dashboard.emptyState.noPendingSubmissions') : t('dashboard.emptyState.reviewedWillAppear')}
           </div>
         </Card>
       )}
@@ -1885,7 +1921,6 @@ export default function ApproverDashboard({ activePage, onAuditLog, documents, o
                   remarks={remarks[doc.id] || ''}
                   onRemarksChange={val => setRemarks(r => ({ ...r, [doc.id]: val }))}
                   onDecide={(decision, annots) => decide(doc.id, decision, annots)}
-                  activePage={activePage}
                   deciding={deciding?.id === doc.id ? deciding.action : null}
                 />
               )}

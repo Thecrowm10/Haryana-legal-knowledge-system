@@ -18,6 +18,11 @@ const TYPE_CARD_COLORS = {
   'Miscellaneous':       { bg: 'rgba(100,116,139,.08)',accent: '#64748b', text: '#475569' },
 };
 
+// camelCase field key → Title Case label, e.g. 'noOfRules' → 'No Of Rules'
+function fieldLabel(k) {
+  return k.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase()).trim();
+}
+
 function parseDisplayRemarks(str) {
   if (!str) return [];
   const lines = str.split('\n').filter(l => l.trim());
@@ -233,14 +238,22 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
   const LS = { fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)' };
 
   const meta = [
+    ['Short Title',     doc.shortTitle      || null],
     ['Reference No.',   doc.referenceNumber || null],
     ['Issue Date',      doc.enactmentDate   || null],
     ['Effective From',  doc.effectiveFrom   || null],
     ['Gazette Ref.',    doc.gazette         || null],
     ['Legal Authority', doc.authority       || null],
+    ['Uploader',        doc.uploader        || null],
     ['Upload Date',     doc.uploadedAt      || null],
     ['File',            doc.fileName        || null],
   ].filter(([, v]) => v);
+
+  // Type-specific fields (e.g. Act Year, No. of Rules for an Act; Sector for a Policy) —
+  // everything the uploader entered that isn't already covered by the fixed fields above.
+  const typeExtra = doc.typeFields
+    ? Object.entries(doc.typeFields).filter(([, v]) => v)
+    : [];
 
   const statusAccent = doc.status === 'approved' ? '#16a34a' : doc.status === 'rejected' ? '#ef4444' : '#f59e0b';
   const statusBg     = doc.status === 'approved' ? 'rgba(34,197,94,.1)'  : doc.status === 'rejected' ? 'rgba(239,68,68,.1)'  : 'rgba(245,158,11,.1)';
@@ -451,11 +464,50 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
               </div>
             )}
 
+            {typeExtra.length > 0 && (
+              <div style={{ marginBottom: 22 }}>
+                <div style={{ ...LS, marginBottom: 10 }}>Type-Specific Fields</div>
+                <div style={{ borderRadius: 10, border: '1px solid var(--surface-border)', overflow: 'hidden' }}>
+                  {typeExtra.map(([k, v], idx) => (
+                    <div key={k} style={{ display: 'flex', alignItems: 'flex-start', borderBottom: idx < typeExtra.length - 1 ? '1px solid var(--surface-border)' : 'none' }}>
+                      <div style={{ padding: '10px 14px', minWidth: 128, flexShrink: 0, background: 'var(--surface-50)', fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', fontWeight: 600, borderRight: '1px solid var(--surface-border)' }}>{fieldLabel(k)}</div>
+                      <div style={{ padding: '10px 14px', fontSize: 12.5, color: 'var(--text-heading)', fontWeight: 500, flex: 1, wordBreak: 'break-word' }}>{String(v)}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {doc.desc && (
               <div style={{ marginBottom: 22 }}>
                 <div style={{ ...LS, marginBottom: 10 }}>Description</div>
                 <div style={{ padding: '14px 16px', borderRadius: 10, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', fontSize: 13, color: 'var(--text-color)', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>
                   {doc.desc}
+                </div>
+              </div>
+            )}
+
+            {doc.docRelations?.length > 0 && (
+              <div style={{ marginBottom: 22 }}>
+                <div style={{ ...LS, marginBottom: 10 }}>Relationships · {doc.docRelations.length}</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {doc.docRelations.map((r, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 12px', borderRadius: 8,
+                      background: r.isPending ? 'rgba(245,158,11,.05)' : 'rgba(34,197,94,.05)',
+                      border: `1px solid ${r.isPending ? 'rgba(245,158,11,.2)' : 'rgba(34,197,94,.2)'}` }}>
+                      <div style={{ width: 20, height: 20, borderRadius: '50%', background: r.isPending ? 'rgba(245,158,11,.15)' : 'rgba(34,197,94,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
+                        <span style={{ fontSize: 9, color: r.isPending ? '#d97706' : '#16a34a', fontWeight: 900 }}>↔</span>
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 10.5, fontFamily: 'var(--mono)', color: r.isPending ? '#d97706' : '#16a34a', fontWeight: 700, marginBottom: 2 }}>
+                          {r.label}{r.targetType ? ` · ${r.targetType}` : ''}{r.isPending ? ' · PENDING' : ''}
+                        </div>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.targetTitle}</div>
+                        {r.section && <div style={{ fontSize: 10.5, fontFamily: 'var(--mono)', color: 'var(--primary)', marginTop: 2 }}>{r.section}</div>}
+                        {r.note && <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 2, fontStyle: 'italic' }}>{r.note}</div>}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}

@@ -14,8 +14,8 @@ import { DOCUMENTS } from './data/mockData';
 
 const DEFAULT_PAGE = {
   citizen:  'home',
-  uploader: 'upload',
-  approver: 'pending',
+  uploader: 'dashboard',
+  approver: 'dashboard',
   csoffice: 'analytics',
   officer:  'analytics',
   admin:    'users',
@@ -121,6 +121,7 @@ export default function App() {
         return (
           <UploaderDashboard
             activePage={activePage}
+            onNavigate={navigate}
             onAuditLog={addAuditLog}
             documents={documents}
             onAddDocument={addDocument}
@@ -131,6 +132,7 @@ export default function App() {
         return (
           <ApproverDashboard
             activePage={activePage}
+            onNavigate={navigate}
             onAuditLog={addAuditLog}
             documents={documents}
             onApprove={approveDocument}   // ← NEW

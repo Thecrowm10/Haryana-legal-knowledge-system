@@ -696,6 +696,44 @@ export default function NodalOfficerDashboard({ activePage }) {
         gazette:         d.gazette_reference || null,
         authority:       d.legal_authority || null,
         approval:        d.latest_approval || null,
+        shortTitle:      d.short_title || null,
+        uploader:        (d.uploader_first_name || d.uploader_last_name)
+                            ? `${d.uploader_first_name || ''} ${d.uploader_last_name || ''}`.trim()
+                            : (d.uploader_username || null),
+        // Extra fields the uploader entered for this specific document type (Act, Policy, etc.)
+        typeFields: {
+          ...(d.valid_until           ? { validity:           d.valid_until }           : {}),
+          ...(d.sector_domain         ? { sector:             d.sector_domain }         : {}),
+          ...(d.implementing_agency   ? { implementingAgency: d.implementing_agency }   : {}),
+          ...(d.next_review_date      ? { reviewDate:         d.next_review_date }      : {}),
+          ...(d.rule_making_authority ? { ruleAuthority:      d.rule_making_authority } : {}),
+          ...(d.act_year              ? { actYear:            d.act_year }              : {}),
+          ...(d.long_title            ? { longTitle:          d.long_title }            : {}),
+          ...(d.regional_title        ? { regionalTitle:      d.regional_title }        : {}),
+          ...(d.notification_no       ? { notificationNo:     d.notification_no }       : {}),
+          ...(d.act_code              ? { actCode:            d.act_code }              : {}),
+          ...(d.so_reason             ? { soReason:           d.so_reason }             : {}),
+          ...(d.no_of_rules           ? { noOfRules:          d.no_of_rules }           : {}),
+          ...(d.no_of_notifications   ? { noOfNotifications:  d.no_of_notifications }   : {}),
+          ...(d.no_of_regulations     ? { noOfRegulations:    d.no_of_regulations }     : {}),
+          ...(d.no_of_circulars       ? { noOfCirculars:      d.no_of_circulars }       : {}),
+          ...(d.no_of_statutes        ? { noOfStatutes:       d.no_of_statutes }        : {}),
+          ...(d.no_of_ordinances      ? { noOfOrdinances:     d.no_of_ordinances }      : {}),
+          ...(d.no_of_orders          ? { noOfOrders:         d.no_of_orders }          : {}),
+          ...(d.keywords              ? { keywords:           d.keywords }              : {}),
+          ...(d.is_repealed           ? { repealed:           'Yes' }                   : {}),
+        },
+        // Amend / replace / issued-under links to other documents
+        docRelations: (d.relationships || [])
+          .filter(r => r.type !== 'parent_act')
+          .map(r => ({
+            label:       (r.type || 'references').replace(/_/g, ' '),
+            targetTitle: r.document_name || `Document #${r.pdf_id}`,
+            targetType:  r.document_type_name || '',
+            note:        '',
+            section:     '',
+            isPending:   false,
+          })),
       };
     }
 

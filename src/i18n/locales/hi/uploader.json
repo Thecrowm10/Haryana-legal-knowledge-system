@@ -86,7 +86,7 @@
     "rejected": "अस्वीकृत"
   },
   "dashboard": {
-    "greeting": "वापसी पर स्वागत है, {{name}}",
+    "greeting": "स्वागत है, {{name}}",
     "subtitle": "आपके दस्तावेज़ अपलोड का सारांश यहाँ है",
     "quickActionsLabel": "त्वरित कार्रवाइयाँ",
     "quickActions": {

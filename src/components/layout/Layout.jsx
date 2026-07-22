@@ -2,6 +2,9 @@ import { useState } from 'react';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 
+// These roles get a single-page dashboard (no left nav) — see their Topbar branding block instead.
+const NO_SIDEBAR_ROLES = ['citizen', 'uploader', 'approver'];
+
 export default function Layout({ user, activePage, onNavigate, onLogout, onChangePassword, children }) {
   const [collapsed, setCollapsed] = useState(true);
 
@@ -9,7 +12,7 @@ export default function Layout({ user, activePage, onNavigate, onLogout, onChang
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--surface-ground)' }}>
       <a href="#main-content" className="skip-nav">Skip to main content</a>
       <div className="a11y-zoom-scope" style={{ display: 'flex', width: '100%', height: '100%' }}>
-        {user.role !== 'citizen' && (
+        {!NO_SIDEBAR_ROLES.includes(user.role) && (
           <Sidebar
             user={user}
             activePage={activePage}
@@ -23,6 +26,7 @@ export default function Layout({ user, activePage, onNavigate, onLogout, onChang
             <Topbar
               user={user}
               activePage={activePage}
+              onNavigate={onNavigate}
               onLogout={onLogout}
               onChangePassword={onChangePassword}
               onToggleSidebar={() => setCollapsed(c => !c)}

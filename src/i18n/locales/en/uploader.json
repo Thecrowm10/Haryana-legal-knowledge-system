@@ -86,7 +86,7 @@
     "rejected": "Rejected"
   },
   "dashboard": {
-    "greeting": "Welcome back, {{name}}",
+    "greeting": "Welcome, {{name}}",
     "subtitle": "Here's an overview of your document uploads",
     "quickActionsLabel": "Quick Actions",
     "quickActions": {

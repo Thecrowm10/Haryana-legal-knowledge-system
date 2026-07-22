@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Search, FileText, X, BookOpen, Bookmark, BookmarkCheck,
-  ChevronRight, MapPin, AlertCircle, Building2, Layers, User,
+  ChevronRight, ChevronDown, AlertCircle, Building2, Layers, User,
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import DocViewModal from '../components/DocViewModal';
@@ -11,7 +11,8 @@ import AccessibilityMenu from '../components/AccessibilityMenu';
 import LanguageToggle from '../components/LanguageToggle';
 import haryanaLogo from '../assets/haryana-logo.png';
 import bannerBg from '../assets/banner-1-768x217.png';
-import { fullTextSearch, getAllDocumentsAdmin } from '../services/pdf';
+import { publicSearchDocuments } from '../services/pdf';
+import { getDocumentTypes } from '../services/departments';
 
 // Document types matching backend VALID_DOCUMENT_TYPES
 const DOC_TYPE_META = {
@@ -79,42 +80,25 @@ function HighlightedSnippet({ text, query }) {
   );
 }
 
-// Group flat search results by pdf_id so each document appears once
-function groupResults(results) {
-  const map = new Map();
-  for (const r of results) {
-    if (!map.has(r.pdf_id)) {
-      map.set(r.pdf_id, { pdf_id: r.pdf_id, original_filename: r.original_filename, hits: [] });
-    }
-    map.get(r.pdf_id).hits.push({ page: r.page_number, score: r.relevance_score, snippet: r.snippet });
-  }
-  return [...map.values()]
-    .map(g => ({ ...g, hits: g.hits.sort((a, b) => a.page - b.page) }))
-    .sort((a, b) => Math.max(...b.hits.map(h => h.score)) - Math.max(...a.hits.map(h => h.score)));
-}
-
-function GroupedResultCard({ group, query, onView }) {
+// One card per document — the public search endpoint returns full document
+// records (not per-page text hits), so there's no grouping or page-chip
+// navigation needed here anymore; each result opens straight to the viewer.
+function DocumentResultCard({ doc, query, onView }) {
   const { t } = useTranslation('citizen');
-  const name    = cleanFilename(group.original_filename);
-  const maxScore = Math.max(...group.hits.map(h => h.score));
-  const tier     = maxScore > 70 ? 'high' : maxScore > 30 ? 'medium' : 'low';
-  const tierColor = tier === 'high' ? '#16a34a' : tier === 'medium' ? '#d97706' : '#64748b';
-  const tierBg    = tier === 'high' ? 'rgba(34,197,94,.08)' : tier === 'medium' ? 'rgba(217,119,6,.08)' : 'rgba(100,116,139,.08)';
-  const tierLabel = tier === 'high' ? t('highMatch') : tier === 'medium' ? t('mediumMatch') : t('lowMatch');
-
-  // Best hit = highest relevance score (shown as default snippet)
-  const bestHit = group.hits.reduce((b, h) => h.score > b.score ? h : b, group.hits[0]);
+  const name = doc.document_name || cleanFilename(doc.original_filename);
+  const meta = doc.document_type_name ? DOC_TYPE_META[doc.document_type_name] : null;
+  const year = doc.issue_date ? new Date(doc.issue_date).getFullYear() : (doc.created_at ? new Date(doc.created_at).getFullYear() : null);
 
   return (
     <div
-      style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 12, padding: '16px 18px', transition: 'box-shadow .2s, border-color .2s' }}
+      onClick={onView}
+      style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 12, padding: '16px 18px', cursor: 'pointer', transition: 'box-shadow .2s, border-color .2s' }}
       onMouseEnter={e => { e.currentTarget.style.boxShadow = 'var(--card-shadow)'; e.currentTarget.style.borderColor = 'rgba(26,86,219,.25)'; }}
       onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = 'var(--surface-border)'; }}
     >
-      {/* Header row */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 10 }}>
-        <div style={{ width: 36, height: 36, borderRadius: 9, background: 'rgba(26,86,219,.08)', border: '1px solid rgba(26,86,219,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <FileText size={16} color="var(--primary)" strokeWidth={1.5} />
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+        <div style={{ width: 36, height: 36, borderRadius: 9, background: meta?.bg || 'rgba(26,86,219,.08)', border: `1px solid ${meta?.border || 'rgba(26,86,219,.15)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <FileText size={16} color={meta?.color || 'var(--primary)'} strokeWidth={1.5} />
         </div>
 
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -122,31 +106,29 @@ function GroupedResultCard({ group, query, onView }) {
             <HighlightedSnippet text={name} query={query} />
           </div>
 
-          {/* Page chips — each opens viewer at that specific page */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-            <MapPin size={11} color="var(--text-color-secondary)" style={{ flexShrink: 0 }} />
-            {group.hits.map(h => (
-              <button key={h.page} onClick={() => onView(h.page)}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 10.5, fontWeight: 600, fontFamily: 'var(--mono)', padding: '3px 9px', borderRadius: 5, background: 'rgba(26,86,219,.08)', color: 'var(--primary)', border: '1px solid rgba(26,86,219,.2)', cursor: 'pointer', transition: 'background .12s' }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(26,86,219,.18)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'rgba(26,86,219,.08)'}>
-                p.{h.page}
-              </button>
-            ))}
-            {group.hits.length > 1 && (
-              <span style={{ fontSize: 10.5, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>
-                · {t('matches', { count: group.hits.length })}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            {doc.document_type_name && (
+              <span style={{ fontSize: 9.5, fontWeight: 700, padding: '2px 8px', borderRadius: 5, fontFamily: 'var(--mono)', letterSpacing: '.04em', textTransform: 'uppercase', background: meta?.bg || 'rgba(100,116,139,.08)', color: meta?.color || '#64748b', border: `1px solid ${meta?.border || 'rgba(100,116,139,.25)'}` }}>
+                {doc.document_type_name}
               </span>
             )}
-            <span style={{ fontSize: 10, fontWeight: 700, fontFamily: 'var(--mono)', letterSpacing: '.03em', padding: '2px 8px', borderRadius: 5, background: tierBg, color: tierColor, border: `1px solid ${tierColor}33`, marginLeft: 4 }}>
-              {tierLabel}
-            </span>
+            {doc.department_name && (
+              <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)' }}>{doc.department_name}</span>
+            )}
+            {year && (
+              <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{year}</span>
+            )}
           </div>
+
+          {doc.description && (
+            <div style={{ marginTop: 8, fontSize: 12.5, lineHeight: 1.6, color: 'var(--text-color)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+              <HighlightedSnippet text={doc.description} query={query} />
+            </div>
+          )}
         </div>
 
-        {/* View at best page */}
         <button
-          onClick={() => onView(bestHit.page)}
+          onClick={e => { e.stopPropagation(); onView(); }}
           style={{ background: 'var(--primary)', color: 'white', border: 'none', padding: '8px 18px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, transition: 'opacity .15s' }}
           onMouseEnter={e => e.currentTarget.style.opacity = '.85'}
           onMouseLeave={e => e.currentTarget.style.opacity = '1'}
@@ -154,15 +136,6 @@ function GroupedResultCard({ group, query, onView }) {
           <BookOpen size={13} /> {t('view')}
         </button>
       </div>
-
-      {/* Best-match snippet */}
-      {bestHit.snippet && (
-        <div
-          className="search-snippet"
-          style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '10px 14px', fontSize: 12.5, lineHeight: 1.8, color: 'var(--text-color)', fontFamily: 'Georgia, serif' }}
-          dangerouslySetInnerHTML={{ __html: bestHit.snippet }}
-        />
-      )}
     </div>
   );
 }
@@ -179,18 +152,29 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
   const [viewDoc, setViewDoc]       = useState(null);
   const [bookmarks, setBookmarks]   = useState(loadBookmarks);
   const [showSugg, setShowSugg]     = useState(false);
+  const [liveSuggestions, setLiveSuggestions] = useState([]); // documents from /pdf/public/search, live as you type
+  const [suggestLoading, setSuggestLoading]   = useState(false);
   const [recentDocs, setRecentDocs] = useState([]);
   const [recentLoading, setRecentLoading] = useState(false);
   const [scrolled, setScrolled]     = useState(false);
   const [searchBarHeight, setSearchBarHeight] = useState(0);
+  const [docTypes, setDocTypes]     = useState([]); // [{ id, name }] — live list; falls back to DOC_TYPE_META names if the endpoint needs auth
+  const [docTypeId, setDocTypeId]   = useState(''); // selected filter — '' means search across all types
   const inputRef = useRef(null);
   const rootRef = useRef(null);
   const searchBoxRef = useRef(null);
 
+  // Document types for the search filter dropdown
+  useEffect(() => {
+    getDocumentTypes().then(res => setDocTypes(res.data || [])).catch(() => {});
+  }, []);
+
+  const typeOptions = docTypes.length > 0 ? docTypes : Object.keys(DOC_TYPE_META).map(name => ({ id: '', name }));
+
   // Fetch recently published docs for the idle/landing state
   useEffect(() => {
     setRecentLoading(true);
-    getAllDocumentsAdmin('approved', 0, 8)
+    publicSearchDocuments({ skip: 0, limit: 8 })
       .then(res => setRecentDocs(res.data.documents || []))
       .catch(() => {})
       .finally(() => setRecentLoading(false));
@@ -218,6 +202,21 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
     return () => scrollEl.removeEventListener('scroll', onScroll);
   }, []);
 
+  // Live suggestions — same public search endpoint as the Search button, just
+  // debounced and capped small so it reads as autocomplete while typing.
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) { setLiveSuggestions([]); setSuggestLoading(false); return; }
+    setSuggestLoading(true);
+    const timer = setTimeout(() => {
+      publicSearchDocuments({ name: q, document_type_id: docTypeId || undefined, skip: 0, limit: 8 })
+        .then(res => setLiveSuggestions(res.data.documents || []))
+        .catch(() => setLiveSuggestions([]))
+        .finally(() => setSuggestLoading(false));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [query, docTypeId]);
+
   // Measured once, at natural (undocked) size, so the anchor above can reserve
   // exactly that much space once the real search box goes fixed and docks.
   useEffect(() => {
@@ -233,8 +232,8 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
     setSearched(false);
     setError(null);
     try {
-      const res = await fullTextSearch(trimmed, 0, 50);
-      setResults(res.data.results || []);
+      const res = await publicSearchDocuments({ name: trimmed, document_type_id: docTypeId || undefined, skip: 0, limit: 50 });
+      setResults(res.data.documents || []);
       setTotal(res.data.total || 0);
       onAuditLog?.(`Searched: "${trimmed}"`);
     } catch {
@@ -258,26 +257,12 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
     saveBookmarks(updated);
   }
 
-  function openDoc(group, pageNum) {
-    const allPages = group.hits.map(h => h.page); // already sorted ascending
-    setViewDoc({
-      id: group.pdf_id,
-      document_name: cleanFilename(group.original_filename),
-      original_filename: group.original_filename,
-      _initialPage: pageNum,
-      _searchQuery: query,
-      _searchPages: allPages,
-    });
-    onAuditLog?.(`Viewed: ${group.original_filename}`);
-  }
-
-  function openRecentDoc(doc) {
+  function openDoc(doc) {
     setViewDoc({ id: doc.id, document_name: doc.document_name || cleanFilename(doc.original_filename), original_filename: doc.original_filename });
     onAuditLog?.(`Viewed: ${doc.document_name || doc.original_filename}`);
   }
 
   const isBookmarked = bookmarks.includes(query.trim());
-  const suggestions  = QUICK_SEARCHES.filter(s => s.includes(query.toLowerCase()) && query.length >= 2);
 
   const publishedCount = documents.filter(d => d.status === 'approved').length;
   const deptCount = new Set(documents.map(d => d.dept).filter(Boolean)).size;
@@ -460,6 +445,38 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
                         <X size={14} />
                       </button>
                     )}
+                    <div style={{
+                      position: 'relative', alignSelf: 'stretch', display: 'flex', alignItems: 'center',
+                      margin: scrolled ? '5px 5px 5px 0' : '9px 9px 9px 0',
+                      background: 'rgba(148,163,184,.12)',
+                      backdropFilter: 'blur(10px) saturate(180%)', WebkitBackdropFilter: 'blur(10px) saturate(180%)',
+                      border: '1px solid rgba(255,255,255,.7)',
+                      boxShadow: 'inset 0 1px 1px rgba(255,255,255,.8), 0 1px 2px rgba(15,23,42,.05)',
+                      borderRadius: scrolled ? 8 : 10,
+                      flexShrink: 0, transition: `margin ${TOP_BAR_EASE}`,
+                    }}>
+                      <Layers size={scrolled ? 12 : 14} color="var(--text-color-secondary)"
+                        style={{ marginLeft: scrolled ? 8 : 11, flexShrink: 0, pointerEvents: 'none', transition: `margin ${TOP_BAR_EASE}` }} />
+                      <select
+                        value={docTypeId}
+                        onChange={e => setDocTypeId(e.target.value)}
+                        title={t('allTypes')}
+                        style={{
+                          alignSelf: 'stretch', border: 'none', outline: 'none', background: 'transparent', cursor: 'pointer',
+                          appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none',
+                          fontFamily: 'var(--font)', color: docTypeId ? 'var(--text-heading)' : 'var(--text-color-secondary)',
+                          fontSize: scrolled ? 11.5 : 13, fontWeight: 600,
+                          padding: scrolled ? '0 22px 0 6px' : '0 28px 0 8px', maxWidth: scrolled ? 100 : 160,
+                          transition: `padding ${TOP_BAR_EASE}, font-size ${TOP_BAR_EASE}`,
+                        }}>
+                      <option value="">{t('allTypes')}</option>
+                      {typeOptions.map(dt => (
+                        <option key={dt.id || dt.name} value={dt.id}>{dt.name}</option>
+                      ))}
+                      </select>
+                      <ChevronDown size={scrolled ? 11 : 13} color="var(--text-color-secondary)"
+                        style={{ position: 'absolute', right: scrolled ? 7 : 9, pointerEvents: 'none', transition: `right ${TOP_BAR_EASE}` }} />
+                    </div>
                     <button
                       className="cd-search-btn"
                       onClick={() => doSearch()}
@@ -475,17 +492,37 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
                     </button>
                   </div>
 
-                  {/* Autocomplete dropdown */}
-                  {showSugg && suggestions.length > 0 && (
-                    <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, background: '#fff', border: '1px solid var(--surface-border)', borderRadius: 10, boxShadow: 'var(--card-shadow)', zIndex: 100, overflow: 'hidden', textAlign: 'left' }}>
-                      {suggestions.slice(0, 5).map((s, i, arr) => (
-                        <div key={i} onMouseDown={() => doSearch(s)}
-                          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer', borderBottom: i < arr.length - 1 ? '1px solid var(--surface-border)' : 'none', fontSize: 13, color: 'var(--text-color)', transition: 'background .12s' }}
-                          onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
-                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                          <Search size={12} color="var(--text-color-secondary)" /> {s}
-                        </div>
-                      ))}
+                  {/* Live autocomplete — same /pdf/public/search endpoint as the Search button, just
+                      debounced; each row is a real document and opens straight into the viewer. */}
+                  {showSugg && query.trim().length >= 2 && (
+                    <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, background: '#fff', border: '1px solid var(--surface-border)', borderRadius: 10, boxShadow: 'var(--card-shadow)', zIndex: 100, overflow: 'hidden', textAlign: 'left', maxHeight: 360, overflowY: 'auto' }}>
+                      {suggestLoading ? (
+                        <div style={{ padding: '16px', fontSize: 12.5, color: 'var(--text-color-secondary)', textAlign: 'center' }}>{t('loading')}</div>
+                      ) : liveSuggestions.length === 0 ? (
+                        <div style={{ padding: '16px', fontSize: 12.5, color: 'var(--text-color-secondary)', textAlign: 'center' }}>{t('noResultsFound')}</div>
+                      ) : (
+                        liveSuggestions.map((doc, i, arr) => {
+                          const meta = doc.document_type_name ? DOC_TYPE_META[doc.document_type_name] : null;
+                          return (
+                            <div key={doc.id} onMouseDown={() => { setShowSugg(false); openDoc(doc); }}
+                              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer', borderBottom: i < arr.length - 1 ? '1px solid var(--surface-border)' : 'none', transition: 'background .12s' }}
+                              onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                              <FileText size={14} color={meta?.color || 'var(--primary)'} style={{ flexShrink: 0 }} />
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-color)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  <HighlightedSnippet text={doc.document_name || cleanFilename(doc.original_filename)} query={query} />
+                                </div>
+                                {(doc.document_type_name || doc.department_name) && (
+                                  <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {[doc.document_type_name, doc.department_name].filter(Boolean).join(' · ')}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
                     </div>
                   )}
                 </div>
@@ -499,7 +536,7 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
                   <div ref={searchBoxRef} className="cd-docked-search" style={{
                     position: 'fixed', top: 0, height: TOP_BAR_HEIGHT, display: 'flex', alignItems: 'center',
                     left: '50%', transform: 'translateX(-50%)',
-                    width: 'calc(100% - 64px)', maxWidth: 420, zIndex: 55,
+                    width: 'calc(100% - 64px)', maxWidth: 640, zIndex: 55,
                     transition: `max-width ${TOP_BAR_EASE}, width ${TOP_BAR_EASE}`,
                   }}>
                     {inner}
@@ -601,19 +638,13 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
         {/* Results */}
         {!loading && searched && !error && (
           <>
-            {(() => {
-              const groups = groupResults(results);
-              return (
-                <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', marginBottom: 14, fontFamily: 'var(--mono)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span>
-                    <strong style={{ color: 'var(--primary)' }}>{groups.length}</strong> {t('documentsSuffix', { count: groups.length })}
-                    {total > groups.length && <> · <strong style={{ color: 'var(--primary)' }}>{total}</strong> {t('totalMatchesSuffix', { count: total })}</>}
-                    {query && <> {t('forQuery')} <em style={{ color: 'var(--text-heading)', fontStyle: 'normal' }}>"{query}"</em></>}
-                  </span>
-                  {/* <span style={{ fontSize: 11 }}>{t('verbatimNotice')}</span> */}
-                </div>
-              );
-            })()}
+            <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', marginBottom: 14, fontFamily: 'var(--mono)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span>
+                <strong style={{ color: 'var(--primary)' }}>{results.length}</strong> {t('documentsSuffix', { count: results.length })}
+                {total > results.length && <> · <strong style={{ color: 'var(--primary)' }}>{total}</strong> {t('totalMatchesSuffix', { count: total })}</>}
+                {query && <> {t('forQuery')} <em style={{ color: 'var(--text-heading)', fontStyle: 'normal' }}>"{query}"</em></>}
+              </span>
+            </div>
 
             {results.length === 0 ? (
               <Card style={{ textAlign: 'center', padding: '72px 0' }}>
@@ -623,12 +654,12 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
               </Card>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {groupResults(results).map(group => (
-                  <GroupedResultCard
-                    key={group.pdf_id}
-                    group={group}
+                {results.map(doc => (
+                  <DocumentResultCard
+                    key={doc.id}
+                    doc={doc}
                     query={query}
-                    onView={pageNum => openDoc(group, pageNum)}
+                    onView={() => openDoc(doc)}
                   />
                 ))}
               </div>
@@ -651,7 +682,7 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
                   return (
                     <div key={doc.id}
                       style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 6px', borderBottom: i < recentDocs.length - 1 ? '1px solid var(--surface-border)' : 'none', cursor: 'pointer', borderRadius: 6, transition: 'background .12s' }}
-                      onClick={() => openRecentDoc(doc)}
+                      onClick={() => openDoc(doc)}
                       onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                       <FileText size={14} color="var(--text-color-secondary)" style={{ flexShrink: 0 }} />

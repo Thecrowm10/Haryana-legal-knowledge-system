@@ -147,7 +147,7 @@
   },
   "dashboard": {
     "failedToLoadDocuments": "Failed to load documents",
-    "greeting": "Document Review",
+    "greeting": "Welcome, {{name}}",
     "subtitle": "Review pending submissions and manage department link requests",
     "quickActionsLabel": "Quick Actions",
     "quickActions": {
