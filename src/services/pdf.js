@@ -11,7 +11,10 @@ export const uploadPdfMetadata = (data)     => api.post('/pdf/upload', data);
 export const updatePdfMetadata = (id, data) => api.put(`/pdf/${id}`, data);
 export const getMyDocuments    = ()         => api.get('/pdf/my-documents');
 export const searchDocuments      = (document_type, q, limit = 20) => api.get('/pdf/search-documents', { params: { document_type, q, limit } });
-export const fullTextSearch       = (q, skip = 0, limit = 50)      => publicApi.get('/pdf/search', { params: { q, skip, limit } });
+export const fullTextSearch       = (q, skip = 0, limit = 50, document_type_id) => publicApi.get('/pdf/search', { params: { q, skip, limit, ...(document_type_id ? { document_type_id } : {}) } });
+// Public citizen document browse/filter — no token required (unlike getAllDocumentsAdmin below,
+// which hits an admin-gated endpoint and 401s for anonymous citizens).
+export const publicSearchDocuments = (params = {}) => publicApi.get('/pdf/public/search', { params });
 export const getApproverDocuments = (status, skip = 0, limit = 100) => api.get('/pdf/approver/documents', { params: { skip, limit, ...(status ? { status } : {}) } });
 export const reviewDocument       = (pdf_id, action, comments, annotations_json) => api.post('/pdf/review', { pdf_id, action, ...(comments ? { comments } : {}), ...(annotations_json ? { annotations_json } : {}) });
 export const getPdfFile           = (id)                              => api.get(`/pdf/${id}/file`, { responseType: 'arraybuffer' });
