@@ -147,6 +147,14 @@
   },
   "dashboard": {
     "failedToLoadDocuments": "Failed to load documents",
+    "greeting": "Document Review",
+    "subtitle": "Review pending submissions and manage department link requests",
+    "quickActionsLabel": "Quick Actions",
+    "quickActions": {
+      "linkRequestsTitle": "Link Requests",
+      "linkRequestsDesc": "Review requests from other departments to link a shared document"
+    },
+    "overviewLabel": "Overview",
     "summary": {
       "pending": "Pending",
       "approved": "Approved",

@@ -147,6 +147,14 @@
   },
   "dashboard": {
     "failedToLoadDocuments": "दस्तावेज़ लोड करने में विफल",
+    "greeting": "दस्तावेज़ समीक्षा",
+    "subtitle": "लंबित सबमिशन की समीक्षा करें और विभागीय लिंक अनुरोध प्रबंधित करें",
+    "quickActionsLabel": "त्वरित कार्रवाइयाँ",
+    "quickActions": {
+      "linkRequestsTitle": "लिंक अनुरोध",
+      "linkRequestsDesc": "किसी साझा दस्तावेज़ को लिंक करने के लिए अन्य विभागों के अनुरोधों की समीक्षा करें"
+    },
+    "overviewLabel": "अवलोकन",
     "summary": {
       "pending": "लंबित",
       "approved": "स्वीकृत",

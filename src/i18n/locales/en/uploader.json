@@ -85,6 +85,18 @@
     "pendingReview": "Pending Review",
     "rejected": "Rejected"
   },
+  "dashboard": {
+    "greeting": "Welcome back, {{name}}",
+    "subtitle": "Here's an overview of your document uploads",
+    "quickActionsLabel": "Quick Actions",
+    "quickActions": {
+      "uploadTitle": "Upload New Document",
+      "uploadDesc": "Add a new Act, Notification, Circular or other document",
+      "editTitle": "Edit Document",
+      "editDesc": "Update details of a document you've already uploaded"
+    },
+    "overviewLabel": "Overview"
+  },
   "bulkEdit": {
     "button": "Bulk Edit",
     "title_one": "Bulk Edit — {{count}} Draft Document",
