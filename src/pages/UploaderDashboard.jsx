@@ -1401,22 +1401,28 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       if (data.chapters?.length > 0) {
         setSecHasChapters(true);
         setSecChapters(data.chapters.map(ch => ({
+          id: ch.id ?? null,
           name: ch.chapter_title || ch.chapter_number || '',
+          isDeleted: false,
           sections: (ch.sections || []).map(sec => ({
+            id: sec.id ?? null,
             name: sec.section_title || sec.section_number || '',
             description: sec.section_content || '',
             file: null,
             fileRef: null,
+            isDeleted: false,
           })),
         })));
         setSecFlatSections([]);
       } else if (data.flat_sections?.length > 0) {
         setSecHasChapters(false);
         setSecFlatSections(data.flat_sections.map(sec => ({
+          id: sec.id ?? null,
           name: sec.section_title || sec.section_number || '',
           description: sec.section_content || '',
           file: null,
           fileRef: null,
+          isDeleted: false,
         })));
         setSecChapters([]);
       }
@@ -1432,11 +1438,13 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       setSubDocEntries(prev => ({
         ...prev,
         [tab]: rows.map(r => ({
+          id: r.id ?? null,
           number: r.entry_number || '',
           title: r.title || '',
           description: r.description || '',
           file: null,
           fileRef: null,
+          isDeleted: false,
         })),
       }));
     } catch { /* ignore */ }
@@ -3187,25 +3195,47 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
 
     function addChapter() {
       setSecChapters(prev => {
-        setActiveChapterIdx(prev.length); // the new chapter becomes the one being edited
-        return [...prev, { name: '', sections: [] }];
+        const nextIdx = prev.filter(c => !c.isDeleted).length + prev.filter(c => c.isDeleted).length; // = prev.length
+        setActiveChapterIdx(prev.length);
+        return [...prev, { id: null, name: '', isDeleted: false, sections: [] }];
       });
       setActiveSectionIdx(0);
     }
     function removeChapter(idx) {
-      setSecChapters(prev => prev.filter((_, i) => i !== idx));
-      setActiveChapterIdx(prev => (idx <= prev ? Math.max(0, prev - 1) : prev));
+      const ch = secChapters[idx];
+      if (ch?.id != null) {
+        // Existing DB row — soft delete it and all its sections
+        setSecChapters(prev => prev.map((c, i) => i !== idx ? c : {
+          ...c, isDeleted: true,
+          sections: c.sections.map(s => ({ ...s, isDeleted: true })),
+        }));
+        // Move active chapter to the next visible one
+        setActiveChapterIdx(prev => {
+          const visible = secChapters.map((c, i) => ({ c, i })).filter(({ c, i }) => !c.isDeleted && i !== idx);
+          return visible.length > 0 ? visible[0].i : -1;
+        });
+      } else {
+        setSecChapters(prev => prev.filter((_, i) => i !== idx));
+        setActiveChapterIdx(prev => (idx <= prev ? Math.max(0, prev - 1) : prev));
+      }
     }
     function setChapterName(idx, name) {
       setSecChapters(prev => prev.map((ch, i) => i === idx ? { ...ch, name } : ch));
     }
     function addChapterSection(chIdx) {
-      setSecChapters(prev => prev.map((ch, i) => i === chIdx ? { ...ch, sections: [...ch.sections, { name: '', description: '', file: null, fileRef: null }] } : ch));
-      setActiveSectionIdx(secChapters[chIdx]?.sections.length ?? 0); // the new (last) section becomes the one being edited
+      setSecChapters(prev => prev.map((ch, i) => i === chIdx ? { ...ch, sections: [...ch.sections, { id: null, name: '', description: '', file: null, fileRef: null, isDeleted: false }] } : ch));
+      setActiveSectionIdx(secChapters[chIdx]?.sections.length ?? 0);
     }
     function removeChapterSection(chIdx, secIdx) {
-      setSecChapters(prev => prev.map((ch, i) => i === chIdx ? { ...ch, sections: ch.sections.filter((_, si) => si !== secIdx) } : ch));
-      setActiveSectionIdx(prev => (secIdx <= prev ? Math.max(0, prev - 1) : prev));
+      const sec = secChapters[chIdx]?.sections[secIdx];
+      if (sec?.id != null) {
+        setSecChapters(prev => prev.map((ch, i) => i !== chIdx ? ch : {
+          ...ch, sections: ch.sections.map((s, si) => si === secIdx ? { ...s, isDeleted: true } : s),
+        }));
+      } else {
+        setSecChapters(prev => prev.map((ch, i) => i !== chIdx ? ch : { ...ch, sections: ch.sections.filter((_, si) => si !== secIdx) }));
+        setActiveSectionIdx(prev => (secIdx <= prev ? Math.max(0, prev - 1) : prev));
+      }
     }
     function setChapterSectionField(chIdx, secIdx, field, value) {
       setSecChapters(prev => prev.map((ch, i) => {
@@ -3217,13 +3247,18 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     }
     function addFlatSection() {
       setSecFlatSections(prev => {
-        setActiveFlatSectionIdx(prev.length); // the new (last) section becomes the one being edited
-        return [...prev, { name: '', description: '', file: null, fileRef: null }];
+        setActiveFlatSectionIdx(prev.length);
+        return [...prev, { id: null, name: '', description: '', file: null, fileRef: null, isDeleted: false }];
       });
     }
     function removeFlatSection(idx) {
-      setSecFlatSections(prev => prev.filter((_, i) => i !== idx));
-      setActiveFlatSectionIdx(prev => (idx <= prev ? Math.max(0, prev - 1) : prev));
+      const sec = secFlatSections[idx];
+      if (sec?.id != null) {
+        setSecFlatSections(prev => prev.map((s, i) => i === idx ? { ...s, isDeleted: true } : s));
+      } else {
+        setSecFlatSections(prev => prev.filter((_, i) => i !== idx));
+        setActiveFlatSectionIdx(prev => (idx <= prev ? Math.max(0, prev - 1) : prev));
+      }
     }
     function setFlatSectionField(idx, field, value) {
       setSecFlatSections(prev => { const next = [...prev]; next[idx] = { ...next[idx], [field]: value }; return next; });
@@ -3247,14 +3282,18 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
           if (secHasChapters) {
             const chapters = await Promise.all(
               secChapters.map(async ch => ({
+                id: ch.id ?? null,
                 chapter_number: ch.name || '',
                 chapter_title: ch.name || '',
+                is_deleted: ch.isDeleted ? true : false,
                 sections: await Promise.all(
                   ch.sections.map(async sec => ({
+                    id: sec.id ?? null,
                     section_number: sec.name || '',
                     section_title: sec.name || '',
                     section_content: sec.description || '',
-                    file_ref: await uploadSecFile(sec.file),
+                    file_ref: sec.isDeleted ? null : await uploadSecFile(sec.file),
+                    is_deleted: sec.isDeleted ? true : false,
                   }))
                 ),
               }))
@@ -3263,10 +3302,12 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
           } else {
             const flat_sections = await Promise.all(
               secFlatSections.map(async sec => ({
+                id: sec.id ?? null,
                 section_number: sec.name || '',
                 section_title: sec.name || '',
                 section_content: sec.description || '',
-                file_ref: await uploadSecFile(sec.file),
+                file_ref: sec.isDeleted ? null : await uploadSecFile(sec.file),
+                is_deleted: sec.isDeleted ? true : false,
               }))
             );
             payload = { has_chapters: false, flat_sections };
@@ -3280,17 +3321,19 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
           const builtEntries = await Promise.all(
             entries.map(async entry => {
               let fileRef = entry.fileRef;
-              if (entry.file && !fileRef) {
+              if (!entry.isDeleted && entry.file && !fileRef) {
                 const fd = new FormData();
                 fd.append('file', entry.file);
                 const res = await uploadActPartFile(fd);
                 fileRef = res.data?.file_ref || null;
               }
               return {
+                id: entry.id ?? null,
                 entry_number: entry.number || '',
                 title: entry.title || '',
                 description: entry.description || '',
-                file_ref: fileRef,
+                file_ref: entry.isDeleted ? null : fileRef,
+                is_deleted: entry.isDeleted ? true : false,
               };
             })
           );
@@ -3386,8 +3429,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                     <FileText size={11} color={tab.accent} />
                     <span style={{ fontSize: 11.5, fontWeight: active ? 700 : 600, color: active ? tab.text : 'var(--text-heading)', whiteSpace: 'nowrap' }}>{t(tab.labelKey)}</span>
                     {active && <CheckCircle size={11} color={tab.accent} />}
-                    {(subDocEntries[tab.key]?.length > 0) && (
-                      <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, color: tab.accent, background: 'rgba(255,255,255,.5)', padding: '0 6px', borderRadius: 20 }}>{subDocEntries[tab.key].length}</span>
+                    {((subDocEntries[tab.key] || []).filter(e => !e.isDeleted).length > 0) && (
+                      <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, color: tab.accent, background: 'rgba(255,255,255,.5)', padding: '0 6px', borderRadius: 20 }}>{(subDocEntries[tab.key] || []).filter(e => !e.isDeleted).length}</span>
                     )}
                   </button>
                 );
@@ -3441,8 +3484,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                       { v: false, icon: FileText, title: t('addDocuments.sections.withoutChaptersOption'), desc: t('addDocuments.sections.withoutChaptersDesc') },
                     ].map(opt => {
                       const active = secHasChapters === opt.v;
-                      const hasExisting = secChapters.length > 0 || secFlatSections.length > 0;
-                      const locked = hasExisting && !active; // disable the non-current option when data is loaded
+                      const hasDbRecords = secChapters.some(c => c.id != null) || secFlatSections.some(s => s.id != null);
+                      const locked = hasDbRecords && !active; // disable switching structure when DB rows already exist
                       return (
                         <button key={String(opt.v)} type="button" onClick={() => !locked && setSecHasChapters(opt.v)}
                           disabled={locked}
@@ -3474,6 +3517,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                 {secHasChapters === true && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     {secChapters.map((ch, ci) => {
+                      if (ch.isDeleted) return null;
                       if (ci !== activeChapterIdx) {
                         return (
                           <div key={ci} role="button" tabIndex={0} onClick={() => toggleChapter(ci)}
@@ -3489,9 +3533,9 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                             <span style={{ fontSize: 13, fontWeight: 600, color: ch.name ? 'var(--text-heading)' : 'var(--text-color-secondary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {ch.name || t('addDocuments.sections.chapterNamePlaceholder')}
                             </span>
-                            {ch.sections.length > 0 && (
+                            {ch.sections.filter(s => !s.isDeleted).length > 0 && (
                               <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--text-color-secondary)', background: 'var(--surface-card)', border: '1px solid var(--surface-border)', padding: '1px 8px', borderRadius: 20, flexShrink: 0 }}>
-                                {t('addDocuments.sections.sectionCountBadge', { count: ch.sections.length })}
+                                {t('addDocuments.sections.sectionCountBadge', { count: ch.sections.filter(s => !s.isDeleted).length })}
                               </span>
                             )}
                             <ChevronRight size={14} color="var(--text-color-secondary)" style={{ flexShrink: 0 }} />
@@ -3519,9 +3563,10 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                               style={{ ...INPUT_BASE, fontWeight: 700, background: 'var(--surface-card)' }} onFocus={focusStyle} onBlur={blurStyle} />
                           </div>
 
-                          {ch.sections.length > 0 && (
+                          {ch.sections.filter(s => !s.isDeleted).length > 0 && (
                             <div style={{ marginLeft: 10, paddingLeft: 20, borderLeft: `2px solid ${activeSubTab.accent}40`, display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
                               {ch.sections.map((sec, si) => {
+                                if (sec.isDeleted) return null;
                                 if (si !== activeSectionIdx) {
                                   // Collapsed — done editing this one; show its name + a clipped
                                   // preview of the description so the active section (usually the
@@ -3645,6 +3690,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                 {secHasChapters === false && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     {secFlatSections.map((sec, si) => {
+                      if (sec.isDeleted) return null;
                       if (si !== activeFlatSectionIdx) {
                         return (
                           <div key={si} role="button" tabIndex={0} onClick={() => toggleFlatSection(si)}
@@ -3746,10 +3792,18 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         {subDocTab !== 'sections' && subDocAct && (() => {
           const entries = subDocEntries[subDocTab] || [];
           function addEntry() {
-            setSubDocEntries(prev => ({ ...prev, [subDocTab]: [...(prev[subDocTab] || []), { number: '', title: '', description: '', file: null, fileRef: null }] }));
+            setSubDocEntries(prev => ({ ...prev, [subDocTab]: [...(prev[subDocTab] || []), { id: null, number: '', title: '', description: '', file: null, fileRef: null, isDeleted: false }] }));
           }
           function removeEntry(idx) {
-            setSubDocEntries(prev => ({ ...prev, [subDocTab]: (prev[subDocTab] || []).filter((_, i) => i !== idx) }));
+            const entry = (subDocEntries[subDocTab] || [])[idx];
+            if (entry?.id != null) {
+              setSubDocEntries(prev => ({
+                ...prev,
+                [subDocTab]: (prev[subDocTab] || []).map((e, i) => i === idx ? { ...e, isDeleted: true } : e),
+              }));
+            } else {
+              setSubDocEntries(prev => ({ ...prev, [subDocTab]: (prev[subDocTab] || []).filter((_, i) => i !== idx) }));
+            }
           }
           function setEntryField(idx, field, val) {
             setSubDocEntries(prev => {
@@ -3765,11 +3819,13 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                 {activeSubTab ? t(activeSubTab.labelKey) : subDocTab}
               </div>
               <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '2px 8px', borderRadius: 20 }}>
-                {entries.length} {entries.length === 1 ? 'entry' : 'entries'}
+                {entries.filter(e => !e.isDeleted).length} {entries.filter(e => !e.isDeleted).length === 1 ? 'entry' : 'entries'}
               </span>
             </div>
             <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {entries.map((entry, i) => (
+              {entries.map((entry, i) => {
+                if (entry.isDeleted) return null;
+                return (
                 <div key={i} style={{ padding: '14px 16px', borderRadius: 10, border: `1.5px solid ${activeSubTab ? activeSubTab.accent : 'var(--surface-border)'}30`, background: 'var(--surface-ground)', display: 'flex', flexDirection: 'column', gap: 12 }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', background: 'var(--surface-card)', border: '1px solid var(--surface-border)', padding: '2px 9px', borderRadius: 20 }}>
@@ -3823,7 +3879,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                     )}
                   </div>
                 </div>
-              ))}
+              );
+              })}
               <button type="button" onClick={addEntry}
                 style={{ display: 'flex', alignItems: 'center', gap: 6, alignSelf: 'flex-start', fontSize: 12.5, fontWeight: 700, color: activeSubTab ? activeSubTab.accent : 'var(--primary)', background: activeSubTab ? activeSubTab.bg : 'transparent', border: `1px solid ${activeSubTab ? activeSubTab.accent + '40' : 'var(--surface-border)'}`, borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontFamily: 'var(--font)' }}>
                 <Plus size={13} /> Add Entry
