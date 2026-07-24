@@ -1443,12 +1443,12 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             for (let j = 1; j <= maxSecPos; j++) {
               const sf = apiSecs.find(s => s.section_number === `Section ${j}`);
               if (sf) {
-                sectionsArray.push({ id: sf.id ?? null, name: sf.section_title || sf.section_number || '', description: sf.section_content || '', file: null, fileRef: null, existingFilename: sf.original_filename || null, existingFileRef: sf.file_ref || null, isDeleted: false });
+                sectionsArray.push({ id: sf.id ?? null, name: sf.section_title || sf.section_number || '', description: sf.section_content || '', file: null, fileRef: null, existingFilename: sf.original_filename || null, existingFileRef: sf.file_ref || null, isDeleted: false, status: sf.status || 'draft' });
               } else {
-                sectionsArray.push({ id: null, name: '', description: '', file: null, fileRef: null, existingFilename: null, existingFileRef: null, isDeleted: true });
+                sectionsArray.push({ id: null, name: '', description: '', file: null, fileRef: null, existingFilename: null, existingFileRef: null, isDeleted: true, status: 'draft' });
               }
             }
-            chapterArray.push({ id: found.id ?? null, name: found.chapter_title || found.chapter_number || '', isDeleted: false, sections: sectionsArray });
+            chapterArray.push({ id: found.id ?? null, name: found.chapter_title || found.chapter_number || '', isDeleted: false, sections: sectionsArray, status: found.status || 'draft' });
           } else {
             // Gap — chapter was soft-deleted; leave placeholder slot
             chapterArray.push({ id: null, name: '', isDeleted: true, sections: [] });
@@ -1466,9 +1466,9 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         for (let i = 1; i <= maxSecPos; i++) {
           const sf = apiFlat.find(s => s.section_number === `Section ${i}`);
           if (sf) {
-            flatArray.push({ id: sf.id ?? null, name: sf.section_title || sf.section_number || '', description: sf.section_content || '', file: null, fileRef: null, existingFilename: sf.original_filename || null, existingFileRef: sf.file_ref || null, isDeleted: false });
+            flatArray.push({ id: sf.id ?? null, name: sf.section_title || sf.section_number || '', description: sf.section_content || '', file: null, fileRef: null, existingFilename: sf.original_filename || null, existingFileRef: sf.file_ref || null, isDeleted: false, status: sf.status || 'draft' });
           } else {
-            flatArray.push({ id: null, name: '', description: '', file: null, fileRef: null, existingFilename: null, existingFileRef: null, isDeleted: true });
+            flatArray.push({ id: null, name: '', description: '', file: null, fileRef: null, existingFilename: null, existingFileRef: null, isDeleted: true, status: 'draft' });
           }
         }
 
@@ -1496,9 +1496,9 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       for (let i = 1; i <= maxPos; i++) {
         const found = rows.find(r => r.entry_number === `${label} ${i}`);
         if (found) {
-          entryArray.push({ id: found.id ?? null, number: found.entry_number || '', title: found.title || '', description: found.description || '', file: null, fileRef: null, existingFilename: found.original_filename || null, existingFileRef: found.file_ref || null, isDeleted: false });
+          entryArray.push({ id: found.id ?? null, number: found.entry_number || '', title: found.title || '', description: found.description || '', file: null, fileRef: null, existingFilename: found.original_filename || null, existingFileRef: found.file_ref || null, isDeleted: false, status: found.status || 'draft' });
         } else {
-          entryArray.push({ id: null, number: '', title: '', description: '', file: null, fileRef: null, existingFilename: null, existingFileRef: null, isDeleted: true });
+          entryArray.push({ id: null, number: '', title: '', description: '', file: null, fileRef: null, existingFilename: null, existingFileRef: null, isDeleted: true, status: 'draft' });
         }
       }
       setSubDocEntries(prev => ({ ...prev, [tab]: entryArray }));
@@ -3386,7 +3386,11 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             payload = { has_chapters: false, flat_sections };
           }
           await saveActPartSections(subDocAct, payload);
-          showToast('success', 'Sections saved successfully.');
+          try {
+            const submitRes = await submitActPartForApproval(subDocAct, subDocTab);
+            setSubDocApprovals(prev => ({ ...prev, [subDocTab]: submitRes.data }));
+          } catch { /* save succeeded; approval state refreshes on reload */ }
+          showToast('success', 'Sections saved and submitted for approval.');
           await loadActPartSections(subDocAct);
         } else {
           // Non-sections tab: upload per-entry files then save entries
@@ -3413,7 +3417,11 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             })
           )).filter(e => !(e.is_deleted && e.id == null));
           await saveActPartEntries(subDocAct, subDocTab, { entries: builtEntries });
-          showToast('success', `${subDocTab.charAt(0).toUpperCase() + subDocTab.slice(1)} saved successfully.`);
+          try {
+            const submitRes = await submitActPartForApproval(subDocAct, subDocTab);
+            setSubDocApprovals(prev => ({ ...prev, [subDocTab]: submitRes.data }));
+          } catch { /* save succeeded; approval state refreshes on reload */ }
+          showToast('success', `${subDocTab.charAt(0).toUpperCase() + subDocTab.slice(1)} saved and submitted for approval.`);
           await loadActPartEntries(subDocAct, subDocTab);
         }
       } catch (err) {
@@ -3603,6 +3611,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                         );
                       }
                       if (ci !== activeChapterIdx) {
+                        const chStatusChip = ch.id ? (ch.status || 'draft') : null;
                         return (
                           <div key={ci} role="button" tabIndex={0} onClick={() => toggleChapter(ci)}
                             onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleChapter(ci); } }}
@@ -3621,6 +3630,14 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                               <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--text-color-secondary)', background: 'var(--surface-card)', border: '1px solid var(--surface-border)', padding: '1px 8px', borderRadius: 20, flexShrink: 0 }}>
                                 {t('addDocuments.sections.sectionCountBadge', { count: ch.sections.filter(s => !s.isDeleted).length })}
                               </span>
+                            )}
+                            {chStatusChip && (
+                              <span style={{ fontSize: 9.5, fontWeight: 700, borderRadius: 20, padding: '1px 8px', flexShrink: 0,
+                                ...(chStatusChip === 'draft'    ? { background: '#f1f5f9', color: '#64748b', border: '1px solid #cbd5e1' } :
+                                    chStatusChip === 'pending'  ? { background: '#fef3c7', color: '#92400e', border: '1px solid #f59e0b' } :
+                                    chStatusChip === 'approved' ? { background: '#d1fae5', color: '#065f46', border: '1px solid #10b981' } :
+                                                                   { background: '#fee2e2', color: '#991b1b', border: '1px solid #ef4444' }),
+                              }}>{chStatusChip.charAt(0).toUpperCase() + chStatusChip.slice(1)}</span>
                             )}
                             <ChevronRight size={14} color="var(--text-color-secondary)" style={{ flexShrink: 0 }} />
                           </div>
@@ -3665,6 +3682,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                                   // Collapsed — done editing this one; show its name + a clipped
                                   // preview of the description so the active section (usually the
                                   // newest) doesn't get crowded out.
+                                  const secStatusChip = sec.id ? (sec.status || 'draft') : null;
                                   return (
                                     <div key={si} role="button" tabIndex={0} onClick={() => toggleSection(si)}
                                       onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSection(si); } }}
@@ -3672,6 +3690,14 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                                       <div aria-hidden="true" style={{ position: 'absolute', left: -20, top: 20, width: 20, height: 1, background: activeSubTab.accent + '50' }} />
                                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                                         <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '2px 8px', borderRadius: 20, flexShrink: 0 }}>{t('addDocuments.sections.sectionNumber', { number: si + 1 })}</span>
+                                        {secStatusChip && (
+                                          <span style={{ fontSize: 9.5, fontWeight: 700, borderRadius: 20, padding: '1px 7px', flexShrink: 0,
+                                            ...(secStatusChip === 'draft'    ? { background: '#f1f5f9', color: '#64748b', border: '1px solid #cbd5e1' } :
+                                                secStatusChip === 'pending'  ? { background: '#fef3c7', color: '#92400e', border: '1px solid #f59e0b' } :
+                                                secStatusChip === 'approved' ? { background: '#d1fae5', color: '#065f46', border: '1px solid #10b981' } :
+                                                                               { background: '#fee2e2', color: '#991b1b', border: '1px solid #ef4444' }),
+                                          }}>{secStatusChip.charAt(0).toUpperCase() + secStatusChip.slice(1)}</span>
+                                        )}
                                         <span style={{ fontSize: 13, fontWeight: 600, color: sec.name ? 'var(--text-heading)' : 'var(--text-color-secondary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                           {sec.name || t('addDocuments.sections.sectionNamePlain')}
                                         </span>
@@ -3810,12 +3836,21 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                         );
                       }
                       if (si !== activeFlatSectionIdx) {
+                        const flatSecStatusChip = sec.id ? (sec.status || 'draft') : null;
                         return (
                           <div key={si} role="button" tabIndex={0} onClick={() => toggleFlatSection(si)}
                             onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleFlatSection(si); } }}
                             style={{ padding: 12, borderRadius: 10, border: '1px solid var(--surface-border)', background: 'var(--surface-card)', cursor: 'pointer' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                               <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '2px 8px', borderRadius: 20, flexShrink: 0 }}>{t('addDocuments.sections.sectionNumber', { number: si + 1 })}</span>
+                              {flatSecStatusChip && (
+                                <span style={{ fontSize: 9.5, fontWeight: 700, borderRadius: 20, padding: '1px 7px', flexShrink: 0,
+                                  ...(flatSecStatusChip === 'draft'    ? { background: '#f1f5f9', color: '#64748b', border: '1px solid #cbd5e1' } :
+                                      flatSecStatusChip === 'pending'  ? { background: '#fef3c7', color: '#92400e', border: '1px solid #f59e0b' } :
+                                      flatSecStatusChip === 'approved' ? { background: '#d1fae5', color: '#065f46', border: '1px solid #10b981' } :
+                                                                         { background: '#fee2e2', color: '#991b1b', border: '1px solid #ef4444' }),
+                                }}>{flatSecStatusChip.charAt(0).toUpperCase() + flatSecStatusChip.slice(1)}</span>
+                              )}
                               <span style={{ fontSize: 13, fontWeight: 600, color: sec.name ? 'var(--text-heading)' : 'var(--text-color-secondary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                 {sec.name || t('addDocuments.sections.sectionNamePlain')}
                               </span>
@@ -3970,12 +4005,23 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                     </div>
                   );
                 }
+                const entryStatusChip = entry.id ? (entry.status || 'draft') : null;
                 return (
                 <div key={i} style={{ padding: '14px 16px', borderRadius: 10, border: `1.5px solid ${activeSubTab ? activeSubTab.accent : 'var(--surface-border)'}30`, background: 'var(--surface-ground)', display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', background: 'var(--surface-card)', border: '1px solid var(--surface-border)', padding: '2px 9px', borderRadius: 20 }}>
-                      {singularLabel(subDocTab)} {i + 1}
-                    </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', background: 'var(--surface-card)', border: '1px solid var(--surface-border)', padding: '2px 9px', borderRadius: 20 }}>
+                        {singularLabel(subDocTab)} {i + 1}
+                      </span>
+                      {entryStatusChip && (
+                        <span style={{ fontSize: 9.5, fontWeight: 700, borderRadius: 20, padding: '1px 7px', flexShrink: 0,
+                          ...(entryStatusChip === 'draft'    ? { background: '#f1f5f9', color: '#64748b', border: '1px solid #cbd5e1' } :
+                              entryStatusChip === 'pending'  ? { background: '#fef3c7', color: '#92400e', border: '1px solid #f59e0b' } :
+                              entryStatusChip === 'approved' ? { background: '#d1fae5', color: '#065f46', border: '1px solid #10b981' } :
+                                                               { background: '#fee2e2', color: '#991b1b', border: '1px solid #ef4444' }),
+                        }}>{entryStatusChip.charAt(0).toUpperCase() + entryStatusChip.slice(1)}</span>
+                      )}
+                    </div>
                     <button type="button" onClick={() => removeEntry(i)}
                       style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex' }}>
                       <X size={14} />
@@ -4052,21 +4098,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             rejected: { bg: '#fee2e2', color: '#991b1b', border: '#ef4444', icon: '✗' },
           };
           const sc = SC[approvalStatus] || null;
-          const isSubmitDisabled = subDocSubmitting || approvalStatus === 'pending' || approvalStatus === 'approved';
-
-          async function handleSubmitForApproval() {
-            setSubDocSubmitting(true);
-            try {
-              const res = await submitActPartForApproval(subDocAct, subDocTab);
-              setSubDocApprovals(prev => ({ ...prev, [subDocTab]: res.data }));
-              showToast('success', `${activeSubTab ? t(activeSubTab.labelKey) : subDocTab} submitted for approval.`);
-            } catch (err) {
-              showToast('error', err?.response?.data?.detail || 'Could not submit for approval.');
-            } finally {
-              setSubDocSubmitting(false);
-            }
-          }
-
           return (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
               {/* Left: approval status badge */}
@@ -4084,18 +4115,11 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                 </div>
               ) : <div />}
 
-              {/* Right: action buttons */}
-              <div style={{ display: 'flex', gap: 10 }}>
-                <button type="button" onClick={handleAddDocSubmit} disabled={subDocSaving}
-                  style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 24px', borderRadius: 10, border: 'none', background: subDocSaving ? '#94a3b8' : 'var(--primary)', color: 'white', fontSize: 13.5, fontWeight: 700, cursor: subDocSaving ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', boxShadow: subDocSaving ? 'none' : '0 2px 12px rgba(26,86,219,.25)' }}>
-                  <Save size={15} /> {subDocSaving ? 'Saving…' : `Save ${activeSubTab ? t(activeSubTab.labelKey) : ''}`}
-                </button>
-                <button type="button" onClick={handleSubmitForApproval} disabled={isSubmitDisabled}
-                  style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 22px', borderRadius: 10, border: `1.5px solid ${isSubmitDisabled ? '#c4b5fd' : '#7c3aed'}`, background: isSubmitDisabled ? '#f5f3ff' : '#7c3aed', color: isSubmitDisabled ? '#a78bfa' : 'white', fontSize: 13.5, fontWeight: 700, cursor: isSubmitDisabled ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)' }}>
-                  <Send size={15} />
-                  {subDocSubmitting ? 'Submitting…' : approvalStatus === 'pending' ? 'Pending Approval' : approvalStatus === 'approved' ? 'Approved' : 'Submit for Approval'}
-                </button>
-              </div>
+              {/* Right: save button — auto-submits for approval on save */}
+              <button type="button" onClick={handleAddDocSubmit} disabled={subDocSaving}
+                style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 24px', borderRadius: 10, border: 'none', background: subDocSaving ? '#94a3b8' : 'var(--primary)', color: 'white', fontSize: 13.5, fontWeight: 700, cursor: subDocSaving ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', boxShadow: subDocSaving ? 'none' : '0 2px 12px rgba(26,86,219,.25)' }}>
+                <Save size={15} /> {subDocSaving ? 'Saving…' : `Save ${activeSubTab ? t(activeSubTab.labelKey) : ''}`}
+              </button>
             </div>
           );
         })()}

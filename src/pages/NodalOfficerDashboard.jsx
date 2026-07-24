@@ -1470,6 +1470,13 @@ function ActPartsDetailModal({ item, partsData, onClose, readOnly = false, onApp
   function renderContent() {
     if (!partsData) return <div style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: '#ef4444' }}>Could not load content.</div>;
 
+    const statusChip = (status) => {
+      if (!status) return null;
+      const s = { draft: { bg: '#f1f5f9', color: '#64748b', border: '#cbd5e1' }, pending: { bg: '#fef3c7', color: '#92400e', border: '#f59e0b' }, approved: { bg: '#d1fae5', color: '#065f46', border: '#10b981' }, rejected: { bg: '#fee2e2', color: '#991b1b', border: '#ef4444' } }[status];
+      if (!s) return null;
+      return <span style={{ fontSize: 9.5, fontWeight: 700, background: s.bg, color: s.color, border: `1px solid ${s.border}`, borderRadius: 20, padding: '1px 7px', flexShrink: 0, marginLeft: 6 }}>{status.charAt(0).toUpperCase() + status.slice(1)}</span>;
+    };
+
     if (partType === 'sections') {
       const hasCh = partsData.has_chapters && partsData.chapters?.length > 0;
       if (hasCh) {
@@ -1480,11 +1487,13 @@ function ActPartsDetailModal({ item, partsData, onClose, readOnly = false, onApp
                 {ch.chapter_number || '—'}
               </span>
               {ch.chapter_title || '(No title)'}
+              {statusChip(ch.status)}
             </div>
             {(ch.sections || []).map(sec => (
               <div key={sec.id} style={{ marginLeft: 20, marginBottom: 10, padding: '10px 14px', background: 'var(--surface-ground)', borderRadius: 8, border: '1px solid var(--surface-border)' }}>
-                <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 4 }}>
-                  {sec.section_number || '—'} {sec.section_title && `— ${sec.section_title}`}
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 4, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
+                  <span>{sec.section_number || '—'} {sec.section_title && `— ${sec.section_title}`}</span>
+                  {statusChip(sec.status)}
                 </div>
                 {sec.section_content && (
                   <div style={{ fontSize: 12, color: 'var(--text-color)', lineHeight: 1.65, whiteSpace: 'pre-wrap', maxHeight: 120, overflowY: 'auto' }}>{sec.section_content}</div>
@@ -1504,8 +1513,9 @@ function ActPartsDetailModal({ item, partsData, onClose, readOnly = false, onApp
       if (flat.length === 0) return <div style={{ fontSize: 13, color: 'var(--text-color-secondary)', fontStyle: 'italic' }}>No sections added.</div>;
       return flat.map(sec => (
         <div key={sec.id} style={{ marginBottom: 10, padding: '10px 14px', background: 'var(--surface-ground)', borderRadius: 8, border: '1px solid var(--surface-border)' }}>
-          <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 4 }}>
-            {sec.section_number || '—'} {sec.section_title && `— ${sec.section_title}`}
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 4, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
+            <span>{sec.section_number || '—'} {sec.section_title && `— ${sec.section_title}`}</span>
+            {statusChip(sec.status)}
           </div>
           {sec.section_content && (
             <div style={{ fontSize: 12, color: 'var(--text-color)', lineHeight: 1.65, whiteSpace: 'pre-wrap', maxHeight: 120, overflowY: 'auto' }}>{sec.section_content}</div>
@@ -1523,8 +1533,9 @@ function ActPartsDetailModal({ item, partsData, onClose, readOnly = false, onApp
     if (entries.length === 0) return <div style={{ fontSize: 13, color: 'var(--text-color-secondary)', fontStyle: 'italic' }}>No entries added.</div>;
     return entries.map(e => (
       <div key={e.id} style={{ marginBottom: 10, padding: '10px 14px', background: 'var(--surface-ground)', borderRadius: 8, border: '1px solid var(--surface-border)' }}>
-        <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 4 }}>
-          {e.entry_number || '—'} {e.title && `— ${e.title}`}
+        <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 4, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
+          <span>{e.entry_number || '—'} {e.title && `— ${e.title}`}</span>
+          {statusChip(e.status)}
         </div>
         {e.description && (
           <div style={{ fontSize: 12, color: 'var(--text-color)', lineHeight: 1.65, whiteSpace: 'pre-wrap', maxHeight: 120, overflowY: 'auto' }}>{e.description}</div>
