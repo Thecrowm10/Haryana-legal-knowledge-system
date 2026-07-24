@@ -6,3 +6,4 @@ export const getActPartSections  = (actId)       => api.get(`/act-parts/${actId}
 export const saveActPartEntries  = (actId, type, body) => api.post(`/act-parts/${actId}/${type}`, body);
 export const getActPartEntries   = (actId, type)       => api.get(`/act-parts/${actId}/${type}`);
 export const getAllActParts       = (actId)             => api.get(`/act-parts/${actId}`);
+export const getActPartFile      = (fileRef)           => api.get(`/act-parts/file/${encodeURIComponent(fileRef)}`, { responseType: 'blob' });

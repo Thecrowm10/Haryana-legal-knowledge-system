@@ -17,7 +17,7 @@ import SelectField from '../components/ui/SelectField';
 import { useAuth } from '../hooks/useAuth';
 import { getDepartments, getDocumentTypes } from '../services/departments';
 import { uploadPdfFile, uploadPdfMetadata, updatePdfMetadata, getMyDocuments, searchDocuments, getPdfFile, checkDuplicateDocument, linkDocumentToDepartment, getLinkedDocuments, getActChildren, getMyDepartmentActs, getMyDepartmentDocsByType } from '../services/pdf';
-import { uploadActPartFile, saveActPartSections, saveActPartEntries, getActPartSections, getActPartEntries } from '../services/act_parts';
+import { uploadActPartFile, saveActPartSections, saveActPartEntries, getActPartSections, getActPartEntries, getActPartFile } from '../services/act_parts';
 import { createNotification } from '../services/notifications';
 
 // Constants
@@ -1410,6 +1410,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             description: sec.section_content || '',
             file: null,
             fileRef: null,
+            existingFilename: sec.original_filename || null,
+            existingFileRef: sec.file_ref || null,
             isDeleted: false,
           })),
         })));
@@ -1422,6 +1424,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
           description: sec.section_content || '',
           file: null,
           fileRef: null,
+          existingFilename: sec.original_filename || null,
+          existingFileRef: sec.file_ref || null,
           isDeleted: false,
         })));
         setSecChapters([]);
@@ -1444,6 +1448,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
           description: r.description || '',
           file: null,
           fileRef: null,
+          existingFilename: r.original_filename || null,
+          existingFileRef: r.file_ref || null,
           isDeleted: false,
         })),
       }));
@@ -3223,7 +3229,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       setSecChapters(prev => prev.map((ch, i) => i === idx ? { ...ch, name } : ch));
     }
     function addChapterSection(chIdx) {
-      setSecChapters(prev => prev.map((ch, i) => i === chIdx ? { ...ch, sections: [...ch.sections, { id: null, name: '', description: '', file: null, fileRef: null, isDeleted: false }] } : ch));
+      setSecChapters(prev => prev.map((ch, i) => i === chIdx ? { ...ch, sections: [...ch.sections, { id: null, name: '', description: '', file: null, fileRef: null, existingFilename: null, existingFileRef: null, isDeleted: false }] } : ch));
       setActiveSectionIdx(secChapters[chIdx]?.sections.length ?? 0);
     }
     function removeChapterSection(chIdx, secIdx) {
@@ -3248,7 +3254,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     function addFlatSection() {
       setSecFlatSections(prev => {
         setActiveFlatSectionIdx(prev.length);
-        return [...prev, { id: null, name: '', description: '', file: null, fileRef: null, isDeleted: false }];
+        return [...prev, { id: null, name: '', description: '', file: null, fileRef: null, existingFilename: null, existingFileRef: null, isDeleted: false }];
       });
     }
     function removeFlatSection(idx) {
@@ -3262,6 +3268,18 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     }
     function setFlatSectionField(idx, field, value) {
       setSecFlatSections(prev => { const next = [...prev]; next[idx] = { ...next[idx], [field]: value }; return next; });
+    }
+
+    async function openActPartFile(fileRef, filename) {
+      try {
+        const res = await getActPartFile(fileRef);
+        const blob = new Blob([res.data], { type: res.headers['content-type'] || 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        setTimeout(() => URL.revokeObjectURL(url), 30000);
+      } catch {
+        setToast({ type: 'error', message: `Could not open file: ${filename || fileRef}` });
+      }
     }
 
     async function handleAddDocSubmit() {
@@ -3644,6 +3662,21 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                                             <X size={11} />
                                           </button>
                                         </div>
+                                      ) : sec.existingFilename ? (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', flex: 1, minWidth: 0 }}>
+                                            <Paperclip size={12} color={activeSubTab.accent} />
+                                            <span style={{ fontSize: 11.5, color: 'var(--text-heading)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sec.existingFilename}</span>
+                                            <button type="button" onClick={() => openActPartFile(sec.existingFileRef, sec.existingFilename)}
+                                              style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 6, background: 'var(--primary)', color: 'white', border: 'none', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+                                              <ExternalLink size={11} /> Open
+                                            </button>
+                                          </div>
+                                          <label htmlFor={`sec-file-ch${ci}-s${si}`}
+                                            style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: 'var(--text-color-secondary)', background: 'transparent', border: '1px dashed var(--surface-border)', borderRadius: 7, padding: '5px 12px', cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+                                            Replace
+                                          </label>
+                                        </div>
                                       ) : (
                                         <label htmlFor={`sec-file-ch${ci}-s${si}`}
                                           style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: activeSubTab.accent, background: 'transparent', border: `1px dashed ${activeSubTab.accent}60`, borderRadius: 7, padding: '5px 12px', cursor: 'pointer', fontFamily: 'var(--font)' }}>
@@ -3763,6 +3796,21 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                                   <X size={11} />
                                 </button>
                               </div>
+                            ) : sec.existingFilename ? (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', flex: 1, minWidth: 0 }}>
+                                  <Paperclip size={12} color="var(--primary)" />
+                                  <span style={{ fontSize: 11.5, color: 'var(--text-heading)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sec.existingFilename}</span>
+                                  <button type="button" onClick={() => openActPartFile(sec.existingFileRef, sec.existingFilename)}
+                                    style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 6, background: 'var(--primary)', color: 'white', border: 'none', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+                                    <ExternalLink size={11} /> Open
+                                  </button>
+                                </div>
+                                <label htmlFor={`sec-flat-file-${si}`}
+                                  style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: 'var(--text-color-secondary)', background: 'transparent', border: '1px dashed var(--surface-border)', borderRadius: 7, padding: '5px 12px', cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+                                  Replace
+                                </label>
+                              </div>
                             ) : (
                               <label htmlFor={`sec-flat-file-${si}`}
                                 style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: 'var(--primary)', background: 'transparent', border: '1px dashed rgba(26,86,219,.4)', borderRadius: 7, padding: '5px 12px', cursor: 'pointer', fontFamily: 'var(--font)' }}>
@@ -3792,7 +3840,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         {subDocTab !== 'sections' && subDocAct && (() => {
           const entries = subDocEntries[subDocTab] || [];
           function addEntry() {
-            setSubDocEntries(prev => ({ ...prev, [subDocTab]: [...(prev[subDocTab] || []), { id: null, number: '', title: '', description: '', file: null, fileRef: null, isDeleted: false }] }));
+            setSubDocEntries(prev => ({ ...prev, [subDocTab]: [...(prev[subDocTab] || []), { id: null, number: '', title: '', description: '', file: null, fileRef: null, existingFilename: null, existingFileRef: null, isDeleted: false }] }));
           }
           function removeEntry(idx) {
             const entry = (subDocEntries[subDocTab] || [])[idx];
@@ -3870,6 +3918,21 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                           style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex' }}>
                           <X size={11} />
                         </button>
+                      </div>
+                    ) : entry.existingFilename ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-card)', flex: 1, minWidth: 0 }}>
+                          <Paperclip size={12} color={activeSubTab ? activeSubTab.accent : 'var(--primary)'} />
+                          <span style={{ fontSize: 11.5, color: 'var(--text-heading)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.existingFilename}</span>
+                          <button type="button" onClick={() => openActPartFile(entry.existingFileRef, entry.existingFilename)}
+                            style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 6, background: 'var(--primary)', color: 'white', border: 'none', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+                            <ExternalLink size={11} /> Open
+                          </button>
+                        </div>
+                        <label htmlFor={`entry-file-${subDocTab}-${i}`}
+                          style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: 'var(--text-color-secondary)', background: 'transparent', border: '1px dashed var(--surface-border)', borderRadius: 7, padding: '5px 12px', cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+                          Replace
+                        </label>
                       </div>
                     ) : (
                       <label htmlFor={`entry-file-${subDocTab}-${i}`}
