@@ -35,6 +35,7 @@ const BREADCRUMBS = {
   dashboard: ['topbar.crumbs.home'],
   upload: ['topbar.crumbs.home', 'topbar.crumbs.upload'],
   editdocument: ['topbar.crumbs.home', 'topbar.crumbs.editDocument'],
+  adddocuments: ['topbar.crumbs.home', 'topbar.crumbs.addDocuments'],
   links: ['topbar.crumbs.home', 'topbar.crumbs.linkRequests'],
   analytics: ['topbar.crumbs.analytics', 'topbar.crumbs.dashboard'], graph: ['topbar.crumbs.analytics', 'topbar.crumbs.knowledgeGraph'], audit: ['topbar.crumbs.analytics', 'topbar.crumbs.misReport'],
   users: ['topbar.crumbs.admin', 'topbar.crumbs.userManagement'], logs: ['topbar.crumbs.admin', 'topbar.crumbs.systemLogs'],
@@ -53,6 +54,7 @@ const DEFAULT_CRUMB = ['topbar.crumbs.dashboard'];
 const CRUMB_TARGETS = {
   upload:       ['dashboard'],
   editdocument: ['dashboard'],
+  adddocuments: ['dashboard'],
   links:        ['dashboard'],
 };
 
@@ -100,7 +102,22 @@ export default function Topbar({ user, activePage, onNavigate, onLogout, onToggl
 
   return (
     <>
-    <header style={{
+    <style>{`
+      @media (max-width: 640px) {
+        .tb-header { padding: 0 10px !important; gap: 6px !important; }
+        .tb-brand { min-width: 0 !important; gap: 8px !important; }
+        .tb-brand-logo { width: 32px !important; height: 32px !important; }
+        .tb-brand-text { display: none !important; }
+        .tb-crumb-row { font-size: 11.5px !important; }
+        .tb-crumb-row span, .tb-crumb-row button { font-size: 11.5px !important; }
+        .tb-profile-text { display: none !important; }
+        .tb-profile-btn { padding: 4px !important; gap: 0 !important; }
+        .tb-crumb-bar { margin: 0 10px !important; }
+        .tb-crumb-bowl { padding: 8px 14px !important; }
+        .tb-crumb-bowl span, .tb-crumb-bowl button { font-size: 11.5px !important; }
+      }
+    `}</style>
+    <header className="tb-header" style={{
       height: 60, background: 'var(--surface-card)',
       borderBottom: '1px solid var(--surface-border)',
       display: 'flex', alignItems: 'center', padding: '0 20px 0 16px',
@@ -117,9 +134,9 @@ export default function Topbar({ user, activePage, onNavigate, onLogout, onToggl
       ) : (
         /* No sidebar for this role, so the org branding lives here instead */
         <>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, minWidth: 240 }}>
-            <img src={haryanaLogo} alt="Haryana Government" style={{ width: 42, height: 42, objectFit: 'contain', flexShrink: 0 }} />
-            <div style={{ overflow: 'hidden' }}>
+          <div className="tb-brand" style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, minWidth: 240 }}>
+            <img className="tb-brand-logo" src={haryanaLogo} alt="Haryana Government" style={{ width: 42, height: 42, objectFit: 'contain', flexShrink: 0 }} />
+            <div className="tb-brand-text" style={{ overflow: 'hidden' }}>
               <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', lineHeight: 1.3, whiteSpace: 'nowrap' }}>{t('sidebar.orgName')}</div>
               <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', lineHeight: 1.3, whiteSpace: 'nowrap' }}>{t('sidebar.orgTagline')}</div>
             </div>
@@ -129,7 +146,7 @@ export default function Topbar({ user, activePage, onNavigate, onLogout, onToggl
       )}
 
       {/* Breadcrumb — branded roles show it on the curvy bar below instead */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1 }}>
+      <div className="tb-crumb-row" style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0 }}>
         {!isBranded && crumbEls}
       </div>
 
@@ -151,7 +168,7 @@ export default function Topbar({ user, activePage, onNavigate, onLogout, onToggl
 
       {/* Profile dropdown */}
       <div style={{ position: 'relative' }}>
-        <button onClick={() => setProfileOpen(o => !o)} style={{
+        <button className="tb-profile-btn" onClick={() => setProfileOpen(o => !o)} style={{
           background: profileOpen ? 'var(--surface-hover)' : 'transparent',
           border: '1px solid var(--surface-border)',
           borderRadius: 999, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 9,
@@ -166,7 +183,7 @@ export default function Topbar({ user, activePage, onNavigate, onLogout, onToggl
             fontSize: 12, fontWeight: 700, color: 'white',
             boxShadow: `0 0 0 2px var(--surface-card), 0 0 0 3.5px ${rm.color}`,
           }}>{user.role === 'citizen' ? 'U' : user.name[0]}</div>
-          <div style={{ textAlign: 'left' }}>
+          <div className="tb-profile-text" style={{ textAlign: 'left' }}>
             <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-heading)', whiteSpace: 'nowrap', lineHeight: 1.3 }}>{headerPrimaryText}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10.5, fontWeight: 600, color: rm.color }}>
               <span aria-hidden="true" style={{ width: 5, height: 5, borderRadius: '50%', background: rm.color, flexShrink: 0 }} />
@@ -210,7 +227,7 @@ export default function Topbar({ user, activePage, onNavigate, onLogout, onToggl
         corner "flares" (a small quarter-circle radial-gradient in the matching surface color),
         then rounding into a bowl at the bottom. More actions will land here later. */}
     {isBranded && (
-      <div style={{ position: 'relative', margin: '0 4rem', flexShrink: 0 }}>
+      <div className="tb-crumb-bar" style={{ position: 'relative', margin: '0 4rem', flexShrink: 0 }}>
         <div aria-hidden="true" style={{
           position: 'absolute', top: 0, left: -22, width: 22, height: 22,
           background: 'radial-gradient(circle at 0 0, transparent 22px, var(--surface-card) 22px)',
@@ -219,7 +236,7 @@ export default function Topbar({ user, activePage, onNavigate, onLogout, onToggl
           position: 'absolute', top: 0, right: -22, width: 22, height: 22,
           background: 'radial-gradient(circle at 100% 0, transparent 22px, var(--surface-card) 22px)',
         }} />
-        <div style={{
+        <div className="tb-crumb-bowl" style={{
           padding: '10px 22px',
           borderRadius: '0 0 28px 28px',
           background: 'var(--surface-card)',

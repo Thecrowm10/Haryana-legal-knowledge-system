@@ -2,7 +2,7 @@
 import { useTranslation } from 'react-i18next';
 import {
   Upload, FileText, CheckCircle, XCircle, X, TrendingUp, FileType, Download, Clock,
-  RotateCcw, AlertCircle, Eye, GitBranch, Plus,
+  RotateCcw, AlertCircle, Eye, GitBranch, Plus, FolderPlus,
   Layers, ChevronRight, AlertTriangle, CheckSquare, Square,
   Edit3, Tag, Search, MessageSquare, MessageCircle, ZoomIn, ZoomOut, RotateCw, ExternalLink,
   Save, ArrowRight,
@@ -107,6 +107,17 @@ const TYPE_CARD_DESC = {
   'Miscellaneous':       'Other official documents not covered above',
 };
 
+// "Add Documents" tabs — the supporting parts of an Act that get attached separately from the
+// Act itself (Sections/Schedule/Annexure/Appendix/Forms). Colors reuse the same accent language
+// as TYPE_CARD_COLORS above so this page reads as part of the same design system.
+const SUBDOC_TABS = [
+  { key: 'sections', labelKey: 'addDocuments.tabs.sections', descKey: 'addDocuments.tabDesc.sections', accent: '#1a56db', bg: 'rgba(26,86,219,.08)', text: '#1e40af' },
+  { key: 'schedule', labelKey: 'addDocuments.tabs.schedule', descKey: 'addDocuments.tabDesc.schedule', accent: '#0ea5e9', bg: 'rgba(14,165,233,.08)', text: '#0369a1' },
+  { key: 'annexure', labelKey: 'addDocuments.tabs.annexure', descKey: 'addDocuments.tabDesc.annexure', accent: '#22c55e', bg: 'rgba(34,197,94,.08)', text: '#16a34a' },
+  { key: 'appendix', labelKey: 'addDocuments.tabs.appendix', descKey: 'addDocuments.tabDesc.appendix', accent: '#f59e0b', bg: 'rgba(245,158,11,.08)', text: '#d97706' },
+  { key: 'forms',    labelKey: 'addDocuments.tabs.forms',    descKey: 'addDocuments.tabDesc.forms',    accent: '#8b5cf6', bg: 'rgba(139,92,246,.08)', text: '#7c3aed' },
+];
+
 // Per-type metadata fields
 const TYPE_FIELDS = {
   'Act': [], // handled inline in form
@@ -119,6 +130,41 @@ const TYPE_FIELDS = {
   'Bye Laws': [], // handled inline
   'Miscellaneous': [], // handled inline
 };
+
+// Mobile reflow — overrides the inline desktop styles via className + !important, same
+// technique as CitizenDashboard's <style> block. Mounted once per top-level return (the
+// component has three) since modals/sections are reused across all of them.
+const UD_RESPONSIVE_CSS = `
+  @media (max-width: 640px) {
+    .ud-welcome-title { font-size: 18px !important; }
+    .ud-grid-2, .ud-grid-3 { grid-template-columns: 1fr !important; }
+    .ud-stats-grid { grid-template-columns: repeat(2,1fr) !important; }
+    .ud-search-row { flex-direction: column !important; align-items: stretch !important; }
+    .ud-search-box { max-width: none !important; width: 100% !important; }
+    .ud-sort-row { margin-left: 0 !important; }
+    .ud-docview-grid { grid-template-columns: 1fr !important; grid-auto-rows: min-content !important; overflow-y: auto !important; }
+    .ud-docview-preview { max-height: 60vh !important; }
+    .ud-docview-topbar { padding: 10px 14px !important; gap: 8px !important; }
+    .ud-editlist-refno, .ud-editlist-version { display: none !important; }
+    .ud-editlist-table { font-size: 12px !important; }
+    .ud-editlist-table th, .ud-editlist-table td { padding: 6px 8px !important; }
+    .ud-dropzone { padding: 40px 16px !important; }
+    .ud-drawer-body { padding: 16px !important; }
+  }
+`;
+
+// Below this width the uploads/linked-docs list switches from a fixed-column grid row to a
+// stacked card — a DOM-shape change, not just a style override, so it can't be done via CSS alone.
+function useIsMobile(breakpoint = 640) {
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= breakpoint);
+  useEffect(() => {
+    function update() { setIsMobile(window.innerWidth <= breakpoint); }
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, [breakpoint]);
+  return isMobile;
+}
 
 // camelCase field key → Title Case label, e.g. 'noOfRules' → 'No Of Rules'
 function fieldLabel(k) {
@@ -249,6 +295,17 @@ function formatSize(bytes) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
+// Chapter headings in Acts conventionally use Roman numerals (Chapter I, II, III…), unlike
+// sections which stay plain numbers.
+const ROMAN_VALUES = [
+  [1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'],
+  [50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I'],
+];
+function toRoman(num) {
+  let n = num, out = '';
+  for (const [v, s] of ROMAN_VALUES) { while (n >= v) { out += s; n -= v; } }
+  return out || String(num);
+}
 // Pulls the list of documents matching `type` out of a "/pdf/{id}/children" response.
 // Real shape: { act_id, children: { [documentTypeName]: [...] } }. A few other plausible
 // shapes are tolerated too: {results:[...]}, {documents:[...]}, a flat array, {groups:[...]},
@@ -345,7 +402,7 @@ function VersionConflictModal({ existingDoc, newVersion, onUploadAsNew, onCancel
   const { t } = useTranslation('uploader');
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div style={{ background: 'var(--surface-card)', borderRadius: 14, padding: 28, width: 420, boxShadow: '0 24px 80px rgba(0,0,0,.3)' }}>
+      <div style={{ background: 'var(--surface-card)', borderRadius: 14, padding: 28, width: 420, maxWidth: 'calc(100vw - 32px)', boxShadow: '0 24px 80px rgba(0,0,0,.3)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
           <div style={{ width: 36, height: 36, borderRadius: 9, background: 'rgba(245,158,11,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <AlertTriangle size={18} color="#d97706" />
@@ -593,7 +650,7 @@ function DocViewModal({ doc, onClose }) {
     <div style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', flexDirection: 'column', background: 'var(--surface-card)' }}>
 
       {/* ── Top bar ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 24px', borderBottom: '1px solid var(--surface-border)', background: 'var(--surface-50)', flexShrink: 0, minHeight: 64 }}>
+      <div className="ud-docview-topbar" style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 24px', borderBottom: '1px solid var(--surface-border)', background: 'var(--surface-50)', flexShrink: 0, minHeight: 64 }}>
         {/* Doc icon */}
         <div style={{ width: 40, height: 40, borderRadius: 10, background: typeColor.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <FileText size={18} color={typeColor.accent} />
@@ -625,10 +682,10 @@ function DocViewModal({ doc, onClose }) {
       </div>
 
       {/* ── 2-panel body ── */}
-      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '57% 43%', overflow: 'hidden' }}>
+      <div className="ud-docview-grid" style={{ flex: 1, display: 'grid', gridTemplateColumns: '57% 43%', overflow: 'hidden' }}>
 
         {/* ── Left: PDF viewer ── */}
-        <div style={{ borderRight: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#3a3d40' }}>
+        <div className="ud-docview-preview" style={{ borderRight: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#3a3d40' }}>
 
           {/* PDF toolbar */}
           <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10, background: '#2d2f31', flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,.08)' }}>
@@ -749,7 +806,7 @@ function DocViewModal({ doc, onClose }) {
           <div style={{ flex: 1, overflow: 'auto', padding: '20px 20px 28px' }}>
 
             {/* Core info strip */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 22 }}>
+            <div className="ud-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 22 }}>
               {[
                 { label: t('common.type'),       value: doc.type,           color: typeColor.accent, bg: typeColor.bg },
                 { label: t('common.department'), value: doc.dept,           color: 'var(--primary)', bg: 'rgba(26,86,219,.07)' },
@@ -998,6 +1055,7 @@ function DocViewModal({ doc, onClose }) {
 export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, documents = [], onAddDocument, taxonomy = [] }) {
   const { user } = useAuth();
   const { t } = useTranslation('uploader');
+  const isMobile = useIsMobile();
   const [deptsData, setDeptsData] = useState([]);
   const [typesData, setTypesData] = useState([]);
   const DEPTS = deptsData.length > 0 ? deptsData.map(d => d.name) : DEFAULT_DEPTS;
@@ -1252,6 +1310,24 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
 
   const [files, setFiles]           = useState([]);
   const [dragOver, setDragOver]     = useState(false);
+  const [subDocTab, setSubDocTab]       = useState('');
+  const [subDocFiles, setSubDocFiles]   = useState({}); // { [tabKey]: File[] } — kept separate so switching tabs doesn't lose what's picked
+  const [subDocDragOver, setSubDocDragOver] = useState(false);
+  const subDocInputRef = useRef();
+  const subDocStructureRef = useRef(null); // scrolled into view once the Parent Act reveals the structure card below
+  // Sections tab: parent Act gate (mirrors the Amendment "Parent Act" field), then the
+  // has-chapters branch — chapter-wise sections (added one at a time, shown as a tree, like
+  // India Code) or flat sections with no chapter.
+  const [subDocAct, setSubDocAct]           = useState('');
+  const [subDocActsList, setSubDocActsList] = useState(null);
+  const [subDocActsLoading, setSubDocActsLoading] = useState(false);
+  const [secHasChapters, setSecHasChapters] = useState(null); // null = not answered yet
+  const [secChapters, setSecChapters]       = useState([]); // [{ name, sections: [{name,description},...] }]
+  const [activeChapterIdx, setActiveChapterIdx] = useState(0); // only one chapter's sections are open for editing at a time
+  const [activeSectionIdx, setActiveSectionIdx] = useState(0); // within the active chapter, only one section is expanded for editing — the rest collapse to a summary
+  const [secFlatSections, setSecFlatSections] = useState([]); // [{name,description},...] — used when there are no chapters
+  const [activeFlatSectionIdx, setActiveFlatSectionIdx] = useState(0); // same one-open-at-a-time idea, for the flat (no-chapter) list
+  const [previewTarget, setPreviewTarget] = useState(null); // null closed | { chapterIdx, sectionIdx } — chapterIdx is null for a flat section; the preview/edit modal is scoped to one section
   const [form, setForm]             = useState({ act: '', dept: user?.dept || '', type: '', version: '1.0', desc: '', enactmentDate: '', parentAct: '', changeTypes: [] });
   const [amendmentProvisions, setAmendmentProvisions] = useState([]);
   const [typeFields, setTypeFields]  = useState({});
@@ -1399,6 +1475,56 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       .finally(() => { if (!cancelled) setDepartmentActsLoading(false); });
     return () => { cancelled = true; };
   }, [form.type]);
+
+  // Add Documents / Sections tab: same department-Acts list, fetched independently so it
+  // doesn't depend on (or get cleared by) the main Upload wizard's form.type.
+  useEffect(() => {
+    if (activePage !== 'adddocuments') return;
+    let cancelled = false;
+    setSubDocActsLoading(true);
+    getMyDepartmentActs()
+      .then(res => { if (!cancelled) setSubDocActsList(res.data?.documents || res.data?.results || (Array.isArray(res.data) ? res.data : [])); })
+      .catch(() => { if (!cancelled) setSubDocActsList(null); })
+      .finally(() => { if (!cancelled) setSubDocActsLoading(false); });
+    return () => { cancelled = true; };
+  }, [activePage]);
+
+  // Once the Parent Act is picked, the Chapter & Section Structure card appears below the fold —
+  // scroll it into view automatically instead of leaving the user to notice/scroll manually.
+  useEffect(() => {
+    if (activePage === 'adddocuments' && subDocTab === 'sections' && subDocAct) {
+      subDocStructureRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [activePage, subDocTab, subDocAct]);
+
+  // Add Chapter / Add Section — trying to scroll precisely to "just enough" kept leaving the
+  // add buttons off-screen, so this just scrolls the page straight to the bottom instead, which
+  // is where new content always lands anyway.
+  function scrollAddDocumentsToEnd() {
+    document.getElementById('main-content')?.scrollTo({ top: 1e9, behavior: 'smooth' });
+  }
+
+  // Switching (or adding) a chapter should default to its own last section being the open one,
+  // not whatever section index was active in the previously-open chapter.
+  useEffect(() => {
+    if (activePage === 'adddocuments') {
+      setActiveSectionIdx(Math.max(0, (secChapters[activeChapterIdx]?.sections.length || 1) - 1));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePage, activeChapterIdx]);
+
+  useEffect(() => {
+    if (activePage === 'adddocuments' && secHasChapters === true) scrollAddDocumentsToEnd();
+  }, [activePage, secHasChapters, secChapters.length]);
+
+  const activeChapterSectionCount = secChapters[activeChapterIdx]?.sections.length;
+  useEffect(() => {
+    if (activePage === 'adddocuments' && secHasChapters === true) scrollAddDocumentsToEnd();
+  }, [activePage, secHasChapters, activeChapterSectionCount]);
+
+  useEffect(() => {
+    if (activePage === 'adddocuments' && secHasChapters === false) scrollAddDocumentsToEnd();
+  }, [activePage, secHasChapters, secFlatSections.length]);
 
   const fmt      = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -1940,13 +2066,14 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
+        <style>{UD_RESPONSIVE_CSS}</style>
 
         <Toast toast={toast} onClose={() => setToast(null)} />
 
         {/* Welcome header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
           <div>
-            <div style={{ fontSize: 21, fontWeight: 800, color: 'var(--text-heading)', letterSpacing: '-.01em' }}>
+            <div className="ud-welcome-title" style={{ fontSize: 21, fontWeight: 800, color: 'var(--text-heading)', letterSpacing: '-.01em' }}>
               {t('dashboard.greeting', { name: user?.name || '' })}
             </div>
             <div style={{ fontSize: 13.5, color: 'var(--text-color-secondary)', marginTop: 4 }}>
@@ -1963,10 +2090,11 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         {/* Quick actions */}
         <div>
           <div style={{ ...LABEL, marginBottom: 10 }}>{t('dashboard.quickActionsLabel')}</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div className="ud-grid-3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
             {[
               { key: 'upload', icon: Upload, title: t('dashboard.quickActions.uploadTitle'), desc: t('dashboard.quickActions.uploadDesc'), accent: '#1a56db', bg: 'rgba(26,86,219,.08)' },
               { key: 'editdocument', icon: Edit3, title: t('dashboard.quickActions.editTitle'), desc: t('dashboard.quickActions.editDesc'), accent: '#f59e0b', bg: 'rgba(245,158,11,.08)' },
+              { key: 'adddocuments', icon: FolderPlus, title: t('dashboard.quickActions.addDocumentsTitle'), desc: t('dashboard.quickActions.addDocumentsDesc'), accent: '#16a34a', bg: 'rgba(22,163,74,.08)' },
             ].map(action => (
               <Card key={action.key} onClick={() => onNavigate?.(action.key)}
                 style={{
@@ -1991,7 +2119,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         {/* Version history modal */}
         {versionModal && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setVersionModal(null)}>
-            <div style={{ background: 'var(--surface-card)', borderRadius: 14, padding: 28, minWidth: 360, maxWidth: 480, boxShadow: '0 24px 80px rgba(0,0,0,.3)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ background: 'var(--surface-card)', borderRadius: 14, padding: 28, width: 'min(480px, calc(100vw - 32px))', boxShadow: '0 24px 80px rgba(0,0,0,.3)' }} onClick={e => e.stopPropagation()}>
               <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 18, paddingBottom: 12, borderBottom: '1px solid var(--surface-border)' }}>
                 {t('versionModal.title', { title: versionModal.title })}
               </div>
@@ -2015,7 +2143,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         {remarksModal && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             onClick={() => setRemarksModal(null)}>
-            <div style={{ background: 'var(--surface-card)', borderRadius: 14, padding: 28, minWidth: 400, maxWidth: 520, boxShadow: '0 24px 80px rgba(0,0,0,.3)', width: '90vw' }}
+            <div style={{ background: 'var(--surface-card)', borderRadius: 14, padding: 28, boxShadow: '0 24px 80px rgba(0,0,0,.3)', width: 'min(520px, calc(100vw - 32px))' }}
               onClick={e => e.stopPropagation()}>
 
               {/* Header */}
@@ -2099,7 +2227,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         ) : (
         <>
         <div style={{ ...LABEL }}>{t('dashboard.overviewLabel')}</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
+        <div className="ud-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
           {[
             { label: t('stats.totalUploads'),  value: uploads.length, bg: 'rgba(26,86,219,.12)',  color: 'var(--primary)', icon: FileText,    filter: 'all' },
             { label: t('stats.approved'),       value: approved,        bg: 'rgba(34,197,94,.12)',  color: '#22c55e',        icon: CheckCircle, filter: 'approved' },
@@ -2150,7 +2278,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
               <AlertTriangle size={12} color="#d97706" />
               {t('bulkEdit.warning')}
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+            <div className="ud-grid-3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
               {[
                 { label: t('common.department'), key: 'dept', opts: DEPTS, translate: false },
                 { label: t('common.type'),       key: 'type', opts: TYPES, translate: true },
@@ -2223,7 +2351,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         <Card padding="0">
 
           {/* ── Header ── */}
-          <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', rowGap: 8 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>{t('table.title')}</div>
             <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '2px 9px', borderRadius: 20 }}>
               {t('table.documentCount', { count: filtered.length })}
@@ -2249,9 +2377,9 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
 
           {/* ── Search + Sort + Filter ── */}
           <div style={{ padding: '10px 20px', borderBottom: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', gap: 8, background: 'var(--surface-50)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <div className="ud-search-row" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               {/* Search */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '7px 12px', flex: 1, maxWidth: 320 }}>
+              <div className="ud-search-box" style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '7px 12px', flex: 1, maxWidth: 320 }}>
                 <Search size={13} color="var(--text-color-secondary)" />
                 <input value={tableSearch} onChange={e => setTableSearch(e.target.value)} placeholder={t('table.searchPlaceholder')}
                   style={{ background: 'transparent', border: 'none', outline: 'none', fontSize: 12.5, color: 'var(--text-color)', width: '100%' }} />
@@ -2265,7 +2393,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                 </div>
               )}
               {/* Sort controls */}
-              <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <div className="ud-sort-row" style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5 }}>
                 <span style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', marginRight: 2 }}>{t('table.sortLabel')}</span>
                 {[
                   { col: 'uploadedAt', label: t('table.sortDate') },
@@ -2283,7 +2411,22 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                 })}
               </div>
             </div>
-            {/* Type filter pills */}
+            {/* Type filter: dropdown on mobile (pill row wraps to too many lines to be usable), pills on desktop */}
+            {isMobile ? (
+              <select value={filterType} onChange={e => setFilterType(e.target.value)}
+                style={{ ...INPUT_BASE, cursor: 'pointer', appearance: 'none', fontSize: 12.5 }}
+                onFocus={focusStyle} onBlur={blurStyle}>
+                <option value="">{t('table.allTypes')}</option>
+                {TYPES.map(type => {
+                  const count = uploads.filter(d => d.type === type).length;
+                  return (
+                    <option key={type} value={type}>
+                      {(DOC_TYPE_KEY[type] ? t(`docTypes.${DOC_TYPE_KEY[type]}`) : type)} ({count})
+                    </option>
+                  );
+                })}
+              </select>
+            ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               {TYPES.map(type => {
                 const count  = uploads.filter(d => d.type === type).length;
@@ -2304,27 +2447,30 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                 </button>
               )}
             </div>
+            )}
           </div>
 
-          {/* ── Column headers ── */}
+          {/* ── Column headers (desktop only — a card list has no use for them) ── */}
           {(() => {
             const cols = bulkSelectMode ? '4px 48px 1fr 190px 115px 280px' : '4px 1fr 190px 115px 280px';
             return (
               <>
-                <div style={{ display: 'grid', gridTemplateColumns: cols, background: 'var(--surface-50)', borderBottom: '2px solid var(--surface-border)' }}>
-                  <div />
-                  {bulkSelectMode && (
-                    <div style={{ display: 'flex', alignItems: 'center', padding: '0 0 0 16px' }}>
-                      <button onClick={toggleSelectAll} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', alignItems: 'center' }}>
-                        {selectedIds.size === draftUploads.length && draftUploads.length > 0 ? <CheckSquare size={14} color="var(--primary)" /> : <Square size={14} />}
-                      </button>
-                    </div>
-                  )}
-                  <div style={{ ...LABEL, padding: '10px 16px 10px 68px' }}>{t('table.colDocument')}</div>
-                  <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>{t('common.status')}</div>
-                  <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>{t('table.colUploadedOn')}</div>
-                  <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>{t('table.colActions')}</div>
-                </div>
+                {!isMobile && (
+                  <div style={{ display: 'grid', gridTemplateColumns: cols, background: 'var(--surface-50)', borderBottom: '2px solid var(--surface-border)' }}>
+                    <div />
+                    {bulkSelectMode && (
+                      <div style={{ display: 'flex', alignItems: 'center', padding: '0 0 0 16px' }}>
+                        <button onClick={toggleSelectAll} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', alignItems: 'center' }}>
+                          {selectedIds.size === draftUploads.length && draftUploads.length > 0 ? <CheckSquare size={14} color="var(--primary)" /> : <Square size={14} />}
+                        </button>
+                      </div>
+                    )}
+                    <div style={{ ...LABEL, padding: '10px 16px 10px 68px' }}>{t('table.colDocument')}</div>
+                    <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>{t('common.status')}</div>
+                    <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>{t('table.colUploadedOn')}</div>
+                    <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>{t('table.colActions')}</div>
+                  </div>
+                )}
 
                 {/* ── Document rows ── */}
                 <div>
@@ -2345,6 +2491,73 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                       ? `${doc.approval.approver_first_name} ${doc.approval.approver_last_name || ''}`.trim()
                       : doc.approval?.approver_username;
                     const StatusIcon = doc.status === 'approved' ? CheckCircle : doc.status === 'rejected' ? XCircle : Clock;
+
+                    // Mobile: the desktop layout is a fixed 5-6 column grid row (~585px of fixed
+                    // columns alone) that can't be reflowed with CSS alone, so it becomes a stacked
+                    // card instead of a grid row here.
+                    if (isMobile) {
+                      return (
+                        <div key={doc.id}
+                          style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '12px 14px', borderBottom: '1px solid var(--surface-border)', borderLeft: `3px solid ${statusAccent}`, background: isSelected ? 'rgba(26,86,219,.04)' : 'transparent' }}>
+
+                          {/* Row 1: (select) + icon + title + status pill */}
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                            {bulkSelectMode && (
+                              isDraft ? (
+                                <button onClick={() => toggleSelectDoc(doc.id)}
+                                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', alignItems: 'center', flexShrink: 0, marginTop: 3 }}>
+                                  {isSelected ? <CheckSquare size={14} color="var(--primary)" /> : <Square size={14} />}
+                                </button>
+                              ) : (
+                                <Square size={14} color="var(--surface-200)" style={{ flexShrink: 0, marginTop: 3 }} />
+                              )
+                            )}
+                            <div style={{ width: 34, height: 34, borderRadius: 9, background: typeColor.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                              {doc.isWord ? <FileType size={15} color={typeColor.accent} /> : <FileText size={15} color={typeColor.accent} />}
+                            </div>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
+                              {doc.title}
+                            </div>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px 3px 6px', borderRadius: 20, background: statusBg, border: `1px solid ${statusBorder}`, flexShrink: 0 }}>
+                              <StatusIcon size={10} color={statusAccent} />
+                              <span style={{ fontSize: 9.5, fontWeight: 700, color: statusAccent, fontFamily: 'var(--mono)' }}>
+                                {doc.status === 'approved' ? t('common.statusApproved') : doc.status === 'rejected' ? t('common.statusRejected') : t('common.statusPending')}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Row 2: meta chips */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: typeColor.bg, color: typeColor.text || typeColor.accent }}>
+                              {DOC_TYPE_KEY[doc.type] ? t(`docTypes.${DOC_TYPE_KEY[doc.type]}`) : doc.type}
+                            </span>
+                            <span style={{ fontSize: 11, color: 'var(--text-color-secondary)' }}>{doc.dept}</span>
+                            <span style={{ fontSize: 10.5, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '1px 7px', borderRadius: 20 }}>{doc.year}</span>
+                          </div>
+
+                          {/* Row 3: date + actions */}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                            <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)' }}>{doc.uploadedAt}</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              {doc.approval?.comments && (
+                                <button onClick={() => setRemarksModal(doc)}
+                                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 10px', borderRadius: 7, border: `1px solid ${statusBorder}`, background: statusBg, color: statusAccent, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                                  <MessageSquare size={12} /> {t('table.remarksButton')}
+                                </button>
+                              )}
+                              <button onClick={() => setVersionModal(doc)}
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 9px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 10.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--mono)' }}>
+                                <GitBranch size={11} /> v{doc.version || '1.0'}
+                              </button>
+                              <button onClick={() => setViewDoc(doc)}
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 7, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                                <Eye size={13} /> {t('common.view')}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
 
                     return (
                       <div key={doc.id}
@@ -2485,6 +2698,46 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                   } : null,
                 };
               };
+              if (isMobile) {
+                return (
+                  <div key={l.link_id} style={{ borderBottom: '1px solid var(--surface-border)', borderLeft: `3px solid ${linkAccent}`, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                      <div style={{ width: 34, height: 34, borderRadius: 9, background: typeColor.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <FileText size={15} color={typeColor.accent} />
+                      </div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
+                        {l.document_name || l.original_filename}
+                      </div>
+                      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 20, background: linkBg, border: `1px solid ${linkBorder}`, flexShrink: 0 }}>
+                        <LinkIcon size={10} color={linkAccent} />
+                        <span style={{ fontSize: 9.5, fontWeight: 700, color: linkAccent, fontFamily: 'var(--mono)' }}>{linkLabel}</span>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: typeColor.bg, color: typeColor.text || typeColor.accent }}>{DOC_TYPE_KEY[l.document_type_name] ? t(`docTypes.${DOC_TYPE_KEY[l.document_type_name]}`) : l.document_type_name}</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-color-secondary)' }}>{l.department_name}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                      <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)' }}>{l.created_at?.split('T')[0] || ''}</span>
+                      <button
+                        onClick={() => setViewingLinkedDoc(mapLinkedDocForViewer())}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 7, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                        <Eye size={13} /> {t('common.view')}
+                      </button>
+                    </div>
+                    {isRejected && l.review_comments && (
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                        <XCircle size={13} color="#dc2626" style={{ flexShrink: 0, marginTop: 2 }} />
+                        <div>
+                          <div style={{ fontSize: 10.5, fontWeight: 700, color: '#dc2626', fontFamily: 'var(--mono)', marginBottom: 3 }}>{t('linkedDocs.rejectionRemarks')}</div>
+                          <div style={{ fontSize: 12, color: 'var(--text-color-secondary)', lineHeight: 1.6 }}>{l.review_comments}</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
               return (
                 <div key={l.link_id} style={{ borderBottom: '1px solid var(--surface-border)', background: 'transparent', transition: 'background .15s' }}
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
@@ -2554,6 +2807,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   if (activePage === 'editdocument') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease', justifyContent: editType ? 'flex-start' : 'center', minHeight: editType ? 'auto' : 'calc(100vh - 220px)' }}>
+        <style>{UD_RESPONSIVE_CSS}</style>
         <Toast toast={toast} onClose={() => setToast(null)} />
 
         {!editType ? (
@@ -2564,7 +2818,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                 <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-heading)', marginBottom: 8 }}>{t('editDocument.pickTypeHeading')}</div>
                 <div style={{ fontSize: 13.5, color: 'var(--text-color-secondary)' }}>{t('editDocument.pickTypeSubheading')}</div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(240px, 1fr))', gap: 20 }}>
+              <div className="ud-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(240px, 1fr))', gap: 20 }}>
                 {TYPES.map(type => {
                   const c = TYPE_CARD_COLORS[type] || { bg: 'rgba(148,163,184,.08)', accent: '#94a3b8', text: '#64748b' };
                   return (
@@ -2600,6 +2854,15 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
           <Card padding="14px 22px" style={{ animation: 'fadeSlideIn .25s ease' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ ...LABEL, fontSize: 10.5, color: 'var(--text-heading)', flexShrink: 0 }}>{t('wizard.step1.label')}</div>
+              {isMobile ? (
+                <select value={editType || ''} onChange={e => setEditType(e.target.value)}
+                  style={{ ...INPUT_BASE, flex: 1, cursor: 'pointer', appearance: 'none', fontSize: 12.5 }}
+                  onFocus={focusStyle} onBlur={blurStyle}>
+                  {TYPES.map(type => (
+                    <option key={type} value={type}>{DOC_TYPE_KEY[type] ? t(`docTypes.${DOC_TYPE_KEY[type]}`) : type}</option>
+                  ))}
+                </select>
+              ) : (
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flex: 1 }}>
                 {TYPES.map(type => {
                   const c = TYPE_CARD_COLORS[type] || { bg: 'rgba(148,163,184,.08)', accent: '#94a3b8', text: '#64748b' };
@@ -2625,6 +2888,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                   );
                 })}
               </div>
+              )}
             </div>
           </Card>
 
@@ -2646,14 +2910,14 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
               <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', padding: '10px 0' }}>{t('common.loading')}</div>
             ) : (
               <div style={{ border: '1px solid var(--surface-border)', borderRadius: 10, overflow: 'hidden' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                <table className="ud-editlist-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
                   <thead>
                     <tr style={{ background: 'var(--surface-ground)' }}>
                       <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('wizard.step3.colDocumentName')}</th>
-                      <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.referenceNo')}</th>
+                      <th className="ud-editlist-refno" style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.referenceNo')}</th>
                       <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.issueDate')}</th>
                       <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.department')}</th>
-                      <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.version')}</th>
+                      <th className="ud-editlist-version" style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.version')}</th>
                       <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.status')}</th>
                       <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('editDocument.action')}</th>
                     </tr>
@@ -2670,10 +2934,10 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                       return (
                         <tr key={d.id} style={{ borderTop: '1px solid var(--surface-border)' }}>
                           <td style={{ padding: '8px 12px', color: 'var(--text-heading)', fontWeight: 600 }}>{d.title || '—'}</td>
-                          <td style={{ padding: '8px 12px', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.referenceNumber || '—'}</td>
+                          <td className="ud-editlist-refno" style={{ padding: '8px 12px', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.referenceNumber || '—'}</td>
                           <td style={{ padding: '8px 12px', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.enactmentDate || '—'}</td>
                           <td style={{ padding: '8px 12px', color: 'var(--text-color-secondary)' }}>{d.dept || '—'}</td>
-                          <td style={{ padding: '8px 12px', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.version || '—'}</td>
+                          <td className="ud-editlist-version" style={{ padding: '8px 12px', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.version || '—'}</td>
                           <td style={{ padding: '8px 12px', color: 'var(--text-color-secondary)', textTransform: 'capitalize' }}>
                             {{ approved: t('common.statusWordApproved'), pending: t('common.statusWordPending'), rejected: t('common.statusWordRejected') }[d.status] || d.status || '—'}
                           </td>
@@ -2727,7 +2991,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                 </button>
               </div>
 
-              <div style={{ flex: 1, overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div className="ud-drawer-body" style={{ flex: 1, overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {editError && (
                   <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', color: '#dc2626', fontSize: 12.5 }}>
                     {editError}
@@ -2748,7 +3012,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                     style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="ud-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
                     <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')}</div>
                     <input type="date" value={editForm.issue_date || ''}
@@ -2777,7 +3041,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                     style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="ud-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
                     <div style={{ ...LABEL, marginBottom: 6 }}>{t('editDocument.shortTitle')}</div>
                     <input value={editForm.short_title}
@@ -2843,9 +3107,619 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     );
   }
 
+  if (activePage === 'adddocuments') {
+    const activeSubTab = SUBDOC_TABS.find(tb => tb.key === subDocTab);
+    const activeSubFiles = subDocFiles[subDocTab] || [];
+
+    function addSubDocFiles(fileList) {
+      const arr = Array.from(fileList || []).filter(f => /\.(pdf|docx?)$/i.test(f.name));
+      setSubDocFiles(prev => ({ ...prev, [subDocTab]: [...(prev[subDocTab] || []), ...arr] }));
+    }
+    function handleSubDocDrop(e) {
+      e.preventDefault();
+      setSubDocDragOver(false);
+      addSubDocFiles(e.dataTransfer.files);
+    }
+
+    // Click a collapsed chapter to expand it; click the expanded one's own badge again to
+    // collapse it back — a plain toggle, same idea for sections below.
+    function toggleChapter(ci) {
+      setActiveChapterIdx(prev => (prev === ci ? -1 : ci));
+    }
+    function toggleSection(si) {
+      setActiveSectionIdx(prev => (prev === si ? -1 : si));
+    }
+    function toggleFlatSection(si) {
+      setActiveFlatSectionIdx(prev => (prev === si ? -1 : si));
+    }
+
+    function addChapter() {
+      setSecChapters(prev => {
+        setActiveChapterIdx(prev.length); // the new chapter becomes the one being edited
+        return [...prev, { name: '', sections: [] }];
+      });
+      setActiveSectionIdx(0);
+    }
+    function removeChapter(idx) {
+      setSecChapters(prev => prev.filter((_, i) => i !== idx));
+      setActiveChapterIdx(prev => (idx <= prev ? Math.max(0, prev - 1) : prev));
+    }
+    function setChapterName(idx, name) {
+      setSecChapters(prev => prev.map((ch, i) => i === idx ? { ...ch, name } : ch));
+    }
+    function addChapterSection(chIdx) {
+      setSecChapters(prev => prev.map((ch, i) => i === chIdx ? { ...ch, sections: [...ch.sections, { name: '', description: '' }] } : ch));
+      setActiveSectionIdx(secChapters[chIdx]?.sections.length ?? 0); // the new (last) section becomes the one being edited
+    }
+    function removeChapterSection(chIdx, secIdx) {
+      setSecChapters(prev => prev.map((ch, i) => i === chIdx ? { ...ch, sections: ch.sections.filter((_, si) => si !== secIdx) } : ch));
+      setActiveSectionIdx(prev => (secIdx <= prev ? Math.max(0, prev - 1) : prev));
+    }
+    function setChapterSectionField(chIdx, secIdx, field, value) {
+      setSecChapters(prev => prev.map((ch, i) => {
+        if (i !== chIdx) return ch;
+        const sections = [...ch.sections];
+        sections[secIdx] = { ...sections[secIdx], [field]: value };
+        return { ...ch, sections };
+      }));
+    }
+    function addFlatSection() {
+      setSecFlatSections(prev => {
+        setActiveFlatSectionIdx(prev.length); // the new (last) section becomes the one being edited
+        return [...prev, { name: '', description: '' }];
+      });
+    }
+    function removeFlatSection(idx) {
+      setSecFlatSections(prev => prev.filter((_, i) => i !== idx));
+      setActiveFlatSectionIdx(prev => (idx <= prev ? Math.max(0, prev - 1) : prev));
+    }
+    function setFlatSectionField(idx, field, value) {
+      setSecFlatSections(prev => { const next = [...prev]; next[idx] = { ...next[idx], [field]: value }; return next; });
+    }
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
+        <style>{UD_RESPONSIVE_CSS}</style>
+        <Toast toast={toast} onClose={() => setToast(null)} />
+
+        <div>
+          <div style={{ fontSize: 21, fontWeight: 800, color: 'var(--text-heading)', letterSpacing: '-.01em' }}>{t('addDocuments.heading')}</div>
+          <div style={{ fontSize: 13.5, color: 'var(--text-color-secondary)', marginTop: 4 }}>{t('addDocuments.subheading')}</div>
+        </div>
+
+        {!subDocTab ? (
+          /* Big centered picker — identical design to the Upload wizard's Document Type picker */
+          <Card padding="28px 26px">
+            <div style={{ maxWidth: 1180, margin: '0 auto' }}>
+              <div style={{ textAlign: 'center', marginBottom: 32 }}>
+                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-heading)', marginBottom: 8 }}>{t('addDocuments.pickHeading')} <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ fontSize: 13.5, color: 'var(--text-color-secondary)' }}>{t('addDocuments.pickSubheading')}</div>
+              </div>
+              <div className="ud-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(240px, 1fr))', gap: 20 }}>
+                {SUBDOC_TABS.map(tab => (
+                  <button key={tab.key} type="button"
+                      onClick={() => setSubDocTab(tab.key)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 16,
+                        padding: '22px 20px', borderRadius: 14, textAlign: 'left',
+                        border: `1.5px solid ${tab.accent}30`,
+                        background: 'var(--surface-card)',
+                        cursor: 'pointer', transition: 'all .15s', fontFamily: 'var(--font)',
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background = tab.bg; e.currentTarget.style.borderColor = tab.accent + '55'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'var(--surface-card)'; e.currentTarget.style.borderColor = tab.accent + '30'; }}>
+                      <div style={{ width: 46, height: 46, borderRadius: 11, background: tab.bg, border: `1px solid ${tab.accent}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <FileText size={21} color={tab.accent} />
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', lineHeight: 1.3 }}>{t(tab.labelKey)}</div>
+                        <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', lineHeight: 1.45, marginTop: 3 }}>{t(tab.descKey)}</div>
+                      </div>
+                    </button>
+                ))}
+              </div>
+            </div>
+          </Card>
+        ) : (
+        <>
+        {/* Compact selected-part row — same collapsed pattern as the Upload wizard's Step 1.
+            Parent Act (Sections only) lives in the same card, below a divider, instead of its
+            own separate card — saves vertical space, same idea as the Document Type + file-info
+            rows sharing one card in the main Upload wizard. */}
+        <Card padding="0">
+          <div style={{ padding: '14px 22px', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ ...LABEL, fontSize: 10.5, color: 'var(--text-heading)', flexShrink: 0 }}>{t('addDocuments.pickLabel')}</div>
+            {isMobile ? (
+              <select value={subDocTab} onChange={e => setSubDocTab(e.target.value)}
+                style={{ ...INPUT_BASE, flex: 1, cursor: 'pointer', appearance: 'none', fontSize: 12.5 }}
+                onFocus={focusStyle} onBlur={blurStyle}>
+                {SUBDOC_TABS.map(tab => (
+                  <option key={tab.key} value={tab.key}>{t(tab.labelKey)}</option>
+                ))}
+              </select>
+            ) : (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flex: 1 }}>
+              {SUBDOC_TABS.map(tab => {
+                const active = subDocTab === tab.key;
+                return (
+                  <button key={tab.key} type="button" onClick={() => setSubDocTab(tab.key)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      padding: '6px 10px', borderRadius: 8,
+                      border: active ? `1.5px solid ${tab.accent}` : `1.5px solid ${tab.accent}30`,
+                      background: active ? tab.bg : 'var(--surface-card)',
+                      opacity: active ? 1 : 0.72,
+                      boxShadow: active ? `0 0 0 3px ${tab.accent}15` : 'none',
+                      cursor: 'pointer', transition: 'all .15s', fontFamily: 'var(--font)',
+                    }}
+                    onMouseEnter={e => { if (!active) { e.currentTarget.style.opacity = 1; e.currentTarget.style.borderColor = tab.accent + '60'; }}}
+                    onMouseLeave={e => { if (!active) { e.currentTarget.style.opacity = 0.72; e.currentTarget.style.borderColor = tab.accent + '30'; }}}>
+                    <FileText size={11} color={tab.accent} />
+                    <span style={{ fontSize: 11.5, fontWeight: active ? 700 : 600, color: active ? tab.text : 'var(--text-heading)', whiteSpace: 'nowrap' }}>{t(tab.labelKey)}</span>
+                    {active && <CheckCircle size={11} color={tab.accent} />}
+                    {(subDocFiles[tab.key]?.length > 0) && (
+                      <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, color: tab.accent, background: 'rgba(255,255,255,.5)', padding: '0 6px', borderRadius: 20 }}>{subDocFiles[tab.key].length}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+            )}
+          </div>
+
+          {/* Sections tab only: parent Act gate (same pattern as Amendment's Parent Act field) —
+              merged into this same card, below a divider, instead of a separate card. */}
+          {subDocTab === 'sections' && (
+            <div style={{ padding: '14px 22px', borderTop: '1px solid var(--surface-border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ ...LABEL, fontSize: 10.5, color: 'var(--text-heading)', flexShrink: 0 }}>{t('wizard.step3.parentActLabel')}</div>
+                <select value={subDocAct} onChange={e => setSubDocAct(e.target.value)}
+                  disabled={subDocActsLoading}
+                  style={{ ...INPUT_BASE, flex: 1, cursor: 'pointer', appearance: 'none', fontSize: 12.5 }}
+                  onFocus={focusStyle} onBlur={blurStyle}>
+                  <option value="">{subDocActsLoading ? t('addDocuments.sections.selectActLoading') : t('addDocuments.sections.selectActPlaceholder')}</option>
+                  {(subDocActsList || []).map(act => (
+                    <option key={act.id} value={act.id}>{act.document_name}</option>
+                  ))}
+                </select>
+              </div>
+              {!subDocActsLoading && subDocActsList?.length === 0 && (
+                <div style={{ fontSize: 11.5, color: '#d97706', marginTop: 8 }}>{t('addDocuments.sections.selectActEmpty')}</div>
+              )}
+              {!subDocAct && (
+                <div style={{ fontSize: 11.5, color: '#d97706', marginTop: 8 }}>{t('wizard.step3.selectActNotice')}</div>
+              )}
+            </div>
+          )}
+        </Card>
+
+        {subDocTab === 'sections' && subDocAct && (
+          <div ref={subDocStructureRef} style={{ scrollMarginTop: 16 }}>
+          <Card padding="0">
+            <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 30, height: 30, borderRadius: 8, background: activeSubTab.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Layers size={14} color={activeSubTab.accent} />
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)', flex: 1 }}>{t('addDocuments.sections.structureHeading')}</div>
+            </div>
+            <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+                {/* Which structure this Act uses — picking either just sets secHasChapters, same
+                    as the old Yes/No toggle; these are just clearer about what each choice does. */}
+                <div>
+                  <div className="ud-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    {[
+                      { v: true, icon: Layers, title: t('addDocuments.sections.withChaptersOption'), desc: t('addDocuments.sections.withChaptersDesc') },
+                      { v: false, icon: FileText, title: t('addDocuments.sections.withoutChaptersOption'), desc: t('addDocuments.sections.withoutChaptersDesc') },
+                    ].map(opt => {
+                      const active = secHasChapters === opt.v;
+                      return (
+                        <button key={String(opt.v)} type="button" onClick={() => setSecHasChapters(opt.v)}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left',
+                            padding: '14px 16px', borderRadius: 12, cursor: 'pointer', fontFamily: 'var(--font)',
+                            border: active ? '1.5px solid var(--primary)' : '1.5px solid var(--surface-border)',
+                            background: active ? 'rgba(26,86,219,.06)' : 'var(--surface-card)',
+                            transition: 'all .15s',
+                          }}>
+                          <div style={{ width: 40, height: 40, borderRadius: 10, background: active ? 'rgba(26,86,219,.14)' : 'var(--surface-ground)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <opt.icon size={18} color={active ? 'var(--primary)' : 'var(--text-color-secondary)'} />
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: active ? 'var(--primary)' : 'var(--text-heading)' }}>{opt.title}</div>
+                            <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 2, lineHeight: 1.4 }}>{opt.desc}</div>
+                          </div>
+                          {active && <CheckCircle size={16} color="var(--primary)" style={{ flexShrink: 0 }} />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* With chapters: only one chapter is open for editing at a time — its sections
+                    (each with a name and a description, which can run long) nest below it.
+                    Other chapters collapse to a summary row; click one to switch to it. */}
+                {secHasChapters === true && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {secChapters.map((ch, ci) => {
+                      if (ci !== activeChapterIdx) {
+                        return (
+                          <div key={ci} role="button" tabIndex={0} onClick={() => toggleChapter(ci)}
+                            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleChapter(ci); } }}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', width: '100%',
+                              padding: '12px 14px', borderRadius: 10, cursor: 'pointer', fontFamily: 'var(--font)',
+                              border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', boxSizing: 'border-box',
+                            }}>
+                            <span style={{ fontSize: 10.5, fontWeight: 700, color: activeSubTab.accent, fontFamily: 'var(--mono)', letterSpacing: '.04em', flexShrink: 0 }}>
+                              {t('addDocuments.sections.chapterNumber', { number: toRoman(ci + 1) })}
+                            </span>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: ch.name ? 'var(--text-heading)' : 'var(--text-color-secondary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {ch.name || t('addDocuments.sections.chapterNamePlaceholder')}
+                            </span>
+                            {ch.sections.length > 0 && (
+                              <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--text-color-secondary)', background: 'var(--surface-card)', border: '1px solid var(--surface-border)', padding: '1px 8px', borderRadius: 20, flexShrink: 0 }}>
+                                {t('addDocuments.sections.sectionCountBadge', { count: ch.sections.length })}
+                              </span>
+                            )}
+                            <ChevronRight size={14} color="var(--text-color-secondary)" style={{ flexShrink: 0 }} />
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div key={ci} style={{ padding: '16px 18px', borderRadius: 12, border: `1.5px solid ${activeSubTab.accent}40`, background: activeSubTab.bg }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                            <button type="button" onClick={() => toggleChapter(ci)} title={t('addDocuments.sections.collapseHint')}
+                              style={{ fontSize: 11, fontWeight: 700, color: activeSubTab.accent, fontFamily: 'var(--mono)', letterSpacing: '.04em', background: 'var(--surface-card)', border: 'none', padding: '3px 10px', borderRadius: 20, cursor: 'pointer' }}>
+                              {t('addDocuments.sections.chapterNumber', { number: toRoman(ci + 1) })}
+                            </button>
+                            <div style={{ flex: 1 }} />
+                            <button type="button" onClick={() => removeChapter(ci)}
+                              style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', flexShrink: 0 }}>
+                              <X size={15} />
+                            </button>
+                          </div>
+                          <div style={{ marginBottom: 14 }}>
+                            <div style={{ ...LABEL, marginBottom: 6 }}>{t('addDocuments.sections.chapterNameLabel')}</div>
+                            <input value={ch.name} onChange={e => setChapterName(ci, e.target.value)}
+                              placeholder={t('addDocuments.sections.chapterNamePlaceholder')}
+                              style={{ ...INPUT_BASE, fontWeight: 700, background: 'var(--surface-card)' }} onFocus={focusStyle} onBlur={blurStyle} />
+                          </div>
+
+                          {ch.sections.length > 0 && (
+                            <div style={{ marginLeft: 10, paddingLeft: 20, borderLeft: `2px solid ${activeSubTab.accent}40`, display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
+                              {ch.sections.map((sec, si) => {
+                                if (si !== activeSectionIdx) {
+                                  // Collapsed — done editing this one; show its name + a clipped
+                                  // preview of the description so the active section (usually the
+                                  // newest) doesn't get crowded out.
+                                  return (
+                                    <div key={si} role="button" tabIndex={0} onClick={() => toggleSection(si)}
+                                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleSection(si); } }}
+                                      style={{ position: 'relative', padding: 12, borderRadius: 10, border: '1px solid var(--surface-border)', background: 'var(--surface-card)', cursor: 'pointer' }}>
+                                      <div aria-hidden="true" style={{ position: 'absolute', left: -20, top: 20, width: 20, height: 1, background: activeSubTab.accent + '50' }} />
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                        <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '2px 8px', borderRadius: 20, flexShrink: 0 }}>{t('addDocuments.sections.sectionNumber', { number: si + 1 })}</span>
+                                        <span style={{ fontSize: 13, fontWeight: 600, color: sec.name ? 'var(--text-heading)' : 'var(--text-color-secondary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                          {sec.name || t('addDocuments.sections.sectionNamePlain')}
+                                        </span>
+                                        <button type="button" onClick={e => { e.stopPropagation(); setPreviewTarget({ chapterIdx: ci, sectionIdx: si }); }}
+                                          style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 10.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+                                          <Eye size={11} /> {t('addDocuments.sections.previewButton')}
+                                        </button>
+                                        <button type="button" onClick={e => { e.stopPropagation(); removeChapterSection(ci, si); }}
+                                          style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', flexShrink: 0 }}>
+                                          <X size={13} />
+                                        </button>
+                                      </div>
+                                      {sec.description && (
+                                        <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', lineHeight: 1.5, marginTop: 6, marginLeft: 42, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                                          {sec.description}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                }
+
+                                return (
+                                  <div key={si} style={{ position: 'relative', padding: 14, borderRadius: 10, border: `1.5px solid ${activeSubTab.accent}60`, background: 'var(--surface-card)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                    <div aria-hidden="true" style={{ position: 'absolute', left: -20, top: 22, width: 20, height: 1, background: activeSubTab.accent + '50' }} />
+                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                      <button type="button" onClick={() => toggleSection(si)} title={t('addDocuments.sections.collapseHint')}
+                                        style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '2px 9px', borderRadius: 20, cursor: 'pointer' }}>
+                                        {t('addDocuments.sections.sectionNumber', { number: si + 1 })}
+                                      </button>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <button type="button" onClick={() => setPreviewTarget({ chapterIdx: ci, sectionIdx: si })}
+                                          style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 10.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                                          <Eye size={11} /> {t('addDocuments.sections.previewButton')}
+                                        </button>
+                                        <button type="button" onClick={() => removeChapterSection(ci, si)}
+                                          style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', flexShrink: 0 }}>
+                                          <X size={13} />
+                                        </button>
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <div style={{ ...LABEL, marginBottom: 6 }}>{t('addDocuments.sections.sectionNameLabel')}</div>
+                                      <input value={sec.name} onChange={e => setChapterSectionField(ci, si, 'name', e.target.value)}
+                                        placeholder={t('addDocuments.sections.sectionNamePlain')}
+                                        style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                                    </div>
+                                    <div>
+                                      <div style={{ ...LABEL, marginBottom: 6 }}>{t('addDocuments.sections.descriptionLabel')}</div>
+                                      <textarea value={sec.description} onChange={e => setChapterSectionField(ci, si, 'description', e.target.value)}
+                                        placeholder={t('addDocuments.sections.descriptionPlaceholder')} rows={3}
+                                        style={{ ...INPUT_BASE, resize: 'vertical', minHeight: 70, fontFamily: 'var(--font)', fontSize: 12.5, lineHeight: 1.5 }}
+                                        onFocus={focusStyle} onBlur={blurStyle} />
+                                    </div>
+                                    <button type="button" onClick={() => toggleSection(si)}
+                                      style={{ alignSelf: 'flex-end', padding: '7px 18px', borderRadius: 7, border: 'none', background: 'var(--primary)', color: 'white', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                                      {t('addDocuments.sections.confirmButton')}
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                            <button type="button" onClick={() => addChapterSection(ci)}
+                              style={{ display: 'flex', alignItems: 'center', gap: 5, marginLeft: ch.sections.length > 0 ? 30 : 0, fontSize: 11.5, fontWeight: 700, color: activeSubTab.accent, background: 'var(--surface-card)', border: `1px dashed ${activeSubTab.accent}60`, borderRadius: 7, padding: '6px 12px', cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                              <Plus size={12} /> {t('addDocuments.sections.addSection')}
+                            </button>
+                            {/* Only show the chapter's own Confirm once no section inside it is
+                                still expanded — otherwise two Confirm buttons show at once, which
+                                is confusing about which one finishes what. */}
+                            {(ch.sections.length === 0 || activeSectionIdx === -1) && (
+                              <button type="button" onClick={() => toggleChapter(ci)}
+                                style={{ padding: '7px 18px', borderRadius: 7, border: 'none', background: 'var(--primary)', color: 'white', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+                                {t('addDocuments.sections.confirmButton')}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <button type="button" onClick={addChapter}
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, alignSelf: 'flex-start', fontSize: 12.5, fontWeight: 700, color: activeSubTab.accent, background: activeSubTab.bg, border: `1px solid ${activeSubTab.accent}40`, borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                      <Plus size={13} /> {t('addDocuments.sections.addChapter')}
+                    </button>
+                  </div>
+                )}
+
+                {/* Without chapters: flat list of sections, each with a name and a description, not tied to any chapter */}
+                {secHasChapters === false && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {secFlatSections.map((sec, si) => {
+                      if (si !== activeFlatSectionIdx) {
+                        return (
+                          <div key={si} role="button" tabIndex={0} onClick={() => toggleFlatSection(si)}
+                            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleFlatSection(si); } }}
+                            style={{ padding: 12, borderRadius: 10, border: '1px solid var(--surface-border)', background: 'var(--surface-card)', cursor: 'pointer' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '2px 8px', borderRadius: 20, flexShrink: 0 }}>{t('addDocuments.sections.sectionNumber', { number: si + 1 })}</span>
+                              <span style={{ fontSize: 13, fontWeight: 600, color: sec.name ? 'var(--text-heading)' : 'var(--text-color-secondary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {sec.name || t('addDocuments.sections.sectionNamePlain')}
+                              </span>
+                              <button type="button" onClick={e => { e.stopPropagation(); setPreviewTarget({ chapterIdx: null, sectionIdx: si }); }}
+                                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 10.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+                                <Eye size={11} /> {t('addDocuments.sections.previewButton')}
+                              </button>
+                              <button type="button" onClick={e => { e.stopPropagation(); removeFlatSection(si); }}
+                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', flexShrink: 0 }}>
+                                <X size={13} />
+                              </button>
+                            </div>
+                            {sec.description && (
+                              <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', lineHeight: 1.5, marginTop: 6, marginLeft: 42, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                                {sec.description}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div key={si} style={{ padding: 14, borderRadius: 10, border: '1.5px solid var(--primary)', background: 'var(--surface-card)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <button type="button" onClick={() => toggleFlatSection(si)} title={t('addDocuments.sections.collapseHint')}
+                              style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '2px 9px', borderRadius: 20, cursor: 'pointer' }}>
+                              {t('addDocuments.sections.sectionNumber', { number: si + 1 })}
+                            </button>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <button type="button" onClick={() => setPreviewTarget({ chapterIdx: null, sectionIdx: si })}
+                                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 10.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                                <Eye size={11} /> {t('addDocuments.sections.previewButton')}
+                              </button>
+                              <button type="button" onClick={() => removeFlatSection(si)}
+                                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', flexShrink: 0 }}>
+                                <X size={13} />
+                              </button>
+                            </div>
+                          </div>
+                          <div>
+                            <div style={{ ...LABEL, marginBottom: 6 }}>{t('addDocuments.sections.sectionNameLabel')}</div>
+                            <input value={sec.name} onChange={e => setFlatSectionField(si, 'name', e.target.value)}
+                              placeholder={t('addDocuments.sections.sectionNamePlain')}
+                              style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                          </div>
+                          <div>
+                            <div style={{ ...LABEL, marginBottom: 6 }}>{t('addDocuments.sections.descriptionLabel')}</div>
+                            <textarea value={sec.description} onChange={e => setFlatSectionField(si, 'description', e.target.value)}
+                              placeholder={t('addDocuments.sections.descriptionPlaceholder')} rows={3}
+                              style={{ ...INPUT_BASE, resize: 'vertical', minHeight: 70, fontFamily: 'var(--font)', fontSize: 12.5, lineHeight: 1.5 }}
+                              onFocus={focusStyle} onBlur={blurStyle} />
+                          </div>
+                          <button type="button" onClick={() => toggleFlatSection(si)}
+                            style={{ alignSelf: 'flex-end', padding: '7px 18px', borderRadius: 7, border: 'none', background: 'var(--primary)', color: 'white', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                            {t('addDocuments.sections.confirmButton')}
+                          </button>
+                        </div>
+                      );
+                    })}
+                    <button type="button" onClick={addFlatSection}
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, alignSelf: 'flex-start', fontSize: 12.5, fontWeight: 700, color: activeSubTab.accent, background: activeSubTab.bg, border: `1px solid ${activeSubTab.accent}40`, borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                      <Plus size={13} /> {t('addDocuments.sections.addSection')}
+                    </button>
+                  </div>
+                )}
+              </div>
+          </Card>
+          </div>
+        )}
+
+        {/* Attach a file — optional, shown after the fields for every part except Sections, which
+            is purely about defining chapter/section structure and never involves a file upload. */}
+        {subDocTab !== 'sections' && (
+        <Card padding="0">
+          <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-color-secondary)' }}>{t('addDocuments.attachFileHeading')}</div>
+            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '2px 8px', borderRadius: 20, letterSpacing: '.04em' }}>{t('addDocuments.optionalBadge')}</span>
+          </div>
+          <div style={{ padding: 20 }}>
+          <input ref={subDocInputRef} type="file" accept=".pdf,.doc,.docx" multiple style={{ display: 'none' }}
+            onChange={e => { addSubDocFiles(e.target.files); e.target.value = ''; }} />
+
+          {activeSubFiles.length === 0 ? (
+            <div
+              className="ud-dropzone"
+              onClick={() => subDocInputRef.current?.click()}
+              onDrop={handleSubDocDrop}
+              onDragOver={e => { e.preventDefault(); setSubDocDragOver(true); }}
+              onDragLeave={() => setSubDocDragOver(false)}
+              style={{
+                border: `2px dashed ${activeSubTab.accent}${subDocDragOver ? '' : '50'}`,
+                borderRadius: 16, padding: '48px 24px',
+                cursor: 'pointer',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, textAlign: 'center',
+                background: subDocDragOver ? activeSubTab.bg : 'var(--surface-ground)',
+                transition: 'all .25s',
+                boxShadow: subDocDragOver ? `0 0 0 3px ${activeSubTab.accent}18` : 'none',
+              }}>
+              <div style={{ width: 52, height: 52, borderRadius: 14, flexShrink: 0, background: activeSubTab.bg, border: `1px solid ${activeSubTab.accent}40`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Upload size={22} color={activeSubTab.accent} strokeWidth={1.6} />
+              </div>
+              <div>
+                <div style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 6 }}>{t('wizard.step2.dropHere')} <span style={{ color: 'var(--primary)' }}>{t('wizard.step2.clickToBrowse')}</span></div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12, color: 'var(--text-color-secondary)' }}>{t('wizard.step2.fileTypeHint')}</span>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--primary)', background: 'rgba(26,86,219,.08)', border: '1px solid rgba(26,86,219,.2)', padding: '2px 7px', borderRadius: 20 }}>.PDF</span>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: '#2b579a', background: 'rgba(43,87,154,.08)', border: '1px solid rgba(43,87,154,.3)', padding: '2px 7px', borderRadius: 20 }}>.DOC</span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {activeSubFiles.map((f, i) => (
+                <div key={f.name + i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)' }}>
+                  <div style={{ width: 30, height: 30, borderRadius: 7, background: activeSubTab.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    {fileIcon(f)}
+                  </div>
+                  <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-heading)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+                  <span style={{ fontSize: 10.5, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', flexShrink: 0 }}>{formatSize(f.size)}</span>
+                  <button type="button" onClick={() => setSubDocFiles(prev => ({ ...prev, [subDocTab]: prev[subDocTab].filter((_, idx) => idx !== i) }))}
+                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', flexShrink: 0 }}>
+                    <X size={13} />
+                  </button>
+                </div>
+              ))}
+              <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                <button type="button" onClick={() => subDocInputRef.current?.click()}
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 700, color: activeSubTab.accent, background: 'transparent', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '6px 12px', cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                  <Plus size={12} /> {t('wizard.step2.addFile')}
+                </button>
+                <button type="button" onClick={() => setSubDocFiles(prev => ({ ...prev, [subDocTab]: [] }))}
+                  style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-color-secondary)', background: 'transparent', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '6px 12px', cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                  {t('wizard.step2.changeFiles')}
+                </button>
+              </div>
+            </div>
+          )}
+          </div>
+        </Card>
+        )}
+        </>
+        )}
+
+        {/* Preview & edit — scoped to a single section (one at a time), whether it's chapter-nested
+            or flat. Fields here are live-editable, wired to the same setters as the main form,
+            so fixing a typo while reviewing doesn't require closing the modal. */}
+        {previewTarget !== null && (() => {
+          const { chapterIdx, sectionIdx } = previewTarget;
+          const isFlat = chapterIdx === null;
+          const chapter = isFlat ? null : secChapters[chapterIdx];
+          const sec = isFlat ? secFlatSections[sectionIdx] : chapter?.sections[sectionIdx];
+          if (!sec) return null; // section was removed while its preview was open
+          const setName = val => isFlat ? setFlatSectionField(sectionIdx, 'name', val) : setChapterSectionField(chapterIdx, sectionIdx, 'name', val);
+          const setDesc = val => isFlat ? setFlatSectionField(sectionIdx, 'description', val) : setChapterSectionField(chapterIdx, sectionIdx, 'description', val);
+
+          return (
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+              onClick={() => setPreviewTarget(null)}>
+              <div style={{ background: 'var(--surface-card)', borderRadius: 16, width: '100%', maxWidth: 1200, height: '94vh', boxShadow: '0 28px 80px rgba(0,0,0,.35)', display: 'flex', flexDirection: 'column' }}
+                onClick={e => e.stopPropagation()}>
+                <div style={{ padding: '18px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)' }}>
+                      {t('addDocuments.sections.sectionNumber', { number: sectionIdx + 1 })}
+                      {!isFlat && <span style={{ color: 'var(--text-color-secondary)', fontWeight: 500 }}> · {t('addDocuments.sections.chapterNumber', { number: toRoman(chapterIdx + 1) })}</span>}
+                    </div>
+                    <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {(subDocActsList || []).find(a => String(a.id) === String(subDocAct))?.document_name}
+                    </div>
+                  </div>
+                  <button onClick={() => setPreviewTarget(null)}
+                    style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '5px 8px', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', flexShrink: 0 }}>
+                    <X size={14} />
+                  </button>
+                </div>
+
+                <div style={{ flex: 1, overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', gap: 18, minHeight: 0 }}>
+                  {/* Name on top, full width */}
+                  <div style={{ flexShrink: 0 }}>
+                    <div style={{ ...LABEL, marginBottom: 6 }}>{t('addDocuments.sections.sectionNameLabel')}</div>
+                    <input value={sec.name} onChange={e => setName(e.target.value)}
+                      placeholder={t('addDocuments.sections.sectionNamePlain')}
+                      style={{ ...INPUT_BASE, background: 'var(--surface-ground)' }} onFocus={focusStyle} onBlur={blurStyle} />
+                  </div>
+                  {/* Description below, full width and tall so it needs as little scrolling as possible */}
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                    <div style={{ ...LABEL, marginBottom: 6, flexShrink: 0 }}>{t('addDocuments.sections.descriptionLabel')}</div>
+                    <textarea value={sec.description} onChange={e => setDesc(e.target.value)}
+                      placeholder={t('addDocuments.sections.descriptionPlaceholder')}
+                      style={{ ...INPUT_BASE, width: '100%', flex: 1, background: 'var(--surface-ground)', resize: 'none', minHeight: 300, fontFamily: 'var(--font)', fontSize: 13.5, lineHeight: 1.8, boxSizing: 'border-box' }}
+                      onFocus={focusStyle} onBlur={blurStyle} autoFocus />
+                  </div>
+                </div>
+
+                <div style={{ padding: '14px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end', flexShrink: 0 }}>
+                  <button type="button" onClick={() => setPreviewTarget(null)}
+                    style={{ padding: '9px 22px', borderRadius: 8, border: 'none', background: 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                    {t('addDocuments.sections.confirmButton')}
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+      </div>
+    );
+  }
+
+  // Picking a document type resets every type-dependent field below it — shared by the
+  // full picker, the compact pill row, and (on mobile) the dropdown that replaces it.
+  function pickDocType(type) {
+    fmt('type', type); setTypeFields({}); setLegalAuthorities([{ act: '', sections: [''] }]);
+    setAmendChanges([{ chapter: '', section: '', subsection: '', changeType: 'Amended', description: '' }]);
+    setHierarchy({ act: '', chapter: '', section: '', subsection: '' }); setRelations([]);
+    setRelType((REL_TYPES_BY_DOCTYPE[type] || REL_TYPES)[0]); setRelDocType(''); setRelTarget(''); setRelSearch('');
+  }
+
   // Upload page
   return (
     <div style={{ animation: 'fadeSlideIn .3s ease' }}>
+      <style>{UD_RESPONSIVE_CSS}</style>
       <Toast toast={toast} onClose={() => setToast(null)} />
       {conflictModal && (
         <VersionConflictModal
@@ -2965,13 +3839,22 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
           <Card padding="12px 22px" style={{ animation: 'fadeSlideIn .25s ease' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ ...LABEL, fontSize: 10.5, color: 'var(--text-heading)', flexShrink: 0 }}>{t('wizard.step1.label')}</div>
+              {isMobile ? (
+                <select value={form.type} onChange={e => pickDocType(e.target.value)}
+                  style={{ ...INPUT_BASE, flex: 1, cursor: 'pointer', appearance: 'none', fontSize: 12.5 }}
+                  onFocus={focusStyle} onBlur={blurStyle}>
+                  {TYPES.map(type => (
+                    <option key={type} value={type}>{DOC_TYPE_KEY[type] ? t(`docTypes.${DOC_TYPE_KEY[type]}`) : type}</option>
+                  ))}
+                </select>
+              ) : (
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flex: 1 }}>
                 {TYPES.map(type => {
                   const c = TYPE_CARD_COLORS[type] || { bg: 'rgba(148,163,184,.08)', accent: '#94a3b8', text: '#64748b' };
                   const active = form.type === type;
                   return (
                     <button key={type} type="button"
-                        onClick={() => { fmt('type', type); setTypeFields({}); setLegalAuthorities([{ act: '', sections: [''] }]); setAmendChanges([{ chapter: '', section: '', subsection: '', changeType: 'Amended', description: '' }]); setHierarchy({ act: '', chapter: '', section: '', subsection: '' }); setRelations([]); setRelType((REL_TYPES_BY_DOCTYPE[type] || REL_TYPES)[0]); setRelDocType(''); setRelTarget(''); setRelSearch(''); }}
+                        onClick={() => pickDocType(type)}
                         style={{
                           display: 'flex', alignItems: 'center', gap: 6,
                           padding: '6px 10px', borderRadius: 8,
@@ -2990,6 +3873,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                     );
                   })}
               </div>
+              )}
             </div>
             <div style={{ height: 1, background: 'var(--surface-border)', margin: '10px 0' }} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -3020,13 +3904,22 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
           {form.type ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: typeCompact ? 10 : 14, animation: 'fadeSlideIn .25s ease' }}>
               <div style={{ ...LABEL, fontSize: typeCompact ? 10.5 : 11.5, color: 'var(--text-heading)', flexShrink: 0 }}>{t('wizard.step1.label')}</div>
+              {isMobile ? (
+                <select value={form.type} onChange={e => pickDocType(e.target.value)}
+                  style={{ ...INPUT_BASE, flex: 1, cursor: 'pointer', appearance: 'none', fontSize: 12.5 }}
+                  onFocus={focusStyle} onBlur={blurStyle}>
+                  {TYPES.map(type => (
+                    <option key={type} value={type}>{DOC_TYPE_KEY[type] ? t(`docTypes.${DOC_TYPE_KEY[type]}`) : type}</option>
+                  ))}
+                </select>
+              ) : (
               <div style={{ display: 'flex', gap: typeCompact ? 6 : 8, flexWrap: 'wrap', flex: 1 }}>
                 {TYPES.map(type => {
                   const c = TYPE_CARD_COLORS[type] || { bg: 'rgba(148,163,184,.08)', accent: '#94a3b8', text: '#64748b' };
                   const active = form.type === type;
                   return (
                     <button key={type} type="button"
-                        onClick={() => { fmt('type', type); setTypeFields({}); setLegalAuthorities([{ act: '', sections: [''] }]); setAmendChanges([{ chapter: '', section: '', subsection: '', changeType: 'Amended', description: '' }]); setHierarchy({ act: '', chapter: '', section: '', subsection: '' }); setRelations([]); setRelType((REL_TYPES_BY_DOCTYPE[type] || REL_TYPES)[0]); setRelDocType(''); setRelTarget(''); setRelSearch(''); }}
+                        onClick={() => pickDocType(type)}
                         style={{
                           display: 'flex', alignItems: 'center', gap: typeCompact ? 6 : 8,
                           padding: typeCompact ? '6px 10px' : '9px 14px', borderRadius: typeCompact ? 8 : 10,
@@ -3045,19 +3938,20 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                     );
                   })}
                 </div>
-              </div>
+              )}
+            </div>
           ) : (
             <div style={{ maxWidth: 1180, margin: '0 auto' }}>
               <div style={{ textAlign: 'center', marginBottom: 32 }}>
                 <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-heading)', marginBottom: 8 }}>{t('wizard.step1.heading')} <span style={{ color: '#ef4444' }}>*</span></div>
                 <div style={{ fontSize: 13.5, color: 'var(--text-color-secondary)' }}>{t('wizard.step1.subheading')}</div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(240px, 1fr))', gap: 20 }}>
+              <div className="ud-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(240px, 1fr))', gap: 20 }}>
                 {TYPES.map(type => {
                   const c = TYPE_CARD_COLORS[type] || { bg: 'rgba(148,163,184,.08)', accent: '#94a3b8', text: '#64748b' };
                   return (
                     <button key={type} type="button"
-                        onClick={() => { fmt('type', type); setTypeFields({}); setLegalAuthorities([{ act: '', sections: [''] }]); setAmendChanges([{ chapter: '', section: '', subsection: '', changeType: 'Amended', description: '' }]); setHierarchy({ act: '', chapter: '', section: '', subsection: '' }); setRelations([]); setRelType((REL_TYPES_BY_DOCTYPE[type] || REL_TYPES)[0]); setRelDocType(''); setRelTarget(''); setRelSearch(''); }}
+                        onClick={() => pickDocType(type)}
                         style={{
                           display: 'flex', alignItems: 'center', gap: 16,
                           padding: '22px 20px', borderRadius: 14, textAlign: 'left',
@@ -3109,6 +4003,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
               </div>
             ) : files.length === 0 ? (
               <div
+                className="ud-dropzone"
                 onClick={() => inputRef.current?.click()}
                 onDrop={handleDrop}
                 onDragOver={e => { e.preventDefault(); setDragOver(true); }}
@@ -3242,7 +4137,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                 </div>
               )}
         <form onSubmit={handleSubmit}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+          <div className="ud-grid-3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
 
             {/* Act / Legal Authority — must be set first for every type except Act; gates the rest of the form */}
             {form.type !== 'Act' && (
@@ -3305,7 +4200,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                 <input value={typeFields.shortTitle || ''} onChange={e => setTypeFields(f => ({ ...f, shortTitle: e.target.value }))}
                   placeholder={t('wizard.placeholders.act.shortTitle')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
-              <div style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div className="ud-grid-2" style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div>
                   <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.act.longTitle')}</div>
                   <input value={typeFields.longTitle || ''} onChange={e => setTypeFields(f => ({ ...f, longTitle: e.target.value }))}
@@ -3958,7 +4853,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
 
           {/* Slide-in panel */}
           <div style={{
-            position: 'fixed', right: 0, top: 0, height: '100vh', width: 420,
+            position: 'fixed', right: 0, top: 0, height: '100vh', width: 420, maxWidth: '100%',
             background: 'var(--surface-card)',
             boxShadow: '-4px 0 40px rgba(0,0,0,.18)',
             zIndex: 301,
@@ -3994,7 +4889,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             </div>
 
             {/* Drawer body */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
+            <div className="ud-drawer-body" style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
 
               {/* ── Hierarchy form ── */}
               {drawerType === 'hierarchy' && (
@@ -4267,7 +5162,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                               </button>
                             )}
                           </div>
-                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                          <div className="ud-grid-3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
                             {[
                               { key: 'chapter', ph: t('drawer.changeChapterPlaceholder') },
                               { key: 'section', ph: t('drawer.changeSectionPlaceholder') },

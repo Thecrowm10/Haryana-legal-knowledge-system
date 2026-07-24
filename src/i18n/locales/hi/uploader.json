@@ -93,7 +93,9 @@
       "uploadTitle": "नया दस्तावेज़ अपलोड करें",
       "uploadDesc": "नया अधिनियम, अधिसूचना, परिपत्र या अन्य दस्तावेज़ जोड़ें",
       "editTitle": "दस्तावेज़ संपादित करें",
-      "editDesc": "पहले अपलोड किए गए दस्तावेज़ का विवरण अपडेट करें"
+      "editDesc": "पहले अपलोड किए गए दस्तावेज़ का विवरण अपडेट करें",
+      "addDocumentsTitle": "दस्तावेज़ जोड़ें",
+      "addDocumentsDesc": "किसी अधिनियम में अनुभाग, अनुसूची, अनुबंध आदि जोड़ें"
     },
     "overviewLabel": "अवलोकन"
   },
@@ -126,7 +128,8 @@
     "colUploadedOn": "अपलोड की तिथि",
     "colActions": "कार्रवाई",
     "noDocumentsFound": "कोई दस्तावेज़ नहीं मिला।",
-    "remarksButton": "टिप्पणियाँ"
+    "remarksButton": "टिप्पणियाँ",
+    "allTypes": "सभी प्रकार"
   },
   "linkedDocs": {
     "title": "लिंक किए गए दस्तावेज़",
@@ -461,5 +464,53 @@
     "submitSuccessMulti": "{{count}} दस्तावेज़ सफलतापूर्वक सबमिट किए गए — अनुमोदन लंबित है।",
     "documentFallback": "दस्तावेज़",
     "failedToLoadDocuments": "आपके दस्तावेज़ लोड करने में विफल"
+  },
+  "addDocuments": {
+    "heading": "दस्तावेज़ जोड़ें",
+    "subheading": "किसी अधिनियम के सहायक भाग जोड़ें — नीचे एक अनुभाग चुनें, फिर उसकी फ़ाइलें अपलोड करें",
+    "pickHeading": "दस्तावेज़ का भाग",
+    "pickSubheading": "शुरू करने के लिए अधिनियम का वह भाग चुनें जिसे आप जोड़ रहे हैं",
+    "pickLabel": "दस्तावेज़ का भाग",
+    "attachFileHeading": "फ़ाइल संलग्न करें",
+    "optionalBadge": "वैकल्पिक",
+    "tabs": {
+      "sections": "अनुभाग",
+      "schedule": "अनुसूची",
+      "annexure": "अनुबंध",
+      "appendix": "परिशिष्ट",
+      "forms": "प्रपत्र"
+    },
+    "tabDesc": {
+      "sections": "अधिनियम के क्रमांकित अनुभाग",
+      "schedule": "अधिनियम से जुड़ी तालिकाएँ और सूचियाँ",
+      "annexure": "सहायक संलग्न दस्तावेज़",
+      "appendix": "अतिरिक्त संदर्भ सामग्री",
+      "forms": "अधिनियम के अंतर्गत निर्धारित प्रपत्र"
+    },
+    "sections": {
+      "selectActPlaceholder": "अधिनियम चुनें",
+      "selectActLoading": "अधिनियम लोड हो रहे हैं…",
+      "selectActEmpty": "आपके विभाग में अभी तक कोई अधिनियम नहीं मिला",
+      "structureHeading": "अध्याय और अनुभाग संरचना",
+      "withChaptersOption": "अध्याय सहित अनुभाग जोड़ें",
+      "withChaptersDesc": "इंडिया कोड की तरह अनुभागों को अध्यायों के अंतर्गत समूहित करें",
+      "withoutChaptersOption": "बिना अध्याय के अनुभाग जोड़ें",
+      "withoutChaptersDesc": "अनुभागों की एक सीधी सूची, बिना अध्याय समूहन के",
+      "chapterNumber": "अध्याय {{number}}",
+      "chapterNameLabel": "अध्याय का नाम",
+      "chapterNamePlaceholder": "अध्याय का नाम",
+      "sectionNumber": "अनुभाग {{number}}",
+      "sectionNameLabel": "अनुभाग का नाम",
+      "sectionNamePlain": "अनुभाग का नाम",
+      "descriptionLabel": "विवरण",
+      "descriptionPlaceholder": "विवरण (वैकल्पिक)",
+      "sectionCountBadge_one": "{{count}} अनुभाग",
+      "sectionCountBadge_other": "{{count}} अनुभाग",
+      "addChapter": "अध्याय जोड़ें",
+      "addSection": "अनुभाग जोड़ें",
+      "previewButton": "पूर्वावलोकन",
+      "confirmButton": "पुष्टि करें",
+      "collapseHint": "छोटा करने के लिए क्लिक करें"
+    }
   }
 }

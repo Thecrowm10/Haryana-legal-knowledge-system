@@ -93,7 +93,9 @@
       "uploadTitle": "Upload New Document",
       "uploadDesc": "Add a new Act, Notification, Circular or other document",
       "editTitle": "Edit Document",
-      "editDesc": "Update details of a document you've already uploaded"
+      "editDesc": "Update details of a document you've already uploaded",
+      "addDocumentsTitle": "Add Documents",
+      "addDocumentsDesc": "Attach Sections, Schedules, Annexures and more to an Act"
     },
     "overviewLabel": "Overview"
   },
@@ -126,7 +128,8 @@
     "colUploadedOn": "Uploaded On",
     "colActions": "Actions",
     "noDocumentsFound": "No documents found.",
-    "remarksButton": "Remarks"
+    "remarksButton": "Remarks",
+    "allTypes": "All Types"
   },
   "linkedDocs": {
     "title": "Linked Documents",
@@ -461,5 +464,53 @@
     "submitSuccessMulti": "{{count}} documents submitted successfully — pending approval.",
     "documentFallback": "Document",
     "failedToLoadDocuments": "Failed to load your documents"
+  },
+  "addDocuments": {
+    "heading": "Add Documents",
+    "subheading": "Attach supporting parts of an Act — pick a section below, then upload its files",
+    "pickHeading": "Document Part",
+    "pickSubheading": "Choose which part of the Act you're attaching to get started",
+    "pickLabel": "Document Part",
+    "attachFileHeading": "Attach a File",
+    "optionalBadge": "Optional",
+    "tabs": {
+      "sections": "Sections",
+      "schedule": "Schedule",
+      "annexure": "Annexure",
+      "appendix": "Appendix",
+      "forms": "Forms"
+    },
+    "tabDesc": {
+      "sections": "Numbered sections of the Act",
+      "schedule": "Tables and lists attached to the Act",
+      "annexure": "Supporting annexed documents",
+      "appendix": "Additional reference material",
+      "forms": "Prescribed forms under the Act"
+    },
+    "sections": {
+      "selectActPlaceholder": "Select the Act",
+      "selectActLoading": "Loading Acts…",
+      "selectActEmpty": "No Acts found in your department yet",
+      "structureHeading": "Chapter & Section Structure",
+      "withChaptersOption": "Add Chapters with Sections",
+      "withChaptersDesc": "Group sections under chapters, like India Code",
+      "withoutChaptersOption": "Add Sections without Chapters",
+      "withoutChaptersDesc": "A flat list of sections, no chapter grouping",
+      "chapterNumber": "Chapter {{number}}",
+      "chapterNameLabel": "Chapter Name",
+      "chapterNamePlaceholder": "Chapter name",
+      "sectionNumber": "Section {{number}}",
+      "sectionNameLabel": "Section Name",
+      "sectionNamePlain": "Section name",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Description (optional)",
+      "sectionCountBadge_one": "{{count}} section",
+      "sectionCountBadge_other": "{{count}} sections",
+      "addChapter": "Add Chapter",
+      "addSection": "Add Section",
+      "previewButton": "Preview",
+      "confirmButton": "Confirm",
+      "collapseHint": "Click to collapse"
+    }
   }
 }
