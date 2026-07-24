@@ -1321,7 +1321,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const [subDocActsLoading, setSubDocActsLoading] = useState(false);
   const [secHasChapters, setSecHasChapters] = useState(null); // null = not answered yet
   const [secChapters, setSecChapters]       = useState([]); // [{ name, sections: [{name,description},...] }]
-  const [activeChapterIdx, setActiveChapterIdx] = useState(0); // only one chapter's sections are open for editing at a time
+  const [activeChapterIdx, setActiveChapterIdx] = useState(-1); // -1 = all collapsed (overview); set to index to expand
   const [activeSectionIdx, setActiveSectionIdx] = useState(0); // within the active chapter, only one section is expanded for editing — the rest collapse to a summary
   const [secFlatSections, setSecFlatSections] = useState([]); // [{name,description},...] — used when there are no chapters
   const [activeFlatSectionIdx, setActiveFlatSectionIdx] = useState(0); // same one-open-at-a-time idea, for the flat (no-chapter) list
@@ -1400,6 +1400,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       const data = res.data;
       if (data.chapters?.length > 0) {
         setSecHasChapters(true);
+        setActiveChapterIdx(-1);
         setSecChapters(data.chapters.map(ch => ({
           id: ch.id ?? null,
           name: ch.chapter_title || ch.chapter_number || '',
