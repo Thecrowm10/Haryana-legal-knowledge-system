@@ -8,6 +8,7 @@ import { getUsers, getRoles, updateUser, registerUser } from '../services/users'
 import { getMyDepartments } from '../services/departments';
 import { getAllDocumentsAdmin, getAllDepartmentLinks } from '../services/pdf';
 import { getAuditLogs } from '../services/audit';
+import { getAllActPartSubmissions, getAllActParts } from '../services/act_parts';
 
 
 const LABEL = { fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)' };
@@ -273,6 +274,36 @@ export default function NodalOfficerDashboard({ activePage }) {
   }, [activePage]);
 
   const [deptFilter, setDeptFilter] = useState('');
+
+  // ── Act Parts (view-only) state ─────────────────────────────────────────
+  const [actPartsItems, setActPartsItems]     = useState([]);
+  const [actPartsLoading, setActPartsLoading] = useState(false);
+  const [actPartsError, setActPartsError]     = useState('');
+  const [actPartsViewing, setActPartsViewing] = useState(null); // { item, partsData }
+  const [actPartsDetailLoading, setActPartsDetailLoading] = useState(false);
+  const [actPartsStatusFilter, setActPartsStatusFilter]   = useState('');
+
+  useEffect(() => {
+    if (activePage !== 'nodalactparts') return;
+    setActPartsLoading(true);
+    setActPartsError('');
+    getAllActPartSubmissions()
+      .then(res => setActPartsItems(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setActPartsError('Failed to load act part submissions.'))
+      .finally(() => setActPartsLoading(false));
+  }, [activePage]);
+
+  async function openActPartsDetail(item) {
+    setActPartsDetailLoading(true);
+    try {
+      const res = await getAllActParts(item.pdf_document_id);
+      setActPartsViewing({ item, partsData: res.data });
+    } catch {
+      setActPartsViewing({ item, partsData: null });
+    } finally {
+      setActPartsDetailLoading(false);
+    }
+  }
 
   // ── User Management ─────────────────────────────────────────────────────
   if (activePage === 'nodalusers') {
@@ -1310,5 +1341,293 @@ export default function NodalOfficerDashboard({ activePage }) {
     );
   }
 
+  // ── Act Parts (view-only for nodal officer) ──────────────────────────────
+  if (activePage === 'nodalactparts') {
+    const TAB_LABELS = { sections: 'Sections', schedule: 'Schedule', annexure: 'Annexure', appendix: 'Appendix', forms: 'Forms' };
+    const STATUS_SC  = {
+      pending:  { bg: '#fef3c7', color: '#92400e', border: '#f59e0b', label: 'Pending'  },
+      approved: { bg: '#d1fae5', color: '#065f46', border: '#10b981', label: 'Approved' },
+      rejected: { bg: '#fee2e2', color: '#991b1b', border: '#ef4444', label: 'Rejected' },
+    };
+    const filtered = actPartsStatusFilter
+      ? actPartsItems.filter(i => i.status === actPartsStatusFilter)
+      : actPartsItems;
+
+    return (
+      <div style={{ padding: '28px 32px', maxWidth: 1100, margin: '0 auto', fontFamily: 'var(--font)' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24, gap: 16, flexWrap: 'wrap' }}>
+          <div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-heading)' }}>Act Parts Overview</div>
+            <div style={{ fontSize: 13, color: 'var(--text-color-secondary)', marginTop: 4 }}>All act part submissions and their approval status</div>
+          </div>
+          {/* Status filter pills */}
+          <div style={{ display: 'flex', background: 'var(--surface-ground)', borderRadius: 8, padding: 3, gap: 2, border: '1px solid var(--surface-border)' }}>
+            {[{ key: '', label: 'All' }, { key: 'pending', label: 'Pending' }, { key: 'approved', label: 'Approved' }, { key: 'rejected', label: 'Rejected' }].map(opt => (
+              <button key={opt.key} onClick={() => setActPartsStatusFilter(opt.key)}
+                style={{ padding: '5px 14px', borderRadius: 6, border: 'none', fontFamily: 'var(--font)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', transition: 'all .15s',
+                  background: actPartsStatusFilter === opt.key ? 'var(--surface-card)' : 'transparent',
+                  color: actPartsStatusFilter === opt.key ? 'var(--text-heading)' : 'var(--text-color-secondary)',
+                  boxShadow: actPartsStatusFilter === opt.key ? '0 1px 4px rgba(0,0,0,.08)' : 'none',
+                }}>
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {actPartsLoading && (
+          <div style={{ padding: '60px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>Loading…</div>
+        )}
+        {actPartsError && (
+          <div style={{ padding: '20px 0', fontSize: 13, color: '#ef4444' }}>{actPartsError}</div>
+        )}
+
+        {!actPartsLoading && !actPartsError && filtered.length === 0 && (
+          <Card style={{ padding: '60px 0', textAlign: 'center' }}>
+            <FileText size={36} color="var(--surface-200)" style={{ marginBottom: 12 }} />
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-color-secondary)' }}>No submissions found.</div>
+          </Card>
+        )}
+
+        {!actPartsLoading && !actPartsError && filtered.length > 0 && (
+          <Card style={{ overflow: 'hidden' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 150px 140px 140px 100px', background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
+              <div style={{ ...LABEL, padding: '10px 18px' }}>Act / Tab</div>
+              <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Submitted By</div>
+              <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Submitted At</div>
+              <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Status</div>
+              <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>View</div>
+            </div>
+
+            {filtered.map(item => {
+              const sc = STATUS_SC[item.status] || STATUS_SC.pending;
+              return (
+                <div key={`${item.pdf_document_id}-${item.part_type}`}
+                  style={{ display: 'grid', gridTemplateColumns: '1fr 150px 140px 140px 100px', borderBottom: '1px solid var(--surface-border)', alignItems: 'center', minHeight: 58, transition: 'background .15s' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  <div style={{ padding: '10px 18px' }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 2 }}>{item.act_name || `Act #${item.pdf_document_id}`}</div>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <span style={{ fontSize: 10.5, fontWeight: 700, background: 'rgba(26,86,219,.1)', color: '#1a56db', borderRadius: 4, padding: '1px 7px' }}>
+                        {TAB_LABELS[item.part_type] || item.part_type}
+                      </span>
+                      {item.act_type && <span style={{ fontSize: 10.5, color: 'var(--text-color-secondary)' }}>{item.act_type}</span>}
+                    </div>
+                  </div>
+                  <div style={{ padding: '10px 16px', borderLeft: '1px solid var(--surface-border)', fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>
+                    {[item.submitter_first_name, item.submitter_last_name].filter(Boolean).join(' ') || item.submitter_username || '—'}
+                  </div>
+                  <div style={{ padding: '10px 16px', borderLeft: '1px solid var(--surface-border)', fontSize: 12, color: 'var(--text-color-secondary)' }}>
+                    {item.submitted_at ? new Date(item.submitted_at).toLocaleDateString() : '—'}
+                  </div>
+                  <div style={{ padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>
+                    <span style={{ fontSize: 11.5, fontWeight: 700, background: sc.bg, color: sc.color, border: `1px solid ${sc.border}`, borderRadius: 20, padding: '3px 10px' }}>{sc.label}</span>
+                    {item.status === 'rejected' && item.comments && (
+                      <div style={{ fontSize: 11, color: '#991b1b', marginTop: 3, fontStyle: 'italic', maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.comments}>
+                        {item.comments}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>
+                    <button onClick={() => openActPartsDetail(item)} disabled={actPartsDetailLoading}
+                      style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 7, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                      <Eye size={13} /> View
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </Card>
+        )}
+
+        {/* Detail modal (view-only) */}
+        {actPartsViewing && (
+          <ActPartsDetailModal
+            item={actPartsViewing.item}
+            partsData={actPartsViewing.partsData}
+            onClose={() => setActPartsViewing(null)}
+            readOnly
+          />
+        )}
+      </div>
+    );
+  }
+
   return null;
+}
+
+// ── Shared detail modal for viewing act part content ─────────────────────────
+const ACT_PART_TAB_LABELS = { sections: 'Sections', schedule: 'Schedule', annexure: 'Annexure', appendix: 'Appendix', forms: 'Forms' };
+
+function ActPartsDetailModal({ item, partsData, onClose, readOnly = false, onApprove, onReject }) {
+  const [comment, setComment] = useState('');
+  const [confirming, setConfirming] = useState(null); // 'approved' | 'rejected'
+  const [submitting, setSubmitting] = useState(false);
+
+  const partType = item?.part_type;
+
+  function renderContent() {
+    if (!partsData) return <div style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: '#ef4444' }}>Could not load content.</div>;
+
+    if (partType === 'sections') {
+      const hasCh = partsData.has_chapters && partsData.chapters?.length > 0;
+      if (hasCh) {
+        return partsData.chapters.map(ch => (
+          <div key={ch.id} style={{ marginBottom: 18 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-heading)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ background: 'rgba(26,86,219,.1)', color: '#1a56db', borderRadius: 6, padding: '3px 10px', fontFamily: 'var(--mono)', fontSize: 11 }}>
+                {ch.chapter_number || '—'}
+              </span>
+              {ch.chapter_title || '(No title)'}
+            </div>
+            {(ch.sections || []).map(sec => (
+              <div key={sec.id} style={{ marginLeft: 20, marginBottom: 10, padding: '10px 14px', background: 'var(--surface-ground)', borderRadius: 8, border: '1px solid var(--surface-border)' }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 4 }}>
+                  {sec.section_number || '—'} {sec.section_title && `— ${sec.section_title}`}
+                </div>
+                {sec.section_content && (
+                  <div style={{ fontSize: 12, color: 'var(--text-color)', lineHeight: 1.65, whiteSpace: 'pre-wrap', maxHeight: 120, overflowY: 'auto' }}>{sec.section_content}</div>
+                )}
+                {sec.original_filename && (
+                  <div style={{ fontSize: 11.5, color: '#1a56db', marginTop: 6 }}>📎 {sec.original_filename}</div>
+                )}
+              </div>
+            ))}
+            {(!ch.sections || ch.sections.length === 0) && (
+              <div style={{ marginLeft: 20, fontSize: 12, color: 'var(--text-color-secondary)', fontStyle: 'italic' }}>No sections</div>
+            )}
+          </div>
+        ));
+      }
+      const flat = partsData.flat_sections || [];
+      if (flat.length === 0) return <div style={{ fontSize: 13, color: 'var(--text-color-secondary)', fontStyle: 'italic' }}>No sections added.</div>;
+      return flat.map(sec => (
+        <div key={sec.id} style={{ marginBottom: 10, padding: '10px 14px', background: 'var(--surface-ground)', borderRadius: 8, border: '1px solid var(--surface-border)' }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 4 }}>
+            {sec.section_number || '—'} {sec.section_title && `— ${sec.section_title}`}
+          </div>
+          {sec.section_content && (
+            <div style={{ fontSize: 12, color: 'var(--text-color)', lineHeight: 1.65, whiteSpace: 'pre-wrap', maxHeight: 120, overflowY: 'auto' }}>{sec.section_content}</div>
+          )}
+          {sec.original_filename && (
+            <div style={{ fontSize: 11.5, color: '#1a56db', marginTop: 6 }}>📎 {sec.original_filename}</div>
+          )}
+        </div>
+      ));
+    }
+
+    // Flat entries (schedule / annexure / appendix / forms)
+    const keyMap = { schedule: 'schedules', annexure: 'annexures', appendix: 'appendices', forms: 'forms' };
+    const entries = partsData[keyMap[partType]] || [];
+    if (entries.length === 0) return <div style={{ fontSize: 13, color: 'var(--text-color-secondary)', fontStyle: 'italic' }}>No entries added.</div>;
+    return entries.map(e => (
+      <div key={e.id} style={{ marginBottom: 10, padding: '10px 14px', background: 'var(--surface-ground)', borderRadius: 8, border: '1px solid var(--surface-border)' }}>
+        <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 4 }}>
+          {e.entry_number || '—'} {e.title && `— ${e.title}`}
+        </div>
+        {e.description && (
+          <div style={{ fontSize: 12, color: 'var(--text-color)', lineHeight: 1.65, whiteSpace: 'pre-wrap', maxHeight: 120, overflowY: 'auto' }}>{e.description}</div>
+        )}
+        {e.original_filename && (
+          <div style={{ fontSize: 11.5, color: '#1a56db', marginTop: 6 }}>📎 {e.original_filename}</div>
+        )}
+      </div>
+    ));
+  }
+
+  async function handleDecide(action) {
+    if (action === 'rejected' && !comment.trim()) return;
+    setSubmitting(true);
+    try {
+      await onReject?.({ action, comment: comment.trim() || null });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', zIndex: 2500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+      onClick={onClose}>
+      <div style={{ background: 'var(--surface-card)', borderRadius: 16, width: '100%', maxWidth: 720, maxHeight: '90vh', boxShadow: '0 24px 80px rgba(0,0,0,.3)', display: 'flex', flexDirection: 'column' }}
+        onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div style={{ padding: '18px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-heading)' }}>
+              {item?.act_name || `Act #${item?.pdf_document_id}`}
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, background: 'rgba(26,86,219,.1)', color: '#1a56db', borderRadius: 4, padding: '2px 8px' }}>
+                {ACT_PART_TAB_LABELS[partType] || partType}
+              </span>
+              <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
+                Submitted by {[item?.submitter_first_name, item?.submitter_last_name].filter(Boolean).join(' ') || item?.submitter_username}
+                {item?.submitted_at ? ` · ${new Date(item.submitted_at).toLocaleDateString()}` : ''}
+              </span>
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '5px 8px', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', flexShrink: 0 }}>
+            <X size={15} />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: 24, minHeight: 0 }}>
+          {renderContent()}
+        </div>
+
+        {/* Footer — approve/reject only for non-readOnly */}
+        {!readOnly && !confirming && (
+          <div style={{ padding: '16px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end', gap: 10, flexShrink: 0 }}>
+            <button onClick={() => setConfirming('rejected')}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 18px', borderRadius: 9, border: '1.5px solid #ef4444', background: '#fee2e2', color: '#991b1b', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+              <XCircle size={14} /> Reject
+            </button>
+            <button onClick={() => setConfirming('approved')}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 18px', borderRadius: 9, border: 'none', background: '#10b981', color: 'white', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+              <CheckCircle size={14} /> Approve
+            </button>
+          </div>
+        )}
+
+        {!readOnly && confirming && (
+          <div style={{ padding: '16px 24px', borderTop: '1px solid var(--surface-border)', flexShrink: 0 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-color-secondary)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.06em' }}>
+              Comments {confirming === 'rejected' && <span style={{ color: '#ef4444' }}>*</span>}
+            </div>
+            <textarea value={comment} onChange={e => setComment(e.target.value)} rows={2}
+              placeholder={confirming === 'rejected' ? 'Reason for rejection (required)' : 'Optional comments…'}
+              style={{ width: '100%', borderRadius: 8, border: '1px solid var(--surface-border)', padding: '8px 12px', fontSize: 13, fontFamily: 'var(--font)', resize: 'none', boxSizing: 'border-box', background: 'var(--surface-ground)', color: 'var(--text-color)' }} />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 10 }}>
+              <button onClick={() => setConfirming(null)} disabled={submitting}
+                style={{ padding: '8px 18px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'transparent', color: 'var(--text-color-secondary)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                Back
+              </button>
+              <button
+                disabled={submitting || (confirming === 'rejected' && !comment.trim())}
+                onClick={async () => {
+                  setSubmitting(true);
+                  try {
+                    if (confirming === 'approved') await onApprove?.({ comment: comment.trim() || null });
+                    else await onReject?.({ comment: comment.trim() });
+                    onClose();
+                  } finally { setSubmitting(false); }
+                }}
+                style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: confirming === 'approved' ? '#10b981' : '#ef4444', color: 'white', fontSize: 13, fontWeight: 700, cursor: (submitting || (confirming === 'rejected' && !comment.trim())) ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: (submitting || (confirming === 'rejected' && !comment.trim())) ? .5 : 1 }}>
+                {submitting ? 'Submitting…' : confirming === 'approved' ? 'Confirm Approve' : 'Confirm Reject'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {readOnly && (
+          <div style={{ padding: '14px 24px', borderTop: '1px solid var(--surface-border)', textAlign: 'right', flexShrink: 0 }}>
+            <button onClick={onClose} style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'transparent', color: 'var(--text-color-secondary)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>Close</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }

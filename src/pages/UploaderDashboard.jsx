@@ -5,7 +5,7 @@ import {
   RotateCcw, AlertCircle, Eye, GitBranch, Plus, FolderPlus,
   Layers, ChevronRight, AlertTriangle, CheckSquare, Square,
   Edit3, Tag, Search, MessageSquare, MessageCircle, ZoomIn, ZoomOut, RotateCw, ExternalLink,
-  Save, ArrowRight, Paperclip,
+  Save, ArrowRight, Paperclip, Send,
 } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
@@ -17,7 +17,7 @@ import SelectField from '../components/ui/SelectField';
 import { useAuth } from '../hooks/useAuth';
 import { getDepartments, getDocumentTypes } from '../services/departments';
 import { uploadPdfFile, uploadPdfMetadata, updatePdfMetadata, getMyDocuments, searchDocuments, getPdfFile, checkDuplicateDocument, linkDocumentToDepartment, getLinkedDocuments, getActChildren, getMyDepartmentActs, getMyDepartmentDocsByType } from '../services/pdf';
-import { uploadActPartFile, saveActPartSections, saveActPartEntries, getActPartSections, getActPartEntries, getActPartFile } from '../services/act_parts';
+import { uploadActPartFile, saveActPartSections, saveActPartEntries, getActPartSections, getActPartEntries, getActPartFile, getActPartApprovals, submitActPartForApproval } from '../services/act_parts';
 import { createNotification } from '../services/notifications';
 
 // Constants
@@ -1331,6 +1331,9 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const [subDocAct, setSubDocAct]           = useState('');
   const [subDocActsList, setSubDocActsList] = useState(null);
   const [subDocActsLoading, setSubDocActsLoading] = useState(false);
+  // approvals[partType] = { status, submitted_at, reviewed_at, comments, ... } | undefined
+  const [subDocApprovals, setSubDocApprovals] = useState({});
+  const [subDocSubmitting, setSubDocSubmitting] = useState(false);
   const [secHasChapters, setSecHasChapters] = useState(null); // null = not answered yet
   const [secChapters, setSecChapters]       = useState([]); // [{ name, sections: [{name,description},...] }]
   const [activeChapterIdx, setActiveChapterIdx] = useState(-1); // -1 = all collapsed (overview); set to index to expand
@@ -1499,6 +1502,16 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         }
       }
       setSubDocEntries(prev => ({ ...prev, [tab]: entryArray }));
+    } catch { /* ignore */ }
+  }, []);
+
+  const loadActPartApprovals = useCallback(async (actId) => {
+    if (!actId) return;
+    try {
+      const res = await getActPartApprovals(actId);
+      const map = {};
+      (res.data || []).forEach(a => { map[a.part_type] = a; });
+      setSubDocApprovals(map);
     } catch { /* ignore */ }
   }, []);
 
@@ -3507,7 +3520,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             <div style={{ padding: '14px 22px', borderTop: '1px solid var(--surface-border)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ ...LABEL, fontSize: 10.5, color: 'var(--text-heading)', flexShrink: 0 }}>{t('wizard.step3.parentActLabel')}</div>
-                <select value={subDocAct} onChange={e => { const v = e.target.value; setSubDocAct(v); setSecHasChapters(null); setSecChapters([]); setSecFlatSections([]); setSubDocEntries({}); setSubDocLoadedFor({ actId: null, tab: null }); }}
+                <select value={subDocAct} onChange={e => { const v = e.target.value; setSubDocAct(v); setSecHasChapters(null); setSecChapters([]); setSecFlatSections([]); setSubDocEntries({}); setSubDocLoadedFor({ actId: null, tab: null }); setSubDocApprovals({}); if (v) loadActPartApprovals(v); }}
                   disabled={subDocActsLoading}
                   style={{ ...INPUT_BASE, flex: 1, cursor: 'pointer', appearance: 'none', fontSize: 12.5 }}
                   onFocus={focusStyle} onBlur={blurStyle}>
@@ -4029,15 +4042,63 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
           );
         })()}
 
-        {/* Save button — always visible when an act and tab are selected */}
-        {subDocAct && subDocTab && (
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-            <button type="button" onClick={handleAddDocSubmit} disabled={subDocSaving}
-              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 24px', borderRadius: 10, border: 'none', background: subDocSaving ? '#94a3b8' : 'var(--primary)', color: 'white', fontSize: 13.5, fontWeight: 700, cursor: subDocSaving ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', boxShadow: subDocSaving ? 'none' : '0 2px 12px rgba(26,86,219,.25)' }}>
-              <Save size={15} /> {subDocSaving ? 'Saving…' : `Save ${activeSubTab ? t(activeSubTab.labelKey) : ''}`}
-            </button>
-          </div>
-        )}
+        {/* Save + Approval — always visible when an act and tab are selected */}
+        {subDocAct && subDocTab && (() => {
+          const tabApproval = subDocApprovals[subDocTab];
+          const approvalStatus = tabApproval?.status;
+          const SC = {
+            pending:  { bg: '#fef3c7', color: '#92400e', border: '#f59e0b', icon: '⏳' },
+            approved: { bg: '#d1fae5', color: '#065f46', border: '#10b981', icon: '✓' },
+            rejected: { bg: '#fee2e2', color: '#991b1b', border: '#ef4444', icon: '✗' },
+          };
+          const sc = SC[approvalStatus] || null;
+          const isSubmitDisabled = subDocSubmitting || approvalStatus === 'pending' || approvalStatus === 'approved';
+
+          async function handleSubmitForApproval() {
+            setSubDocSubmitting(true);
+            try {
+              const res = await submitActPartForApproval(subDocAct, subDocTab);
+              setSubDocApprovals(prev => ({ ...prev, [subDocTab]: res.data }));
+              showToast('success', `${activeSubTab ? t(activeSubTab.labelKey) : subDocTab} submitted for approval.`);
+            } catch (err) {
+              showToast('error', err?.response?.data?.detail || 'Could not submit for approval.');
+            } finally {
+              setSubDocSubmitting(false);
+            }
+          }
+
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              {/* Left: approval status badge */}
+              {sc ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, background: sc.bg, color: sc.color, border: `1px solid ${sc.border}`, borderRadius: 20, padding: '4px 12px' }}>
+                    {sc.icon} {approvalStatus.charAt(0).toUpperCase() + approvalStatus.slice(1)}
+                  </span>
+                  {approvalStatus === 'rejected' && tabApproval?.comments && (
+                    <span style={{ fontSize: 11.5, color: '#991b1b', fontStyle: 'italic', maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                      title={tabApproval.comments}>
+                      "{tabApproval.comments}"
+                    </span>
+                  )}
+                </div>
+              ) : <div />}
+
+              {/* Right: action buttons */}
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button type="button" onClick={handleAddDocSubmit} disabled={subDocSaving}
+                  style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 24px', borderRadius: 10, border: 'none', background: subDocSaving ? '#94a3b8' : 'var(--primary)', color: 'white', fontSize: 13.5, fontWeight: 700, cursor: subDocSaving ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', boxShadow: subDocSaving ? 'none' : '0 2px 12px rgba(26,86,219,.25)' }}>
+                  <Save size={15} /> {subDocSaving ? 'Saving…' : `Save ${activeSubTab ? t(activeSubTab.labelKey) : ''}`}
+                </button>
+                <button type="button" onClick={handleSubmitForApproval} disabled={isSubmitDisabled}
+                  style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 22px', borderRadius: 10, border: `1.5px solid ${isSubmitDisabled ? '#c4b5fd' : '#7c3aed'}`, background: isSubmitDisabled ? '#f5f3ff' : '#7c3aed', color: isSubmitDisabled ? '#a78bfa' : 'white', fontSize: 13.5, fontWeight: 700, cursor: isSubmitDisabled ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)' }}>
+                  <Send size={15} />
+                  {subDocSubmitting ? 'Submitting…' : approvalStatus === 'pending' ? 'Pending Approval' : approvalStatus === 'approved' ? 'Approved' : 'Submit for Approval'}
+                </button>
+              </div>
+            </div>
+          );
+        })()}
         </>
         )}
 

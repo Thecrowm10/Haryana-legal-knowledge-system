@@ -37,6 +37,7 @@ const BREADCRUMBS = {
   editdocument: ['topbar.crumbs.home', 'topbar.crumbs.editDocument'],
   adddocuments: ['topbar.crumbs.home', 'topbar.crumbs.addDocuments'],
   links: ['topbar.crumbs.home', 'topbar.crumbs.linkRequests'],
+  actparts: ['topbar.crumbs.home', 'topbar.crumbs.actPartsReview'],
   analytics: ['topbar.crumbs.analytics', 'topbar.crumbs.dashboard'], graph: ['topbar.crumbs.analytics', 'topbar.crumbs.knowledgeGraph'], audit: ['topbar.crumbs.analytics', 'topbar.crumbs.misReport'],
   users: ['topbar.crumbs.admin', 'topbar.crumbs.userManagement'], logs: ['topbar.crumbs.admin', 'topbar.crumbs.systemLogs'],
   taxonomy: ['topbar.crumbs.admin', 'topbar.crumbs.masterDataManager'],
@@ -45,6 +46,7 @@ const BREADCRUMBS = {
   auditlog: ['topbar.crumbs.auditorLabel', 'topbar.crumbs.misReport'],
   nodalusers: ['topbar.crumbs.nodalOfficerLabel', 'topbar.crumbs.userManagement'],
   nodaluploads:   ['topbar.crumbs.nodalOfficerLabel', 'topbar.crumbs.allUploads'],
+  nodalactparts:  ['topbar.crumbs.nodalOfficerLabel', 'topbar.crumbs.actPartsReview'],
   nodalauditfull: ['topbar.crumbs.nodalOfficerLabel', 'topbar.crumbs.misReport'],
 };
 const DEFAULT_CRUMB = ['topbar.crumbs.dashboard'];
@@ -56,6 +58,7 @@ const CRUMB_TARGETS = {
   editdocument: ['dashboard'],
   adddocuments: ['dashboard'],
   links:        ['dashboard'],
+  actparts:     ['dashboard'],
 };
 
 export default function Topbar({ user, activePage, onNavigate, onLogout, onToggleSidebar, onChangePassword }) {

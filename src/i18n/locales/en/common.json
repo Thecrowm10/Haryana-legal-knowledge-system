@@ -34,7 +34,8 @@
       "fullMisReport": "Full MIS Report",
       "auditLog": "Audit Log",
       "queryHistory": "Query History",
-      "complianceReport": "Compliance Report"
+      "complianceReport": "Compliance Report",
+      "actPartsReview": "Act Parts Review"
     }
   },
   "topbar": {
@@ -71,7 +72,8 @@
       "fullMisReport": "Full MIS Report",
       "allUploads": "All Uploads",
       "auditorLabel": "Auditor",
-      "nodalOfficerLabel": "Nodal Officer"
+      "nodalOfficerLabel": "Nodal Officer",
+      "actPartsReview": "Act Parts Review"
     },
     "userFallback": "User",
     "profile": "Profile",
