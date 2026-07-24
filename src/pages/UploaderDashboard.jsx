@@ -17,7 +17,7 @@ import SelectField from '../components/ui/SelectField';
 import { useAuth } from '../hooks/useAuth';
 import { getDepartments, getDocumentTypes } from '../services/departments';
 import { uploadPdfFile, uploadPdfMetadata, updatePdfMetadata, getMyDocuments, searchDocuments, getPdfFile, checkDuplicateDocument, linkDocumentToDepartment, getLinkedDocuments, getActChildren, getMyDepartmentActs, getMyDepartmentDocsByType } from '../services/pdf';
-import { uploadActPartFile, saveActPartSections, saveActPartEntries } from '../services/act_parts';
+import { uploadActPartFile, saveActPartSections, saveActPartEntries, getActPartSections, getActPartEntries } from '../services/act_parts';
 import { createNotification } from '../services/notifications';
 
 // Constants
@@ -1329,6 +1329,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   // Entry-based data for non-sections tabs: [{ number, title, description, file: File|null, fileRef: null }]
   const [subDocEntries, setSubDocEntries] = useState({});
   const [subDocSaving, setSubDocSaving] = useState(false);
+  const [subDocLoadedFor, setSubDocLoadedFor] = useState({ actId: null, tab: null });
   const [form, setForm]             = useState({ act: '', dept: user?.dept || '', type: '', version: '1.0', desc: '', enactmentDate: '', parentAct: '', changeTypes: [] });
   const [amendmentProvisions, setAmendmentProvisions] = useState([]);
   const [typeFields, setTypeFields]  = useState({});
@@ -1390,6 +1391,55 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     toastTimerRef.current = setTimeout(() => setToast(null), 4500);
   }, []);
   useEffect(() => () => clearTimeout(toastTimerRef.current), []);
+
+  const loadActPartSections = useCallback(async (actId) => {
+    if (!actId) return;
+    try {
+      const res = await getActPartSections(actId);
+      const data = res.data;
+      if (data.chapters?.length > 0) {
+        setSecHasChapters(true);
+        setSecChapters(data.chapters.map(ch => ({
+          name: ch.chapter_title || ch.chapter_number || '',
+          sections: (ch.sections || []).map(sec => ({
+            name: sec.section_title || sec.section_number || '',
+            description: sec.section_content || '',
+            file: null,
+            fileRef: null,
+          })),
+        })));
+        setSecFlatSections([]);
+      } else if (data.flat_sections?.length > 0) {
+        setSecHasChapters(false);
+        setSecFlatSections(data.flat_sections.map(sec => ({
+          name: sec.section_title || sec.section_number || '',
+          description: sec.section_content || '',
+          file: null,
+          fileRef: null,
+        })));
+        setSecChapters([]);
+      }
+      // empty response → keep state null so user chooses structure
+    } catch { /* ignore — user will see an empty form */ }
+  }, []);
+
+  const loadActPartEntries = useCallback(async (actId, tab) => {
+    if (!actId || !tab) return;
+    try {
+      const res = await getActPartEntries(actId, tab);
+      const rows = res.data || [];
+      setSubDocEntries(prev => ({
+        ...prev,
+        [tab]: rows.map(r => ({
+          number: r.entry_number || '',
+          title: r.title || '',
+          description: r.description || '',
+          file: null,
+          fileRef: null,
+        })),
+      }));
+    } catch { /* ignore */ }
+  }, []);
 
   // Table filter + sort
   const [tableSearch, setTableSearch] = useState('');
@@ -1497,6 +1547,17 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       subDocStructureRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }, [activePage, subDocTab, subDocAct]);
+
+  // Load existing entries from DB when act or tab changes.
+  // Skips if this (actId, tab) pair was already loaded — preserves unsaved additions across tab switches.
+  useEffect(() => {
+    if (!subDocAct || !subDocTab) return;
+    if (subDocLoadedFor.actId === subDocAct && subDocLoadedFor.tab === subDocTab) return;
+    const loader = subDocTab === 'sections'
+      ? loadActPartSections(subDocAct)
+      : loadActPartEntries(subDocAct, subDocTab);
+    loader.then(() => setSubDocLoadedFor({ actId: subDocAct, tab: subDocTab }));
+  }, [subDocAct, subDocTab, subDocLoadedFor, loadActPartSections, loadActPartEntries]);
 
   // Add Chapter / Add Section — trying to scroll precisely to "just enough" kept leaving the
   // add buttons off-screen, so this just scrolls the page straight to the bottom instead, which
@@ -3211,7 +3272,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
           }
           await saveActPartSections(subDocAct, payload);
           setToast({ type: 'success', message: 'Sections saved successfully.' });
-          setSecHasChapters(null); setSecChapters([]); setSecFlatSections([]);
+          await loadActPartSections(subDocAct);
         } else {
           // Non-sections tab: upload per-entry files then save entries
           const entries = subDocEntries[subDocTab] || [];
@@ -3234,7 +3295,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
           );
           await saveActPartEntries(subDocAct, subDocTab, { entries: builtEntries });
           setToast({ type: 'success', message: `${subDocTab.charAt(0).toUpperCase() + subDocTab.slice(1)} saved successfully.` });
-          setSubDocEntries(prev => ({ ...prev, [subDocTab]: [] }));
+          await loadActPartEntries(subDocAct, subDocTab);
         }
       } catch (err) {
         const msg = err?.response?.data?.detail || err?.message || 'Save failed.';
@@ -3340,7 +3401,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             <div style={{ padding: '14px 22px', borderTop: '1px solid var(--surface-border)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ ...LABEL, fontSize: 10.5, color: 'var(--text-heading)', flexShrink: 0 }}>{t('wizard.step3.parentActLabel')}</div>
-                <select value={subDocAct} onChange={e => { setSubDocAct(e.target.value); setSecHasChapters(null); setSecChapters([]); setSecFlatSections([]); setSubDocEntries({}); }}
+                <select value={subDocAct} onChange={e => { const v = e.target.value; setSubDocAct(v); setSecHasChapters(null); setSecChapters([]); setSecFlatSections([]); setSubDocEntries({}); setSubDocLoadedFor({ actId: null, tab: null }); }}
                   disabled={subDocActsLoading}
                   style={{ ...INPUT_BASE, flex: 1, cursor: 'pointer', appearance: 'none', fontSize: 12.5 }}
                   onFocus={focusStyle} onBlur={blurStyle}>
@@ -3379,13 +3440,17 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                       { v: false, icon: FileText, title: t('addDocuments.sections.withoutChaptersOption'), desc: t('addDocuments.sections.withoutChaptersDesc') },
                     ].map(opt => {
                       const active = secHasChapters === opt.v;
+                      const hasExisting = secChapters.length > 0 || secFlatSections.length > 0;
+                      const locked = hasExisting && !active; // disable the non-current option when data is loaded
                       return (
-                        <button key={String(opt.v)} type="button" onClick={() => setSecHasChapters(opt.v)}
+                        <button key={String(opt.v)} type="button" onClick={() => !locked && setSecHasChapters(opt.v)}
+                          disabled={locked}
                           style={{
                             display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left',
-                            padding: '14px 16px', borderRadius: 12, cursor: 'pointer', fontFamily: 'var(--font)',
+                            padding: '14px 16px', borderRadius: 12, cursor: locked ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)',
                             border: active ? '1.5px solid var(--primary)' : '1.5px solid var(--surface-border)',
                             background: active ? 'rgba(26,86,219,.06)' : 'var(--surface-card)',
+                            opacity: locked ? 0.45 : 1,
                             transition: 'all .15s',
                           }}>
                           <div style={{ width: 40, height: 40, borderRadius: 10, background: active ? 'rgba(26,86,219,.14)' : 'var(--surface-ground)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
