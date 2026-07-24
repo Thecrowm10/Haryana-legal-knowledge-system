@@ -5,7 +5,7 @@ import {
   RotateCcw, AlertCircle, Eye, GitBranch, Plus, FolderPlus,
   Layers, ChevronRight, AlertTriangle, CheckSquare, Square,
   Edit3, Tag, Search, MessageSquare, MessageCircle, ZoomIn, ZoomOut, RotateCw, ExternalLink,
-  Save, ArrowRight,
+  Save, ArrowRight, Paperclip,
 } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
@@ -17,6 +17,7 @@ import SelectField from '../components/ui/SelectField';
 import { useAuth } from '../hooks/useAuth';
 import { getDepartments, getDocumentTypes } from '../services/departments';
 import { uploadPdfFile, uploadPdfMetadata, updatePdfMetadata, getMyDocuments, searchDocuments, getPdfFile, checkDuplicateDocument, linkDocumentToDepartment, getLinkedDocuments, getActChildren, getMyDepartmentActs, getMyDepartmentDocsByType } from '../services/pdf';
+import { uploadActPartFile, saveActPartSections, saveActPartEntries } from '../services/act_parts';
 import { createNotification } from '../services/notifications';
 
 // Constants
@@ -1311,9 +1312,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const [files, setFiles]           = useState([]);
   const [dragOver, setDragOver]     = useState(false);
   const [subDocTab, setSubDocTab]       = useState('');
-  const [subDocFiles, setSubDocFiles]   = useState({}); // { [tabKey]: File[] } — kept separate so switching tabs doesn't lose what's picked
-  const [subDocDragOver, setSubDocDragOver] = useState(false);
-  const subDocInputRef = useRef();
   const subDocStructureRef = useRef(null); // scrolled into view once the Parent Act reveals the structure card below
   // Sections tab: parent Act gate (mirrors the Amendment "Parent Act" field), then the
   // has-chapters branch — chapter-wise sections (added one at a time, shown as a tree, like
@@ -1328,6 +1326,9 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const [secFlatSections, setSecFlatSections] = useState([]); // [{name,description},...] — used when there are no chapters
   const [activeFlatSectionIdx, setActiveFlatSectionIdx] = useState(0); // same one-open-at-a-time idea, for the flat (no-chapter) list
   const [previewTarget, setPreviewTarget] = useState(null); // null closed | { chapterIdx, sectionIdx } — chapterIdx is null for a flat section; the preview/edit modal is scoped to one section
+  // Entry-based data for non-sections tabs: [{ number, title, description, file: File|null, fileRef: null }]
+  const [subDocEntries, setSubDocEntries] = useState({});
+  const [subDocSaving, setSubDocSaving] = useState(false);
   const [form, setForm]             = useState({ act: '', dept: user?.dept || '', type: '', version: '1.0', desc: '', enactmentDate: '', parentAct: '', changeTypes: [] });
   const [amendmentProvisions, setAmendmentProvisions] = useState([]);
   const [typeFields, setTypeFields]  = useState({});
@@ -3109,17 +3110,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
 
   if (activePage === 'adddocuments') {
     const activeSubTab = SUBDOC_TABS.find(tb => tb.key === subDocTab);
-    const activeSubFiles = subDocFiles[subDocTab] || [];
-
-    function addSubDocFiles(fileList) {
-      const arr = Array.from(fileList || []).filter(f => /\.(pdf|docx?)$/i.test(f.name));
-      setSubDocFiles(prev => ({ ...prev, [subDocTab]: [...(prev[subDocTab] || []), ...arr] }));
-    }
-    function handleSubDocDrop(e) {
-      e.preventDefault();
-      setSubDocDragOver(false);
-      addSubDocFiles(e.dataTransfer.files);
-    }
 
     // Click a collapsed chapter to expand it; click the expanded one's own badge again to
     // collapse it back — a plain toggle, same idea for sections below.
@@ -3148,7 +3138,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       setSecChapters(prev => prev.map((ch, i) => i === idx ? { ...ch, name } : ch));
     }
     function addChapterSection(chIdx) {
-      setSecChapters(prev => prev.map((ch, i) => i === chIdx ? { ...ch, sections: [...ch.sections, { name: '', description: '' }] } : ch));
+      setSecChapters(prev => prev.map((ch, i) => i === chIdx ? { ...ch, sections: [...ch.sections, { name: '', description: '', file: null, fileRef: null }] } : ch));
       setActiveSectionIdx(secChapters[chIdx]?.sections.length ?? 0); // the new (last) section becomes the one being edited
     }
     function removeChapterSection(chIdx, secIdx) {
@@ -3166,7 +3156,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     function addFlatSection() {
       setSecFlatSections(prev => {
         setActiveFlatSectionIdx(prev.length); // the new (last) section becomes the one being edited
-        return [...prev, { name: '', description: '' }];
+        return [...prev, { name: '', description: '', file: null, fileRef: null }];
       });
     }
     function removeFlatSection(idx) {
@@ -3175,6 +3165,83 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     }
     function setFlatSectionField(idx, field, value) {
       setSecFlatSections(prev => { const next = [...prev]; next[idx] = { ...next[idx], [field]: value }; return next; });
+    }
+
+    async function handleAddDocSubmit() {
+      if (!subDocAct || !subDocTab) return;
+      setSubDocSaving(true);
+      try {
+        if (subDocTab === 'sections') {
+          // Upload files for sections that have one attached
+          async function uploadSecFile(file) {
+            if (!file) return null;
+            const fd = new FormData();
+            fd.append('file', file);
+            const res = await uploadActPartFile(fd);
+            return res.data?.file_ref || null;
+          }
+
+          let payload;
+          if (secHasChapters) {
+            const chapters = await Promise.all(
+              secChapters.map(async ch => ({
+                chapter_number: ch.name || '',
+                chapter_title: ch.name || '',
+                sections: await Promise.all(
+                  ch.sections.map(async sec => ({
+                    section_number: sec.name || '',
+                    section_title: sec.name || '',
+                    section_content: sec.description || '',
+                    file_ref: await uploadSecFile(sec.file),
+                  }))
+                ),
+              }))
+            );
+            payload = { has_chapters: true, chapters };
+          } else {
+            const flat_sections = await Promise.all(
+              secFlatSections.map(async sec => ({
+                section_number: sec.name || '',
+                section_title: sec.name || '',
+                section_content: sec.description || '',
+                file_ref: await uploadSecFile(sec.file),
+              }))
+            );
+            payload = { has_chapters: false, flat_sections };
+          }
+          await saveActPartSections(subDocAct, payload);
+          setToast({ type: 'success', message: 'Sections saved successfully.' });
+          setSecHasChapters(null); setSecChapters([]); setSecFlatSections([]);
+        } else {
+          // Non-sections tab: upload per-entry files then save entries
+          const entries = subDocEntries[subDocTab] || [];
+          const builtEntries = await Promise.all(
+            entries.map(async entry => {
+              let fileRef = entry.fileRef;
+              if (entry.file && !fileRef) {
+                const fd = new FormData();
+                fd.append('file', entry.file);
+                const res = await uploadActPartFile(fd);
+                fileRef = res.data?.file_ref || null;
+              }
+              return {
+                entry_number: entry.number || '',
+                title: entry.title || '',
+                description: entry.description || '',
+                file_ref: fileRef,
+              };
+            })
+          );
+          await saveActPartEntries(subDocAct, subDocTab, { entries: builtEntries });
+          setToast({ type: 'success', message: `${subDocTab.charAt(0).toUpperCase() + subDocTab.slice(1)} saved successfully.` });
+          setSubDocEntries(prev => ({ ...prev, [subDocTab]: [] }));
+        }
+      } catch (err) {
+        const msg = err?.response?.data?.detail || err?.message || 'Save failed.';
+        setToast({ type: 'error', message: msg });
+      } finally {
+        setSubDocSaving(false);
+      }
     }
 
     return (
@@ -3257,8 +3324,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                     <FileText size={11} color={tab.accent} />
                     <span style={{ fontSize: 11.5, fontWeight: active ? 700 : 600, color: active ? tab.text : 'var(--text-heading)', whiteSpace: 'nowrap' }}>{t(tab.labelKey)}</span>
                     {active && <CheckCircle size={11} color={tab.accent} />}
-                    {(subDocFiles[tab.key]?.length > 0) && (
-                      <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, color: tab.accent, background: 'rgba(255,255,255,.5)', padding: '0 6px', borderRadius: 20 }}>{subDocFiles[tab.key].length}</span>
+                    {(subDocEntries[tab.key]?.length > 0) && (
+                      <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, color: tab.accent, background: 'rgba(255,255,255,.5)', padding: '0 6px', borderRadius: 20 }}>{subDocEntries[tab.key].length}</span>
                     )}
                   </button>
                 );
@@ -3269,11 +3336,11 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
 
           {/* Sections tab only: parent Act gate (same pattern as Amendment's Parent Act field) —
               merged into this same card, below a divider, instead of a separate card. */}
-          {subDocTab === 'sections' && (
+          {!!subDocTab && (
             <div style={{ padding: '14px 22px', borderTop: '1px solid var(--surface-border)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ ...LABEL, fontSize: 10.5, color: 'var(--text-heading)', flexShrink: 0 }}>{t('wizard.step3.parentActLabel')}</div>
-                <select value={subDocAct} onChange={e => setSubDocAct(e.target.value)}
+                <select value={subDocAct} onChange={e => { setSubDocAct(e.target.value); setSecHasChapters(null); setSecChapters([]); setSecFlatSections([]); setSubDocEntries({}); }}
                   disabled={subDocActsLoading}
                   style={{ ...INPUT_BASE, flex: 1, cursor: 'pointer', appearance: 'none', fontSize: 12.5 }}
                   onFocus={focusStyle} onBlur={blurStyle}>
@@ -3453,6 +3520,26 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                                         style={{ ...INPUT_BASE, resize: 'vertical', minHeight: 70, fontFamily: 'var(--font)', fontSize: 12.5, lineHeight: 1.5 }}
                                         onFocus={focusStyle} onBlur={blurStyle} />
                                     </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                      <input type="file" accept=".pdf,.doc,.docx" style={{ display: 'none' }}
+                                        id={`sec-file-ch${ci}-s${si}`}
+                                        onChange={e => { const f = e.target.files?.[0] || null; setChapterSectionField(ci, si, 'file', f); setChapterSectionField(ci, si, 'fileRef', null); e.target.value = ''; }} />
+                                      {sec.file ? (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', flex: 1 }}>
+                                          <Paperclip size={12} color={activeSubTab.accent} />
+                                          <span style={{ fontSize: 11.5, color: 'var(--text-heading)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sec.file.name}</span>
+                                          <button type="button" onClick={() => { setChapterSectionField(ci, si, 'file', null); setChapterSectionField(ci, si, 'fileRef', null); }}
+                                            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex' }}>
+                                            <X size={11} />
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <label htmlFor={`sec-file-ch${ci}-s${si}`}
+                                          style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: activeSubTab.accent, background: 'transparent', border: `1px dashed ${activeSubTab.accent}60`, borderRadius: 7, padding: '5px 12px', cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                                          <Paperclip size={11} /> Attach file (optional)
+                                        </label>
+                                      )}
+                                    </div>
                                     <button type="button" onClick={() => toggleSection(si)}
                                       style={{ alignSelf: 'flex-end', padding: '7px 18px', borderRadius: 7, border: 'none', background: 'var(--primary)', color: 'white', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                                       {t('addDocuments.sections.confirmButton')}
@@ -3551,6 +3638,26 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                               style={{ ...INPUT_BASE, resize: 'vertical', minHeight: 70, fontFamily: 'var(--font)', fontSize: 12.5, lineHeight: 1.5 }}
                               onFocus={focusStyle} onBlur={blurStyle} />
                           </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <input type="file" accept=".pdf,.doc,.docx" style={{ display: 'none' }}
+                              id={`sec-flat-file-${si}`}
+                              onChange={e => { const f = e.target.files?.[0] || null; setFlatSectionField(si, 'file', f); setFlatSectionField(si, 'fileRef', null); e.target.value = ''; }} />
+                            {sec.file ? (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', flex: 1 }}>
+                                <Paperclip size={12} color="var(--primary)" />
+                                <span style={{ fontSize: 11.5, color: 'var(--text-heading)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sec.file.name}</span>
+                                <button type="button" onClick={() => { setFlatSectionField(si, 'file', null); setFlatSectionField(si, 'fileRef', null); }}
+                                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex' }}>
+                                  <X size={11} />
+                                </button>
+                              </div>
+                            ) : (
+                              <label htmlFor={`sec-flat-file-${si}`}
+                                style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: 'var(--primary)', background: 'transparent', border: '1px dashed rgba(26,86,219,.4)', borderRadius: 7, padding: '5px 12px', cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                                <Paperclip size={11} /> Attach file (optional)
+                              </label>
+                            )}
+                          </div>
                           <button type="button" onClick={() => toggleFlatSection(si)}
                             style={{ alignSelf: 'flex-end', padding: '7px 18px', borderRadius: 7, border: 'none', background: 'var(--primary)', color: 'white', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                             {t('addDocuments.sections.confirmButton')}
@@ -3569,75 +3676,105 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
           </div>
         )}
 
-        {/* Attach a file — optional, shown after the fields for every part except Sections, which
-            is purely about defining chapter/section structure and never involves a file upload. */}
-        {subDocTab !== 'sections' && (
-        <Card padding="0">
-          <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-color-secondary)' }}>{t('addDocuments.attachFileHeading')}</div>
-            <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '2px 8px', borderRadius: 20, letterSpacing: '.04em' }}>{t('addDocuments.optionalBadge')}</span>
-          </div>
-          <div style={{ padding: 20 }}>
-          <input ref={subDocInputRef} type="file" accept=".pdf,.doc,.docx" multiple style={{ display: 'none' }}
-            onChange={e => { addSubDocFiles(e.target.files); e.target.value = ''; }} />
-
-          {activeSubFiles.length === 0 ? (
-            <div
-              className="ud-dropzone"
-              onClick={() => subDocInputRef.current?.click()}
-              onDrop={handleSubDocDrop}
-              onDragOver={e => { e.preventDefault(); setSubDocDragOver(true); }}
-              onDragLeave={() => setSubDocDragOver(false)}
-              style={{
-                border: `2px dashed ${activeSubTab.accent}${subDocDragOver ? '' : '50'}`,
-                borderRadius: 16, padding: '48px 24px',
-                cursor: 'pointer',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, textAlign: 'center',
-                background: subDocDragOver ? activeSubTab.bg : 'var(--surface-ground)',
-                transition: 'all .25s',
-                boxShadow: subDocDragOver ? `0 0 0 3px ${activeSubTab.accent}18` : 'none',
-              }}>
-              <div style={{ width: 52, height: 52, borderRadius: 14, flexShrink: 0, background: activeSubTab.bg, border: `1px solid ${activeSubTab.accent}40`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Upload size={22} color={activeSubTab.accent} strokeWidth={1.6} />
+        {/* Entry-based form for schedule / annexure / appendix / forms tabs */}
+        {subDocTab !== 'sections' && subDocAct && (() => {
+          const entries = subDocEntries[subDocTab] || [];
+          function addEntry() {
+            setSubDocEntries(prev => ({ ...prev, [subDocTab]: [...(prev[subDocTab] || []), { number: '', title: '', description: '', file: null, fileRef: null }] }));
+          }
+          function removeEntry(idx) {
+            setSubDocEntries(prev => ({ ...prev, [subDocTab]: (prev[subDocTab] || []).filter((_, i) => i !== idx) }));
+          }
+          function setEntryField(idx, field, val) {
+            setSubDocEntries(prev => {
+              const next = [...(prev[subDocTab] || [])];
+              next[idx] = { ...next[idx], [field]: val };
+              return { ...prev, [subDocTab]: next };
+            });
+          }
+          return (
+          <Card padding="0">
+            <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-heading)' }}>
+                {activeSubTab ? t(activeSubTab.labelKey) : subDocTab}
               </div>
-              <div>
-                <div style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 6 }}>{t('wizard.step2.dropHere')} <span style={{ color: 'var(--primary)' }}>{t('wizard.step2.clickToBrowse')}</span></div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 12, color: 'var(--text-color-secondary)' }}>{t('wizard.step2.fileTypeHint')}</span>
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--primary)', background: 'rgba(26,86,219,.08)', border: '1px solid rgba(26,86,219,.2)', padding: '2px 7px', borderRadius: 20 }}>.PDF</span>
-                  <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: '#2b579a', background: 'rgba(43,87,154,.08)', border: '1px solid rgba(43,87,154,.3)', padding: '2px 7px', borderRadius: 20 }}>.DOC</span>
-                </div>
-              </div>
+              <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '2px 8px', borderRadius: 20 }}>
+                {entries.length} {entries.length === 1 ? 'entry' : 'entries'}
+              </span>
             </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {activeSubFiles.map((f, i) => (
-                <div key={f.name + i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)' }}>
-                  <div style={{ width: 30, height: 30, borderRadius: 7, background: activeSubTab.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    {fileIcon(f)}
+            <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {entries.map((entry, i) => (
+                <div key={i} style={{ padding: '14px 16px', borderRadius: 10, border: `1.5px solid ${activeSubTab ? activeSubTab.accent : 'var(--surface-border)'}30`, background: 'var(--surface-ground)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', background: 'var(--surface-card)', border: '1px solid var(--surface-border)', padding: '2px 9px', borderRadius: 20 }}>
+                      #{i + 1}
+                    </span>
+                    <button type="button" onClick={() => removeEntry(i)}
+                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex' }}>
+                      <X size={14} />
+                    </button>
                   </div>
-                  <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-heading)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
-                  <span style={{ fontSize: 10.5, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', flexShrink: 0 }}>{formatSize(f.size)}</span>
-                  <button type="button" onClick={() => setSubDocFiles(prev => ({ ...prev, [subDocTab]: prev[subDocTab].filter((_, idx) => idx !== i) }))}
-                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', flexShrink: 0 }}>
-                    <X size={13} />
-                  </button>
+                  <div className="ud-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12 }}>
+                    <div>
+                      <div style={{ ...LABEL, marginBottom: 5 }}>Number</div>
+                      <input value={entry.number} onChange={e => setEntryField(i, 'number', e.target.value)}
+                        placeholder="e.g. I, 1, A"
+                        style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                    </div>
+                    <div>
+                      <div style={{ ...LABEL, marginBottom: 5 }}>Title</div>
+                      <input value={entry.title} onChange={e => setEntryField(i, 'title', e.target.value)}
+                        placeholder="Entry title"
+                        style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ ...LABEL, marginBottom: 5 }}>Description (optional)</div>
+                    <textarea value={entry.description} onChange={e => setEntryField(i, 'description', e.target.value)}
+                      placeholder="Brief description or content summary" rows={2}
+                      style={{ ...INPUT_BASE, resize: 'vertical', minHeight: 56, fontFamily: 'var(--font)', fontSize: 12.5, lineHeight: 1.5 }}
+                      onFocus={focusStyle} onBlur={blurStyle} />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <input type="file" accept=".pdf,.doc,.docx" style={{ display: 'none' }}
+                      id={`entry-file-${subDocTab}-${i}`}
+                      onChange={e => { const f = e.target.files?.[0] || null; setEntryField(i, 'file', f); setEntryField(i, 'fileRef', null); e.target.value = ''; }} />
+                    {entry.file ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-card)', flex: 1 }}>
+                        {fileIcon(entry.file)}
+                        <span style={{ fontSize: 11.5, color: 'var(--text-heading)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.file.name}</span>
+                        <span style={{ fontSize: 10.5, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', flexShrink: 0 }}>{formatSize(entry.file.size)}</span>
+                        <button type="button" onClick={() => { setEntryField(i, 'file', null); setEntryField(i, 'fileRef', null); }}
+                          style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex' }}>
+                          <X size={11} />
+                        </button>
+                      </div>
+                    ) : (
+                      <label htmlFor={`entry-file-${subDocTab}-${i}`}
+                        style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: activeSubTab ? activeSubTab.text : 'var(--primary)', background: 'transparent', border: `1px dashed ${activeSubTab ? activeSubTab.accent + '50' : 'rgba(26,86,219,.4)'}`, borderRadius: 7, padding: '5px 12px', cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                        <Paperclip size={11} /> Attach file (optional)
+                      </label>
+                    )}
+                  </div>
                 </div>
               ))}
-              <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                <button type="button" onClick={() => subDocInputRef.current?.click()}
-                  style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 700, color: activeSubTab.accent, background: 'transparent', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '6px 12px', cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                  <Plus size={12} /> {t('wizard.step2.addFile')}
-                </button>
-                <button type="button" onClick={() => setSubDocFiles(prev => ({ ...prev, [subDocTab]: [] }))}
-                  style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-color-secondary)', background: 'transparent', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '6px 12px', cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                  {t('wizard.step2.changeFiles')}
-                </button>
-              </div>
+              <button type="button" onClick={addEntry}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, alignSelf: 'flex-start', fontSize: 12.5, fontWeight: 700, color: activeSubTab ? activeSubTab.accent : 'var(--primary)', background: activeSubTab ? activeSubTab.bg : 'transparent', border: `1px solid ${activeSubTab ? activeSubTab.accent + '40' : 'var(--surface-border)'}`, borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                <Plus size={13} /> Add Entry
+              </button>
             </div>
-          )}
+          </Card>
+          );
+        })()}
+
+        {/* Save button — always visible when an act and tab are selected */}
+        {subDocAct && subDocTab && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+            <button type="button" onClick={handleAddDocSubmit} disabled={subDocSaving}
+              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 24px', borderRadius: 10, border: 'none', background: subDocSaving ? '#94a3b8' : 'var(--primary)', color: 'white', fontSize: 13.5, fontWeight: 700, cursor: subDocSaving ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', boxShadow: subDocSaving ? 'none' : '0 2px 12px rgba(26,86,219,.25)' }}>
+              <Save size={15} /> {subDocSaving ? 'Saving…' : `Save ${activeSubTab ? t(activeSubTab.labelKey) : ''}`}
+            </button>
           </div>
-        </Card>
         )}
         </>
         )}
