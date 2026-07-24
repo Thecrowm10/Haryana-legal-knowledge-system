@@ -1379,6 +1379,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const [bulkFields, setBulkFields]     = useState({ dept: '', type: '', year: '' });
   const [fileRefs,    setFileRefs]    = useState([]); // [{ fileName, fileRef, originalFilename, fileSize }]
   const [fileMeta,    setFileMeta]    = useState({}); // { [fileName]: { documentName, desc } }
+  const [descPreviewFile, setDescPreviewFile] = useState(null); // fileName being previewed/edited full-screen, or null
   const [uploadStep, setUploadStep]   = useState(null); // null | 'uploading' | 'ready' | 'saving' | 'done' | 'error'
   const [uploadError, setUploadError] = useState('');
   const [toast, setToast] = useState(null); // { type: 'success' | 'error', message }
@@ -4667,21 +4668,31 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                 </div>
                 {files.map(f => (
                   <div key={f.name}>
-                    {files.length > 1 && (
-                      <div style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text-heading)', marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</div>
-                    )}
-                    {fileMeta[f.name]?.desc && (
-                      <div style={{ marginBottom: 3 }}>
-                        <span style={{ fontSize: 10, fontWeight: 600, color: '#16a34a', textTransform: 'none', letterSpacing: 0 }}>{t('wizard.step3.autoFilled')}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 3 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                        {files.length > 1 && (
+                          <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+                        )}
+                        {fileMeta[f.name]?.desc && (
+                          <span style={{ fontSize: 10, fontWeight: 600, color: '#16a34a', textTransform: 'none', letterSpacing: 0, flexShrink: 0 }}>{t('wizard.step3.autoFilled')}</span>
+                        )}
                       </div>
-                    )}
+                      {/* Full-page preview/edit — the inline box here is only 3 rows, too
+                          cramped to read a longer auto-generated description comfortably. */}
+                      <button type="button" onClick={() => setDescPreviewFile(f.name)}
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 10.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+                        <Eye size={11} /> {t('wizard.step3.previewButton')}
+                      </button>
+                    </div>
+                    {/* Read-only here — editing only happens in the Preview modal now, so there's
+                        a single place it can be changed instead of two boxes drifting apart. */}
                     <textarea
                       value={fileMeta[f.name]?.desc ?? ''}
-                      onChange={e => setFileMeta(prev => ({ ...prev, [f.name]: { ...prev[f.name], desc: e.target.value } }))}
-                      onFocus={focusStyle} onBlur={blurStyle}
+                      readOnly
+                      onClick={() => setDescPreviewFile(f.name)}
                       rows={3}
                       placeholder={t('wizard.step3.descriptionPlaceholder')}
-                      style={{ ...INPUT_BASE, resize: 'vertical', lineHeight: 1.6 }} />
+                      style={{ ...INPUT_BASE, resize: 'none', lineHeight: 1.6, cursor: 'pointer', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)' }} />
                   </div>
                 ))}
               </div>
@@ -5339,6 +5350,42 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             </div>
           </div>
         </>
+      )}
+
+      {/* Full-page description preview/edit — the inline textarea is only 3 rows, too small to
+          read a longer auto-generated summary comfortably; this gives it room, still editable. */}
+      {descPreviewFile && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+          onClick={() => setDescPreviewFile(null)}>
+          <div style={{ background: 'var(--surface-card)', borderRadius: 16, width: '100%', maxWidth: 1200, height: '94vh', boxShadow: '0 28px 80px rgba(0,0,0,.35)', display: 'flex', flexDirection: 'column' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ padding: '18px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)' }}>{t('wizard.step3.descriptionLabel')}</div>
+                <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{descPreviewFile}</div>
+              </div>
+              <button onClick={() => setDescPreviewFile(null)}
+                style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '5px 8px', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', flexShrink: 0 }}>
+                <X size={14} />
+              </button>
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+              <textarea value={fileMeta[descPreviewFile]?.desc ?? ''}
+                onChange={e => setFileMeta(prev => ({ ...prev, [descPreviewFile]: { ...prev[descPreviewFile], desc: e.target.value } }))}
+                placeholder={t('wizard.step3.descriptionPlaceholder')}
+                style={{ ...INPUT_BASE, width: '100%', flex: 1, background: 'var(--surface-ground)', resize: 'none', minHeight: 300, fontFamily: 'var(--font)', fontSize: 13.5, lineHeight: 1.8, boxSizing: 'border-box' }}
+                onFocus={focusStyle} onBlur={blurStyle} autoFocus />
+            </div>
+
+            <div style={{ padding: '14px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end', flexShrink: 0 }}>
+              <button type="button" onClick={() => setDescPreviewFile(null)}
+                style={{ padding: '9px 22px', borderRadius: 8, border: 'none', background: 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                {t('wizard.step3.confirmButton')}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -256,6 +256,8 @@
       "setPerFile": "Set per file",
       "autoFilled": "auto-filled, you can edit",
       "descriptionPlaceholder": "Brief description or upload remarks…",
+      "previewButton": "Preview",
+      "confirmButton": "Confirm",
       "clearAll": "Clear All",
       "uploadingFile": "Uploading file…",
       "savingDetails": "Saving details…",
