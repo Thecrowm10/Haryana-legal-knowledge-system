@@ -3633,11 +3633,12 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                             )}
                             {chStatusChip && (
                               <span style={{ fontSize: 9.5, fontWeight: 700, borderRadius: 20, padding: '1px 8px', flexShrink: 0,
-                                ...(chStatusChip === 'draft'    ? { background: '#f1f5f9', color: '#64748b', border: '1px solid #cbd5e1' } :
-                                    chStatusChip === 'pending'  ? { background: '#fef3c7', color: '#92400e', border: '1px solid #f59e0b' } :
-                                    chStatusChip === 'approved' ? { background: '#d1fae5', color: '#065f46', border: '1px solid #10b981' } :
-                                                                   { background: '#fee2e2', color: '#991b1b', border: '1px solid #ef4444' }),
-                              }}>{chStatusChip.charAt(0).toUpperCase() + chStatusChip.slice(1)}</span>
+                                ...(chStatusChip === 'draft'          ? { background: '#f1f5f9', color: '#64748b', border: '1px solid #cbd5e1' } :
+                                    chStatusChip === 'pending'        ? { background: '#fef3c7', color: '#92400e', border: '1px solid #f59e0b' } :
+                                    chStatusChip === 'approved'       ? { background: '#d1fae5', color: '#065f46', border: '1px solid #10b981' } :
+                                    chStatusChip === 'pending_delete' ? { background: '#fff1f2', color: '#9f1239', border: '1px solid #fda4af' } :
+                                                                        { background: '#fee2e2', color: '#991b1b', border: '1px solid #ef4444' }),
+                              }}>{{ draft: 'Draft', pending: 'Pending', approved: 'Approved', rejected: 'Rejected', pending_delete: 'Del. Pending' }[chStatusChip] || chStatusChip}</span>
                             )}
                             <ChevronRight size={14} color="var(--text-color-secondary)" style={{ flexShrink: 0 }} />
                           </div>
@@ -3692,11 +3693,12 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                                         <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '2px 8px', borderRadius: 20, flexShrink: 0 }}>{t('addDocuments.sections.sectionNumber', { number: si + 1 })}</span>
                                         {secStatusChip && (
                                           <span style={{ fontSize: 9.5, fontWeight: 700, borderRadius: 20, padding: '1px 7px', flexShrink: 0,
-                                            ...(secStatusChip === 'draft'    ? { background: '#f1f5f9', color: '#64748b', border: '1px solid #cbd5e1' } :
-                                                secStatusChip === 'pending'  ? { background: '#fef3c7', color: '#92400e', border: '1px solid #f59e0b' } :
-                                                secStatusChip === 'approved' ? { background: '#d1fae5', color: '#065f46', border: '1px solid #10b981' } :
-                                                                               { background: '#fee2e2', color: '#991b1b', border: '1px solid #ef4444' }),
-                                          }}>{secStatusChip.charAt(0).toUpperCase() + secStatusChip.slice(1)}</span>
+                                            ...(secStatusChip === 'draft'          ? { background: '#f1f5f9', color: '#64748b', border: '1px solid #cbd5e1' } :
+                                                secStatusChip === 'pending'        ? { background: '#fef3c7', color: '#92400e', border: '1px solid #f59e0b' } :
+                                                secStatusChip === 'approved'       ? { background: '#d1fae5', color: '#065f46', border: '1px solid #10b981' } :
+                                                secStatusChip === 'pending_delete' ? { background: '#fff1f2', color: '#9f1239', border: '1px solid #fda4af' } :
+                                                                                     { background: '#fee2e2', color: '#991b1b', border: '1px solid #ef4444' }),
+                                          }}>{({ draft: 'Draft', pending: 'Pending', approved: 'Approved', rejected: 'Rejected', pending_delete: 'Del. Pending' })[secStatusChip] || secStatusChip}</span>
                                         )}
                                         <span style={{ fontSize: 13, fontWeight: 600, color: sec.name ? 'var(--text-heading)' : 'var(--text-color-secondary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                           {sec.name || t('addDocuments.sections.sectionNamePlain')}
@@ -3845,11 +3847,12 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                               <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '2px 8px', borderRadius: 20, flexShrink: 0 }}>{t('addDocuments.sections.sectionNumber', { number: si + 1 })}</span>
                               {flatSecStatusChip && (
                                 <span style={{ fontSize: 9.5, fontWeight: 700, borderRadius: 20, padding: '1px 7px', flexShrink: 0,
-                                  ...(flatSecStatusChip === 'draft'    ? { background: '#f1f5f9', color: '#64748b', border: '1px solid #cbd5e1' } :
-                                      flatSecStatusChip === 'pending'  ? { background: '#fef3c7', color: '#92400e', border: '1px solid #f59e0b' } :
-                                      flatSecStatusChip === 'approved' ? { background: '#d1fae5', color: '#065f46', border: '1px solid #10b981' } :
-                                                                         { background: '#fee2e2', color: '#991b1b', border: '1px solid #ef4444' }),
-                                }}>{flatSecStatusChip.charAt(0).toUpperCase() + flatSecStatusChip.slice(1)}</span>
+                                  ...(flatSecStatusChip === 'draft'          ? { background: '#f1f5f9', color: '#64748b', border: '1px solid #cbd5e1' } :
+                                      flatSecStatusChip === 'pending'        ? { background: '#fef3c7', color: '#92400e', border: '1px solid #f59e0b' } :
+                                      flatSecStatusChip === 'approved'       ? { background: '#d1fae5', color: '#065f46', border: '1px solid #10b981' } :
+                                      flatSecStatusChip === 'pending_delete' ? { background: '#fff1f2', color: '#9f1239', border: '1px solid #fda4af' } :
+                                                                               { background: '#fee2e2', color: '#991b1b', border: '1px solid #ef4444' }),
+                                }}>{({ draft: 'Draft', pending: 'Pending', approved: 'Approved', rejected: 'Rejected', pending_delete: 'Del. Pending' })[flatSecStatusChip] || flatSecStatusChip}</span>
                               )}
                               <span style={{ fontSize: 13, fontWeight: 600, color: sec.name ? 'var(--text-heading)' : 'var(--text-color-secondary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                 {sec.name || t('addDocuments.sections.sectionNamePlain')}
@@ -4015,11 +4018,12 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                       </span>
                       {entryStatusChip && (
                         <span style={{ fontSize: 9.5, fontWeight: 700, borderRadius: 20, padding: '1px 7px', flexShrink: 0,
-                          ...(entryStatusChip === 'draft'    ? { background: '#f1f5f9', color: '#64748b', border: '1px solid #cbd5e1' } :
-                              entryStatusChip === 'pending'  ? { background: '#fef3c7', color: '#92400e', border: '1px solid #f59e0b' } :
-                              entryStatusChip === 'approved' ? { background: '#d1fae5', color: '#065f46', border: '1px solid #10b981' } :
-                                                               { background: '#fee2e2', color: '#991b1b', border: '1px solid #ef4444' }),
-                        }}>{entryStatusChip.charAt(0).toUpperCase() + entryStatusChip.slice(1)}</span>
+                          ...(entryStatusChip === 'draft'          ? { background: '#f1f5f9', color: '#64748b', border: '1px solid #cbd5e1' } :
+                              entryStatusChip === 'pending'        ? { background: '#fef3c7', color: '#92400e', border: '1px solid #f59e0b' } :
+                              entryStatusChip === 'approved'       ? { background: '#d1fae5', color: '#065f46', border: '1px solid #10b981' } :
+                              entryStatusChip === 'pending_delete' ? { background: '#fff1f2', color: '#9f1239', border: '1px solid #fda4af' } :
+                                                                     { background: '#fee2e2', color: '#991b1b', border: '1px solid #ef4444' }),
+                        }}>{({ draft: 'Draft', pending: 'Pending', approved: 'Approved', rejected: 'Rejected', pending_delete: 'Del. Pending' })[entryStatusChip] || entryStatusChip}</span>
                       )}
                     </div>
                     <button type="button" onClick={() => removeEntry(i)}
