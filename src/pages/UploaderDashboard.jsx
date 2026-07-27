@@ -113,9 +113,9 @@ const TYPE_CARD_DESC = {
 // as TYPE_CARD_COLORS above so this page reads as part of the same design system.
 const SUBDOC_TABS = [
   { key: 'sections', labelKey: 'addDocuments.tabs.sections', descKey: 'addDocuments.tabDesc.sections', accent: '#1a56db', bg: 'rgba(26,86,219,.08)', text: '#1e40af' },
-  { key: 'schedule', labelKey: 'addDocuments.tabs.schedule', descKey: 'addDocuments.tabDesc.schedule', accent: '#0ea5e9', bg: 'rgba(14,165,233,.08)', text: '#0369a1' },
-  { key: 'annexure', labelKey: 'addDocuments.tabs.annexure', descKey: 'addDocuments.tabDesc.annexure', accent: '#22c55e', bg: 'rgba(34,197,94,.08)', text: '#16a34a' },
-  { key: 'appendix', labelKey: 'addDocuments.tabs.appendix', descKey: 'addDocuments.tabDesc.appendix', accent: '#f59e0b', bg: 'rgba(245,158,11,.08)', text: '#d97706' },
+  { key: 'schedules', labelKey: 'addDocuments.tabs.schedule', descKey: 'addDocuments.tabDesc.schedule', accent: '#0ea5e9', bg: 'rgba(14,165,233,.08)', text: '#0369a1' },
+  { key: 'annexures', labelKey: 'addDocuments.tabs.annexure', descKey: 'addDocuments.tabDesc.annexure', accent: '#22c55e', bg: 'rgba(34,197,94,.08)', text: '#16a34a' },
+  { key: 'appendices', labelKey: 'addDocuments.tabs.appendix', descKey: 'addDocuments.tabDesc.appendix', accent: '#f59e0b', bg: 'rgba(245,158,11,.08)', text: '#d97706' },
   { key: 'forms',    labelKey: 'addDocuments.tabs.forms',    descKey: 'addDocuments.tabDesc.forms',    accent: '#8b5cf6', bg: 'rgba(139,92,246,.08)', text: '#7c3aed' },
 ];
 
@@ -319,10 +319,36 @@ function fromRoman(str) {
   }
   return result || 0;
 }
-// Pulls the list of documents matching `type` out of a "/pdf/{id}/children" response.
-// Real shape: { act_id, children: { [documentTypeName]: [...] } }. A few other plausible
-// shapes are tolerated too: {results:[...]}, {documents:[...]}, a flat array, {groups:[...]},
-// or an object keyed directly by type name.
+// Produces a stable, comparable snapshot of the sections form — used to detect whether the
+// user has actually changed anything since the last load/save so the Save button can be disabled
+// when re-submitting would just resend an identical payload. `id`/`status` are left out on purpose:
+// they're server-assigned and don't reflect user edits.
+function sectionFileKey(sec) {
+  return sec.file ? `new:${sec.file.name}:${sec.file.size}` : (sec.existingFileRef || null);
+}
+function sectionsSignature(hasChapters, chapters, flatSections) {
+  if (hasChapters === true) {
+    return JSON.stringify({
+      hasChapters: true,
+      chapters: (chapters || []).map(ch => ({
+        name: ch.name || '', isDeleted: !!ch.isDeleted,
+        sections: (ch.sections || []).map(s => ({ name: s.name || '', description: s.description || '', isDeleted: !!s.isDeleted, file: sectionFileKey(s) })),
+      })),
+    });
+  }
+  if (hasChapters === false) {
+    return JSON.stringify({
+      hasChapters: false,
+      flat_sections: (flatSections || []).map(s => ({ name: s.name || '', description: s.description || '', isDeleted: !!s.isDeleted, file: sectionFileKey(s) })),
+    });
+  }
+  return JSON.stringify({ hasChapters: null });
+}
+// Same idea as sectionsSignature, for the flat entry lists (schedule/annexure/appendix/forms).
+function entriesSignature(entries) {
+  return JSON.stringify((entries || []).map(e => ({ title: e.title || '', description: e.description || '', isDeleted: !!e.isDeleted, file: sectionFileKey(e) })));
+}
+
 function extractTypeChildren(data, type) {
   if (!data) return [];
   const matchesType = d => [d.document_type, d.type, d.document_type_name].includes(type);
@@ -1328,7 +1354,11 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   // Sections tab: parent Act gate (mirrors the Amendment "Parent Act" field), then the
   // has-chapters branch — chapter-wise sections (added one at a time, shown as a tree, like
   // India Code) or flat sections with no chapter.
-  const [subDocAct, setSubDocAct]           = useState('');
+  // Each SUBDOC_TABS tab (sections/schedules/annexures/appendices/forms) can be tagged to a
+  // different Act, so the selected Act is keyed by tab rather than being one shared value —
+  // picking an Act on the Schedule tab must not carry over when switching to Annexure.
+  const [subDocActByTab, setSubDocActByTab] = useState({});
+  const subDocAct = subDocActByTab[subDocTab] || '';
   const [subDocActsList, setSubDocActsList] = useState(null);
   const [subDocActsLoading, setSubDocActsLoading] = useState(false);
   // approvals[partType] = { status, submitted_at, reviewed_at, comments, ... } | undefined
@@ -1343,8 +1373,15 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const [previewTarget, setPreviewTarget] = useState(null); // null closed | { chapterIdx, sectionIdx } — chapterIdx is null for a flat section; the preview/edit modal is scoped to one section
   // Entry-based data for non-sections tabs: [{ number, title, description, file: File|null, fileRef: null }]
   const [subDocEntries, setSubDocEntries] = useState({});
+  const [activeEntryIdx, setActiveEntryIdx] = useState(-1); // -1 = all collapsed (saved entries show as a summary); set to index to expand for editing
+  const [entryPreviewIdx, setEntryPreviewIdx] = useState(null); // null closed | index — full-page preview/edit modal for one entry, shown regardless of whether it has a description yet
   const [subDocSaving, setSubDocSaving] = useState(false);
   const [subDocLoadedFor, setSubDocLoadedFor] = useState({ actId: null, tab: null });
+  // Snapshot of the sections/entries form taken right after a load or a successful save — the
+  // Save button stays disabled until the live form diverges from this, so re-saving an untouched
+  // upload isn't possible.
+  const [sectionsBaseline, setSectionsBaseline] = useState(() => sectionsSignature(null, [], []));
+  const [entriesBaseline, setEntriesBaseline] = useState({}); // { [tab]: signature string }; a missing key falls back to entriesSignature([])
   const [form, setForm]             = useState({ act: '', dept: user?.dept || '', type: '', version: '1.0', desc: '', enactmentDate: '', parentAct: '', changeTypes: [] });
   const [amendmentProvisions, setAmendmentProvisions] = useState([]);
   const [typeFields, setTypeFields]  = useState({});
@@ -1457,6 +1494,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
 
         setSecChapters(chapterArray);
         setSecFlatSections([]);
+        setSectionsBaseline(sectionsSignature(true, chapterArray, []));
       } else if (data.flat_sections?.length > 0) {
         setSecHasChapters(false);
 
@@ -1474,8 +1512,11 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
 
         setSecFlatSections(flatArray);
         setSecChapters([]);
+        setSectionsBaseline(sectionsSignature(false, [], flatArray));
+      } else {
+        // empty response → keep state null so user chooses structure
+        setSectionsBaseline(sectionsSignature(null, [], []));
       }
-      // empty response → keep state null so user chooses structure
     } catch { /* ignore — user will see an empty form */ }
   }, []);
 
@@ -1502,6 +1543,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         }
       }
       setSubDocEntries(prev => ({ ...prev, [tab]: entryArray }));
+      setEntriesBaseline(prev => ({ ...prev, [tab]: entriesSignature(entryArray) }));
     } catch { /* ignore */ }
   }, []);
 
@@ -1621,6 +1663,13 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       subDocStructureRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }, [activePage, subDocTab, subDocAct]);
+
+  // Switching tabs (schedule → annexure, etc.) shouldn't leave an entry from the previous
+  // tab's list expanded — start each tab's entries collapsed.
+  useEffect(() => {
+    setActiveEntryIdx(-1);
+    setEntryPreviewIdx(null);
+  }, [subDocTab]);
 
   // Load existing entries from DB when act or tab changes.
   // Skips if this (actId, tab) pair was already loaded — preserves unsaved additions across tab switches.
@@ -3257,6 +3306,9 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     function toggleFlatSection(si) {
       setActiveFlatSectionIdx(prev => (prev === si ? -1 : si));
     }
+    function toggleEntry(idx) {
+      setActiveEntryIdx(prev => (prev === idx ? -1 : idx));
+    }
 
     function addChapter() {
       setSecChapters(prev => {
@@ -3423,6 +3475,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
           } catch { /* save succeeded; approval state refreshes on reload */ }
           showToast('success', `${subDocTab.charAt(0).toUpperCase() + subDocTab.slice(1)} saved and submitted for approval.`);
           await loadActPartEntries(subDocAct, subDocTab);
+          setActiveEntryIdx(-1);
         }
       } catch (err) {
         const msg = err?.response?.data?.detail || err?.message || 'Save failed.';
@@ -3431,6 +3484,21 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         setSubDocSaving(false);
       }
     }
+
+    // Shared by the structure/entries card headers (status badge) and the footer save button
+    // (disabled state) below — computed once so both stay in sync.
+    const APPROVAL_STATUS_STYLES = {
+      pending:  { bg: '#fef3c7', color: '#92400e', border: '#f59e0b', icon: '⏳' },
+      approved: { bg: '#d1fae5', color: '#065f46', border: '#10b981', icon: '✓' },
+      rejected: { bg: '#fee2e2', color: '#991b1b', border: '#ef4444', icon: '✗' },
+    };
+    const tabApproval = subDocApprovals[subDocTab];
+    const approvalStatus = tabApproval?.status;
+    const approvalStyle = APPROVAL_STATUS_STYLES[approvalStatus] || null;
+
+    const subDocDirty = subDocTab === 'sections'
+      ? sectionsSignature(secHasChapters, secChapters, secFlatSections) !== sectionsBaseline
+      : entriesSignature(subDocEntries[subDocTab] || []) !== (entriesBaseline[subDocTab] ?? entriesSignature([]));
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
@@ -3528,7 +3596,15 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             <div style={{ padding: '14px 22px', borderTop: '1px solid var(--surface-border)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ ...LABEL, fontSize: 10.5, color: 'var(--text-heading)', flexShrink: 0 }}>{t('wizard.step3.parentActLabel')}</div>
-                <select value={subDocAct} onChange={e => { const v = e.target.value; setSubDocAct(v); setSecHasChapters(null); setSecChapters([]); setSecFlatSections([]); setSubDocEntries({}); setSubDocLoadedFor({ actId: null, tab: null }); setSubDocApprovals({}); if (v) loadActPartApprovals(v); }}
+                <select value={subDocAct} onChange={e => {
+                    const v = e.target.value;
+                    setSubDocActByTab(prev => ({ ...prev, [subDocTab]: v }));
+                    if (subDocTab === 'sections') { setSecHasChapters(null); setSecChapters([]); setSecFlatSections([]); setSectionsBaseline(sectionsSignature(null, [], [])); }
+                    else { setSubDocEntries(prev => ({ ...prev, [subDocTab]: [] })); setEntriesBaseline(prev => ({ ...prev, [subDocTab]: entriesSignature([]) })); }
+                    setSubDocLoadedFor({ actId: null, tab: null });
+                    setSubDocApprovals({});
+                    if (v) loadActPartApprovals(v);
+                  }}
                   disabled={subDocActsLoading}
                   style={{ ...INPUT_BASE, flex: 1, cursor: 'pointer', appearance: 'none', fontSize: 12.5 }}
                   onFocus={focusStyle} onBlur={blurStyle}>
@@ -3556,6 +3632,11 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                 <Layers size={14} color={activeSubTab.accent} />
               </div>
               <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)', flex: 1 }}>{t('addDocuments.sections.structureHeading')}</div>
+              {approvalStyle && (
+                <span style={{ fontSize: 11, fontWeight: 700, background: approvalStyle.bg, color: approvalStyle.color, border: `1px solid ${approvalStyle.border}`, borderRadius: 20, padding: '3px 11px', flexShrink: 0 }}>
+                  {approvalStyle.icon} {approvalStatus.charAt(0).toUpperCase() + approvalStatus.slice(1)}
+                </span>
+              )}
             </div>
             <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 18 }}>
                 {/* Which structure this Act uses — picking either just sets secHasChapters, same
@@ -3963,15 +4044,26 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         {subDocTab !== 'sections' && subDocAct && (() => {
           const entries = subDocEntries[subDocTab] || [];
           function addEntry() {
-            setSubDocEntries(prev => ({ ...prev, [subDocTab]: [...(prev[subDocTab] || []), { id: null, number: '', title: '', description: '', file: null, fileRef: null, existingFilename: null, existingFileRef: null, isDeleted: false }] }));
+            setSubDocEntries(prev => {
+              const list = prev[subDocTab] || [];
+              setActiveEntryIdx(list.length);
+              return { ...prev, [subDocTab]: [...list, { id: null, number: '', title: '', description: '', file: null, fileRef: null, existingFilename: null, existingFileRef: null, isDeleted: false }] };
+            });
           }
           const ENTRY_SINGULAR = { schedule: 'Schedule', annexure: 'Annexure', appendix: 'Appendix', forms: 'Form' };
           function singularLabel(tab) { return ENTRY_SINGULAR[tab] || tab; }
           function removeEntry(idx) {
-            setSubDocEntries(prev => ({
-              ...prev,
-              [subDocTab]: (prev[subDocTab] || []).map((e, i) => i === idx ? { ...e, isDeleted: true } : e),
-            }));
+            const entry = (subDocEntries[subDocTab] || [])[idx];
+            if (entry?.id != null) {
+              setSubDocEntries(prev => ({
+                ...prev,
+                [subDocTab]: (prev[subDocTab] || []).map((e, i) => i === idx ? { ...e, isDeleted: true } : e),
+              }));
+              setActiveEntryIdx(prev => (prev === idx ? -1 : prev));
+            } else {
+              setSubDocEntries(prev => ({ ...prev, [subDocTab]: (prev[subDocTab] || []).filter((_, i) => i !== idx) }));
+              setActiveEntryIdx(prev => (idx <= prev ? Math.max(-1, prev - 1) : prev));
+            }
           }
           function restoreEntry(idx) {
             setSubDocEntries(prev => ({
@@ -3987,6 +4079,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             });
           }
           return (
+          <>
           <Card padding="0">
             <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-heading)' }}>
@@ -3995,6 +4088,11 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
               <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '2px 8px', borderRadius: 20 }}>
                 {entries.filter(e => !e.isDeleted).length} {entries.filter(e => !e.isDeleted).length === 1 ? 'entry' : 'entries'}
               </span>
+              {approvalStyle && (
+                <span style={{ fontSize: 11, fontWeight: 700, background: approvalStyle.bg, color: approvalStyle.color, border: `1px solid ${approvalStyle.border}`, borderRadius: 20, padding: '3px 11px', flexShrink: 0, marginLeft: 'auto' }}>
+                  {approvalStyle.icon} {approvalStatus.charAt(0).toUpperCase() + approvalStatus.slice(1)}
+                </span>
+              )}
             </div>
             <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
               {entries.map((entry, i) => {
@@ -4009,27 +4107,64 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                   );
                 }
                 const entryStatusChip = entry.id ? (entry.status || 'draft') : null;
-                return (
-                <div key={i} style={{ padding: '14px 16px', borderRadius: 10, border: `1.5px solid ${activeSubTab ? activeSubTab.accent : 'var(--surface-border)'}30`, background: 'var(--surface-ground)', display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', background: 'var(--surface-card)', border: '1px solid var(--surface-border)', padding: '2px 9px', borderRadius: 20 }}>
-                        {singularLabel(subDocTab)} {i + 1}
-                      </span>
-                      {entryStatusChip && (
-                        <span style={{ fontSize: 9.5, fontWeight: 700, borderRadius: 20, padding: '1px 7px', flexShrink: 0,
-                          ...(entryStatusChip === 'draft'          ? { background: '#f1f5f9', color: '#64748b', border: '1px solid #cbd5e1' } :
-                              entryStatusChip === 'pending'        ? { background: '#fef3c7', color: '#92400e', border: '1px solid #f59e0b' } :
-                              entryStatusChip === 'approved'       ? { background: '#d1fae5', color: '#065f46', border: '1px solid #10b981' } :
-                              entryStatusChip === 'pending_delete' ? { background: '#fff1f2', color: '#9f1239', border: '1px solid #fda4af' } :
-                                                                     { background: '#fee2e2', color: '#991b1b', border: '1px solid #ef4444' }),
-                        }}>{({ draft: 'Draft', pending: 'Pending', approved: 'Approved', rejected: 'Rejected', pending_delete: 'Del. Pending' })[entryStatusChip] || entryStatusChip}</span>
+
+                if (i !== activeEntryIdx) {
+                  return (
+                    <div key={i} role="button" tabIndex={0} onClick={() => toggleEntry(i)}
+                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleEntry(i); } }}
+                      style={{ padding: 12, borderRadius: 10, border: '1px solid var(--surface-border)', background: 'var(--surface-card)', cursor: 'pointer' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '2px 8px', borderRadius: 20, flexShrink: 0 }}>
+                          {entry.number || `#${i + 1}`}
+                        </span>
+                        <span style={{ fontSize: 13, fontWeight: 600, color: entry.title ? 'var(--text-heading)' : 'var(--text-color-secondary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {entry.title || 'Untitled entry'}
+                        </span>
+                        {entryStatusChip && (
+                          <span style={{ fontSize: 9.5, fontWeight: 700, borderRadius: 20, padding: '1px 7px', flexShrink: 0,
+                            ...(entryStatusChip === 'draft'          ? { background: '#f1f5f9', color: '#64748b', border: '1px solid #cbd5e1' } :
+                                entryStatusChip === 'pending'        ? { background: '#fef3c7', color: '#92400e', border: '1px solid #f59e0b' } :
+                                entryStatusChip === 'approved'       ? { background: '#d1fae5', color: '#065f46', border: '1px solid #10b981' } :
+                                entryStatusChip === 'pending_delete' ? { background: '#fff1f2', color: '#9f1239', border: '1px solid #fda4af' } :
+                                                                       { background: '#fee2e2', color: '#991b1b', border: '1px solid #ef4444' }),
+                          }}>{({ draft: 'Draft', pending: 'Pending', approved: 'Approved', rejected: 'Rejected', pending_delete: 'Del. Pending' })[entryStatusChip] || entryStatusChip}</span>
+                        )}
+                        {(entry.file || entry.existingFilename) && <Paperclip size={12} color={activeSubTab ? activeSubTab.accent : 'var(--primary)'} style={{ flexShrink: 0 }} />}
+                        <button type="button" onClick={e => { e.stopPropagation(); setEntryPreviewIdx(i); }}
+                          style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 10.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+                          <Eye size={11} /> {t('addDocuments.sections.previewButton')}
+                        </button>
+                        <button type="button" onClick={e => { e.stopPropagation(); removeEntry(i); }}
+                          style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', flexShrink: 0 }}>
+                          <X size={13} />
+                        </button>
+                      </div>
+                      {entry.description && (
+                        <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', lineHeight: 1.5, marginTop: 6, marginLeft: 42, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                          {entry.description}
+                        </div>
                       )}
                     </div>
-                    <button type="button" onClick={() => removeEntry(i)}
-                      style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex' }}>
-                      <X size={14} />
+                  );
+                }
+
+                return (
+                <div key={i} style={{ padding: '14px 16px', borderRadius: 10, border: `1.5px solid ${activeSubTab ? activeSubTab.accent : 'var(--surface-border)'}30`, background: 'var(--surface-ground)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <button type="button" onClick={() => toggleEntry(i)} title={t('addDocuments.sections.collapseHint')}
+                      style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', background: 'var(--surface-card)', border: '1px solid var(--surface-border)', padding: '2px 9px', borderRadius: 20, cursor: 'pointer' }}>
+                      {singularLabel(subDocTab)} {i + 1}
                     </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <button type="button" onClick={() => setEntryPreviewIdx(i)}
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 10.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                        <Eye size={11} /> {t('addDocuments.sections.previewButton')}
+                      </button>
+                      <button type="button" onClick={() => removeEntry(i)}
+                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex' }}>
+                        <X size={14} />
+                      </button>
+                    </div>
                   </div>
                   <div>
                     <div style={{ ...LABEL, marginBottom: 5 }}>Title</div>
@@ -4080,6 +4215,10 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                       </label>
                     )}
                   </div>
+                  <button type="button" onClick={() => toggleEntry(i)}
+                    style={{ alignSelf: 'flex-end', padding: '7px 18px', borderRadius: 7, border: 'none', background: 'var(--primary)', color: 'white', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                    {t('addDocuments.sections.confirmButton')}
+                  </button>
                 </div>
               );
               })}
@@ -4089,39 +4228,78 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
               </button>
             </div>
           </Card>
+
+          {/* Preview & edit — full-page modal for one entry, shown regardless of whether it
+              has a description yet, so the uploader can always open it and start typing. */}
+          {entryPreviewIdx !== null && entries[entryPreviewIdx] && (() => {
+            const entry = entries[entryPreviewIdx];
+            return (
+              <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+                onClick={() => setEntryPreviewIdx(null)}>
+                <div style={{ background: 'var(--surface-card)', borderRadius: 16, width: '100%', maxWidth: 1200, height: '94vh', boxShadow: '0 28px 80px rgba(0,0,0,.35)', display: 'flex', flexDirection: 'column' }}
+                  onClick={e => e.stopPropagation()}>
+                  <div style={{ padding: '18px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)' }}>
+                        {singularLabel(subDocTab)} {entryPreviewIdx + 1}
+                      </div>
+                      <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {(subDocActsList || []).find(a => String(a.id) === String(subDocAct))?.document_name}
+                      </div>
+                    </div>
+                    <button onClick={() => setEntryPreviewIdx(null)}
+                      style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '5px 8px', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', flexShrink: 0 }}>
+                      <X size={14} />
+                    </button>
+                  </div>
+
+                  <div style={{ flex: 1, overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', gap: 18, minHeight: 0 }}>
+                    <div style={{ flexShrink: 0 }}>
+                      <div style={{ ...LABEL, marginBottom: 6 }}>Title</div>
+                      <input value={entry.title} onChange={e => setEntryField(entryPreviewIdx, 'title', e.target.value)}
+                        placeholder="Entry title"
+                        style={{ ...INPUT_BASE, background: 'var(--surface-ground)' }} onFocus={focusStyle} onBlur={blurStyle} />
+                    </div>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                      <div style={{ ...LABEL, marginBottom: 6, flexShrink: 0 }}>Description (optional)</div>
+                      <textarea value={entry.description} onChange={e => setEntryField(entryPreviewIdx, 'description', e.target.value)}
+                        placeholder="Brief description or content summary"
+                        style={{ ...INPUT_BASE, width: '100%', flex: 1, background: 'var(--surface-ground)', resize: 'none', minHeight: 300, fontFamily: 'var(--font)', fontSize: 13.5, lineHeight: 1.8, boxSizing: 'border-box' }}
+                        onFocus={focusStyle} onBlur={blurStyle} autoFocus />
+                    </div>
+                  </div>
+
+                  <div style={{ padding: '14px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end', flexShrink: 0 }}>
+                    <button type="button" onClick={() => setEntryPreviewIdx(null)}
+                      style={{ padding: '9px 22px', borderRadius: 8, border: 'none', background: 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                      {t('addDocuments.sections.confirmButton')}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+          </>
           );
         })()}
 
-        {/* Save + Approval — always visible when an act and tab are selected */}
+        {/* Save + Approval — always visible when an act and tab are selected. The status badge
+            itself now lives in the structure/entries card header (top-right corner) instead of
+            here, so this row is just the rejection note (if any) and the save button. */}
         {subDocAct && subDocTab && (() => {
-          const tabApproval = subDocApprovals[subDocTab];
-          const approvalStatus = tabApproval?.status;
-          const SC = {
-            pending:  { bg: '#fef3c7', color: '#92400e', border: '#f59e0b', icon: '⏳' },
-            approved: { bg: '#d1fae5', color: '#065f46', border: '#10b981', icon: '✓' },
-            rejected: { bg: '#fee2e2', color: '#991b1b', border: '#ef4444', icon: '✗' },
-          };
-          const sc = SC[approvalStatus] || null;
+          const saveDisabled = subDocSaving || !subDocDirty;
           return (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-              {/* Left: approval status badge */}
-              {sc ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontSize: 12, fontWeight: 700, background: sc.bg, color: sc.color, border: `1px solid ${sc.border}`, borderRadius: 20, padding: '4px 12px' }}>
-                    {sc.icon} {approvalStatus.charAt(0).toUpperCase() + approvalStatus.slice(1)}
-                  </span>
-                  {approvalStatus === 'rejected' && tabApproval?.comments && (
-                    <span style={{ fontSize: 11.5, color: '#991b1b', fontStyle: 'italic', maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                      title={tabApproval.comments}>
-                      "{tabApproval.comments}"
-                    </span>
-                  )}
-                </div>
-              ) : <div />}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12 }}>
+              {approvalStatus === 'rejected' && tabApproval?.comments && (
+                <span style={{ fontSize: 11.5, color: '#991b1b', fontStyle: 'italic', maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: 'auto' }}
+                  title={tabApproval.comments}>
+                  "{tabApproval.comments}"
+                </span>
+              )}
 
-              {/* Right: save button — auto-submits for approval on save */}
-              <button type="button" onClick={handleAddDocSubmit} disabled={subDocSaving}
-                style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 24px', borderRadius: 10, border: 'none', background: subDocSaving ? '#94a3b8' : 'var(--primary)', color: 'white', fontSize: 13.5, fontWeight: 700, cursor: subDocSaving ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', boxShadow: subDocSaving ? 'none' : '0 2px 12px rgba(26,86,219,.25)' }}>
+              <button type="button" onClick={handleAddDocSubmit} disabled={saveDisabled}
+                title={!subDocSaving && !subDocDirty ? 'No changes since the last save' : undefined}
+                style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 24px', borderRadius: 10, border: 'none', background: saveDisabled ? '#94a3b8' : 'var(--primary)', color: 'white', fontSize: 13.5, fontWeight: 700, cursor: saveDisabled ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', boxShadow: saveDisabled ? 'none' : '0 2px 12px rgba(26,86,219,.25)' }}>
                 <Save size={15} /> {subDocSaving ? 'Saving…' : `Save ${activeSubTab ? t(activeSubTab.labelKey) : ''}`}
               </button>
             </div>
@@ -5124,10 +5302,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                 </div>
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>{['Circular', 'Notification', 'Policy', 'Order/Gazette'].includes(form.type) ? t('wizard.fields.generic.actReference') : t('wizard.fields.generic.hierarchicalTags')}</div>
-                <HierarchyTag hierarchy={hierarchy} onOpen={() => { setDrawerHierarchy({ ...hierarchy }); setDrawerType('hierarchy'); }} isRef={['Circular', 'Notification', 'Policy', 'Order/Gazette'].includes(form.type)} />
-              </div>
-              <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.relationships')}</div>
                 <button type="button" onClick={() => setDrawerType('relationship')}
                   style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: relations.length > 0 ? 'var(--primary)' : 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
@@ -5392,11 +5566,11 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
               {/* ── Hierarchy form ── */}
               {drawerType === 'hierarchy' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-                  {/* Act Name / Parent Act Name — only for Amendment; other types get their own Act/Rule Name field below (multi-legal-authority list or Act/Chapter/Section block) */}
-                  {!['Circular', 'Notification', 'Order/Gazette', 'Policy', 'Miscellaneous', 'Rules & Regulations', 'Bye Laws'].includes(form.type) && (
+                  {/* Parent Act Name — only for Amendment; other types get their own Act/Rule Name field below (multi-legal-authority list or Act/Chapter/Section block) */}
+                  {form.type === 'Amendment' && (
                     <div>
                       <div style={{ ...LABEL, marginBottom: 6 }}>
-                        {form.type === 'Amendment' ? t('drawer.parentActName') : t('drawer.actName')}
+                        {t('drawer.parentActName')}
                       </div>
                       <div style={{ position: 'relative' }}>
                         <input value={drawerHierarchy.act}

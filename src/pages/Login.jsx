@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Search, Eye, EyeOff, Shield, Lock, User, ArrowRight, ShieldAlert } from 'lucide-react';
+import { Search, Eye, EyeOff, Shield, Lock, User, ArrowRight, ShieldAlert, UploadCloud, CheckCircle2, BarChart3, Settings, FileSearch } from 'lucide-react';
 import haryanaLogo from '../assets/haryana-logo.png';
 import bannerBg from '../assets/banner-1-768x217.png';
 import ForgotPasswordScreen from './ForgotPasswordScreen';
@@ -171,7 +171,6 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
 
         <div style={{ position:'absolute', bottom:0, left:0, right:0, zIndex:3, padding:'10px 6%', display:'flex', justifyContent:'space-between' }}>
           <div style={{ fontSize:11, color:'rgba(255,255,255,.16)' }}>{t('footerCopyright')}</div>
-          <div style={{ fontSize:11, fontFamily:'monospace', color:'rgba(255,255,255,.13)' }}>TOR: HARTRON/PM(ICT)/ToR-CSO/2026-27/03</div>
         </div>
       </div>
     </>
@@ -239,14 +238,26 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
             <h1 style={{ fontSize:'clamp(30px,3.8vw,52px)', fontWeight:800, lineHeight:1.1, letterSpacing:'-.025em', color:'#fff', marginBottom:16 }}>
               {t('brandHaryana')}<br/><span style={{ color:'#4ade80' }}>{t('brandLegal')}</span><br/>{t('brandSystem')}
             </h1>
-            <p style={{ fontSize:14.5, color:'rgba(255,255,255,.42)', lineHeight:1.8, maxWidth:360, marginBottom:40 }}>
+            <p style={{ fontSize:14.5, color:'rgba(255,255,255,.42)', lineHeight:1.8, maxWidth:360, marginBottom:0 }}>
               {t('heroDescription')}
             </p>
-            <div style={{ display:'flex', gap:'clamp(20px,3vw,44px)' }}>
-              {[['5','statOfficialRoles'],['100%','statAuditTrail'],['2026','statActiveSince']].map(([v,lKey])=>(
-                <div key={lKey}>
-                  <div style={{ fontSize:'clamp(20px,2.5vw,30px)', fontWeight:800, color:'#fff' }}>{v}</div>
-                  <div style={{ fontSize:10.5, color:'rgba(255,255,255,.3)', textTransform:'uppercase', letterSpacing:'.08em', marginTop:4, fontWeight:600 }}>{t(lKey)}</div>
+
+            {/* Role strip — the 5 official roles this portal serves, purely iconographic.
+                Pinned to the same 360px column as the paragraph above (justify-between, no
+                gap/wrap) so the two blocks share one consistent left edge AND right edge. */}
+            <div style={{ marginTop:30, maxWidth:360, display:'flex', justifyContent:'space-between' }}>
+              {[
+                [UploadCloud,  t('roleUploader')],
+                [CheckCircle2, t('roleApprover')],
+                [BarChart3,    t('roleCsOffice')],
+                [Settings,     t('roleAdmin')],
+                [FileSearch,   t('roleAuditor')],
+              ].map(([Icon, label]) => (
+                <div key={label} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:9, width:56 }}>
+                  <div style={{ width:40, height:40, borderRadius:12, background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.14)', display:'flex', alignItems:'center', justifyContent:'center', transition:'background .15s, border-color .15s' }}>
+                    <Icon size={17} color="rgba(74,222,128,.85)" strokeWidth={1.8}/>
+                  </div>
+                  <div style={{ fontSize:10, color:'rgba(255,255,255,.38)', textAlign:'center', lineHeight:1.3, letterSpacing:'.01em' }}>{label}</div>
                 </div>
               ))}
             </div>
@@ -399,7 +410,6 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
         {/* Footer */}
         <div style={{ position:'absolute', bottom:0, left:0, right:0, zIndex:3, padding:'10px 6%', display:'flex', justifyContent:'space-between' }}>
           <div style={{ fontSize:11, color:'rgba(255,255,255,.16)' }}>{t('footerCopyright')}</div>
-          <div style={{ fontSize:11, fontFamily:'monospace', color:'rgba(255,255,255,.13)' }}>TOR: HARTRON/PM(ICT)/ToR-CSO/2026-27/03</div>
         </div>
       </div>
     </>
