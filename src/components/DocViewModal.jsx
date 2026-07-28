@@ -7,12 +7,12 @@ import mammoth from 'mammoth';
 import { getPdfFile } from '../services/pdf';
 
 const TYPE_CARD_COLORS = {
-  'Act':                 { bg: 'rgba(26,86,219,.08)',  accent: '#1a56db', text: '#1e40af' },
-  'Amendment':           { bg: 'rgba(245,158,11,.08)', accent: '#f59e0b', text: '#d97706' },
+  'Act':                 { bg: 'rgba(33, 74, 171,.08)',  accent: '#214aab', text: '#1e40af' },
+  'Amendment':           { bg: 'rgba(255, 193, 7,.08)', accent: '#ffc107', text: '#d97706' },
   'Notification':        { bg: 'rgba(139,92,246,.08)', accent: '#8b5cf6', text: '#7c3aed' },
   'Circular':            { bg: 'rgba(20,184,166,.08)', accent: '#14b8a6', text: '#0f766e' },
-  'Policy':              { bg: 'rgba(34,197,94,.08)',  accent: '#22c55e', text: '#16a34a' },
-  'Rules & Regulations': { bg: 'rgba(239,68,68,.08)',  accent: '#ef4444', text: '#dc2626' },
+  'Policy':              { bg: 'rgba(25, 135, 84,.08)',  accent: '#198754', text: '#16a34a' },
+  'Rules & Regulations': { bg: 'rgba(220, 53, 69,.08)',  accent: '#dc3545', text: '#dc2626' },
   'Order/Gazette':     { bg: 'rgba(234,179,8,.08)',  accent: '#eab308', text: '#a16207' },
   'Bye Laws':            { bg: 'rgba(14,165,233,.08)', accent: '#0ea5e9', text: '#0369a1' },
   'Miscellaneous':       { bg: 'rgba(100,116,139,.08)',accent: '#64748b', text: '#475569' },
@@ -255,8 +255,8 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
     ? Object.entries(doc.typeFields).filter(([, v]) => v)
     : [];
 
-  const statusAccent = doc.status === 'approved' ? '#16a34a' : doc.status === 'rejected' ? '#ef4444' : '#f59e0b';
-  const statusBg     = doc.status === 'approved' ? 'rgba(34,197,94,.1)'  : doc.status === 'rejected' ? 'rgba(239,68,68,.1)'  : 'rgba(245,158,11,.1)';
+  const statusAccent = doc.status === 'approved' ? '#16a34a' : doc.status === 'rejected' ? '#dc3545' : '#ffc107';
+  const statusBg     = doc.status === 'approved' ? 'rgba(25, 135, 84,.1)'  : doc.status === 'rejected' ? 'rgba(220, 53, 69,.1)'  : 'rgba(255, 193, 7,.1)';
   const StatusIconV  = doc.status === 'approved' ? CheckCircle : doc.status === 'rejected' ? XCircle : Clock;
   const typeColor    = TYPE_CARD_COLORS[doc.type] || { accent: '#94a3b8', bg: 'rgba(148,163,184,.12)', text: '#64748b' };
 
@@ -353,9 +353,9 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
             )}
             {blobUrl && !docxHtml && (
               <a href={blobUrl} target="_blank" rel="noreferrer"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 7, background: 'rgba(26,86,219,.25)', border: '1px solid rgba(26,86,219,.4)', color: '#93c5fd', textDecoration: 'none', fontSize: 11.5, fontWeight: 600, fontFamily: 'var(--font)', transition: 'background .15s' }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(26,86,219,.4)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'rgba(26,86,219,.25)'}>
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 7, background: 'rgba(33, 74, 171,.25)', border: '1px solid rgba(33, 74, 171,.4)', color: '#93c5fd', textDecoration: 'none', fontSize: 11.5, fontWeight: 600, fontFamily: 'var(--font)', transition: 'background .15s' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(33, 74, 171,.4)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'rgba(33, 74, 171,.25)'}>
                 <ExternalLink size={12} /> Open
               </a>
             )}
@@ -394,7 +394,7 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
                             fill={ann.color} stroke="rgba(0,0,0,.2)" strokeWidth="1" />
                           <title>{ann.comment}</title>
                           <foreignObject x={`${ann.x * 100}%`} y={`${ann.y * 100}%`} width="20" height="20" style={{ overflow: 'visible', pointerEvents: 'auto' }}>
-                            <div title={ann.comment} style={{ width: 16, height: 16, borderRadius: '50%', background: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'default' }}>
+                            <div title={ann.comment} style={{ width: 16, height: 16, borderRadius: '50%', background: '#ffc107', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'default' }}>
                               <MessageCircle size={9} color="white" />
                             </div>
                           </foreignObject>
@@ -429,7 +429,7 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
         {/* Right: Document details */}
         <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--surface-card)' }}>
           <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, background: 'var(--surface-50)', flexShrink: 0 }}>
-            <div style={{ width: 30, height: 30, borderRadius: 8, background: 'rgba(26,86,219,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 30, height: 30, borderRadius: 8, background: 'rgba(33, 74, 171,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <FileText size={14} color="var(--primary)" />
             </div>
             <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)' }}>Document Details</span>
@@ -439,7 +439,7 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 22 }}>
               {[
                 { label: 'Type',       value: doc.type,                   color: typeColor.accent, bg: typeColor.bg },
-                { label: 'Department', value: doc.dept,                   color: 'var(--primary)', bg: 'rgba(26,86,219,.07)' },
+                { label: 'Department', value: doc.dept,                   color: 'var(--primary)', bg: 'rgba(33, 74, 171,.07)' },
                 { label: 'Year',       value: String(doc.year),           color: '#64748b',        bg: 'rgba(100,116,139,.08)' },
                 { label: 'Version',    value: `v${doc.version || '1.0'}`, color: '#64748b',        bg: 'rgba(100,116,139,.08)' },
               ].map(({ label, value, color, bg }) => (
@@ -493,9 +493,9 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {doc.docRelations.map((r, i) => (
                     <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 12px', borderRadius: 8,
-                      background: r.isPending ? 'rgba(245,158,11,.05)' : 'rgba(34,197,94,.05)',
-                      border: `1px solid ${r.isPending ? 'rgba(245,158,11,.2)' : 'rgba(34,197,94,.2)'}` }}>
-                      <div style={{ width: 20, height: 20, borderRadius: '50%', background: r.isPending ? 'rgba(245,158,11,.15)' : 'rgba(34,197,94,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
+                      background: r.isPending ? 'rgba(255, 193, 7,.05)' : 'rgba(25, 135, 84,.05)',
+                      border: `1px solid ${r.isPending ? 'rgba(255, 193, 7,.2)' : 'rgba(25, 135, 84,.2)'}` }}>
+                      <div style={{ width: 20, height: 20, borderRadius: '50%', background: r.isPending ? 'rgba(255, 193, 7,.15)' : 'rgba(25, 135, 84,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
                         <span style={{ fontSize: 9, color: r.isPending ? '#d97706' : '#16a34a', fontWeight: 900 }}>↔</span>
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -516,7 +516,7 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
               <div>
                 <div style={{ ...LS, marginBottom: 10 }}>Reviewer Remarks</div>
                 <div style={{ borderRadius: 12, border: `1px solid ${statusAccent}44`, overflow: 'hidden' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', background: doc.status === 'approved' ? 'rgba(34,197,94,.06)' : doc.status === 'rejected' ? 'rgba(239,68,68,.06)' : 'rgba(245,158,11,.06)', borderBottom: doc.approval.comments ? `1px solid ${statusAccent}22` : 'none' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', background: doc.status === 'approved' ? 'rgba(25, 135, 84,.06)' : doc.status === 'rejected' ? 'rgba(220, 53, 69,.06)' : 'rgba(255, 193, 7,.06)', borderBottom: doc.approval.comments ? `1px solid ${statusAccent}22` : 'none' }}>
                     <div style={{ width: 36, height: 36, borderRadius: 9, background: statusBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       <StatusIconV size={16} color={statusAccent} />
                     </div>

@@ -159,7 +159,7 @@ export default function CookieBanner() {
             background: '#4ade80', border: '1.5px solid #4ade80', color: '#14532d',
             transition: 'background .15s',
           }}
-            onMouseEnter={e => e.currentTarget.style.background = '#22c55e'}
+            onMouseEnter={e => e.currentTarget.style.background = '#198754'}
             onMouseLeave={e => e.currentTarget.style.background = '#4ade80'}
           >
             Accept All

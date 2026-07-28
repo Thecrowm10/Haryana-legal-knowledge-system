@@ -18,10 +18,10 @@ function TopbarDivider() {
 }
 
 const ROLE_META = {
-  citizen:  { label: 'topbar.roles.citizen',       color: '#1a56db', bg: 'rgba(26,86,219,.1)' },
-  uploader: { label: 'topbar.roles.uploader',       color: '#3b82f6', bg: 'rgba(59,130,246,.1)' },
-  approver: { label: 'topbar.roles.approver',       color: '#f59e0b', bg: 'rgba(245,158,11,.1)' },
-  csoffice: { label: 'topbar.roles.csoffice',       color: '#22c55e', bg: 'rgba(34,197,94,.1)' },
+  citizen:  { label: 'topbar.roles.citizen',       color: '#214aab', bg: 'rgba(33, 74, 171,.1)' },
+  uploader: { label: 'topbar.roles.uploader',       color: '#0d6efd', bg: 'rgba(13, 110, 253,.1)' },
+  approver: { label: 'topbar.roles.approver',       color: '#b45309', bg: 'rgba(255, 193, 7,.1)' },
+  csoffice: { label: 'topbar.roles.csoffice',       color: '#198754', bg: 'rgba(25, 135, 84,.1)' },
   admin:    { label: 'topbar.roles.admin',          color: '#8b5cf6', bg: 'rgba(139,92,246,.1)' },
   nodal_officer: { label: 'topbar.roles.nodalOfficer', color: '#0ea5e9', bg: 'rgba(14,165,233,.1)' },
   auditor:  { label: 'topbar.roles.auditor',        color: '#64748b', bg: 'rgba(100,116,139,.1)' },
@@ -217,7 +217,7 @@ export default function Topbar({ user, activePage, onNavigate, onLogout, onToggl
             <div style={{ height: 1, background: 'var(--surface-border)', margin: '4px 0' }} />
             <div onClick={() => { setProfileOpen(false); onLogout(); }}
               style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer', fontSize: 13, color: 'var(--red)', transition: 'background .15s' }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,.07)'}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(220, 53, 69,.07)'}
               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
               <LogOut size={14} /> {t('topbar.logout')}
             </div>
@@ -233,11 +233,11 @@ export default function Topbar({ user, activePage, onNavigate, onLogout, onToggl
       <div className="tb-crumb-bar" style={{ position: 'relative', margin: '0 4rem', flexShrink: 0 }}>
         <div aria-hidden="true" style={{
           position: 'absolute', top: 0, left: -22, width: 22, height: 22,
-          background: 'radial-gradient(circle at 0 0, transparent 22px, var(--surface-card) 22px)',
+          background: 'radial-gradient(circle at 0 100%, transparent 22px, var(--surface-card) 22px)',
         }} />
         <div aria-hidden="true" style={{
           position: 'absolute', top: 0, right: -22, width: 22, height: 22,
-          background: 'radial-gradient(circle at 100% 0, transparent 22px, var(--surface-card) 22px)',
+          background: 'radial-gradient(circle at 100% 100%, transparent 22px, var(--surface-card) 22px)',
         }} />
         <div className="tb-crumb-bowl" style={{
           padding: '10px 22px',

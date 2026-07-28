@@ -47,17 +47,17 @@ export default function ChangePasswordScreen({ user, onPasswordChanged, onLogout
     if (/[A-Z]/.test(p)) score++;
     if (/[0-9]/.test(p)) score++;
     if (/[^A-Za-z0-9]/.test(p)) score++;
-    if (score <= 1) return { label: 'Weak',   color: '#ef4444', w: '25%' };
-    if (score <= 2) return { label: 'Fair',   color: '#f59e0b', w: '50%' };
-    if (score <= 3) return { label: 'Good',   color: '#3b82f6', w: '75%' };
-    return              { label: 'Strong', color: '#22c55e', w: '100%' };
+    if (score <= 1) return { label: 'Weak',   color: '#dc3545', w: '25%' };
+    if (score <= 2) return { label: 'Fair',   color: '#b45309', w: '50%' };
+    if (score <= 3) return { label: 'Good',   color: '#0d6efd', w: '75%' };
+    return              { label: 'Strong', color: '#198754', w: '100%' };
   })();
 
   return (
     <>
       <style>{`
         .fp * { box-sizing:border-box; margin:0; padding:0; }
-        .fp { font-family:'Plus Jakarta Sans Variable','Plus Jakarta Sans',sans-serif; }
+        .fp { font-family:var(--font); }
         @keyframes fpFade { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:none} }
         @keyframes spin   { to{transform:rotate(360deg)} }
         .fp-card { animation: fpFade .4s cubic-bezier(.22,1,.36,1) both; }
@@ -139,11 +139,11 @@ export default function ChangePasswordScreen({ user, onPasswordChanged, onLogout
 
             <button className="fp-btn" type="submit" disabled={loading} style={{
               width: '100%', padding: '12px',
-              background: canSubmit ? 'linear-gradient(135deg,#22c55e,#16a34a)' : 'rgba(255,255,255,.04)',
+              background: canSubmit ? 'linear-gradient(135deg,#198754,#16a34a)' : 'rgba(255,255,255,.04)',
               borderRadius: 11, color: canSubmit ? '#fff' : 'rgba(255,255,255,.32)', fontSize: 14, fontWeight: 700,
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               border: canSubmit ? 'none' : '1.5px dashed rgba(255,255,255,.2)',
-              boxShadow: canSubmit ? '0 4px 18px rgba(34,197,94,.35)' : 'none',
+              boxShadow: canSubmit ? '0 4px 18px rgba(25, 135, 84,.35)' : 'none',
               cursor: canSubmit ? 'pointer' : 'not-allowed',
               marginBottom: 14,
             }}>

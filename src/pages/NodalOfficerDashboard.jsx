@@ -327,9 +327,9 @@ export default function NodalOfficerDashboard({ activePage }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
           {[
-            { label: 'Total Users',    value: users.length, color: 'var(--primary)',  bg: 'rgba(26,86,219,.12)',  icon: Users },
-            { label: 'Active',         value: active,       color: '#22c55e',         bg: 'rgba(34,197,94,.12)',  icon: CheckCircle },
-            { label: 'Inactive',       value: inactive,     color: '#f59e0b',         bg: 'rgba(245,158,11,.12)', icon: XCircle },
+            { label: 'Total Users',    value: users.length, color: 'var(--primary)',  bg: 'rgba(33, 74, 171,.12)',  icon: Users },
+            { label: 'Active',         value: active,       color: '#198754',         bg: 'rgba(25, 135, 84,.12)',  icon: CheckCircle },
+            { label: 'Inactive',       value: inactive,     color: '#b45309',         bg: 'rgba(255, 193, 7,.12)', icon: XCircle },
           ].map(s => (
             <Card key={s.label}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
@@ -347,7 +347,7 @@ export default function NodalOfficerDashboard({ activePage }) {
 
         <Card padding="0">
           <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>System Users</div>
+            <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>System Users</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <SelectField value={deptFilter} onChange={e => setDeptFilter(e.target.value)} placeholder="All Departments" style={{ width: 200 }}>
                 <option value="">All Departments</option>
@@ -366,7 +366,7 @@ export default function NodalOfficerDashboard({ activePage }) {
             </div>
           )}
           {usersError && (
-            <div style={{ padding: '20px 18px', fontSize: 13, color: '#ef4444' }}>
+            <div style={{ padding: '20px 18px', fontSize: 13, color: '#dc3545' }}>
               {usersError}
             </div>
           )}
@@ -379,8 +379,8 @@ export default function NodalOfficerDashboard({ activePage }) {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
-                {['Name', 'Username', 'Role', 'Department', 'Status', 'Last Login', 'Actions'].map(h => (
-                  <th key={h} scope="col" style={{ ...LABEL, padding: '11px 16px', textAlign: 'left' }}>{h}</th>
+                {['Name', 'Username', 'Role', 'Department', 'Status', 'Last Login', 'Actions'].map((h, i) => (
+                  <th key={h} scope="col" style={{ ...LABEL, padding: '11px 16px', textAlign: 'left', ...(i > 0 && { borderLeft: '1px solid var(--surface-border)' }) }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -393,17 +393,17 @@ export default function NodalOfficerDashboard({ activePage }) {
                     <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>{u.name}</div>
                     <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 2 }}>{u.email}</div>
                   </td>
-                  <td style={{ padding: '12px 16px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)' }}>{u.username}</td>
-                  <td style={{ padding: '12px 16px' }}><Badge label={u.role} variant={u.role} /></td>
-                  <td style={{ padding: '12px 16px', fontSize: 12.5, color: 'var(--text-color-secondary)' }}>{u.dept}</td>
-                  <td style={{ padding: '12px 16px' }}>
+                  <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)' }}>{u.username}</td>
+                  <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)' }}><Badge label={u.role} variant={u.role} /></td>
+                  <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)', fontSize: 12.5, color: 'var(--text-color-secondary)' }}>{u.dept}</td>
+                  <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)' }}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: u.status === 'active' ? '#1e40af' : '#b45309' }}>
-                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: u.status === 'active' ? '#22c55e' : '#f59e0b', display: 'inline-block' }} />
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: u.status === 'active' ? '#198754' : '#ffc107', display: 'inline-block' }} />
                       {u.status}
                     </span>
                   </td>
-                  <td style={{ padding: '12px 16px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)' }}>{u.lastLogin}</td>
-                  <td style={{ padding: '12px 16px' }}>
+                  <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)' }}>{u.lastLogin}</td>
+                  <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)' }}>
                     <div style={{ display: 'flex', gap: 6 }}>
                       <button title="Edit" onClick={() => openEdit(u)}
                         style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 6, padding: '5px 8px', cursor: 'pointer', color: 'var(--primary)', display: 'flex' }}>
@@ -413,7 +413,7 @@ export default function NodalOfficerDashboard({ activePage }) {
                         title={u.isActive ? 'Deactivate' : 'Activate'}
                         disabled={togglingId === u.id}
                         onClick={() => handleToggle(u)}
-                        style={{ background: u.isActive ? 'rgba(239,68,68,.08)' : 'rgba(34,197,94,.08)', border: `1px solid ${u.isActive ? 'rgba(239,68,68,.2)' : 'rgba(34,197,94,.2)'}`, borderRadius: 6, padding: '5px 8px', cursor: togglingId === u.id ? 'not-allowed' : 'pointer', color: u.isActive ? '#ef4444' : '#22c55e', display: 'flex', opacity: togglingId === u.id ? 0.5 : 1 }}>
+                        style={{ background: u.isActive ? 'rgba(220, 53, 69,.08)' : 'rgba(25, 135, 84,.08)', border: `1px solid ${u.isActive ? 'rgba(220, 53, 69,.2)' : 'rgba(25, 135, 84,.2)'}`, borderRadius: 6, padding: '5px 8px', cursor: togglingId === u.id ? 'not-allowed' : 'pointer', color: u.isActive ? '#dc3545' : '#198754', display: 'flex', opacity: togglingId === u.id ? 0.5 : 1 }}>
                         {u.isActive ? <XCircle size={12} /> : <CheckCircle size={12} />}
                       </button>
                     </div>
@@ -439,8 +439,8 @@ export default function NodalOfficerDashboard({ activePage }) {
               {/* Header */}
               <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)' }}>Add New User</div>
-                  <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 1 }}>Create a new system account</div>
+                  <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)' }}>Add New User</div>
+                  <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-color-secondary)', marginTop: 1 }}>Create a new system account</div>
                 </div>
                 <button onClick={() => setAddingUser(false)}
                   style={{ width: 30, height: 30, borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-color-secondary)', flexShrink: 0 }}>
@@ -455,7 +455,7 @@ export default function NodalOfficerDashboard({ activePage }) {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
                     <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Username *</label>
-                    <input style={{ ...INP_STYLE, borderColor: addError.toLowerCase().includes('username') ? 'rgba(239,68,68,.6)' : undefined }}
+                    <input style={{ ...INP_STYLE, borderColor: addError.toLowerCase().includes('username') ? 'rgba(220, 53, 69,.6)' : undefined }}
                       placeholder="e.g. firstname.lastname"
                       autoComplete="off"
                       value={addForm.username}
@@ -463,7 +463,7 @@ export default function NodalOfficerDashboard({ activePage }) {
                   </div>
                   <div>
                     <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Email *</label>
-                    <input style={{ ...INP_STYLE, borderColor: addError.toLowerCase().includes('email') ? 'rgba(239,68,68,.6)' : undefined }}
+                    <input style={{ ...INP_STYLE, borderColor: addError.toLowerCase().includes('email') ? 'rgba(220, 53, 69,.6)' : undefined }}
                       type="email" placeholder="user@example.com"
                       autoComplete="off"
                       value={addForm.email}
@@ -476,7 +476,7 @@ export default function NodalOfficerDashboard({ activePage }) {
                   <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Password *</label>
                   <div style={{ position: 'relative' }}>
                     <input
-                      style={{ ...INP_STYLE, paddingRight: 38, borderColor: addError.toLowerCase().includes('password') ? 'rgba(239,68,68,.6)' : undefined }}
+                      style={{ ...INP_STYLE, paddingRight: 38, borderColor: addError.toLowerCase().includes('password') ? 'rgba(220, 53, 69,.6)' : undefined }}
                       type={showAddPass ? 'text' : 'password'}
                       placeholder="Set a password"
                       autoComplete="new-password"
@@ -524,7 +524,7 @@ export default function NodalOfficerDashboard({ activePage }) {
                 </div>
 
                 {addError && (
-                  <div style={{ padding: '9px 12px', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, fontSize: 12.5, color: '#ef4444', display: 'flex', gap: 7, alignItems: 'center' }}>
+                  <div style={{ padding: '9px 12px', background: 'rgba(220, 53, 69,.08)', border: '1px solid rgba(220, 53, 69,.25)', borderRadius: 8, fontSize: 12.5, color: '#dc3545', display: 'flex', gap: 7, alignItems: 'center' }}>
                     <span>⚠</span> {addError}
                   </div>
                 )}
@@ -564,7 +564,7 @@ export default function NodalOfficerDashboard({ activePage }) {
               {/* Modal header */}
               <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)' }}>Edit User</div>
+                  <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)' }}>Edit User</div>
                   <div style={{ fontSize: 12, color: 'var(--text-color-secondary)', marginTop: 2 }}>{editingUser.username}</div>
                 </div>
                 <button onClick={() => setEditingUser(null)}
@@ -615,20 +615,20 @@ export default function NodalOfficerDashboard({ activePage }) {
                 {/* Active status toggle */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: 'var(--surface-ground)', borderRadius: 10, border: '1px solid var(--surface-border)' }}>
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>Account Status</div>
-                    <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 2 }}>
+                    <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 600, color: 'var(--text-heading)' }}>Account Status</div>
+                    <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-color-secondary)', marginTop: 2 }}>
                       {editForm.is_active ? 'User can log in and access the system' : 'User is blocked from logging in'}
                     </div>
                   </div>
                   <button type="button"
                     onClick={() => setEditForm(f => ({ ...f, is_active: !f.is_active }))}
-                    style={{ width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer', background: editForm.is_active ? '#22c55e' : 'var(--surface-border)', position: 'relative', transition: 'background .2s', flexShrink: 0 }}>
+                    style={{ width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer', background: editForm.is_active ? '#198754' : 'var(--surface-border)', position: 'relative', transition: 'background .2s', flexShrink: 0 }}>
                     <span style={{ position: 'absolute', top: 3, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left .2s', left: editForm.is_active ? 23 : 3, boxShadow: '0 1px 4px rgba(0,0,0,.25)' }} />
                   </button>
                 </div>
 
                 {editError && (
-                  <div style={{ padding: '9px 12px', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, fontSize: 12.5, color: '#ef4444', display: 'flex', gap: 7, alignItems: 'center' }}>
+                  <div style={{ padding: '9px 12px', background: 'rgba(220, 53, 69,.08)', border: '1px solid rgba(220, 53, 69,.25)', borderRadius: 8, fontSize: 12.5, color: '#dc3545', display: 'flex', gap: 7, alignItems: 'center' }}>
                     <span>⚠</span> {editError}
                   </div>
                 )}
@@ -769,9 +769,9 @@ export default function NodalOfficerDashboard({ activePage }) {
     }
 
     const SC = {
-      approved: { color: '#16a34a', bg: 'rgba(34,197,94,.1)',  label: 'Approved' },
-      pending:  { color: '#f59e0b', bg: 'rgba(245,158,11,.1)', label: 'Pending'  },
-      rejected: { color: '#ef4444', bg: 'rgba(239,68,68,.1)',  label: 'Rejected' },
+      approved: { color: '#16a34a', bg: 'rgba(25, 135, 84,.1)',  label: 'Approved' },
+      pending:  { color: '#b45309', bg: 'rgba(255, 193, 7,.1)', label: 'Pending'  },
+      rejected: { color: '#dc3545', bg: 'rgba(220, 53, 69,.1)',  label: 'Rejected' },
     };
     const cols = '4px 1fr 175px 155px 155px 90px';
     const anyFilter = uploadsSearch || uploadsFilterStatus || uploadsFilterDept || uploadsFilterUploader || uploadsFilterApprover;
@@ -791,10 +791,10 @@ export default function NodalOfficerDashboard({ activePage }) {
         {/* Stats */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
           {[
-            { label: 'Total Uploads', value: totalDocs,    color: 'var(--primary)', bg: 'rgba(26,86,219,.12)',  icon: Layers,      key: '' },
-            { label: 'Approved',      value: approvedDocs, color: '#16a34a',        bg: 'rgba(34,197,94,.12)',  icon: CheckCircle, key: 'approved' },
-            { label: 'Pending',       value: pendingDocs,  color: '#f59e0b',        bg: 'rgba(245,158,11,.12)', icon: Clock,       key: 'pending'  },
-            { label: 'Rejected',      value: rejectedDocs, color: '#ef4444',        bg: 'rgba(239,68,68,.12)',  icon: XCircle,     key: 'rejected' },
+            { label: 'Total Uploads', value: totalDocs,    color: 'var(--primary)', bg: 'rgba(33, 74, 171,.12)',  icon: Layers,      key: '' },
+            { label: 'Approved',      value: approvedDocs, color: '#16a34a',        bg: 'rgba(25, 135, 84,.12)',  icon: CheckCircle, key: 'approved' },
+            { label: 'Pending',       value: pendingDocs,  color: '#b45309',        bg: 'rgba(255, 193, 7,.12)', icon: Clock,       key: 'pending'  },
+            { label: 'Rejected',      value: rejectedDocs, color: '#dc3545',        bg: 'rgba(220, 53, 69,.12)',  icon: XCircle,     key: 'rejected' },
           ].map(s => {
             const isActive = uploadsFilterStatus === s.key && s.key !== '';
             return (
@@ -863,7 +863,7 @@ export default function NodalOfficerDashboard({ activePage }) {
             <div style={{ padding: '50px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>Loading documents…</div>
           )}
           {allDocsError && (
-            <div style={{ padding: '20px 18px', fontSize: 13, color: '#ef4444' }}>{allDocsError}</div>
+            <div style={{ padding: '20px 18px', fontSize: 13, color: '#dc3545' }}>{allDocsError}</div>
           )}
 
           {!allDocsLoading && !allDocsError && (
@@ -953,9 +953,9 @@ export default function NodalOfficerDashboard({ activePage }) {
                     {/* Actions */}
                     <div style={{ padding: '10px 14px', borderLeft: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <button onClick={() => setViewDoc(mapDocForViewer(doc))}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 7, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'background .15s' }}
-                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(26,86,219,.14)'}
-                        onMouseLeave={e => e.currentTarget.style.background = 'rgba(26,86,219,.07)'}>
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 7, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'background .15s' }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(33, 74, 171,.14)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'rgba(33, 74, 171,.07)'}>
                         <Eye size={12} /> View
                       </button>
                     </div>
@@ -1049,22 +1049,22 @@ export default function NodalOfficerDashboard({ activePage }) {
         {/* Table */}
         <Card padding="0">
           <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>Department Audit History</div>
+            <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>Department Audit History</div>
             <span style={{ ...LABEL }}>{auditTotal} total entries</span>
           </div>
 
           {auditLoading ? (
             <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>Loading audit logs…</div>
           ) : auditError ? (
-            <div style={{ padding: 24, color: '#ef4444', fontSize: 13 }}>{auditError}</div>
+            <div style={{ padding: 24, color: '#dc3545', fontSize: 13 }}>{auditError}</div>
           ) : auditLogs.length === 0 ? (
             <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>No audit records found.</div>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
-                  {['Timestamp', 'User', 'Action', 'Entity', 'Status', 'IP Address'].map(h => (
-                    <th key={h} scope="col" style={{ ...LABEL, padding: '11px 16px', textAlign: 'left' }}>{h}</th>
+                  {['Timestamp', 'User', 'Action', 'Entity', 'Status', 'IP Address'].map((h, i) => (
+                    <th key={h} scope="col" style={{ ...LABEL, padding: '11px 16px', textAlign: 'left', ...(i > 0 && { borderLeft: '1px solid var(--surface-border)' }) }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -1087,22 +1087,22 @@ export default function NodalOfficerDashboard({ activePage }) {
                         <td style={{ padding: '12px 16px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)', whiteSpace: 'nowrap' }}>
                           {new Date(log.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })}
                         </td>
-                        <td style={{ padding: '12px 16px' }}>
+                        <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)' }}>
                           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>{fmtAuditActor(log.actor)}</div>
                           {log.actor?.username && <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>@{log.actor.username}</div>}
                         </td>
-                        <td style={{ padding: '12px 16px', fontSize: 12.5, color: 'var(--text-color)' }}>{fmtAction(log.action)}</td>
-                        <td style={{ padding: '12px 16px' }}>
+                        <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)', fontSize: 12.5, color: 'var(--text-color)' }}>{fmtAction(log.action)}</td>
+                        <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)' }}>
                           <span style={{ fontSize: 11, fontWeight: 600, fontFamily: 'var(--mono)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 5, padding: '2px 7px', color: 'var(--text-color-secondary)' }}>
                             {log.entity_type}{log.entity_id ? ` #${log.entity_id}` : ''}
                           </span>
                         </td>
-                        <td style={{ padding: '12px 16px' }}>
-                          <span style={{ fontSize: 11, fontWeight: 700, borderRadius: 5, padding: '3px 8px', background: isSuccess ? 'rgba(34,197,94,.1)' : 'rgba(239,68,68,.1)', color: isSuccess ? '#16a34a' : '#ef4444' }}>
+                        <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)' }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, borderRadius: 5, padding: '3px 8px', background: isSuccess ? 'rgba(25, 135, 84,.1)' : 'rgba(220, 53, 69,.1)', color: isSuccess ? '#16a34a' : '#dc3545' }}>
                             {log.status}
                           </span>
                         </td>
-                        <td style={{ padding: '12px 16px', fontSize: 11.5, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>
+                        <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)', fontSize: 11.5, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>
                           {log.ip_address || '—'}
                         </td>
                       </tr>
@@ -1162,9 +1162,9 @@ export default function NodalOfficerDashboard({ activePage }) {
     });
 
     const LS = {
-      approved: { color: '#16a34a', bg: 'rgba(34,197,94,.1)',  label: 'Approved' },
-      pending:  { color: '#f59e0b', bg: 'rgba(245,158,11,.1)', label: 'Pending'  },
-      rejected: { color: '#ef4444', bg: 'rgba(239,68,68,.1)',  label: 'Rejected' },
+      approved: { color: '#16a34a', bg: 'rgba(25, 135, 84,.1)',  label: 'Approved' },
+      pending:  { color: '#b45309', bg: 'rgba(255, 193, 7,.1)', label: 'Pending'  },
+      rejected: { color: '#dc3545', bg: 'rgba(220, 53, 69,.1)',  label: 'Rejected' },
     };
     const totals = { all: scopedLinks.length, pending: 0, approved: 0, rejected: 0 };
     scopedLinks.forEach(l => { if (totals[l.link_status] !== undefined) totals[l.link_status]++; });
@@ -1183,10 +1183,10 @@ export default function NodalOfficerDashboard({ activePage }) {
         {/* Stats */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
           {[
-            { label: 'Total Links', value: totals.all,      color: 'var(--primary)', bg: 'rgba(26,86,219,.12)',  icon: Link2,       key: '' },
-            { label: 'Approved',    value: totals.approved,  color: '#16a34a',       bg: 'rgba(34,197,94,.12)',  icon: CheckCircle, key: 'approved' },
-            { label: 'Pending',     value: totals.pending,   color: '#f59e0b',       bg: 'rgba(245,158,11,.12)', icon: Clock,       key: 'pending'  },
-            { label: 'Rejected',    value: totals.rejected,  color: '#ef4444',       bg: 'rgba(239,68,68,.12)',  icon: XCircle,     key: 'rejected' },
+            { label: 'Total Links', value: totals.all,      color: 'var(--primary)', bg: 'rgba(33, 74, 171,.12)',  icon: Link2,       key: '' },
+            { label: 'Approved',    value: totals.approved,  color: '#16a34a',       bg: 'rgba(25, 135, 84,.12)',  icon: CheckCircle, key: 'approved' },
+            { label: 'Pending',     value: totals.pending,   color: '#b45309',       bg: 'rgba(255, 193, 7,.12)', icon: Clock,       key: 'pending'  },
+            { label: 'Rejected',    value: totals.rejected,  color: '#dc3545',       bg: 'rgba(220, 53, 69,.12)',  icon: XCircle,     key: 'rejected' },
           ].map(s => {
             const isActive = nodalLinksFilterStatus === s.key && s.key !== '';
             return (
@@ -1240,7 +1240,7 @@ export default function NodalOfficerDashboard({ activePage }) {
           </div>
 
           {nodalLinksLoading && <div style={{ padding: '50px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>Loading linked documents…</div>}
-          {nodalLinksError && <div style={{ padding: '20px 18px', fontSize: 13, color: '#ef4444' }}>{nodalLinksError}</div>}
+          {nodalLinksError && <div style={{ padding: '20px 18px', fontSize: 13, color: '#dc3545' }}>{nodalLinksError}</div>}
 
           {!nodalLinksLoading && !nodalLinksError && (
             <>
@@ -1268,13 +1268,13 @@ export default function NodalOfficerDashboard({ activePage }) {
                     onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                     <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(245,158,11,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(255, 193, 7,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         <Link2 size={14} color="#d97706" strokeWidth={2} />
                       </div>
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 280 }}>{link.document_name}</div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 3 }}>
-                          {link.document_type_name && <span style={{ fontSize: 10, fontWeight: 600, color: '#d97706', background: 'rgba(245,158,11,.1)', borderRadius: 4, padding: '1px 5px' }}>{link.document_type_name}</span>}
+                          {link.document_type_name && <span style={{ fontSize: 10, fontWeight: 600, color: '#d97706', background: 'rgba(255, 193, 7,.1)', borderRadius: 4, padding: '1px 5px' }}>{link.document_type_name}</span>}
                           {link.version_no && <span style={{ fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>v{link.version_no}</span>}
                         </div>
                       </div>
@@ -1323,9 +1323,9 @@ export default function NodalOfficerDashboard({ activePage }) {
                             annotations_json:    link.annotations_json       || null,
                           } : null,
                         })}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 10px', borderRadius: 7, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'background .15s' }}
-                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(26,86,219,.14)'}
-                        onMouseLeave={e => e.currentTarget.style.background = 'rgba(26,86,219,.07)'}>
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 10px', borderRadius: 7, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'background .15s' }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(33, 74, 171,.14)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'rgba(33, 74, 171,.07)'}>
                         <Eye size={12} /> View
                       </button>
                     </div>
@@ -1345,9 +1345,9 @@ export default function NodalOfficerDashboard({ activePage }) {
   if (activePage === 'nodalactparts') {
     const TAB_LABELS = { sections: 'Sections', schedule: 'Schedule', annexure: 'Annexure', appendix: 'Appendix', forms: 'Forms' };
     const STATUS_SC  = {
-      pending:  { bg: '#fef3c7', color: '#92400e', border: '#f59e0b', label: 'Pending'  },
+      pending:  { bg: '#fef3c7', color: '#92400e', border: '#ffc107', label: 'Pending'  },
       approved: { bg: '#d1fae5', color: '#065f46', border: '#10b981', label: 'Approved' },
-      rejected: { bg: '#fee2e2', color: '#991b1b', border: '#ef4444', label: 'Rejected' },
+      rejected: { bg: '#fee2e2', color: '#991b1b', border: '#dc3545', label: 'Rejected' },
     };
     const filtered = actPartsStatusFilter
       ? actPartsItems.filter(i => i.status === actPartsStatusFilter)
@@ -1358,7 +1358,7 @@ export default function NodalOfficerDashboard({ activePage }) {
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24, gap: 16, flexWrap: 'wrap' }}>
           <div>
             <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-heading)' }}>Act Parts Overview</div>
-            <div style={{ fontSize: 13, color: 'var(--text-color-secondary)', marginTop: 4 }}>All act part submissions and their approval status</div>
+            <div style={{ fontSize: 'var(--font-size-p2)', color: 'var(--text-color-secondary)', marginTop: 4 }}>All act part submissions and their approval status</div>
           </div>
           {/* Status filter pills */}
           <div style={{ display: 'flex', background: 'var(--surface-ground)', borderRadius: 8, padding: 3, gap: 2, border: '1px solid var(--surface-border)' }}>
@@ -1379,7 +1379,7 @@ export default function NodalOfficerDashboard({ activePage }) {
           <div style={{ padding: '60px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>Loading…</div>
         )}
         {actPartsError && (
-          <div style={{ padding: '20px 0', fontSize: 13, color: '#ef4444' }}>{actPartsError}</div>
+          <div style={{ padding: '20px 0', fontSize: 13, color: '#dc3545' }}>{actPartsError}</div>
         )}
 
         {!actPartsLoading && !actPartsError && filtered.length === 0 && (
@@ -1409,7 +1409,7 @@ export default function NodalOfficerDashboard({ activePage }) {
                   <div style={{ padding: '10px 18px' }}>
                     <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 2 }}>{item.act_name || `Act #${item.pdf_document_id}`}</div>
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                      <span style={{ fontSize: 10.5, fontWeight: 700, background: 'rgba(26,86,219,.1)', color: '#1a56db', borderRadius: 4, padding: '1px 7px' }}>
+                      <span style={{ fontSize: 10.5, fontWeight: 700, background: 'rgba(33, 74, 171,.1)', color: '#214aab', borderRadius: 4, padding: '1px 7px' }}>
                         {TAB_LABELS[item.part_type] || item.part_type}
                       </span>
                       {item.act_type && <span style={{ fontSize: 10.5, color: 'var(--text-color-secondary)' }}>{item.act_type}</span>}
@@ -1431,7 +1431,7 @@ export default function NodalOfficerDashboard({ activePage }) {
                   </div>
                   <div style={{ padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>
                     <button onClick={() => openActPartsDetail(item)} disabled={actPartsDetailLoading}
-                      style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 7, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                      style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 7, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                       <Eye size={13} /> View
                     </button>
                   </div>
@@ -1468,11 +1468,11 @@ function ActPartsDetailModal({ item, partsData, onClose, readOnly = false, onApp
   const partType = item?.part_type;
 
   function renderContent() {
-    if (!partsData) return <div style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: '#ef4444' }}>Could not load content.</div>;
+    if (!partsData) return <div style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: '#dc3545' }}>Could not load content.</div>;
 
     const statusChip = (status) => {
       if (!status) return null;
-      const s = { draft: { bg: '#f1f5f9', color: '#64748b', border: '#cbd5e1' }, pending: { bg: '#fef3c7', color: '#92400e', border: '#f59e0b' }, approved: { bg: '#d1fae5', color: '#065f46', border: '#10b981' }, rejected: { bg: '#fee2e2', color: '#991b1b', border: '#ef4444' }, pending_delete: { bg: '#fff1f2', color: '#9f1239', border: '#fda4af' } }[status];
+      const s = { draft: { bg: '#f1f5f9', color: '#64748b', border: '#cbd5e1' }, pending: { bg: '#fef3c7', color: '#92400e', border: '#ffc107' }, approved: { bg: '#d1fae5', color: '#065f46', border: '#10b981' }, rejected: { bg: '#fee2e2', color: '#991b1b', border: '#dc3545' }, pending_delete: { bg: '#fff1f2', color: '#9f1239', border: '#fda4af' } }[status];
       if (!s) return null;
       const label = { draft: 'Draft', pending: 'Pending', approved: 'Approved', rejected: 'Rejected', pending_delete: 'Del. Pending' }[status] || status;
       return <span style={{ fontSize: 9.5, fontWeight: 700, background: s.bg, color: s.color, border: `1px solid ${s.border}`, borderRadius: 20, padding: '1px 7px', flexShrink: 0, marginLeft: 6 }}>{label}</span>;
@@ -1483,8 +1483,8 @@ function ActPartsDetailModal({ item, partsData, onClose, readOnly = false, onApp
       if (hasCh) {
         return partsData.chapters.map(ch => (
           <div key={ch.id} style={{ marginBottom: 18 }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text-heading)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ background: 'rgba(26,86,219,.1)', color: '#1a56db', borderRadius: 6, padding: '3px 10px', fontFamily: 'var(--mono)', fontSize: 11 }}>
+            <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 800, color: 'var(--text-heading)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ background: 'rgba(33, 74, 171,.1)', color: '#214aab', borderRadius: 6, padding: '3px 10px', fontFamily: 'var(--mono)', fontSize: 11 }}>
                 {ch.chapter_number || '—'}
               </span>
               {ch.chapter_title || '(No title)'}
@@ -1500,7 +1500,7 @@ function ActPartsDetailModal({ item, partsData, onClose, readOnly = false, onApp
                   <div style={{ fontSize: 12, color: 'var(--text-color)', lineHeight: 1.65, whiteSpace: 'pre-wrap', maxHeight: 120, overflowY: 'auto' }}>{sec.section_content}</div>
                 )}
                 {sec.original_filename && (
-                  <div style={{ fontSize: 11.5, color: '#1a56db', marginTop: 6 }}>📎 {sec.original_filename}</div>
+                  <div style={{ fontSize: 11.5, color: '#214aab', marginTop: 6 }}>📎 {sec.original_filename}</div>
                 )}
               </div>
             ))}
@@ -1522,7 +1522,7 @@ function ActPartsDetailModal({ item, partsData, onClose, readOnly = false, onApp
             <div style={{ fontSize: 12, color: 'var(--text-color)', lineHeight: 1.65, whiteSpace: 'pre-wrap', maxHeight: 120, overflowY: 'auto' }}>{sec.section_content}</div>
           )}
           {sec.original_filename && (
-            <div style={{ fontSize: 11.5, color: '#1a56db', marginTop: 6 }}>📎 {sec.original_filename}</div>
+            <div style={{ fontSize: 11.5, color: '#214aab', marginTop: 6 }}>📎 {sec.original_filename}</div>
           )}
         </div>
       ));
@@ -1542,7 +1542,7 @@ function ActPartsDetailModal({ item, partsData, onClose, readOnly = false, onApp
           <div style={{ fontSize: 12, color: 'var(--text-color)', lineHeight: 1.65, whiteSpace: 'pre-wrap', maxHeight: 120, overflowY: 'auto' }}>{e.description}</div>
         )}
         {e.original_filename && (
-          <div style={{ fontSize: 11.5, color: '#1a56db', marginTop: 6 }}>📎 {e.original_filename}</div>
+          <div style={{ fontSize: 11.5, color: '#214aab', marginTop: 6 }}>📎 {e.original_filename}</div>
         )}
       </div>
     ));
@@ -1567,11 +1567,11 @@ function ActPartsDetailModal({ item, partsData, onClose, readOnly = false, onApp
         {/* Header */}
         <div style={{ padding: '18px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-heading)' }}>
+            <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 800, color: 'var(--text-heading)' }}>
               {item?.act_name || `Act #${item?.pdf_document_id}`}
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, background: 'rgba(26,86,219,.1)', color: '#1a56db', borderRadius: 4, padding: '2px 8px' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, background: 'rgba(33, 74, 171,.1)', color: '#214aab', borderRadius: 4, padding: '2px 8px' }}>
                 {ACT_PART_TAB_LABELS[partType] || partType}
               </span>
               <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
@@ -1594,7 +1594,7 @@ function ActPartsDetailModal({ item, partsData, onClose, readOnly = false, onApp
         {!readOnly && !confirming && (
           <div style={{ padding: '16px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end', gap: 10, flexShrink: 0 }}>
             <button onClick={() => setConfirming('rejected')}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 18px', borderRadius: 9, border: '1.5px solid #ef4444', background: '#fee2e2', color: '#991b1b', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 18px', borderRadius: 9, border: '1.5px solid #dc3545', background: '#fee2e2', color: '#991b1b', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
               <XCircle size={14} /> Reject
             </button>
             <button onClick={() => setConfirming('approved')}
@@ -1607,7 +1607,7 @@ function ActPartsDetailModal({ item, partsData, onClose, readOnly = false, onApp
         {!readOnly && confirming && (
           <div style={{ padding: '16px 24px', borderTop: '1px solid var(--surface-border)', flexShrink: 0 }}>
             <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-color-secondary)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.06em' }}>
-              Comments {confirming === 'rejected' && <span style={{ color: '#ef4444' }}>*</span>}
+              Comments {confirming === 'rejected' && <span style={{ color: '#dc3545' }}>*</span>}
             </div>
             <textarea value={comment} onChange={e => setComment(e.target.value)} rows={2}
               placeholder={confirming === 'rejected' ? 'Reason for rejection (required)' : 'Optional comments…'}
@@ -1627,7 +1627,7 @@ function ActPartsDetailModal({ item, partsData, onClose, readOnly = false, onApp
                     onClose();
                   } finally { setSubmitting(false); }
                 }}
-                style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: confirming === 'approved' ? '#10b981' : '#ef4444', color: 'white', fontSize: 13, fontWeight: 700, cursor: (submitting || (confirming === 'rejected' && !comment.trim())) ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: (submitting || (confirming === 'rejected' && !comment.trim())) ? .5 : 1 }}>
+                style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: confirming === 'approved' ? '#10b981' : '#dc3545', color: 'white', fontSize: 13, fontWeight: 700, cursor: (submitting || (confirming === 'rejected' && !comment.trim())) ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: (submitting || (confirming === 'rejected' && !comment.trim())) ? .5 : 1 }}>
                 {submitting ? 'Submitting…' : confirming === 'approved' ? 'Confirm Approve' : 'Confirm Reject'}
               </button>
             </div>

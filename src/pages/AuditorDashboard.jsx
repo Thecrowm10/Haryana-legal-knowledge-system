@@ -55,9 +55,9 @@ export default function AuditorDashboard({ activePage }) {
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
           {[
-            { label: 'Total Log Entries', value: MOCK_AUDIT.length,                           color: 'var(--primary)', bg: 'rgba(26,86,219,.12)',  icon: ClipboardList },
-            { label: 'AI Characters Generated', value: '0',                                   color: '#22c55e',        bg: 'rgba(34,197,94,.12)',  icon: CheckCircle   },
-            { label: 'Compliance Status',  value: '100%',                                     color: '#22c55e',        bg: 'rgba(34,197,94,.12)',  icon: CheckCircle   },
+            { label: 'Total Log Entries', value: MOCK_AUDIT.length,                           color: 'var(--primary)', bg: 'rgba(33, 74, 171,.12)',  icon: ClipboardList },
+            { label: 'AI Characters Generated', value: '0',                                   color: '#198754',        bg: 'rgba(25, 135, 84,.12)',  icon: CheckCircle   },
+            { label: 'Compliance Status',  value: '100%',                                     color: '#198754',        bg: 'rgba(25, 135, 84,.12)',  icon: CheckCircle   },
           ].map(s => (
             <Card key={s.label}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
@@ -76,8 +76,8 @@ export default function AuditorDashboard({ activePage }) {
         <Card padding="0">
           <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>System MIS Report</div>
-              <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 2 }}>Read-only · Tamper-evident · Append-only</div>
+              <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>System MIS Report</div>
+              <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-color-secondary)', marginTop: 2 }}>Read-only · Tamper-evident · Append-only</div>
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
               <button onClick={() => exportCSV(MOCK_AUDIT, 'mis-report.csv')}
@@ -93,8 +93,8 @@ export default function AuditorDashboard({ activePage }) {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
-                {['Timestamp', 'User', 'Role', 'Action', 'AI Generated'].map(h => (
-                  <th key={h} scope="col" style={{ ...LABEL, padding: '11px 16px', textAlign: 'left' }}>{h}</th>
+                {['Timestamp', 'User', 'Role', 'Action', 'AI Generated'].map((h, i) => (
+                  <th key={h} scope="col" style={{ ...LABEL, padding: '11px 16px', textAlign: 'left', ...(i > 0 && { borderLeft: '1px solid var(--surface-border)' }) }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -104,10 +104,10 @@ export default function AuditorDashboard({ activePage }) {
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                   <td style={{ padding: '12px 16px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)', whiteSpace: 'nowrap' }}>{log.time}</td>
-                  <td style={{ padding: '12px 16px', fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>{log.user}</td>
-                  <td style={{ padding: '12px 16px' }}><Badge label={roleLabel(log.role)} variant={log.role} /></td>
-                  <td style={{ padding: '12px 16px', fontSize: 12.5, color: 'var(--text-color)' }}>{log.action}</td>
-                  <td style={{ padding: '12px 16px' }}>
+                  <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)', fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>{log.user}</td>
+                  <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)' }}><Badge label={roleLabel(log.role)} variant={log.role} /></td>
+                  <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)', fontSize: 12.5, color: 'var(--text-color)' }}>{log.action}</td>
+                  <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)' }}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: '#1e40af' }}>
                       <CheckCircle size={13} /> None
                     </span>
@@ -128,8 +128,8 @@ export default function AuditorDashboard({ activePage }) {
         <Card padding="0">
           <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>Search Query History</div>
-              <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 2 }}>Guests anonymised · No AI text in any response</div>
+              <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>Search Query History</div>
+              <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-color-secondary)', marginTop: 2 }}>Guests anonymised · No AI text in any response</div>
             </div>
             <button onClick={() => exportCSV(MOCK_QUERIES, 'query-history.csv')}
               style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--surface-ground)', color: 'var(--text-color)', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '7px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
@@ -139,8 +139,8 @@ export default function AuditorDashboard({ activePage }) {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
-                {['Timestamp', 'User Type', 'Query', 'Results', 'Document Pointers Returned'].map(h => (
-                  <th key={h} scope="col" style={{ ...LABEL, padding: '11px 16px', textAlign: 'left' }}>{h}</th>
+                {['Timestamp', 'User Type', 'Query', 'Results', 'Document Pointers Returned'].map((h, i) => (
+                  <th key={h} scope="col" style={{ ...LABEL, padding: '11px 16px', textAlign: h === 'Results' ? 'right' : 'left', ...(i > 0 && { borderLeft: '1px solid var(--surface-border)' }) }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -150,10 +150,10 @@ export default function AuditorDashboard({ activePage }) {
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                   <td style={{ padding: '12px 16px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)', whiteSpace: 'nowrap' }}>{q.time}</td>
-                  <td style={{ padding: '12px 16px' }}><Badge label={roleLabel(q.userType)} variant={q.userType} /></td>
-                  <td style={{ padding: '12px 16px', fontSize: 12.5, color: 'var(--text-color)', fontStyle: 'italic' }}>"{q.query}"</td>
-                  <td style={{ padding: '12px 16px', fontFamily: 'var(--mono)', fontSize: 12, fontWeight: 700, color: 'var(--primary)', textAlign: 'center' }}>{q.results}</td>
-                  <td style={{ padding: '12px 16px', fontSize: 12, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>{q.pointers}</td>
+                  <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)' }}><Badge label={roleLabel(q.userType)} variant={q.userType} /></td>
+                  <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)', fontSize: 12.5, color: 'var(--text-color)', fontStyle: 'italic' }}>"{q.query}"</td>
+                  <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)', fontFamily: 'var(--mono)', fontSize: 12, fontWeight: 700, color: 'var(--primary)', textAlign: 'right' }}>{q.results}</td>
+                  <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)', fontSize: 12, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>{q.pointers}</td>
                 </tr>
               ))}
             </tbody>
@@ -169,20 +169,20 @@ export default function AuditorDashboard({ activePage }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
 
         <Card>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', background: 'rgba(34,197,94,.08)', border: '1px solid rgba(34,197,94,.2)', borderRadius: 10, marginBottom: 20 }}>
-            <CheckCircle size={22} color="#22c55e" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px', background: 'rgba(25, 135, 84,.08)', border: '1px solid rgba(25, 135, 84,.2)', borderRadius: 10, marginBottom: 20 }}>
+            <CheckCircle size={22} color="#198754" />
             <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#1e40af' }}>Zero Generation Compliance — PASSED</div>
-              <div style={{ fontSize: 12.5, color: '#166534', marginTop: 2 }}>No AI-generated text was present in any system response. All results are verbatim document pointers only.</div>
+              <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: '#1e40af' }}>Zero Generation Compliance — PASSED</div>
+              <div style={{ fontSize: 'var(--font-size-small)', color: '#166534', marginTop: 2 }}>No AI-generated text was present in any system response. All results are verbatim document pointers only.</div>
             </div>
           </div>
 
-          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 14 }}>Monthly Compliance Summary</div>
+          <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)', marginBottom: 14 }}>Monthly Compliance Summary</div>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
-                {['Month', 'Total Queries Sampled', 'AI Characters in Responses', 'Status'].map(h => (
-                  <th key={h} scope="col" style={{ ...LABEL, padding: '11px 16px', textAlign: 'left' }}>{h}</th>
+                {['Month', 'Total Queries Sampled', 'AI Characters in Responses', 'Status'].map((h, i) => (
+                  <th key={h} scope="col" style={{ ...LABEL, padding: '11px 16px', textAlign: (h === 'Total Queries Sampled' || h === 'AI Characters in Responses') ? 'right' : 'left', ...(i > 0 && { borderLeft: '1px solid var(--surface-border)' }) }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -192,10 +192,10 @@ export default function AuditorDashboard({ activePage }) {
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                   <td style={{ padding: '13px 16px', fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>{m.month}</td>
-                  <td style={{ padding: '13px 16px', fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-color)' }}>{m.totalQueries}</td>
-                  <td style={{ padding: '13px 16px', fontFamily: 'var(--mono)', fontSize: 12, fontWeight: 700, color: '#1e40af' }}>{m.aiCharacters}</td>
-                  <td style={{ padding: '13px 16px' }}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 20, background: 'rgba(34,197,94,.1)', border: '1px solid rgba(34,197,94,.25)', fontSize: 11.5, fontWeight: 700, color: '#1e40af' }}>
+                  <td style={{ padding: '13px 16px', borderLeft: '1px solid var(--surface-border)', fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text-color)', textAlign: 'right' }}>{m.totalQueries}</td>
+                  <td style={{ padding: '13px 16px', borderLeft: '1px solid var(--surface-border)', fontFamily: 'var(--mono)', fontSize: 12, fontWeight: 700, color: '#1e40af', textAlign: 'right' }}>{m.aiCharacters}</td>
+                  <td style={{ padding: '13px 16px', borderLeft: '1px solid var(--surface-border)' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 20, background: 'rgba(25, 135, 84,.1)', border: '1px solid rgba(25, 135, 84,.25)', fontSize: 11.5, fontWeight: 700, color: '#1e40af' }}>
                       <CheckCircle size={12} /> Compliant
                     </span>
                   </td>
@@ -207,13 +207,13 @@ export default function AuditorDashboard({ activePage }) {
 
         <Card>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>Compliance Certificate</div>
+            <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>Compliance Certificate</div>
             <button onClick={() => alert('Generating compliance report PDF...')}
               style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--primary)', color: 'white', border: 'none', borderRadius: 8, padding: '8px 16px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
               <Download size={13} /> Download Report
             </button>
           </div>
-          <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', lineHeight: 1.8 }}>
+          <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-color-secondary)', lineHeight: 1.8 }}>
             This report certifies that the Haryana Digital Repository has operated in full compliance with the <strong>Zero Generation Constraint</strong> (TOR Module B, Requirement B-04 to B-08). All search results returned during the audit period contained exclusively verbatim document pointers with no AI-generated textual content.
           </div>
           <div style={{ marginTop: 16, display: 'flex', gap: 24 }}>

@@ -101,12 +101,12 @@ export default function ProfileModal({ user, roleLabel, onClose, onChangePasswor
                 </div>
 
                 {error && (
-                  <div style={{ padding: '9px 12px', borderRadius: 8, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', fontSize: 12, color: '#dc2626', display: 'flex', gap: 7, alignItems: 'center' }}>
+                  <div style={{ padding: '9px 12px', borderRadius: 8, background: 'rgba(220, 53, 69,.08)', border: '1px solid rgba(220, 53, 69,.25)', fontSize: 12, color: '#dc2626', display: 'flex', gap: 7, alignItems: 'center' }}>
                     ⚠ {error}
                   </div>
                 )}
                 {success && (
-                  <div style={{ padding: '9px 12px', borderRadius: 8, background: 'rgba(34,197,94,.08)', border: '1px solid rgba(34,197,94,.25)', fontSize: 12, color: '#16a34a', display: 'flex', gap: 7, alignItems: 'center' }}>
+                  <div style={{ padding: '9px 12px', borderRadius: 8, background: 'rgba(25, 135, 84,.08)', border: '1px solid rgba(25, 135, 84,.25)', fontSize: 12, color: '#16a34a', display: 'flex', gap: 7, alignItems: 'center' }}>
                     <CheckCircle2 size={13} /> Password updated successfully.
                   </div>
                 )}

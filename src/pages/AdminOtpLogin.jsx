@@ -69,7 +69,7 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
     <>
       <style>{`
         .aol * { box-sizing:border-box; margin:0; padding:0; }
-        .aol { font-family:'Plus Jakarta Sans Variable','Plus Jakarta Sans',sans-serif; }
+        .aol { font-family:var(--font); }
         @keyframes aolFade { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:none} }
         @keyframes spin    { to{transform:rotate(360deg)} }
         .aol-card { animation: aolFade .4s cubic-bezier(.22,1,.36,1) both; }
@@ -157,10 +157,10 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
 
               <button className="aol-btn" type="submit" disabled={loading} style={{
                 width: '100%', padding: '12px',
-                background: 'linear-gradient(135deg,#22c55e,#16a34a)',
+                background: 'linear-gradient(135deg,#198754,#16a34a)',
                 borderRadius: 11, color: '#fff', fontSize: 14, fontWeight: 700,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                boxShadow: '0 4px 18px rgba(34,197,94,.38)',
+                boxShadow: '0 4px 18px rgba(25, 135, 84,.38)',
                 opacity: loading ? .7 : 1,
               }}>
                 {loading ? <><Spin /> Sending OTP…</> : <>Send OTP &nbsp;→</>}
@@ -205,11 +205,11 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
 
               <button className="aol-btn" type="submit" disabled={loading} style={{
                 width: '100%', padding: '12px',
-                background: canSubmitStep2 ? 'linear-gradient(135deg,#22c55e,#16a34a)' : 'rgba(255,255,255,.04)',
+                background: canSubmitStep2 ? 'linear-gradient(135deg,#198754,#16a34a)' : 'rgba(255,255,255,.04)',
                 borderRadius: 11, color: canSubmitStep2 ? '#fff' : 'rgba(255,255,255,.32)', fontSize: 14, fontWeight: 700,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                 border: canSubmitStep2 ? 'none' : '1.5px dashed rgba(255,255,255,.2)',
-                boxShadow: canSubmitStep2 ? '0 4px 18px rgba(34,197,94,.38)' : 'none',
+                boxShadow: canSubmitStep2 ? '0 4px 18px rgba(25, 135, 84,.38)' : 'none',
                 cursor: canSubmitStep2 ? 'pointer' : 'not-allowed',
                 marginBottom: 12,
               }}>

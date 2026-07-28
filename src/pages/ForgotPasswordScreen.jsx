@@ -84,17 +84,17 @@ export default function ForgotPasswordScreen({ onBack }) {
     if (/[A-Z]/.test(p)) s++;
     if (/[0-9]/.test(p)) s++;
     if (/[^A-Za-z0-9]/.test(p)) s++;
-    if (s <= 1) return { label: 'Weak',   color: '#ef4444', w: '25%' };
-    if (s <= 2) return { label: 'Fair',   color: '#f59e0b', w: '50%' };
-    if (s <= 3) return { label: 'Good',   color: '#3b82f6', w: '75%' };
-    return              { label: 'Strong', color: '#22c55e', w: '100%' };
+    if (s <= 1) return { label: 'Weak',   color: '#dc3545', w: '25%' };
+    if (s <= 2) return { label: 'Fair',   color: '#b45309', w: '50%' };
+    if (s <= 3) return { label: 'Good',   color: '#0d6efd', w: '75%' };
+    return              { label: 'Strong', color: '#198754', w: '100%' };
   })();
 
   return (
     <>
       <style>{`
         .fp * { box-sizing:border-box; margin:0; padding:0; }
-        .fp { font-family:'Plus Jakarta Sans Variable','Plus Jakarta Sans',sans-serif; }
+        .fp { font-family:var(--font); }
         @keyframes fpFade { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:none} }
         @keyframes spin   { to{transform:rotate(360deg)} }
         .fp-card { animation: fpFade .4s cubic-bezier(.22,1,.36,1) both; }
@@ -144,14 +144,14 @@ export default function ForgotPasswordScreen({ onBack }) {
           {/* ── Success ── */}
           {step === 3 && (
             <div style={{ textAlign: 'center', padding: '16px 0' }}>
-              <CheckCircle2 size={52} color="#22c55e" style={{ marginBottom: 14 }} />
+              <CheckCircle2 size={52} color="#198754" style={{ marginBottom: 14 }} />
               <h2 style={{ fontSize: 20, fontWeight: 800, color: '#fff', marginBottom: 8 }}>Password Reset!</h2>
               <p style={{ fontSize: 13.5, color: 'rgba(255,255,255,.6)', lineHeight: 1.6, marginBottom: 24 }}>
                 Your password has been reset successfully.<br/>You can now log in with your new password.
               </p>
               <button className="fp-btn" onClick={onBack} style={{
                 width: '100%', padding: '12px',
-                background: 'linear-gradient(135deg,#22c55e,#16a34a)',
+                background: 'linear-gradient(135deg,#198754,#16a34a)',
                 borderRadius: 11, color: '#fff', fontSize: 14, fontWeight: 700,
               }}>
                 Go to Login
@@ -197,10 +197,10 @@ export default function ForgotPasswordScreen({ onBack }) {
 
               <button className="fp-btn" type="submit" disabled={loading} style={{
                 width: '100%', padding: '12px', marginTop: 4,
-                background: 'linear-gradient(135deg,#22c55e,#16a34a)',
+                background: 'linear-gradient(135deg,#198754,#16a34a)',
                 borderRadius: 11, color: '#fff', fontSize: 14, fontWeight: 700,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                boxShadow: '0 4px 18px rgba(34,197,94,.35)',
+                boxShadow: '0 4px 18px rgba(25, 135, 84,.35)',
                 opacity: loading ? .7 : 1,
               }}>
                 {loading ? <><Spin /> Sending OTP…</> : <>Send OTP &nbsp;→</>}
@@ -293,11 +293,11 @@ export default function ForgotPasswordScreen({ onBack }) {
 
               <button className="fp-btn" type="submit" disabled={loading} style={{
                 width: '100%', padding: '12px',
-                background: canSubmitStep2 ? 'linear-gradient(135deg,#22c55e,#16a34a)' : 'rgba(255,255,255,.04)',
+                background: canSubmitStep2 ? 'linear-gradient(135deg,#198754,#16a34a)' : 'rgba(255,255,255,.04)',
                 borderRadius: 11, color: canSubmitStep2 ? '#fff' : 'rgba(255,255,255,.32)', fontSize: 14, fontWeight: 700,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                 border: canSubmitStep2 ? 'none' : '1.5px dashed rgba(255,255,255,.2)',
-                boxShadow: canSubmitStep2 ? '0 4px 18px rgba(34,197,94,.35)' : 'none',
+                boxShadow: canSubmitStep2 ? '0 4px 18px rgba(25, 135, 84,.35)' : 'none',
                 cursor: canSubmitStep2 ? 'pointer' : 'not-allowed',
                 marginBottom: 12,
               }}>

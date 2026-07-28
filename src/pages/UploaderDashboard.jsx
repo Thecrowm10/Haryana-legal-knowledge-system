@@ -62,7 +62,7 @@ const REL_TARGET_TYPES = {
 };
 
 const AMEND_CHANGE_TYPES = ['Amended', 'Substituted', 'Inserted', 'Deleted', 'Expanded'];
-const AMEND_CHANGE_COLORS = { Amended: '#f59e0b', Substituted: '#3b82f6', Inserted: '#22c55e', Deleted: '#ef4444', Expanded: '#8b5cf6' };
+const AMEND_CHANGE_COLORS = { Amended: '#ffc107', Substituted: '#0d6efd', Inserted: '#198754', Deleted: '#dc3545', Expanded: '#8b5cf6' };
 const EMPTY_PROVISION = () => ({ section: '', chapter: '', subsection: '', page: '', changeType: 'Substituted', before: '', after: '' });
 
 // Display-only lookup maps: map the internal English enum values (used in comparisons,
@@ -86,12 +86,12 @@ const AMEND_CHANGE_KEY = {
 
 // Type card colours and descriptions
 const TYPE_CARD_COLORS = {
-  'Act':                 { bg: 'rgba(26,86,219,.08)',  accent: '#1a56db', text: '#1e40af' },
-  'Amendment':           { bg: 'rgba(245,158,11,.08)', accent: '#f59e0b', text: '#d97706' },
+  'Act':                 { bg: 'rgba(33, 74, 171,.08)',  accent: '#214aab', text: '#1e40af' },
+  'Amendment':           { bg: 'rgba(255, 193, 7,.08)', accent: '#ffc107', text: '#d97706' },
   'Notification':        { bg: 'rgba(139,92,246,.08)', accent: '#8b5cf6', text: '#7c3aed' },
   'Circular':            { bg: 'rgba(20,184,166,.08)', accent: '#14b8a6', text: '#0f766e' },
-  'Policy':              { bg: 'rgba(34,197,94,.08)',  accent: '#22c55e', text: '#16a34a' },
-  'Rules & Regulations': { bg: 'rgba(239,68,68,.08)',  accent: '#ef4444', text: '#dc2626' },
+  'Policy':              { bg: 'rgba(25, 135, 84,.08)',  accent: '#198754', text: '#16a34a' },
+  'Rules & Regulations': { bg: 'rgba(220, 53, 69,.08)',  accent: '#dc3545', text: '#dc2626' },
   'Order/Gazette':     { bg: 'rgba(234,179,8,.08)',  accent: '#eab308', text: '#a16207' },
   'Bye Laws':            { bg: 'rgba(14,165,233,.08)', accent: '#0ea5e9', text: '#0369a1' },
   'Miscellaneous':       { bg: 'rgba(100,116,139,.08)',accent: '#64748b', text: '#475569' },
@@ -112,10 +112,10 @@ const TYPE_CARD_DESC = {
 // Act itself (Sections/Schedule/Annexure/Appendix/Forms). Colors reuse the same accent language
 // as TYPE_CARD_COLORS above so this page reads as part of the same design system.
 const SUBDOC_TABS = [
-  { key: 'sections', labelKey: 'addDocuments.tabs.sections', descKey: 'addDocuments.tabDesc.sections', accent: '#1a56db', bg: 'rgba(26,86,219,.08)', text: '#1e40af' },
+  { key: 'sections', labelKey: 'addDocuments.tabs.sections', descKey: 'addDocuments.tabDesc.sections', accent: '#214aab', bg: 'rgba(33, 74, 171,.08)', text: '#1e40af' },
   { key: 'schedules', labelKey: 'addDocuments.tabs.schedule', descKey: 'addDocuments.tabDesc.schedule', accent: '#0ea5e9', bg: 'rgba(14,165,233,.08)', text: '#0369a1' },
-  { key: 'annexures', labelKey: 'addDocuments.tabs.annexure', descKey: 'addDocuments.tabDesc.annexure', accent: '#22c55e', bg: 'rgba(34,197,94,.08)', text: '#16a34a' },
-  { key: 'appendices', labelKey: 'addDocuments.tabs.appendix', descKey: 'addDocuments.tabDesc.appendix', accent: '#f59e0b', bg: 'rgba(245,158,11,.08)', text: '#d97706' },
+  { key: 'annexures', labelKey: 'addDocuments.tabs.annexure', descKey: 'addDocuments.tabDesc.annexure', accent: '#198754', bg: 'rgba(25, 135, 84,.08)', text: '#16a34a' },
+  { key: 'appendices', labelKey: 'addDocuments.tabs.appendix', descKey: 'addDocuments.tabDesc.appendix', accent: '#ffc107', bg: 'rgba(255, 193, 7,.08)', text: '#d97706' },
   { key: 'forms',    labelKey: 'addDocuments.tabs.forms',    descKey: 'addDocuments.tabDesc.forms',    accent: '#8b5cf6', bg: 'rgba(139,92,246,.08)', text: '#7c3aed' },
 ];
 
@@ -393,7 +393,7 @@ function isAccepted(f) {
 }
 function focusStyle(e) {
   e.target.style.borderColor = 'var(--primary)';
-  e.target.style.boxShadow   = '0 0 0 3px rgba(26,86,219,.1)';
+  e.target.style.boxShadow   = '0 0 0 3px rgba(33, 74, 171,.1)';
 }
 function blurStyle(e) {
   e.target.style.borderColor = 'var(--surface-border)';
@@ -443,20 +443,20 @@ function VersionConflictModal({ existingDoc, newVersion, onUploadAsNew, onCancel
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ background: 'var(--surface-card)', borderRadius: 14, padding: 28, width: 420, maxWidth: 'calc(100vw - 32px)', boxShadow: '0 24px 80px rgba(0,0,0,.3)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 9, background: 'rgba(245,158,11,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ width: 36, height: 36, borderRadius: 9, background: 'rgba(255, 193, 7,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <AlertTriangle size={18} color="#d97706" />
           </div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>{t('versionConflict.title')}</div>
+          <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>{t('versionConflict.title')}</div>
         </div>
-        <div style={{ padding: '12px 14px', borderRadius: 9, background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)', marginBottom: 18 }}>
-          <div style={{ fontSize: 12.5, color: 'var(--text-heading)', fontWeight: 600, marginBottom: 4 }}>
+        <div style={{ padding: '12px 14px', borderRadius: 9, background: 'rgba(255, 193, 7,.06)', border: '1px solid rgba(255, 193, 7,.2)', marginBottom: 18 }}>
+          <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-heading)', fontWeight: 600, marginBottom: 4 }}>
             {t('versionConflict.alreadyExists', { title: existingDoc.title })}
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>
             {t('versionConflict.currentVersion', { version: existingDoc.version || '1.0', uploadedAt: existingDoc.uploadedAt })}
           </div>
         </div>
-        <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', marginBottom: 18 }}>
+        <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-color-secondary)', marginBottom: 18 }}>
           {t('versionConflict.isNewVersion')}
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
@@ -477,8 +477,8 @@ function WorkflowBadge({ status }) {
   const { t } = useTranslation('uploader');
   const config = {
     [WORKFLOW_STATUS.DRAFT]:     { label: t('workflowBadge.draft'),          bg: 'rgba(148,163,184,.12)', color: '#64748b' },
-    [WORKFLOW_STATUS.PENDING]:   { label: t('workflowBadge.pendingReview'), bg: 'rgba(245,158,11,.12)', color: '#d97706' },
-    [WORKFLOW_STATUS.PUBLISHED]: { label: t('workflowBadge.published'),       bg: 'rgba(34,197,94,.12)',  color: '#16a34a' },
+    [WORKFLOW_STATUS.PENDING]:   { label: t('workflowBadge.pendingReview'), bg: 'rgba(255, 193, 7,.12)', color: '#d97706' },
+    [WORKFLOW_STATUS.PUBLISHED]: { label: t('workflowBadge.published'),       bg: 'rgba(25, 135, 84,.12)',  color: '#16a34a' },
   };
   const c = config[status] || config[WORKFLOW_STATUS.DRAFT];
   return (
@@ -491,8 +491,8 @@ function WorkflowBadge({ status }) {
 function Toast({ toast, onClose }) {
   if (!toast) return null;
   const isError = toast.type === 'error';
-  const accent  = isError ? '#ef4444' : '#16a34a';
-  const bg      = isError ? 'rgba(239,68,68,.08)'  : 'rgba(34,197,94,.08)';
+  const accent  = isError ? '#dc3545' : '#16a34a';
+  const bg      = isError ? 'rgba(220, 53, 69,.08)'  : 'rgba(25, 135, 84,.08)';
   const Icon    = isError ? XCircle : CheckCircle;
   return (
     <div style={{ position: 'fixed', top: 20, right: 20, zIndex: 3000, display: 'flex', alignItems: 'flex-start', gap: 10, padding: '13px 16px', borderRadius: 10, background: 'var(--surface-card)', border: `1px solid ${accent}44`, boxShadow: '0 12px 32px rgba(0,0,0,.18)', maxWidth: 380, animation: 'fadeSlideIn .25s ease' }}>
@@ -673,8 +673,8 @@ function DocViewModal({ doc, onClose }) {
     ? Object.entries(doc.typeFields).filter(([k, v]) => v && !TYPEEXTRA_SKIP.has(k))
     : [];
 
-  const statusAccent = doc.status === 'approved' ? '#16a34a' : doc.status === 'rejected' ? '#ef4444' : '#f59e0b';
-  const statusBg     = doc.status === 'approved' ? 'rgba(34,197,94,.1)'  : doc.status === 'rejected' ? 'rgba(239,68,68,.1)'  : 'rgba(245,158,11,.1)';
+  const statusAccent = doc.status === 'approved' ? '#16a34a' : doc.status === 'rejected' ? '#dc3545' : '#ffc107';
+  const statusBg     = doc.status === 'approved' ? 'rgba(25, 135, 84,.1)'  : doc.status === 'rejected' ? 'rgba(220, 53, 69,.1)'  : 'rgba(255, 193, 7,.1)';
   const StatusIconV  = doc.status === 'approved' ? CheckCircle : doc.status === 'rejected' ? XCircle : Clock;
   const typeColor    = TYPE_CARD_COLORS[doc.type] || { accent: '#94a3b8', bg: 'rgba(148,163,184,.12)', text: '#64748b' };
 
@@ -696,7 +696,7 @@ function DocViewModal({ doc, onClose }) {
         </div>
         {/* Title + breadcrumb */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.3 }}>{doc.title}</div>
+          <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.3 }}>{doc.title}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 20, background: typeColor.bg, color: typeColor.text || typeColor.accent }}>{doc.type}</span>
             <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)' }}>{doc.dept}</span>
@@ -729,7 +729,7 @@ function DocViewModal({ doc, onClose }) {
           {/* PDF toolbar */}
           <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10, background: '#2d2f31', flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,.08)' }}>
             <Eye size={14} color="rgba(255,255,255,.7)" />
-            <span style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(255,255,255,.85)', flex: 1 }}>{docxHtml ? t('docViewModal.documentPreview') : t('docViewModal.originalPdf')}</span>
+            <span style={{ fontSize: 'var(--font-size-small)', fontWeight: 600, color: 'rgba(255,255,255,.85)', flex: 1 }}>{docxHtml ? t('docViewModal.documentPreview') : t('docViewModal.originalPdf')}</span>
 
             {/* Zoom controls */}
             {!docxHtml && (
@@ -763,9 +763,9 @@ function DocViewModal({ doc, onClose }) {
             {/* Open externally */}
             {blobUrl && !docxHtml && (
               <a href={blobUrl} target="_blank" rel="noreferrer"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 7, background: 'rgba(26,86,219,.25)', border: '1px solid rgba(26,86,219,.4)', color: '#93c5fd', textDecoration: 'none', fontSize: 11.5, fontWeight: 600, fontFamily: 'var(--font)', transition: 'background .15s' }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(26,86,219,.4)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'rgba(26,86,219,.25)'}>
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 7, background: 'rgba(33, 74, 171,.25)', border: '1px solid rgba(33, 74, 171,.4)', color: '#93c5fd', textDecoration: 'none', fontSize: 11.5, fontWeight: 600, fontFamily: 'var(--font)', transition: 'background .15s' }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(33, 74, 171,.4)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'rgba(33, 74, 171,.25)'}>
                 <ExternalLink size={12} /> {t('docViewModal.open')}
               </a>
             )}
@@ -797,7 +797,7 @@ function DocViewModal({ doc, onClose }) {
                             fill={ann.color} stroke="rgba(0,0,0,.2)" strokeWidth="1" />
                           <title>{ann.comment}</title>
                           <foreignObject x={`${ann.x * 100}%`} y={`${ann.y * 100}%`} width="20" height="20" style={{ overflow: 'visible', pointerEvents: 'auto' }}>
-                            <div title={ann.comment} style={{ width: 16, height: 16, borderRadius: '50%', background: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'default' }}>
+                            <div title={ann.comment} style={{ width: 16, height: 16, borderRadius: '50%', background: '#ffc107', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'default' }}>
                               <MessageCircle size={9} color="white" />
                             </div>
                           </foreignObject>
@@ -835,10 +835,10 @@ function DocViewModal({ doc, onClose }) {
 
           {/* Right panel header */}
           <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, background: 'var(--surface-50)', flexShrink: 0 }}>
-            <div style={{ width: 30, height: 30, borderRadius: 8, background: 'rgba(26,86,219,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 30, height: 30, borderRadius: 8, background: 'rgba(33, 74, 171,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <FileText size={14} color="var(--primary)" />
             </div>
-            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)' }}>{t('common.documentDetails')}</span>
+            <span style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>{t('common.documentDetails')}</span>
           </div>
 
           {/* Scrollable content */}
@@ -848,7 +848,7 @@ function DocViewModal({ doc, onClose }) {
             <div className="ud-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 22 }}>
               {[
                 { label: t('common.type'),       value: doc.type,           color: typeColor.accent, bg: typeColor.bg },
-                { label: t('common.department'), value: doc.dept,           color: 'var(--primary)', bg: 'rgba(26,86,219,.07)' },
+                { label: t('common.department'), value: doc.dept,           color: 'var(--primary)', bg: 'rgba(33, 74, 171,.07)' },
                 { label: t('common.year'),       value: String(doc.year),   color: '#64748b',        bg: 'rgba(100,116,139,.08)' },
                 { label: t('common.version'),    value: `v${doc.version || '1.0'}`, color: '#64748b', bg: 'rgba(100,116,139,.08)' },
               ].map(({ label, value, color, bg }) => (
@@ -911,7 +911,7 @@ function DocViewModal({ doc, onClose }) {
             {/* {doc.summary && (
               <div style={{ marginBottom: 22 }}>
                 <div style={{ ...LS, marginBottom: 10 }}>{t('docViewModal.summary')}</div>
-                <div style={{ padding: '14px 16px', borderRadius: 10, background: 'rgba(26,86,219,.04)', border: '1px solid rgba(26,86,219,.15)', fontSize: 13, color: 'var(--text-color)', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>
+                <div style={{ padding: '14px 16px', borderRadius: 10, background: 'rgba(33, 74, 171,.04)', border: '1px solid rgba(33, 74, 171,.15)', fontSize: 13, color: 'var(--text-color)', lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>
                   {doc.summary}
                 </div>
               </div>
@@ -921,7 +921,7 @@ function DocViewModal({ doc, onClose }) {
             {(doc.hierarchy?.act || doc.hierarchy?.chapter || doc.hierarchy?.section) && (
               <div style={{ marginBottom: 22 }}>
                 <div style={{ ...LS, marginBottom: 10 }}>{t('docViewModal.hierarchyTags')}</div>
-                <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(26,86,219,.04)', border: '1px solid rgba(26,86,219,.15)', fontSize: 12, color: 'var(--text-color-secondary)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2, lineHeight: 1.8 }}>
+                <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(33, 74, 171,.04)', border: '1px solid rgba(33, 74, 171,.15)', fontSize: 12, color: 'var(--text-color-secondary)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2, lineHeight: 1.8 }}>
                   {doc.hierarchy.act && <span style={{ color: 'var(--primary)', fontWeight: 700 }}>{doc.hierarchy.act}</span>}
                   {doc.hierarchy.chapter && (<><ChevronRight size={11} color="#94a3b8" style={{ flexShrink: 0 }} /><span>{doc.hierarchy.chapter}</span></>)}
                   {doc.hierarchy.section && (<><ChevronRight size={11} color="#94a3b8" style={{ flexShrink: 0 }} /><span>{doc.hierarchy.section}</span></>)}
@@ -936,12 +936,12 @@ function DocViewModal({ doc, onClose }) {
                 <div style={{ ...LS, marginBottom: 10 }}>{t('docViewModal.legalAuthorities')}</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {doc.legalAuthorities.map((a, i) => (
-                    <div key={i} style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(26,86,219,.04)', border: '1px solid rgba(26,86,219,.15)' }}>
+                    <div key={i} style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(33, 74, 171,.04)', border: '1px solid rgba(33, 74, 171,.15)' }}>
                       <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--primary)', marginBottom: a.sections?.some(s => s) ? 4 : 0 }}>{a.act}</div>
                       {a.sections?.filter(s => s).length > 0 && (
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
                           {a.sections.filter(s => s).map((s, j) => (
-                            <span key={j} style={{ fontSize: 10.5, fontFamily: 'var(--mono)', background: 'rgba(26,86,219,.1)', color: 'var(--primary)', padding: '2px 8px', borderRadius: 12 }}>{s}</span>
+                            <span key={j} style={{ fontSize: 10.5, fontFamily: 'var(--mono)', background: 'rgba(33, 74, 171,.1)', color: 'var(--primary)', padding: '2px 8px', borderRadius: 12 }}>{s}</span>
                           ))}
                         </div>
                       )}
@@ -958,9 +958,9 @@ function DocViewModal({ doc, onClose }) {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {doc.docRelations.map((r, i) => (
                     <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 12px', borderRadius: 8,
-                      background: r.isPending ? 'rgba(245,158,11,.05)' : 'rgba(34,197,94,.05)',
-                      border: `1px solid ${r.isPending ? 'rgba(245,158,11,.2)' : 'rgba(34,197,94,.2)'}` }}>
-                      <div style={{ width: 20, height: 20, borderRadius: '50%', background: r.isPending ? 'rgba(245,158,11,.15)' : 'rgba(34,197,94,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
+                      background: r.isPending ? 'rgba(255, 193, 7,.05)' : 'rgba(25, 135, 84,.05)',
+                      border: `1px solid ${r.isPending ? 'rgba(255, 193, 7,.2)' : 'rgba(25, 135, 84,.2)'}` }}>
+                      <div style={{ width: 20, height: 20, borderRadius: '50%', background: r.isPending ? 'rgba(255, 193, 7,.15)' : 'rgba(25, 135, 84,.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
                         <span style={{ fontSize: 9, color: r.isPending ? '#d97706' : '#16a34a', fontWeight: 900 }}>↔</span>
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -983,14 +983,14 @@ function DocViewModal({ doc, onClose }) {
                 <div style={{ ...LS, marginBottom: 10 }}>{t('docViewModal.amendmentProvisions')}</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   {doc.amendmentProvisions.map((p, i) => (
-                    <div key={i} style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)' }}>
+                    <div key={i} style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(255, 193, 7,.06)', border: '1px solid rgba(255, 193, 7,.2)' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: p.before || p.after || p.description ? 6 : 0 }}>
-                        <span style={{ fontFamily: 'var(--mono)', color: '#d97706', fontWeight: 700, fontSize: 10.5, background: 'rgba(245,158,11,.15)', padding: '2px 7px', borderRadius: 10 }}>{p.changeType || t('docViewModal.amendedDefault')}</span>
+                        <span style={{ fontFamily: 'var(--mono)', color: '#d97706', fontWeight: 700, fontSize: 10.5, background: 'rgba(255, 193, 7,.15)', padding: '2px 7px', borderRadius: 10 }}>{p.changeType || t('docViewModal.amendedDefault')}</span>
                         {p.section && <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text-heading)' }}>{t('docViewModal.sectionLabel', { section: p.section })}{p.chapter ? ` · ${t('docViewModal.chapterSuffix', { chapter: p.chapter })}` : ''}{p.subsection ? ` (${p.subsection})` : ''}</span>}
                       </div>
                       {p.description && <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', lineHeight: 1.5 }}>{p.description}</div>}
-                      {p.before && <div style={{ fontSize: 11, color: '#dc2626', fontFamily: 'var(--mono)', marginTop: 4, background: 'rgba(239,68,68,.05)', padding: '4px 8px', borderRadius: 5, borderLeft: '3px solid rgba(239,68,68,.4)' }}>{t('docViewModal.before', { value: p.before })}</div>}
-                      {p.after  && <div style={{ fontSize: 11, color: '#16a34a', fontFamily: 'var(--mono)', marginTop: 4, background: 'rgba(34,197,94,.05)',  padding: '4px 8px', borderRadius: 5, borderLeft: '3px solid rgba(34,197,94,.4)' }}>{t('docViewModal.after', { value: p.after })}</div>}
+                      {p.before && <div style={{ fontSize: 11, color: '#dc2626', fontFamily: 'var(--mono)', marginTop: 4, background: 'rgba(220, 53, 69,.05)', padding: '4px 8px', borderRadius: 5, borderLeft: '3px solid rgba(220, 53, 69,.4)' }}>{t('docViewModal.before', { value: p.before })}</div>}
+                      {p.after  && <div style={{ fontSize: 11, color: '#16a34a', fontFamily: 'var(--mono)', marginTop: 4, background: 'rgba(25, 135, 84,.05)',  padding: '4px 8px', borderRadius: 5, borderLeft: '3px solid rgba(25, 135, 84,.4)' }}>{t('docViewModal.after', { value: p.after })}</div>}
                     </div>
                   ))}
                 </div>
@@ -1001,7 +1001,7 @@ function DocViewModal({ doc, onClose }) {
             {doc.parentAct && (
               <div style={{ marginBottom: 22 }}>
                 <div style={{ ...LS, marginBottom: 10 }}>{t('docViewModal.parentAct')}</div>
-                <div style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(26,86,219,.04)', border: '1px solid rgba(26,86,219,.15)', fontSize: 12, fontWeight: 600, color: 'var(--primary)' }}>
+                <div style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(33, 74, 171,.04)', border: '1px solid rgba(33, 74, 171,.15)', fontSize: 12, fontWeight: 600, color: 'var(--primary)' }}>
                   {doc.parentAct}
                 </div>
               </div>
@@ -1013,12 +1013,12 @@ function DocViewModal({ doc, onClose }) {
                 <div style={{ ...LS, marginBottom: 10 }}>{t('common.reviewerRemarks')}</div>
                 <div style={{ borderRadius: 12, border: `1px solid ${statusAccent}44`, overflow: 'hidden' }}>
                   {/* Approver header */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', background: doc.status === 'approved' ? 'rgba(34,197,94,.06)' : doc.status === 'rejected' ? 'rgba(239,68,68,.06)' : 'rgba(245,158,11,.06)', borderBottom: doc.approval.comments ? `1px solid ${statusAccent}22` : 'none' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', background: doc.status === 'approved' ? 'rgba(25, 135, 84,.06)' : doc.status === 'rejected' ? 'rgba(220, 53, 69,.06)' : 'rgba(255, 193, 7,.06)', borderBottom: doc.approval.comments ? `1px solid ${statusAccent}22` : 'none' }}>
                     <div style={{ width: 36, height: 36, borderRadius: 9, background: statusBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       <StatusIconV size={16} color={statusAccent} />
                     </div>
                     <div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: statusAccent }}>
+                      <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: statusAccent }}>
                         {doc.reviewTitle || (doc.status === 'approved' ? t('docViewModal.documentApproved') : doc.status === 'rejected' ? t('docViewModal.documentRejected') : t('docViewModal.pendingReview'))}
                       </div>
                       <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', marginTop: 3 }}>
@@ -1097,8 +1097,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const isMobile = useIsMobile();
   const [deptsData, setDeptsData] = useState([]);
   const [typesData, setTypesData] = useState([]);
-  const DEPTS = deptsData.length > 0 ? deptsData.map(d => d.name) : DEFAULT_DEPTS;
-  const TYPES = typesData.length > 0 ? typesData.map(d => d.name) : DEFAULT_TYPES;
+  const DEPTS = deptsData.length > 0 ? deptsData.filter(d => d.is_active !== false).map(d => d.name) : DEFAULT_DEPTS;
+  const TYPES = typesData.length > 0 ? typesData.filter(d => d.is_active !== false).map(d => d.name) : DEFAULT_TYPES;
 
   const [showTypeChanger, setShowTypeChanger] = useState(false);
 
@@ -2258,10 +2258,10 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         {/* Welcome header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
           <div>
-            <div className="ud-welcome-title" style={{ fontSize: 21, fontWeight: 800, color: 'var(--text-heading)', letterSpacing: '-.01em' }}>
+            <div className="ud-welcome-title" style={{ fontSize: 'var(--font-size-h3)', fontWeight: 800, color: 'var(--text-heading)', letterSpacing: '-.01em' }}>
               {t('dashboard.greeting', { name: user?.name || '' })}
             </div>
-            <div style={{ fontSize: 13.5, color: 'var(--text-color-secondary)', marginTop: 4 }}>
+            <div style={{ fontSize: 'var(--font-size-p2)', color: 'var(--text-color-secondary)', marginTop: 4 }}>
               {t('dashboard.subtitle')}
             </div>
           </div>
@@ -2277,8 +2277,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
           <div style={{ ...LABEL, marginBottom: 10 }}>{t('dashboard.quickActionsLabel')}</div>
           <div className="ud-grid-3" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
             {[
-              { key: 'upload', icon: Upload, title: t('dashboard.quickActions.uploadTitle'), desc: t('dashboard.quickActions.uploadDesc'), accent: '#1a56db', bg: 'rgba(26,86,219,.08)' },
-              { key: 'editdocument', icon: Edit3, title: t('dashboard.quickActions.editTitle'), desc: t('dashboard.quickActions.editDesc'), accent: '#f59e0b', bg: 'rgba(245,158,11,.08)' },
+              { key: 'upload', icon: Upload, title: t('dashboard.quickActions.uploadTitle'), desc: t('dashboard.quickActions.uploadDesc'), accent: '#214aab', bg: 'rgba(33, 74, 171,.08)' },
+              { key: 'editdocument', icon: Edit3, title: t('dashboard.quickActions.editTitle'), desc: t('dashboard.quickActions.editDesc'), accent: '#ffc107', bg: 'rgba(255, 193, 7,.08)' },
               { key: 'adddocuments', icon: FolderPlus, title: t('dashboard.quickActions.addDocumentsTitle'), desc: t('dashboard.quickActions.addDocumentsDesc'), accent: '#16a34a', bg: 'rgba(22,163,74,.08)' },
             ].map(action => (
               <Card key={action.key} onClick={() => onNavigate?.(action.key)}
@@ -2292,8 +2292,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                   <action.icon size={21} color={action.accent} strokeWidth={1.8} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', lineHeight: 1.3 }}>{action.title}</div>
-                  <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', lineHeight: 1.45, marginTop: 3 }}>{action.desc}</div>
+                  <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)', lineHeight: 1.3 }}>{action.title}</div>
+                  <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-color-secondary)', lineHeight: 1.45, marginTop: 3 }}>{action.desc}</div>
                 </div>
                 <ArrowRight size={16} color={action.accent} style={{ flexShrink: 0, opacity: .8 }} />
               </Card>
@@ -2305,7 +2305,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         {versionModal && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setVersionModal(null)}>
             <div style={{ background: 'var(--surface-card)', borderRadius: 14, padding: 28, width: 'min(480px, calc(100vw - 32px))', boxShadow: '0 24px 80px rgba(0,0,0,.3)' }} onClick={e => e.stopPropagation()}>
-              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 18, paddingBottom: 12, borderBottom: '1px solid var(--surface-border)' }}>
+              <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)', marginBottom: 18, paddingBottom: 12, borderBottom: '1px solid var(--surface-border)' }}>
                 {t('versionModal.title', { title: versionModal.title })}
               </div>
               {[{ v: versionModal.version || '1.0', date: versionModal.uploadedAt, note: t('versionModal.current') }].map((ver, i, arr) => (
@@ -2313,7 +2313,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)', display: 'flex', alignItems: 'center', gap: 8 }}>
                       v{ver.v}
-                      {i === 0 && <span style={{ fontSize: 10, background: 'rgba(26,86,219,.12)', color: 'var(--primary)', padding: '1px 7px', borderRadius: 20, fontWeight: 700 }}>{t('versionModal.currentBadge')}</span>}
+                      {i === 0 && <span style={{ fontSize: 10, background: 'rgba(33, 74, 171,.12)', color: 'var(--primary)', padding: '1px 7px', borderRadius: 20, fontWeight: 700 }}>{t('versionModal.currentBadge')}</span>}
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 2, fontFamily: 'var(--mono)' }}>{ver.date} — {ver.note}</div>
                   </div>
@@ -2334,7 +2334,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
               {/* Header */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, paddingBottom: 12, borderBottom: '1px solid var(--surface-border)' }}>
                 <div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 4 }}>{t('common.reviewerRemarks')}</div>
+                  <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)', marginBottom: 4 }}>{t('common.reviewerRemarks')}</div>
                   <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 360 }}>{remarksModal.title}</div>
                 </div>
                 <button onClick={() => setRemarksModal(null)}
@@ -2347,15 +2347,15 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
               <div style={{
                 display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16,
                 padding: '10px 14px', borderRadius: 8,
-                background: remarksModal.status === 'approved' ? 'rgba(34,197,94,.06)' : 'rgba(239,68,68,.06)',
-                border: `1px solid ${remarksModal.status === 'approved' ? 'rgba(34,197,94,.2)' : 'rgba(239,68,68,.2)'}`,
+                background: remarksModal.status === 'approved' ? 'rgba(25, 135, 84,.06)' : 'rgba(220, 53, 69,.06)',
+                border: `1px solid ${remarksModal.status === 'approved' ? 'rgba(25, 135, 84,.2)' : 'rgba(220, 53, 69,.2)'}`,
               }}>
                 {remarksModal.status === 'approved'
                   ? <CheckCircle size={16} color="#16a34a" style={{ flexShrink: 0 }} />
-                  : <XCircle    size={16} color="#ef4444" style={{ flexShrink: 0 }} />
+                  : <XCircle    size={16} color="#dc3545" style={{ flexShrink: 0 }} />
                 }
                 <div>
-                  <div style={{ fontSize: 12.5, fontWeight: 700, color: remarksModal.status === 'approved' ? '#16a34a' : '#ef4444' }}>
+                  <div style={{ fontSize: 'var(--font-size-small)', fontWeight: 700, color: remarksModal.status === 'approved' ? '#16a34a' : '#dc3545' }}>
                     {remarksModal.status === 'approved' ? t('remarksModal.approved') : t('remarksModal.rejected')}
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', marginTop: 2 }}>
@@ -2392,11 +2392,11 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
 
         {/* API error */}
         {myDocsError && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderRadius: 10, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', color: '#dc2626' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderRadius: 10, background: 'rgba(220, 53, 69,.08)', border: '1px solid rgba(220, 53, 69,.2)', color: '#dc2626' }}>
             <AlertCircle size={15} style={{ flexShrink: 0 }} />
             <span style={{ fontSize: 13 }}>{myDocsError}</span>
             <button onClick={() => { setMyDocsError(''); setMyDocsLoading(true); getMyDocuments().then(r => setUploads((r.data.documents||[]).map(mapApiDoc))).catch(e => setMyDocsError(e.response?.data?.detail || t('toasts.failedToLoadDocuments'))).finally(() => setMyDocsLoading(false)); }}
-              style={{ marginLeft: 'auto', padding: '5px 14px', borderRadius: 7, border: '1px solid rgba(239,68,68,.3)', background: 'transparent', color: '#dc2626', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+              style={{ marginLeft: 'auto', padding: '5px 14px', borderRadius: 7, border: '1px solid rgba(220, 53, 69,.3)', background: 'transparent', color: '#dc2626', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
               {t('common.retry')}
             </button>
           </div>
@@ -2414,10 +2414,10 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         <div style={{ ...LABEL }}>{t('dashboard.overviewLabel')}</div>
         <div className="ud-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
           {[
-            { label: t('stats.totalUploads'),  value: uploads.length, bg: 'rgba(26,86,219,.12)',  color: 'var(--primary)', icon: FileText,    filter: 'all' },
-            { label: t('stats.approved'),       value: approved,        bg: 'rgba(34,197,94,.12)',  color: '#22c55e',        icon: CheckCircle, filter: 'approved' },
-            { label: t('stats.pendingReview'), value: pending,         bg: 'rgba(245,158,11,.12)', color: '#f59e0b',        icon: TrendingUp,  filter: 'pending' },
-            { label: t('stats.rejected'),       value: rejected,        bg: 'rgba(239,68,68,.12)',  color: '#ef4444',        icon: XCircle,     filter: 'rejected' },
+            { label: t('stats.totalUploads'),  value: uploads.length, bg: 'rgba(33, 74, 171,.12)',  color: 'var(--primary)', icon: FileText,    filter: 'all' },
+            { label: t('stats.approved'),       value: approved,        bg: 'rgba(25, 135, 84,.12)',  color: '#198754',        icon: CheckCircle, filter: 'approved' },
+            { label: t('stats.pendingReview'), value: pending,         bg: 'rgba(255, 193, 7,.12)', color: '#b45309',        icon: TrendingUp,  filter: 'pending' },
+            { label: t('stats.rejected'),       value: rejected,        bg: 'rgba(220, 53, 69,.12)',  color: '#dc3545',        icon: XCircle,     filter: 'rejected' },
           ].map(s => {
             const isActive = filterStatus === s.filter;
             return (
@@ -2438,11 +2438,11 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         </div>
 
         {selectedIds.size > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderRadius: 10, background: 'rgba(26,86,219,.06)', border: '1px solid rgba(26,86,219,.2)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderRadius: 10, background: 'rgba(33, 74, 171,.06)', border: '1px solid rgba(33, 74, 171,.2)' }}>
             <span style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--primary)' }}>{t('table.selectedCount', { count: selectedIds.size })}</span>
             <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>{t('table.draftOnly')}</span>
             <button onClick={() => setBulkEditOpen(v => !v)}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 7, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.08)', color: 'var(--primary)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 7, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.08)', color: 'var(--primary)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
               <Edit3 size={12} /> {t('bulkEdit.button')}
             </button>
             <button onClick={() => setSelectedIds(new Set())}
@@ -2455,11 +2455,11 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         {/* Bulk edit panel */}
         {bulkEditOpen && selectedIds.size > 0 && (
           <Card>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
               <Tag size={14} color="var(--primary)" />
               {t('bulkEdit.title', { count: selectedIds.size })}
             </div>
-            <div style={{ fontSize: 11.5, color: '#d97706', background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 7, padding: '6px 12px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ fontSize: 11.5, color: '#d97706', background: 'rgba(255, 193, 7,.08)', border: '1px solid rgba(255, 193, 7,.2)', borderRadius: 7, padding: '6px 12px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
               <AlertTriangle size={12} color="#d97706" />
               {t('bulkEdit.warning')}
             </div>
@@ -2537,14 +2537,14 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
 
           {/* ── Header ── */}
           <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', rowGap: 8 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>{t('table.title')}</div>
+            <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>{t('table.title')}</div>
             <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '2px 9px', borderRadius: 20 }}>
               {t('table.documentCount', { count: filtered.length })}
             </span>
             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
               {bulkSelectMode ? (
                 <button onClick={() => { setBulkSelectMode(false); setSelectedIds(new Set()); setBulkEditOpen(false); }}
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 7, border: '1px solid rgba(239,68,68,.3)', background: 'rgba(239,68,68,.06)', color: '#dc2626', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 7, border: '1px solid rgba(220, 53, 69,.3)', background: 'rgba(220, 53, 69,.06)', color: '#dc2626', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                   <X size={12} /> {t('table.cancelSelection')}
                 </button>
               ) : (
@@ -2572,7 +2572,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
               </div>
               {/* Active status filter chip */}
               {filterStatus && filterStatus !== 'all' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px 5px 12px', borderRadius: 20, background: 'rgba(26,86,219,.08)', border: '1px solid rgba(26,86,219,.2)', fontSize: 12, fontWeight: 600, color: 'var(--primary)', whiteSpace: 'nowrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px 5px 12px', borderRadius: 20, background: 'rgba(33, 74, 171,.08)', border: '1px solid rgba(33, 74, 171,.2)', fontSize: 12, fontWeight: 600, color: 'var(--primary)', whiteSpace: 'nowrap' }}>
                   {{ approved: t('stats.approved'), pending: t('stats.pendingReview'), rejected: t('stats.rejected') }[filterStatus]}
                   <button onClick={() => setFilterStatus('')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--primary)', display: 'flex', padding: 0, marginLeft: 2 }}><X size={11} /></button>
                 </div>
@@ -2589,7 +2589,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                   const active = sortCol === col;
                   return (
                     <button key={col} onClick={() => toggleSort(col)}
-                      style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '4px 11px', borderRadius: 20, border: `1px solid ${active ? 'var(--primary)' : 'var(--surface-border)'}`, background: active ? 'rgba(26,86,219,.08)' : 'transparent', color: active ? 'var(--primary)' : 'var(--text-color-secondary)', fontSize: 11.5, fontWeight: active ? 700 : 500, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'all .15s' }}>
+                      style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '4px 11px', borderRadius: 20, border: `1px solid ${active ? 'var(--primary)' : 'var(--surface-border)'}`, background: active ? 'rgba(33, 74, 171,.08)' : 'transparent', color: active ? 'var(--primary)' : 'var(--text-color-secondary)', fontSize: 11.5, fontWeight: active ? 700 : 500, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'all .15s' }}>
                       {label}{active && <span style={{ fontSize: 9 }}>{sortDir === 'asc' ? '▲' : '▼'}</span>}
                     </button>
                   );
@@ -2668,9 +2668,9 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                     const isDraft      = !doc.workflowStatus || doc.workflowStatus === WORKFLOW_STATUS.DRAFT;
                     const isPublished  = doc.workflowStatus === WORKFLOW_STATUS.PUBLISHED;
                     const isSelected   = selectedIds.has(doc.id);
-                    const statusAccent = doc.status === 'approved' ? '#16a34a' : doc.status === 'rejected' ? '#ef4444' : '#f59e0b';
-                    const statusBg     = doc.status === 'approved' ? 'rgba(34,197,94,.07)' : doc.status === 'rejected' ? 'rgba(239,68,68,.07)' : 'rgba(245,158,11,.07)';
-                    const statusBorder = doc.status === 'approved' ? 'rgba(34,197,94,.25)' : doc.status === 'rejected' ? 'rgba(239,68,68,.25)' : 'rgba(245,158,11,.25)';
+                    const statusAccent = doc.status === 'approved' ? '#16a34a' : doc.status === 'rejected' ? '#dc3545' : '#ffc107';
+                    const statusBg     = doc.status === 'approved' ? 'rgba(25, 135, 84,.07)' : doc.status === 'rejected' ? 'rgba(220, 53, 69,.07)' : 'rgba(255, 193, 7,.07)';
+                    const statusBorder = doc.status === 'approved' ? 'rgba(25, 135, 84,.25)' : doc.status === 'rejected' ? 'rgba(220, 53, 69,.25)' : 'rgba(255, 193, 7,.25)';
                     const typeColor    = TYPE_CARD_COLORS[doc.type] || { accent: '#94a3b8', bg: 'rgba(148,163,184,.1)', text: '#64748b' };
                     const approverName = doc.approval?.approver_first_name
                       ? `${doc.approval.approver_first_name} ${doc.approval.approver_last_name || ''}`.trim()
@@ -2683,7 +2683,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                     if (isMobile) {
                       return (
                         <div key={doc.id}
-                          style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '12px 14px', borderBottom: '1px solid var(--surface-border)', borderLeft: `3px solid ${statusAccent}`, background: isSelected ? 'rgba(26,86,219,.04)' : 'transparent' }}>
+                          style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '12px 14px', borderBottom: '1px solid var(--surface-border)', borderLeft: `3px solid ${statusAccent}`, background: isSelected ? 'rgba(33, 74, 171,.04)' : 'transparent' }}>
 
                           {/* Row 1: (select) + icon + title + status pill */}
                           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
@@ -2735,7 +2735,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                                 <GitBranch size={11} /> v{doc.version || '1.0'}
                               </button>
                               <button onClick={() => setViewDoc(doc)}
-                                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 7, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 7, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                                 <Eye size={13} /> {t('common.view')}
                               </button>
                             </div>
@@ -2746,9 +2746,9 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
 
                     return (
                       <div key={doc.id}
-                        style={{ display: 'grid', gridTemplateColumns: cols, borderBottom: '1px solid var(--surface-border)', background: isSelected ? 'rgba(26,86,219,.04)' : 'transparent', transition: 'background .15s' }}
+                        style={{ display: 'grid', gridTemplateColumns: cols, borderBottom: '1px solid var(--surface-border)', background: isSelected ? 'rgba(33, 74, 171,.04)' : 'transparent', transition: 'background .15s' }}
                         onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = 'var(--surface-hover)'; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = isSelected ? 'rgba(26,86,219,.04)' : 'transparent'; }}>
+                        onMouseLeave={e => { e.currentTarget.style.background = isSelected ? 'rgba(33, 74, 171,.04)' : 'transparent'; }}>
 
                         {/* Status accent strip */}
                         <div style={{ background: statusAccent }} />
@@ -2810,9 +2810,9 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                         {/* Actions */}
                         <div style={{ padding: '14px 16px', borderLeft: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 7 }}>
                           <button onClick={() => setViewDoc(doc)}
-                            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 7, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', whiteSpace: 'nowrap', transition: 'background .15s' }}
-                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(26,86,219,.14)'}
-                            onMouseLeave={e => e.currentTarget.style.background = 'rgba(26,86,219,.07)'}>
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 7, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', whiteSpace: 'nowrap', transition: 'background .15s' }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(33, 74, 171,.14)'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'rgba(33, 74, 171,.07)'}>
                             <Eye size={13} /> {t('common.view')}
                           </button>
                           {doc.approval?.comments && (
@@ -2844,19 +2844,19 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         {linkedDocs.length > 0 && (
           <Card padding="0">
             <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>{t('linkedDocs.title')}</div>
-              <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: '#d97706', background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.25)', padding: '2px 9px', borderRadius: 20 }}>
+              <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>{t('linkedDocs.title')}</div>
+              <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: '#d97706', background: 'rgba(255, 193, 7,.08)', border: '1px solid rgba(255, 193, 7,.25)', padding: '2px 9px', borderRadius: 20 }}>
                 {linkedDocs.length}
               </span>
-              <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginLeft: 4 }}>{t('linkedDocs.subtitle')}</span>
+              <span style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-color-secondary)', marginLeft: 4 }}>{t('linkedDocs.subtitle')}</span>
             </div>
             {linkedDocs.map(l => {
               const typeColor   = TYPE_CARD_COLORS[l.document_type_name] || { accent: '#94a3b8', bg: 'rgba(148,163,184,.1)', text: '#64748b' };
               const isApproved  = l.link_status === 'approved';
               const isRejected  = l.link_status === 'rejected';
               const linkAccent  = isApproved ? '#16a34a' : isRejected ? '#dc2626' : '#d97706';
-              const linkBg      = isApproved ? 'rgba(34,197,94,.07)' : isRejected ? 'rgba(239,68,68,.07)' : 'rgba(245,158,11,.07)';
-              const linkBorder  = isApproved ? 'rgba(34,197,94,.25)' : isRejected ? 'rgba(239,68,68,.25)' : 'rgba(245,158,11,.25)';
+              const linkBg      = isApproved ? 'rgba(25, 135, 84,.07)' : isRejected ? 'rgba(220, 53, 69,.07)' : 'rgba(255, 193, 7,.07)';
+              const linkBorder  = isApproved ? 'rgba(25, 135, 84,.25)' : isRejected ? 'rgba(220, 53, 69,.25)' : 'rgba(255, 193, 7,.25)';
               const linkLabel   = isApproved ? t('linkedDocs.linkApproved') : isRejected ? t('linkedDocs.linkRejected') : t('linkedDocs.linkPending');
               const LinkIcon    = isApproved ? CheckCircle : isRejected ? XCircle : Clock;
               const mapLinkedDocForViewer = () => {
@@ -2906,7 +2906,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                       <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)' }}>{l.created_at?.split('T')[0] || ''}</span>
                       <button
                         onClick={() => setViewingLinkedDoc(mapLinkedDocForViewer())}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 7, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 7, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                         <Eye size={13} /> {t('common.view')}
                       </button>
                     </div>
@@ -2938,7 +2938,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                           <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {l.document_name || l.original_filename}
                           </span>
-                          <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 20, background: 'rgba(245,158,11,.12)', color: '#d97706', flexShrink: 0, letterSpacing: '.05em' }}>{t('linkedDocs.linkedBadge')}</span>
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 20, background: 'rgba(255, 193, 7,.12)', color: '#d97706', flexShrink: 0, letterSpacing: '.05em' }}>{t('linkedDocs.linkedBadge')}</span>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
                           <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: typeColor.bg, color: typeColor.text || typeColor.accent }}>{DOC_TYPE_KEY[l.document_type_name] ? t(`docTypes.${DOC_TYPE_KEY[l.document_type_name]}`) : l.document_type_name}</span>
@@ -2955,9 +2955,9 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                     <div style={{ padding: '10px 14px', borderLeft: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <button
                         onClick={() => setViewingLinkedDoc(mapLinkedDocForViewer())}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 7, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'background .15s' }}
-                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(26,86,219,.14)'}
-                        onMouseLeave={e => e.currentTarget.style.background = 'rgba(26,86,219,.07)'}>
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 7, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'background .15s' }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(33, 74, 171,.14)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'rgba(33, 74, 171,.07)'}>
                         <Eye size={12} /> {t('common.view')}
                       </button>
                     </div>
@@ -3000,8 +3000,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
           <Card padding="28px 26px">
             <div style={{ maxWidth: 1180, margin: '0 auto' }}>
               <div style={{ textAlign: 'center', marginBottom: 32 }}>
-                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-heading)', marginBottom: 8 }}>{t('editDocument.pickTypeHeading')}</div>
-                <div style={{ fontSize: 13.5, color: 'var(--text-color-secondary)' }}>{t('editDocument.pickTypeSubheading')}</div>
+                <div style={{ fontSize: 'var(--font-size-h2)', fontWeight: 800, color: 'var(--text-heading)', marginBottom: 8 }}>{t('editDocument.pickTypeHeading')}</div>
+                <div style={{ fontSize: 'var(--font-size-p2)', color: 'var(--text-color-secondary)' }}>{t('editDocument.pickTypeSubheading')}</div>
               </div>
               <div className="ud-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(240px, 1fr))', gap: 20 }}>
                 {TYPES.map(type => {
@@ -3022,8 +3022,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                           <FileText size={21} color={c.accent} />
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', lineHeight: 1.3 }}>{t('editDocument.editPrefix', { defaultValue: 'Edit' })} {DOC_TYPE_KEY[type] ? t(`docTypes.${DOC_TYPE_KEY[type]}`) : type}</div>
-                          <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', lineHeight: 1.45, marginTop: 3 }}>{DOC_TYPE_KEY[type] ? t(`docTypeDesc.${DOC_TYPE_KEY[type]}`) : TYPE_CARD_DESC[type]}</div>
+                          <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)', lineHeight: 1.3 }}>{t('editDocument.editPrefix', { defaultValue: 'Edit' })} {DOC_TYPE_KEY[type] ? t(`docTypes.${DOC_TYPE_KEY[type]}`) : type}</div>
+                          <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-color-secondary)', lineHeight: 1.45, marginTop: 3 }}>{DOC_TYPE_KEY[type] ? t(`docTypeDesc.${DOC_TYPE_KEY[type]}`) : TYPE_CARD_DESC[type]}</div>
                         </div>
                       </button>
                   );
@@ -3082,12 +3082,12 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
               <div style={{ width: 28, height: 28, borderRadius: 7, background: 'var(--surface-ground)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <Edit3 size={13} color="var(--primary)" />
               </div>
-              <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>
+              <span style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>
                 {t('editDocument.tableHeading', { type: DOC_TYPE_KEY[editType] ? t(`docTypes.${DOC_TYPE_KEY[editType]}`) : editType })}
               </span>
             </div>
             {editListError && (
-              <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', color: '#dc2626', fontSize: 12.5, marginBottom: 14 }}>
+              <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(220, 53, 69,.08)', border: '1px solid rgba(220, 53, 69,.2)', color: '#dc2626', fontSize: 12.5, marginBottom: 14 }}>
                 {editListError}
               </div>
             )}
@@ -3099,12 +3099,12 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                   <thead>
                     <tr style={{ background: 'var(--surface-ground)' }}>
                       <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('wizard.step3.colDocumentName')}</th>
-                      <th className="ud-editlist-refno" style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.referenceNo')}</th>
-                      <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.issueDate')}</th>
-                      <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.department')}</th>
-                      <th className="ud-editlist-version" style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.version')}</th>
-                      <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.status')}</th>
-                      <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('editDocument.action')}</th>
+                      <th className="ud-editlist-refno" style={{ ...LABEL, textAlign: 'left', padding: '8px 12px', borderLeft: '1px solid var(--surface-border)' }}>{t('common.referenceNo')}</th>
+                      <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px', borderLeft: '1px solid var(--surface-border)' }}>{t('common.issueDate')}</th>
+                      <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px', borderLeft: '1px solid var(--surface-border)' }}>{t('common.department')}</th>
+                      <th className="ud-editlist-version" style={{ ...LABEL, textAlign: 'left', padding: '8px 12px', borderLeft: '1px solid var(--surface-border)' }}>{t('common.version')}</th>
+                      <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px', borderLeft: '1px solid var(--surface-border)' }}>{t('common.status')}</th>
+                      <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px', borderLeft: '1px solid var(--surface-border)' }}>{t('editDocument.action')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -3119,23 +3119,23 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                       return (
                         <tr key={d.id} style={{ borderTop: '1px solid var(--surface-border)' }}>
                           <td style={{ padding: '8px 12px', color: 'var(--text-heading)', fontWeight: 600 }}>{d.title || '—'}</td>
-                          <td className="ud-editlist-refno" style={{ padding: '8px 12px', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.referenceNumber || '—'}</td>
-                          <td style={{ padding: '8px 12px', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.enactmentDate || '—'}</td>
-                          <td style={{ padding: '8px 12px', color: 'var(--text-color-secondary)' }}>{d.dept || '—'}</td>
-                          <td className="ud-editlist-version" style={{ padding: '8px 12px', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.version || '—'}</td>
-                          <td style={{ padding: '8px 12px', color: 'var(--text-color-secondary)', textTransform: 'capitalize' }}>
+                          <td className="ud-editlist-refno" style={{ padding: '8px 12px', borderLeft: '1px solid var(--surface-border)', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.referenceNumber || '—'}</td>
+                          <td style={{ padding: '8px 12px', borderLeft: '1px solid var(--surface-border)', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.enactmentDate || '—'}</td>
+                          <td style={{ padding: '8px 12px', borderLeft: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)' }}>{d.dept || '—'}</td>
+                          <td className="ud-editlist-version" style={{ padding: '8px 12px', borderLeft: '1px solid var(--surface-border)', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.version || '—'}</td>
+                          <td style={{ padding: '8px 12px', borderLeft: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)', textTransform: 'capitalize' }}>
                             {{ approved: t('common.statusWordApproved'), pending: t('common.statusWordPending'), rejected: t('common.statusWordRejected') }[d.status] || d.status || '—'}
                           </td>
-                          <td style={{ padding: '8px 12px' }}>
+                          <td style={{ padding: '8px 12px', borderLeft: '1px solid var(--surface-border)' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                               <button type="button" onClick={() => setViewingEditDoc(d)} title={t('common.view')}
                                 disabled={!d.id}
-                                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 600, cursor: d.id ? 'pointer' : 'not-allowed', fontFamily: 'var(--font)', opacity: d.id ? 1 : 0.5 }}>
+                                style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 600, cursor: d.id ? 'pointer' : 'not-allowed', fontFamily: 'var(--font)', opacity: d.id ? 1 : 0.5 }}>
                                 <Eye size={12} /> {t('common.view')}
                               </button>
                               {editable ? (
                                 <button type="button" onClick={() => openEditDoc(d)}
-                                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                                  style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                                   <Edit3 size={12} /> {t('editDocument.editButton')}
                                 </button>
                               ) : (
@@ -3167,7 +3167,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             <div style={{ width: 520, maxWidth: '100%', height: '100%', background: 'var(--surface-card)', boxShadow: '-8px 0 32px rgba(0,0,0,.18)', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
               <div style={{ padding: '18px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t('editDocument.editHeading')}</div>
+                  <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t('editDocument.editHeading')}</div>
                   <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{editingDoc.title}</div>
                 </div>
                 <button type="button" onClick={closeEditDoc}
@@ -3178,13 +3178,13 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
 
               <div className="ud-drawer-body" style={{ flex: 1, overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
                 {editError && (
-                  <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', color: '#dc2626', fontSize: 12.5 }}>
+                  <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(220, 53, 69,.08)', border: '1px solid rgba(220, 53, 69,.2)', color: '#dc2626', fontSize: 12.5 }}>
                     {editError}
                   </div>
                 )}
 
                 <div>
-                  <div style={{ ...LABEL, marginBottom: 6 }}>{t('editDocument.documentName')} <span style={{ color: '#ef4444' }}>*</span></div>
+                  <div style={{ ...LABEL, marginBottom: 6 }}>{t('editDocument.documentName')} <span style={{ color: '#dc3545' }}>*</span></div>
                   <input value={editForm.document_name}
                     onChange={e => setEditForm(f => ({ ...f, document_name: e.target.value }))}
                     style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
@@ -3281,7 +3281,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                   {t('common.cancel')}
                 </button>
                 <button type="button" onClick={saveEditDoc} disabled={editSaving}
-                  style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 20px', borderRadius: 8, border: 'none', background: editSaving ? 'rgba(26,86,219,.5)' : 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: editSaving ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)' }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 20px', borderRadius: 8, border: 'none', background: editSaving ? 'rgba(33, 74, 171,.5)' : 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: editSaving ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)' }}>
                   <Save size={14} /> {editSaving ? t('editDocument.saving') : t('editDocument.saveChanges')}
                 </button>
               </div>
@@ -3488,9 +3488,9 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     // Shared by the structure/entries card headers (status badge) and the footer save button
     // (disabled state) below — computed once so both stay in sync.
     const APPROVAL_STATUS_STYLES = {
-      pending:  { bg: '#fef3c7', color: '#92400e', border: '#f59e0b', icon: '⏳' },
+      pending:  { bg: '#fef3c7', color: '#92400e', border: '#ffc107', icon: '⏳' },
       approved: { bg: '#d1fae5', color: '#065f46', border: '#10b981', icon: '✓' },
-      rejected: { bg: '#fee2e2', color: '#991b1b', border: '#ef4444', icon: '✗' },
+      rejected: { bg: '#fee2e2', color: '#991b1b', border: '#dc3545', icon: '✗' },
     };
     const tabApproval = subDocApprovals[subDocTab];
     const approvalStatus = tabApproval?.status;
@@ -3506,8 +3506,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         <Toast toast={toast} onClose={() => setToast(null)} />
 
         <div>
-          <div style={{ fontSize: 21, fontWeight: 800, color: 'var(--text-heading)', letterSpacing: '-.01em' }}>{t('addDocuments.heading')}</div>
-          <div style={{ fontSize: 13.5, color: 'var(--text-color-secondary)', marginTop: 4 }}>{t('addDocuments.subheading')}</div>
+          <div style={{ fontSize: 'var(--font-size-h3)', fontWeight: 800, color: 'var(--text-heading)', letterSpacing: '-.01em' }}>{t('addDocuments.heading')}</div>
+          <div style={{ fontSize: 'var(--font-size-p2)', color: 'var(--text-color-secondary)', marginTop: 4 }}>{t('addDocuments.subheading')}</div>
         </div>
 
         {!subDocTab ? (
@@ -3515,8 +3515,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
           <Card padding="28px 26px">
             <div style={{ maxWidth: 1180, margin: '0 auto' }}>
               <div style={{ textAlign: 'center', marginBottom: 32 }}>
-                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-heading)', marginBottom: 8 }}>{t('addDocuments.pickHeading')} <span style={{ color: '#ef4444' }}>*</span></div>
-                <div style={{ fontSize: 13.5, color: 'var(--text-color-secondary)' }}>{t('addDocuments.pickSubheading')}</div>
+                <div style={{ fontSize: 'var(--font-size-h2)', fontWeight: 800, color: 'var(--text-heading)', marginBottom: 8 }}>{t('addDocuments.pickHeading')} <span style={{ color: '#dc3545' }}>*</span></div>
+                <div style={{ fontSize: 'var(--font-size-p2)', color: 'var(--text-color-secondary)' }}>{t('addDocuments.pickSubheading')}</div>
               </div>
               <div className="ud-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(240px, 1fr))', gap: 20 }}>
                 {SUBDOC_TABS.map(tab => (
@@ -3535,8 +3535,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                         <FileText size={21} color={tab.accent} />
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', lineHeight: 1.3 }}>{t(tab.labelKey)}</div>
-                        <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', lineHeight: 1.45, marginTop: 3 }}>{t(tab.descKey)}</div>
+                        <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)', lineHeight: 1.3 }}>{t(tab.labelKey)}</div>
+                        <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-color-secondary)', lineHeight: 1.45, marginTop: 3 }}>{t(tab.descKey)}</div>
                       </div>
                     </button>
                 ))}
@@ -3631,7 +3631,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
               <div style={{ width: 30, height: 30, borderRadius: 8, background: activeSubTab.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <Layers size={14} color={activeSubTab.accent} />
               </div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)', flex: 1 }}>{t('addDocuments.sections.structureHeading')}</div>
+              <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)', flex: 1 }}>{t('addDocuments.sections.structureHeading')}</div>
               {approvalStyle && (
                 <span style={{ fontSize: 11, fontWeight: 700, background: approvalStyle.bg, color: approvalStyle.color, border: `1px solid ${approvalStyle.border}`, borderRadius: 20, padding: '3px 11px', flexShrink: 0 }}>
                   {approvalStyle.icon} {approvalStatus.charAt(0).toUpperCase() + approvalStatus.slice(1)}
@@ -3657,16 +3657,16 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                             display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left',
                             padding: '14px 16px', borderRadius: 12, cursor: locked ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)',
                             border: active ? '1.5px solid var(--primary)' : '1.5px solid var(--surface-border)',
-                            background: active ? 'rgba(26,86,219,.06)' : 'var(--surface-card)',
+                            background: active ? 'rgba(33, 74, 171,.06)' : 'var(--surface-card)',
                             opacity: locked ? 0.45 : 1,
                             transition: 'all .15s',
                           }}>
-                          <div style={{ width: 40, height: 40, borderRadius: 10, background: active ? 'rgba(26,86,219,.14)' : 'var(--surface-ground)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <div style={{ width: 40, height: 40, borderRadius: 10, background: active ? 'rgba(33, 74, 171,.14)' : 'var(--surface-ground)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                             <opt.icon size={18} color={active ? 'var(--primary)' : 'var(--text-color-secondary)'} />
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 13, fontWeight: 700, color: active ? 'var(--primary)' : 'var(--text-heading)' }}>{opt.title}</div>
-                            <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 2, lineHeight: 1.4 }}>{opt.desc}</div>
+                            <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: active ? 'var(--primary)' : 'var(--text-heading)' }}>{opt.title}</div>
+                            <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-color-secondary)', marginTop: 2, lineHeight: 1.4 }}>{opt.desc}</div>
                           </div>
                           {active && <CheckCircle size={16} color="var(--primary)" style={{ flexShrink: 0 }} />}
                         </button>
@@ -3715,10 +3715,10 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                             {chStatusChip && (
                               <span style={{ fontSize: 9.5, fontWeight: 700, borderRadius: 20, padding: '1px 8px', flexShrink: 0,
                                 ...(chStatusChip === 'draft'          ? { background: '#f1f5f9', color: '#64748b', border: '1px solid #cbd5e1' } :
-                                    chStatusChip === 'pending'        ? { background: '#fef3c7', color: '#92400e', border: '1px solid #f59e0b' } :
+                                    chStatusChip === 'pending'        ? { background: '#fef3c7', color: '#92400e', border: '1px solid #ffc107' } :
                                     chStatusChip === 'approved'       ? { background: '#d1fae5', color: '#065f46', border: '1px solid #10b981' } :
                                     chStatusChip === 'pending_delete' ? { background: '#fff1f2', color: '#9f1239', border: '1px solid #fda4af' } :
-                                                                        { background: '#fee2e2', color: '#991b1b', border: '1px solid #ef4444' }),
+                                                                        { background: '#fee2e2', color: '#991b1b', border: '1px solid #dc3545' }),
                               }}>{{ draft: 'Draft', pending: 'Pending', approved: 'Approved', rejected: 'Rejected', pending_delete: 'Del. Pending' }[chStatusChip] || chStatusChip}</span>
                             )}
                             <ChevronRight size={14} color="var(--text-color-secondary)" style={{ flexShrink: 0 }} />
@@ -3775,17 +3775,17 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                                         {secStatusChip && (
                                           <span style={{ fontSize: 9.5, fontWeight: 700, borderRadius: 20, padding: '1px 7px', flexShrink: 0,
                                             ...(secStatusChip === 'draft'          ? { background: '#f1f5f9', color: '#64748b', border: '1px solid #cbd5e1' } :
-                                                secStatusChip === 'pending'        ? { background: '#fef3c7', color: '#92400e', border: '1px solid #f59e0b' } :
+                                                secStatusChip === 'pending'        ? { background: '#fef3c7', color: '#92400e', border: '1px solid #ffc107' } :
                                                 secStatusChip === 'approved'       ? { background: '#d1fae5', color: '#065f46', border: '1px solid #10b981' } :
                                                 secStatusChip === 'pending_delete' ? { background: '#fff1f2', color: '#9f1239', border: '1px solid #fda4af' } :
-                                                                                     { background: '#fee2e2', color: '#991b1b', border: '1px solid #ef4444' }),
+                                                                                     { background: '#fee2e2', color: '#991b1b', border: '1px solid #dc3545' }),
                                           }}>{({ draft: 'Draft', pending: 'Pending', approved: 'Approved', rejected: 'Rejected', pending_delete: 'Del. Pending' })[secStatusChip] || secStatusChip}</span>
                                         )}
                                         <span style={{ fontSize: 13, fontWeight: 600, color: sec.name ? 'var(--text-heading)' : 'var(--text-color-secondary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                           {sec.name || t('addDocuments.sections.sectionNamePlain')}
                                         </span>
                                         <button type="button" onClick={e => { e.stopPropagation(); setPreviewTarget({ chapterIdx: ci, sectionIdx: si }); }}
-                                          style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 10.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+                                          style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 10.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
                                           <Eye size={11} /> {t('addDocuments.sections.previewButton')}
                                         </button>
                                         <button type="button" onClick={e => { e.stopPropagation(); removeChapterSection(ci, si); }}
@@ -3812,7 +3812,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                                       </button>
                                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                         <button type="button" onClick={() => setPreviewTarget({ chapterIdx: ci, sectionIdx: si })}
-                                          style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 10.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                                          style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 10.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                                           <Eye size={11} /> {t('addDocuments.sections.previewButton')}
                                         </button>
                                         <button type="button" onClick={() => removeChapterSection(ci, si)}
@@ -3912,7 +3912,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                         return (
                           <div key={si} style={{ padding: '10px 14px', borderRadius: 10, border: '1px dashed var(--surface-border)' }}>
                             <button type="button" onClick={() => restoreFlatSection(si)}
-                              style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: 'var(--primary)', background: 'transparent', border: '1px dashed rgba(26,86,219,.4)', borderRadius: 7, padding: '5px 12px', cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                              style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: 'var(--primary)', background: 'transparent', border: '1px dashed rgba(33, 74, 171,.4)', borderRadius: 7, padding: '5px 12px', cursor: 'pointer', fontFamily: 'var(--font)' }}>
                               <Plus size={12} /> Add Section {si + 1}
                             </button>
                           </div>
@@ -3929,17 +3929,17 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                               {flatSecStatusChip && (
                                 <span style={{ fontSize: 9.5, fontWeight: 700, borderRadius: 20, padding: '1px 7px', flexShrink: 0,
                                   ...(flatSecStatusChip === 'draft'          ? { background: '#f1f5f9', color: '#64748b', border: '1px solid #cbd5e1' } :
-                                      flatSecStatusChip === 'pending'        ? { background: '#fef3c7', color: '#92400e', border: '1px solid #f59e0b' } :
+                                      flatSecStatusChip === 'pending'        ? { background: '#fef3c7', color: '#92400e', border: '1px solid #ffc107' } :
                                       flatSecStatusChip === 'approved'       ? { background: '#d1fae5', color: '#065f46', border: '1px solid #10b981' } :
                                       flatSecStatusChip === 'pending_delete' ? { background: '#fff1f2', color: '#9f1239', border: '1px solid #fda4af' } :
-                                                                               { background: '#fee2e2', color: '#991b1b', border: '1px solid #ef4444' }),
+                                                                               { background: '#fee2e2', color: '#991b1b', border: '1px solid #dc3545' }),
                                 }}>{({ draft: 'Draft', pending: 'Pending', approved: 'Approved', rejected: 'Rejected', pending_delete: 'Del. Pending' })[flatSecStatusChip] || flatSecStatusChip}</span>
                               )}
                               <span style={{ fontSize: 13, fontWeight: 600, color: sec.name ? 'var(--text-heading)' : 'var(--text-color-secondary)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                 {sec.name || t('addDocuments.sections.sectionNamePlain')}
                               </span>
                               <button type="button" onClick={e => { e.stopPropagation(); setPreviewTarget({ chapterIdx: null, sectionIdx: si }); }}
-                                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 10.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+                                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 10.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
                                 <Eye size={11} /> {t('addDocuments.sections.previewButton')}
                               </button>
                               <button type="button" onClick={e => { e.stopPropagation(); removeFlatSection(si); }}
@@ -3965,7 +3965,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                             </button>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                               <button type="button" onClick={() => setPreviewTarget({ chapterIdx: null, sectionIdx: si })}
-                                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 10.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 10.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                                 <Eye size={11} /> {t('addDocuments.sections.previewButton')}
                               </button>
                               <button type="button" onClick={() => removeFlatSection(si)}
@@ -4017,7 +4017,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                               </div>
                             ) : (
                               <label htmlFor={`sec-flat-file-${si}`}
-                                style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: 'var(--primary)', background: 'transparent', border: '1px dashed rgba(26,86,219,.4)', borderRadius: 7, padding: '5px 12px', cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                                style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: 'var(--primary)', background: 'transparent', border: '1px dashed rgba(33, 74, 171,.4)', borderRadius: 7, padding: '5px 12px', cursor: 'pointer', fontFamily: 'var(--font)' }}>
                                 <Paperclip size={11} /> Attach file (optional)
                               </label>
                             )}
@@ -4082,7 +4082,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
           <>
           <Card padding="0">
             <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-heading)' }}>
+              <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>
                 {activeSubTab ? t(activeSubTab.labelKey) : subDocTab}
               </div>
               <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '2px 8px', borderRadius: 20 }}>
@@ -4100,7 +4100,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                   return (
                     <div key={i} style={{ padding: '10px 14px', borderRadius: 10, border: '1px dashed var(--surface-border)' }}>
                       <button type="button" onClick={() => restoreEntry(i)}
-                        style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: activeSubTab ? activeSubTab.accent : 'var(--primary)', background: 'transparent', border: `1px dashed ${activeSubTab ? activeSubTab.accent + '60' : 'rgba(26,86,219,.4)'}`, borderRadius: 7, padding: '5px 12px', cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                        style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 700, color: activeSubTab ? activeSubTab.accent : 'var(--primary)', background: 'transparent', border: `1px dashed ${activeSubTab ? activeSubTab.accent + '60' : 'rgba(33, 74, 171,.4)'}`, borderRadius: 7, padding: '5px 12px', cursor: 'pointer', fontFamily: 'var(--font)' }}>
                         <Plus size={12} /> Add {singularLabel(subDocTab)} {i + 1}
                       </button>
                     </div>
@@ -4123,15 +4123,15 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                         {entryStatusChip && (
                           <span style={{ fontSize: 9.5, fontWeight: 700, borderRadius: 20, padding: '1px 7px', flexShrink: 0,
                             ...(entryStatusChip === 'draft'          ? { background: '#f1f5f9', color: '#64748b', border: '1px solid #cbd5e1' } :
-                                entryStatusChip === 'pending'        ? { background: '#fef3c7', color: '#92400e', border: '1px solid #f59e0b' } :
+                                entryStatusChip === 'pending'        ? { background: '#fef3c7', color: '#92400e', border: '1px solid #ffc107' } :
                                 entryStatusChip === 'approved'       ? { background: '#d1fae5', color: '#065f46', border: '1px solid #10b981' } :
                                 entryStatusChip === 'pending_delete' ? { background: '#fff1f2', color: '#9f1239', border: '1px solid #fda4af' } :
-                                                                       { background: '#fee2e2', color: '#991b1b', border: '1px solid #ef4444' }),
+                                                                       { background: '#fee2e2', color: '#991b1b', border: '1px solid #dc3545' }),
                           }}>{({ draft: 'Draft', pending: 'Pending', approved: 'Approved', rejected: 'Rejected', pending_delete: 'Del. Pending' })[entryStatusChip] || entryStatusChip}</span>
                         )}
                         {(entry.file || entry.existingFilename) && <Paperclip size={12} color={activeSubTab ? activeSubTab.accent : 'var(--primary)'} style={{ flexShrink: 0 }} />}
                         <button type="button" onClick={e => { e.stopPropagation(); setEntryPreviewIdx(i); }}
-                          style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 10.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+                          style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 10.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
                           <Eye size={11} /> {t('addDocuments.sections.previewButton')}
                         </button>
                         <button type="button" onClick={e => { e.stopPropagation(); removeEntry(i); }}
@@ -4157,7 +4157,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                     </button>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <button type="button" onClick={() => setEntryPreviewIdx(i)}
-                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 10.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 10.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                         <Eye size={11} /> {t('addDocuments.sections.previewButton')}
                       </button>
                       <button type="button" onClick={() => removeEntry(i)}
@@ -4210,7 +4210,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                       </div>
                     ) : (
                       <label htmlFor={`entry-file-${subDocTab}-${i}`}
-                        style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: activeSubTab ? activeSubTab.text : 'var(--primary)', background: 'transparent', border: `1px dashed ${activeSubTab ? activeSubTab.accent + '50' : 'rgba(26,86,219,.4)'}`, borderRadius: 7, padding: '5px 12px', cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                        style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: activeSubTab ? activeSubTab.text : 'var(--primary)', background: 'transparent', border: `1px dashed ${activeSubTab ? activeSubTab.accent + '50' : 'rgba(33, 74, 171,.4)'}`, borderRadius: 7, padding: '5px 12px', cursor: 'pointer', fontFamily: 'var(--font)' }}>
                         <Paperclip size={11} /> Attach file (optional)
                       </label>
                     )}
@@ -4240,7 +4240,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                   onClick={e => e.stopPropagation()}>
                   <div style={{ padding: '18px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)' }}>
+                      <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)' }}>
                         {singularLabel(subDocTab)} {entryPreviewIdx + 1}
                       </div>
                       <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -4299,7 +4299,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
 
               <button type="button" onClick={handleAddDocSubmit} disabled={saveDisabled}
                 title={!subDocSaving && !subDocDirty ? 'No changes since the last save' : undefined}
-                style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 24px', borderRadius: 10, border: 'none', background: saveDisabled ? '#94a3b8' : 'var(--primary)', color: 'white', fontSize: 13.5, fontWeight: 700, cursor: saveDisabled ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', boxShadow: saveDisabled ? 'none' : '0 2px 12px rgba(26,86,219,.25)' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '10px 24px', borderRadius: 10, border: 'none', background: saveDisabled ? '#94a3b8' : 'var(--primary)', color: 'white', fontSize: 13.5, fontWeight: 700, cursor: saveDisabled ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', boxShadow: saveDisabled ? 'none' : '0 2px 12px rgba(33, 74, 171,.25)' }}>
                 <Save size={15} /> {subDocSaving ? 'Saving…' : `Save ${activeSubTab ? t(activeSubTab.labelKey) : ''}`}
               </button>
             </div>
@@ -4422,13 +4422,13 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             <div style={{ overflowY: 'auto', padding: '0 28px' }}>
               {/* Own-department matches — version upgrade */}
               {duplicateModal.matches.filter(m => m.match_type === 'own_dept').map(m => (
-                <div key={m.id} style={{ marginBottom: 16, padding: '14px 16px', borderRadius: 10, background: 'rgba(59,130,246,.06)', border: '1px solid rgba(59,130,246,.2)' }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#3b82f6', letterSpacing: '.06em', marginBottom: 8 }}>{t('duplicateModal.inYourDepartment')}</div>
+                <div key={m.id} style={{ marginBottom: 16, padding: '14px 16px', borderRadius: 10, background: 'rgba(13, 110, 253,.06)', border: '1px solid rgba(13, 110, 253,.2)' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#0d6efd', letterSpacing: '.06em', marginBottom: 8 }}>{t('duplicateModal.inYourDepartment')}</div>
                   <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-heading)', marginBottom: 4 }}>{m.document_name}</div>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12, fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
-                    <span style={{ background: 'rgba(59,130,246,.1)', color: '#3b82f6', padding: '2px 8px', borderRadius: 20, fontWeight: 600 }}>{DOC_TYPE_KEY[m.document_type_name] ? t(`docTypes.${DOC_TYPE_KEY[m.document_type_name]}`) : m.document_type_name}</span>
+                    <span style={{ background: 'rgba(13, 110, 253,.1)', color: '#0d6efd', padding: '2px 8px', borderRadius: 20, fontWeight: 600 }}>{DOC_TYPE_KEY[m.document_type_name] ? t(`docTypes.${DOC_TYPE_KEY[m.document_type_name]}`) : m.document_type_name}</span>
                     <span>v{m.version_no || '1.0'}</span>
-                    <span style={{ background: m.status === 'approved' ? 'rgba(34,197,94,.1)' : 'rgba(245,158,11,.1)', color: m.status === 'approved' ? '#16a34a' : '#d97706', padding: '2px 8px', borderRadius: 20, fontWeight: 600, textTransform: 'capitalize' }}>{{ approved: t('common.statusWordApproved'), pending: t('common.statusWordPending'), rejected: t('common.statusWordRejected') }[m.status] || m.status}</span>
+                    <span style={{ background: m.status === 'approved' ? 'rgba(25, 135, 84,.1)' : 'rgba(255, 193, 7,.1)', color: m.status === 'approved' ? '#16a34a' : '#d97706', padding: '2px 8px', borderRadius: 20, fontWeight: 600, textTransform: 'capitalize' }}>{{ approved: t('common.statusWordApproved'), pending: t('common.statusWordPending'), rejected: t('common.statusWordRejected') }[m.status] || m.status}</span>
                     <span>{m.created_at?.split('T')[0]}</span>
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
@@ -4436,7 +4436,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                       const nextVer = (parseFloat(m.version_no || '1.0') + 0.1).toFixed(1);
                       fmt('version', nextVer);
                       setDuplicateModal(null);
-                    }} style={{ flex: 1, padding: '8px 14px', borderRadius: 8, border: 'none', background: '#3b82f6', color: 'white', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                    }} style={{ flex: 1, padding: '8px 14px', borderRadius: 8, border: 'none', background: '#0d6efd', color: 'white', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                       {t('duplicateModal.uploadAsNewVersion', { version: (parseFloat(m.version_no || '1.0') + 0.1).toFixed(1) })}
                     </button>
                   </div>
@@ -4449,17 +4449,17 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                   <div style={{ fontSize: 11, fontWeight: 700, color: '#d97706', letterSpacing: '.06em', marginBottom: 10 }}>{t('duplicateModal.inOtherDepartments')}</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                     {duplicateModal.matches.filter(m => m.match_type === 'other_dept').map(m => (
-                      <div key={m.id} style={{ padding: '14px 16px', borderRadius: 10, background: 'rgba(245,158,11,.06)', border: '1px solid rgba(245,158,11,.2)' }}>
+                      <div key={m.id} style={{ padding: '14px 16px', borderRadius: 10, background: 'rgba(255, 193, 7,.06)', border: '1px solid rgba(255, 193, 7,.2)' }}>
                         <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-heading)', marginBottom: 4 }}>{m.document_name}</div>
                         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12, fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
-                          <span style={{ background: 'rgba(245,158,11,.1)', color: '#d97706', padding: '2px 8px', borderRadius: 20, fontWeight: 600 }}>{DOC_TYPE_KEY[m.document_type_name] ? t(`docTypes.${DOC_TYPE_KEY[m.document_type_name]}`) : m.document_type_name}</span>
+                          <span style={{ background: 'rgba(255, 193, 7,.1)', color: '#d97706', padding: '2px 8px', borderRadius: 20, fontWeight: 600 }}>{DOC_TYPE_KEY[m.document_type_name] ? t(`docTypes.${DOC_TYPE_KEY[m.document_type_name]}`) : m.document_type_name}</span>
                           <span style={{ fontWeight: 600 }}>{m.department_name}</span>
-                          <span style={{ background: m.status === 'approved' ? 'rgba(34,197,94,.1)' : 'rgba(245,158,11,.1)', color: m.status === 'approved' ? '#16a34a' : '#d97706', padding: '2px 8px', borderRadius: 20, fontWeight: 600, textTransform: 'capitalize' }}>{{ approved: t('common.statusWordApproved'), pending: t('common.statusWordPending'), rejected: t('common.statusWordRejected') }[m.status] || m.status}</span>
+                          <span style={{ background: m.status === 'approved' ? 'rgba(25, 135, 84,.1)' : 'rgba(255, 193, 7,.1)', color: m.status === 'approved' ? '#16a34a' : '#d97706', padding: '2px 8px', borderRadius: 20, fontWeight: 600, textTransform: 'capitalize' }}>{{ approved: t('common.statusWordApproved'), pending: t('common.statusWordPending'), rejected: t('common.statusWordRejected') }[m.status] || m.status}</span>
                           <span>{m.created_at?.split('T')[0]}</span>
                         </div>
                         <button onClick={() => handleLinkDocument(m.id)}
                           disabled={linkingId === m.id}
-                          style={{ width: '100%', padding: '8px 14px', borderRadius: 8, border: 'none', background: linkingId === m.id ? 'rgba(245,158,11,.4)' : '#d97706', color: 'white', fontSize: 12.5, fontWeight: 700, cursor: linkingId === m.id ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)' }}>
+                          style={{ width: '100%', padding: '8px 14px', borderRadius: 8, border: 'none', background: linkingId === m.id ? 'rgba(255, 193, 7,.4)' : '#d97706', color: 'white', fontSize: 12.5, fontWeight: 700, cursor: linkingId === m.id ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)' }}>
                           {linkingId === m.id ? t('duplicateModal.sendingRequest') : t('duplicateModal.linkToDepartment')}
                         </button>
                       </div>
@@ -4489,7 +4489,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
 
         {/* Rejected files alert */}
         {rejected.length > 0 && (
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px', borderRadius: 10, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', color: '#dc2626' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px', borderRadius: 10, background: 'rgba(220, 53, 69,.08)', border: '1px solid rgba(220, 53, 69,.2)', color: '#dc2626' }}>
             <AlertCircle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 1 }}>{t('wizard.step2.unsupportedFileType')}</div>
@@ -4609,7 +4609,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
           ) : (
             <div style={{ maxWidth: 1180, margin: '0 auto' }}>
               <div style={{ textAlign: 'center', marginBottom: 32 }}>
-                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-heading)', marginBottom: 8 }}>{t('wizard.step1.heading')} <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--text-heading)', marginBottom: 8 }}>{t('wizard.step1.heading')} <span style={{ color: '#dc3545' }}>*</span></div>
                 <div style={{ fontSize: 13.5, color: 'var(--text-color-secondary)' }}>{t('wizard.step1.subheading')}</div>
               </div>
               <div className="ud-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(240px, 1fr))', gap: 20 }}>
@@ -4679,18 +4679,18 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                   borderRadius: 16, padding: '80px 24px',
                   cursor: 'pointer',
                   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 18, textAlign: 'center',
-                  background: dragOver ? (TYPE_CARD_COLORS[form.type]?.bg || 'rgba(26,86,219,.05)') : 'var(--surface-card)',
+                  background: dragOver ? (TYPE_CARD_COLORS[form.type]?.bg || 'rgba(33, 74, 171,.05)') : 'var(--surface-card)',
                   transition: 'all .25s',
-                  boxShadow: dragOver ? `0 0 0 3px ${TYPE_CARD_COLORS[form.type]?.accent || '#1a56db'}18` : 'none',
+                  boxShadow: dragOver ? `0 0 0 3px ${TYPE_CARD_COLORS[form.type]?.accent || '#214aab'}18` : 'none',
                 }}>
-                <div style={{ width: 68, height: 68, borderRadius: 16, flexShrink: 0, background: TYPE_CARD_COLORS[form.type]?.bg || 'rgba(26,86,219,.12)', border: `1px solid ${(TYPE_CARD_COLORS[form.type]?.accent || 'var(--primary)')}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .25s' }}>
+                <div style={{ width: 68, height: 68, borderRadius: 16, flexShrink: 0, background: TYPE_CARD_COLORS[form.type]?.bg || 'rgba(33, 74, 171,.12)', border: `1px solid ${(TYPE_CARD_COLORS[form.type]?.accent || 'var(--primary)')}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all .25s' }}>
                   <Upload size={30} color={TYPE_CARD_COLORS[form.type]?.accent || 'var(--primary)'} strokeWidth={1.6} />
                 </div>
                 <div>
                   <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 8 }}>{t('wizard.step2.dropHere')} <span style={{ color: 'var(--primary)' }}>{t('wizard.step2.clickToBrowse')}</span></div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
                       <span style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>{t('wizard.step2.fileTypeHint')}</span>
-                      <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--primary)', background: 'rgba(26,86,219,.08)', border: '1px solid rgba(26,86,219,.2)', padding: '2px 7px', borderRadius: 20 }}>.PDF</span>
+                      <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--primary)', background: 'rgba(33, 74, 171,.08)', border: '1px solid rgba(33, 74, 171,.2)', padding: '2px 7px', borderRadius: 20 }}>.PDF</span>
                       <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: '#2b579a', background: 'rgba(43,87,154,.08)', border: '1px solid rgba(43,87,154,.3)', padding: '2px 7px', borderRadius: 20 }}>.DOC</span>
                     </div>
                 </div>
@@ -4706,11 +4706,11 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                       <div key={f.name} style={{
                         display: 'flex', alignItems: 'center', gap: 10,
                         padding: '8px 10px', borderRadius: 8,
-                        background: uploaded ? 'rgba(22,163,74,.05)' : isUploading ? 'rgba(59,130,246,.05)' : 'var(--surface-ground)',
-                        border: `1.5px solid ${uploaded ? 'rgba(22,163,74,.25)' : isUploading ? 'rgba(59,130,246,.2)' : 'var(--surface-border)'}`,
+                        background: uploaded ? 'rgba(22,163,74,.05)' : isUploading ? 'rgba(13, 110, 253,.05)' : 'var(--surface-ground)',
+                        border: `1.5px solid ${uploaded ? 'rgba(22,163,74,.25)' : isUploading ? 'rgba(13, 110, 253,.2)' : 'var(--surface-border)'}`,
                         transition: 'all .3s',
                       }}>
-                        <div style={{ width: 30, height: 30, borderRadius: 7, background: uploaded ? 'rgba(22,163,74,.1)' : 'rgba(26,86,219,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <div style={{ width: 30, height: 30, borderRadius: 7, background: uploaded ? 'rgba(22,163,74,.1)' : 'rgba(33, 74, 171,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                           {fileIcon(f)}
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
@@ -4718,7 +4718,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                           <div style={{ fontSize: 10.5, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>{formatSize(f.size)}</div>
                         </div>
                         {uploaded && <CheckCircle size={13} color="#16a34a" style={{ flexShrink: 0 }} />}
-                        {isUploading && <Clock size={12} color="#3b82f6" style={{ flexShrink: 0 }} />}
+                        {isUploading && <Clock size={12} color="#0d6efd" style={{ flexShrink: 0 }} />}
                         <button type="button"
                           onClick={() => { removeFile(f.name); if (files.length <= 1) { setFileRefs([]); setUploadStep(null); setUploadError(''); } }}
                           style={{ width: 22, height: 22, borderRadius: 5, border: '1px solid var(--surface-border)', background: 'transparent', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -4735,8 +4735,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                 {/* Upload & OCR-eligibility check */}
                 {!allFilesChecked && uploadStep === 'error' ? (
                   <>
-                    <div style={{ marginBottom: 10, padding: '10px 12px', borderRadius: 8, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                      <AlertCircle size={14} color="#ef4444" style={{ flexShrink: 0, marginTop: 1 }} />
+                    <div style={{ marginBottom: 10, padding: '10px 12px', borderRadius: 8, background: 'rgba(220, 53, 69,.08)', border: '1px solid rgba(220, 53, 69,.25)', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                      <AlertCircle size={14} color="#dc3545" style={{ flexShrink: 0, marginTop: 1 }} />
                       <span style={{ fontSize: 12, color: '#dc2626', flex: 1, lineHeight: 1.5 }}>{uploadError}</span>
                     </div>
                     <button type="button" onClick={checkFiles}
@@ -4793,13 +4793,13 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                   <FileText size={13} color={TYPE_CARD_COLORS[form.type]?.accent || 'var(--primary)'} />
                 </div>
                 <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>{t('common.documentDetails')}</span>
-                {files.length > 1 && <span style={{ fontSize: 11, fontWeight: 600, background: 'rgba(59,130,246,.1)', color: '#3b82f6', padding: '2px 9px', borderRadius: 20 }}>{t('wizard.step3.appliedToAllFiles', { count: files.length })}</span>}
+                {files.length > 1 && <span style={{ fontSize: 11, fontWeight: 600, background: 'rgba(13, 110, 253,.1)', color: '#0d6efd', padding: '2px 9px', borderRadius: 20 }}>{t('wizard.step3.appliedToAllFiles', { count: files.length })}</span>}
               </div>
               {uploadError && uploadStep === 'error' && (
-                <div style={{ marginBottom: 14, padding: '10px 14px', borderRadius: 8, background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <AlertCircle size={14} color="#ef4444" style={{ flexShrink: 0 }} />
+                <div style={{ marginBottom: 14, padding: '10px 14px', borderRadius: 8, background: 'rgba(220, 53, 69,.08)', border: '1px solid rgba(220, 53, 69,.25)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <AlertCircle size={14} color="#dc3545" style={{ flexShrink: 0 }} />
                   <span style={{ fontSize: 12.5, color: '#dc2626', flex: 1 }}>{uploadError}</span>
-                  <button type="button" onClick={() => { setUploadError(''); setUploadStep(null); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444', display: 'flex' }}><X size={12} /></button>
+                  <button type="button" onClick={() => { setUploadError(''); setUploadStep(null); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#dc3545', display: 'flex' }}><X size={12} /></button>
                 </div>
               )}
         <form onSubmit={handleSubmit}>
@@ -4809,7 +4809,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             {form.type !== 'Act' && (
               <div style={{ gridColumn: '1 / -1' }}>
                 <div style={{ ...LABEL, marginBottom: 6 }}>
-                  {form.type === 'Amendment' ? t('wizard.step3.parentActLabel') : t('wizard.step3.legalAuthorityLabel')} <span style={{ color: '#ef4444' }}>*</span>
+                  {form.type === 'Amendment' ? t('wizard.step3.parentActLabel') : t('wizard.step3.legalAuthorityLabel')} <span style={{ color: '#dc3545' }}>*</span>
                 </div>
                 <HierarchyTag hierarchy={hierarchy} onOpen={() => { setDrawerHierarchy({ ...hierarchy }); setDrawerType('hierarchy'); }} isRef={true} legalAuthorities={usesLegalAuthorities ? legalAuthorities : undefined} />
                 {detailsLocked && (
@@ -4826,7 +4826,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                 {files.map(f => (
                   <div key={f.name} style={{ padding: '9px 12px', borderRadius: 10, border: '1.5px solid var(--surface-border)', background: 'var(--surface-ground)', display: 'flex', flexDirection: 'column', gap: 6 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{ width: 22, height: 22, borderRadius: 6, background: 'rgba(26,86,219,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <div style={{ width: 22, height: 22, borderRadius: 6, background: 'rgba(33, 74, 171,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         {fileIcon(f)}
                       </div>
                       <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>{f.name}</span>
@@ -4834,7 +4834,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                     </div>
                     <div>
                       <div style={{ ...LABEL, marginBottom: 3 }}>
-                        {(DOC_TYPE_KEY[form.type] && t(`wizard.fields.${DOC_TYPE_KEY[form.type]}.nameLabel`, { defaultValue: '' })) || t('wizard.fields.generic.nameLabel')} <span style={{ color: '#ef4444' }}>*</span>
+                        {(DOC_TYPE_KEY[form.type] && t(`wizard.fields.${DOC_TYPE_KEY[form.type]}.nameLabel`, { defaultValue: '' })) || t('wizard.fields.generic.nameLabel')} <span style={{ color: '#dc3545' }}>*</span>
                       </div>
                       <input
                         value={fileMeta[f.name]?.documentName ?? ''}
@@ -4852,12 +4852,12 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             {/* ── ACT: all fields inline ── */}
             {form.type === 'Act' && (<>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.act.number')} <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.act.number')} <span style={{ color: '#dc3545' }}>*</span></div>
                 <input value={typeFields.actNumber || ''} onChange={e => setTypeFields(f => ({ ...f, actNumber: e.target.value }))}
                   placeholder={t('wizard.placeholders.act.number')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.year')} <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.year')} <span style={{ color: '#dc3545' }}>*</span></div>
                 <input value={typeFields.year || ''} onChange={e => setTypeFields(f => ({ ...f, year: e.target.value }))}
                   placeholder={t('wizard.placeholders.act.year')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
@@ -4879,7 +4879,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                 </div>
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#dc3545' }}>*</span></div>
                 <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
                   style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
@@ -4960,12 +4960,12 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             {/* ── Amendment: unified inline fields ── */}
             {form.type === 'Amendment' && (<>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.amendment.number')} <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.amendment.number')} <span style={{ color: '#dc3545' }}>*</span></div>
                 <input value={typeFields.amendmentNumber || ''} onChange={e => setTypeFields(f => ({ ...f, amendmentNumber: e.target.value }))}
                   placeholder={t('wizard.placeholders.amendment.number')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#dc3545' }}>*</span></div>
                 <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
                   style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
@@ -5000,12 +5000,12 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             {/* ── Circular: unified inline fields ── */}
             {form.type === 'Circular' && (<>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.circular.number')} <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.circular.number')} <span style={{ color: '#dc3545' }}>*</span></div>
                 <input value={typeFields.circularNumber || ''} onChange={e => setTypeFields(f => ({ ...f, circularNumber: e.target.value }))}
                   placeholder={t('wizard.placeholders.circular.number')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#dc3545' }}>*</span></div>
                 <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
                   style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
@@ -5040,7 +5040,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                   placeholder={t('wizard.placeholders.miscellaneous.referenceNumber')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#dc3545' }}>*</span></div>
                 <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
                   style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
@@ -5070,12 +5070,12 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             {/* ── Notification: unified inline fields ── */}
             {form.type === 'Notification' && (<>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.notification.number')} <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.notification.number')} <span style={{ color: '#dc3545' }}>*</span></div>
                 <input value={typeFields.notificationNumber || ''} onChange={e => setTypeFields(f => ({ ...f, notificationNumber: e.target.value }))}
                   placeholder={t('wizard.placeholders.notification.number')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#dc3545' }}>*</span></div>
                 <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
                   style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
@@ -5110,12 +5110,12 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             {/* ── Order/Gazette: unified inline fields ── */}
             {form.type === 'Order/Gazette' && (<>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.orderGazette.number')} <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.orderGazette.number')} <span style={{ color: '#dc3545' }}>*</span></div>
                 <input value={typeFields.orderNumber || ''} onChange={e => setTypeFields(f => ({ ...f, orderNumber: e.target.value }))}
                   placeholder={t('wizard.placeholders.orderGazette.number')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#dc3545' }}>*</span></div>
                 <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
                   style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
@@ -5150,12 +5150,12 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             {/* ── Policy ── */}
             {form.type === 'Policy' && (<>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.policy.number')} <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.policy.number')} <span style={{ color: '#dc3545' }}>*</span></div>
                 <input value={typeFields.policyNumber || ''} onChange={e => setTypeFields(f => ({ ...f, policyNumber: e.target.value }))}
                   placeholder={t('wizard.placeholders.policy.number')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#dc3545' }}>*</span></div>
                 <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
                   style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
@@ -5200,12 +5200,12 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             {/* ── Rules & Regulations ── */}
             {form.type === 'Rules & Regulations' && (<>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.rulesRegulations.number')} <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.rulesRegulations.number')} <span style={{ color: '#dc3545' }}>*</span></div>
                 <input value={typeFields.ruleNumber || ''} onChange={e => setTypeFields(f => ({ ...f, ruleNumber: e.target.value }))}
                   placeholder={t('wizard.placeholders.rulesRegulations.number')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#dc3545' }}>*</span></div>
                 <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
                   style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
@@ -5245,12 +5245,12 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             {/* ── Bye Laws: mirrors Rules & Regulations' field set ── */}
             {form.type === 'Bye Laws' && (<>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.byeLaws.number')} <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.byeLaws.number')} <span style={{ color: '#dc3545' }}>*</span></div>
                 <input value={typeFields.byeLawNumber || ''} onChange={e => setTypeFields(f => ({ ...f, byeLawNumber: e.target.value }))}
                   placeholder={t('wizard.placeholders.byeLaws.number')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#dc3545' }}>*</span></div>
                 <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
                   style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
@@ -5290,7 +5290,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             {/* ── All other non-Act, non-Amendment, non-Circular, non-Notification types ── */}
             {!['Act', 'Amendment', 'Circular', 'Notification', 'Order/Gazette', 'Policy', 'Rules & Regulations', 'Bye Laws', 'Miscellaneous'].includes(form.type) && (<>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#ef4444' }}>*</span></div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#dc3545' }}>*</span></div>
                 <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
                   style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
@@ -5312,7 +5312,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
               </div>
               {TYPE_FIELDS[form.type]?.map(field => (
                 <div key={field.key} style={{ gridColumn: field.fullWidth ? '1 / -1' : 'auto' }}>
-                  <div style={{ ...LABEL, marginBottom: 6 }}>{field.label}{field.required && <span style={{ color: '#ef4444' }}> *</span>}</div>
+                  <div style={{ ...LABEL, marginBottom: 6 }}>{field.label}{field.required && <span style={{ color: '#dc3545' }}> *</span>}</div>
                   <input type={field.inputType || 'text'} value={typeFields[field.key] || ''}
                     onChange={e => setTypeFields(f => ({ ...f, [field.key]: e.target.value }))}
                     placeholder={field.placeholder || ''} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
@@ -5341,7 +5341,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                       {/* Full-page preview/edit — the inline box here is only 3 rows, too
                           cramped to read a longer auto-generated description comfortably. */}
                       <button type="button" onClick={() => setDescPreviewFile(f.name)}
-                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 10.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 10.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
                         <Eye size={11} /> {t('wizard.step3.previewButton')}
                       </button>
                     </div>
@@ -5380,7 +5380,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                 border: 'none', padding: '10px 28px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700,
                 cursor: files.length > 0 && !detailsLocked && (!uploadStep || uploadStep === 'ready' || uploadStep === 'error') ? 'pointer' : 'not-allowed',
                 display: 'flex', alignItems: 'center', gap: 8,
-                boxShadow: files.length > 0 && !detailsLocked && (!uploadStep || uploadStep === 'ready' || uploadStep === 'error') ? '0 2px 8px rgba(26,86,219,.2)' : 'none',
+                boxShadow: files.length > 0 && !detailsLocked && (!uploadStep || uploadStep === 'ready' || uploadStep === 'error') ? '0 2px 8px rgba(33, 74, 171,.2)' : 'none',
                 transition: 'all .2s',
               }}>
               {uploadStep === 'uploading' && <><Clock size={14} /> {t('wizard.step3.uploadingFile')}</>}
@@ -5412,12 +5412,12 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                     <thead>
                       <tr style={{ background: 'var(--surface-ground)' }}>
                         <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('wizard.step3.colDocumentName')}</th>
-                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.referenceNo')}</th>
-                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.issueDate')}</th>
-                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.department')}</th>
-                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.version')}</th>
-                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.status')}</th>
-                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.view')}</th>
+                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px', borderLeft: '1px solid var(--surface-border)' }}>{t('common.referenceNo')}</th>
+                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px', borderLeft: '1px solid var(--surface-border)' }}>{t('common.issueDate')}</th>
+                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px', borderLeft: '1px solid var(--surface-border)' }}>{t('common.department')}</th>
+                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px', borderLeft: '1px solid var(--surface-border)' }}>{t('common.version')}</th>
+                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px', borderLeft: '1px solid var(--surface-border)' }}>{t('common.status')}</th>
+                        <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px', borderLeft: '1px solid var(--surface-border)' }}>{t('common.view')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -5430,15 +5430,15 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                       ) : list.map((d, i) => (
                         <tr key={d.id ?? i} style={{ borderTop: '1px solid var(--surface-border)' }}>
                           <td style={{ padding: '8px 12px', color: 'var(--text-heading)', fontWeight: 600 }}>{d.document_name || '—'}</td>
-                          <td style={{ padding: '8px 12px', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.reference_number || '—'}</td>
-                          <td style={{ padding: '8px 12px', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.issue_date || '—'}</td>
-                          <td style={{ padding: '8px 12px', color: 'var(--text-color-secondary)' }}>{d.department_name || '—'}</td>
-                          <td style={{ padding: '8px 12px', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.version_no || '—'}</td>
-                          <td style={{ padding: '8px 12px', color: 'var(--text-color-secondary)', textTransform: 'capitalize' }}>{{ approved: t('common.statusWordApproved'), pending: t('common.statusWordPending'), rejected: t('common.statusWordRejected') }[d.status] || d.status || '—'}</td>
-                          <td style={{ padding: '8px 12px' }}>
+                          <td style={{ padding: '8px 12px', borderLeft: '1px solid var(--surface-border)', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.reference_number || '—'}</td>
+                          <td style={{ padding: '8px 12px', borderLeft: '1px solid var(--surface-border)', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.issue_date || '—'}</td>
+                          <td style={{ padding: '8px 12px', borderLeft: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)' }}>{d.department_name || '—'}</td>
+                          <td style={{ padding: '8px 12px', borderLeft: '1px solid var(--surface-border)', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.version_no || '—'}</td>
+                          <td style={{ padding: '8px 12px', borderLeft: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)', textTransform: 'capitalize' }}>{{ approved: t('common.statusWordApproved'), pending: t('common.statusWordPending'), rejected: t('common.statusWordRejected') }[d.status] || d.status || '—'}</td>
+                          <td style={{ padding: '8px 12px', borderLeft: '1px solid var(--surface-border)' }}>
                             <button type="button" onClick={() => setViewingActChildDoc(mapApiDoc(d))}
                               disabled={!d.id}
-                              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 600, cursor: d.id ? 'pointer' : 'not-allowed', fontFamily: 'var(--font)', opacity: d.id ? 1 : 0.5 }}>
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 600, cursor: d.id ? 'pointer' : 'not-allowed', fontFamily: 'var(--font)', opacity: d.id ? 1 : 0.5 }}>
                               <Eye size={12} /> {t('common.view')}
                             </button>
                           </td>
@@ -5469,12 +5469,12 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                   <thead>
                     <tr style={{ background: 'var(--surface-ground)' }}>
                       <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('wizard.step3.colDocumentName')}</th>
-                      <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.referenceNo')}</th>
-                      <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.issueDate')}</th>
-                      <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.department')}</th>
-                      <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.version')}</th>
-                      <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.status')}</th>
-                      <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px' }}>{t('common.view')}</th>
+                      <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px', borderLeft: '1px solid var(--surface-border)' }}>{t('common.referenceNo')}</th>
+                      <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px', borderLeft: '1px solid var(--surface-border)' }}>{t('common.issueDate')}</th>
+                      <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px', borderLeft: '1px solid var(--surface-border)' }}>{t('common.department')}</th>
+                      <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px', borderLeft: '1px solid var(--surface-border)' }}>{t('common.version')}</th>
+                      <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px', borderLeft: '1px solid var(--surface-border)' }}>{t('common.status')}</th>
+                      <th style={{ ...LABEL, textAlign: 'left', padding: '8px 12px', borderLeft: '1px solid var(--surface-border)' }}>{t('common.view')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -5487,15 +5487,15 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                     ) : departmentActs.map((d, i) => (
                       <tr key={d.id ?? i} style={{ borderTop: '1px solid var(--surface-border)' }}>
                         <td style={{ padding: '8px 12px', color: 'var(--text-heading)', fontWeight: 600 }}>{d.document_name || '—'}</td>
-                        <td style={{ padding: '8px 12px', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.reference_number || '—'}</td>
-                        <td style={{ padding: '8px 12px', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.issue_date || '—'}</td>
-                        <td style={{ padding: '8px 12px', color: 'var(--text-color-secondary)' }}>{d.department_name || '—'}</td>
-                        <td style={{ padding: '8px 12px', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.version_no || '—'}</td>
-                        <td style={{ padding: '8px 12px', color: 'var(--text-color-secondary)', textTransform: 'capitalize' }}>{{ approved: t('common.statusWordApproved'), pending: t('common.statusWordPending'), rejected: t('common.statusWordRejected') }[d.status] || d.status || '—'}</td>
-                        <td style={{ padding: '8px 12px' }}>
+                        <td style={{ padding: '8px 12px', borderLeft: '1px solid var(--surface-border)', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.reference_number || '—'}</td>
+                        <td style={{ padding: '8px 12px', borderLeft: '1px solid var(--surface-border)', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.issue_date || '—'}</td>
+                        <td style={{ padding: '8px 12px', borderLeft: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)' }}>{d.department_name || '—'}</td>
+                        <td style={{ padding: '8px 12px', borderLeft: '1px solid var(--surface-border)', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.version_no || '—'}</td>
+                        <td style={{ padding: '8px 12px', borderLeft: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)', textTransform: 'capitalize' }}>{{ approved: t('common.statusWordApproved'), pending: t('common.statusWordPending'), rejected: t('common.statusWordRejected') }[d.status] || d.status || '—'}</td>
+                        <td style={{ padding: '8px 12px', borderLeft: '1px solid var(--surface-border)' }}>
                           <button type="button" onClick={() => setViewingActChildDoc(mapApiDoc(d))}
                             disabled={!d.id}
-                            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 600, cursor: d.id ? 'pointer' : 'not-allowed', fontFamily: 'var(--font)', opacity: d.id ? 1 : 0.5 }}>
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 6, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 600, cursor: d.id ? 'pointer' : 'not-allowed', fontFamily: 'var(--font)', opacity: d.id ? 1 : 0.5 }}>
                             <Eye size={12} /> {t('common.view')}
                           </button>
                         </td>
@@ -5914,7 +5914,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                                 onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
                                 onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                  <span style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', background: 'rgba(245,158,11,.1)', border: '1px solid rgba(245,158,11,.3)', borderRadius: 20, padding: '1px 8px', fontFamily: 'var(--mono)' }}>{t('drawer.pendingBadge')}</span>
+                                  <span style={{ fontSize: 11, fontWeight: 700, color: '#b45309', background: 'rgba(255, 193, 7,.1)', border: '1px solid rgba(255, 193, 7,.3)', borderRadius: 20, padding: '1px 8px', fontFamily: 'var(--mono)' }}>{t('drawer.pendingBadge')}</span>
                                   <span style={{ fontWeight: 600, color: 'var(--text-heading)' }}>"{relSearch.trim()}"</span>
                                 </div>
                                 <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 3 }}>{t('drawer.pendingDocNote')}</div>
@@ -5963,7 +5963,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                       />
                     </div>
                     <button type="button" onClick={addRelation} disabled={!relTarget}
-                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '9px', borderRadius: 8, border: 'none', background: relTarget ? (relTarget.startsWith('__pending__:') ? '#f59e0b' : 'var(--primary)') : 'var(--surface-200)', color: relTarget ? 'white' : '#94a3b8', cursor: relTarget ? 'pointer' : 'not-allowed', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700, width: '100%' }}>
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '9px', borderRadius: 8, border: 'none', background: relTarget ? (relTarget.startsWith('__pending__:') ? '#ffc107' : 'var(--primary)') : 'var(--surface-200)', color: relTarget ? 'white' : '#94a3b8', cursor: relTarget ? 'pointer' : 'not-allowed', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700, width: '100%' }}>
                       <Plus size={14} /> {t('common.addRelationship')}
                     </button>
                   </>)}
@@ -5972,17 +5972,17 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                       <div style={{ ...LABEL }}>{t('drawer.addedRelationships')}</div>
                       {relations.map((r, i) => (
-                        <div key={i} style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(26,86,219,.05)', border: '1px solid rgba(26,86,219,.15)' }}>
+                        <div key={i} style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(33, 74, 171,.05)', border: '1px solid rgba(33, 74, 171,.15)' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <GitBranch size={12} color="var(--primary)" style={{ flexShrink: 0 }} />
-                            <span style={{ fontSize: 12, fontWeight: 700, color: r.isPending ? '#f59e0b' : 'var(--primary)', fontFamily: 'var(--mono)' }}>{REL_TYPE_KEY[r.label] ? t(`relTypes.${REL_TYPE_KEY[r.label]}`) : r.label}</span>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: r.isPending ? '#ffc107' : 'var(--primary)', fontFamily: 'var(--mono)' }}>{REL_TYPE_KEY[r.label] ? t(`relTypes.${REL_TYPE_KEY[r.label]}`) : r.label}</span>
                             {r.targetType && <span style={{ fontSize: 10.5, fontWeight: 600, color: TYPE_CARD_COLORS[r.targetType]?.text || 'var(--text-color-secondary)', background: TYPE_CARD_COLORS[r.targetType]?.bg || 'rgba(148,163,184,.1)', padding: '1px 7px', borderRadius: 20, flexShrink: 0 }}>{DOC_TYPE_KEY[r.targetType] ? t(`docTypes.${DOC_TYPE_KEY[r.targetType]}`) : r.targetType}</span>}
-                            {r.isPending && <span style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', background: 'rgba(245,158,11,.1)', border: '1px solid rgba(245,158,11,.3)', borderRadius: 20, padding: '1px 8px', fontFamily: 'var(--mono)', flexShrink: 0 }}>{t('drawer.pendingBadge')}</span>}
+                            {r.isPending && <span style={{ fontSize: 10, fontWeight: 700, color: '#b45309', background: 'rgba(255, 193, 7,.1)', border: '1px solid rgba(255, 193, 7,.3)', borderRadius: 20, padding: '1px 8px', fontFamily: 'var(--mono)', flexShrink: 0 }}>{t('drawer.pendingBadge')}</span>}
                             <span style={{ fontSize: 12.5, color: 'var(--text-heading)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>→ {r.targetTitle}{r.section ? ` · ${r.section}` : ''}</span>
                             <button type="button" onClick={() => removeRelation(i)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', flexShrink: 0 }}><X size={12} /></button>
                           </div>
                           {r.note && (
-                            <div style={{ marginTop: 7, fontSize: 12, color: 'var(--text-color-secondary)', lineHeight: 1.5, paddingLeft: 20, borderLeft: '2px solid rgba(26,86,219,.2)', fontStyle: 'italic' }}>
+                            <div style={{ marginTop: 7, fontSize: 12, color: 'var(--text-color-secondary)', lineHeight: 1.5, paddingLeft: 20, borderLeft: '2px solid rgba(33, 74, 171,.2)', fontStyle: 'italic' }}>
                               {r.note}
                             </div>
                           )}

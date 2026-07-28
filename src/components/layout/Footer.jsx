@@ -1,42 +1,62 @@
+import { useState } from 'react';
+import FooterInfoModal from './FooterInfoModal';
+import ScreenReaderAccessModal from './ScreenReaderAccessModal';
+import ashokEmblem from '../../assets/ashok-emblem.svg';
+import digitalIndiaLogo from '../../assets/digital-india-logo.svg';
+
 const FOOTER_LINKS = [
   {
     heading: 'Website Policies',
     links: [
-      { label: 'Privacy Policy',   href: '#privacy-policy'   },
-      { label: 'Terms of Use',     href: '#terms-of-use'     },
-      { label: 'Hyperlink Policy', href: '#hyperlink-policy' },
-      { label: 'Copyright Policy', href: '#copyright-policy' },
+      { label: 'Privacy Policy',   pageKey: 'privacy-policy'   },
+      { label: 'Terms of Use',     pageKey: 'terms-of-use'     },
+      { label: 'Hyperlink Policy', pageKey: 'hyperlink-policy' },
+      { label: 'Copyright Policy', pageKey: 'copyright-policy' },
     ],
   },
   {
     heading: 'Help & Support',
     links: [
-      { label: 'FAQs',                  href: '#faqs'                  },
-      { label: 'Screen Reader Access',  href: '#screen-reader'         },
-      { label: 'Feedback',              href: '#feedback'              },
-      { label: 'Contact Us',            href: '#contact'               },
+      { label: 'FAQs',                  pageKey: 'faqs'            },
+      { label: 'Screen Reader Access',  pageKey: 'screen-reader'   },
+      { label: 'Right to Information',  pageKey: 'rti'             },
+      { label: 'Feedback',              pageKey: 'feedback'        },
+      { label: 'Contact Us',            pageKey: 'contact-us'      },
     ],
   },
   {
     heading: 'Navigation',
     links: [
-      { label: 'Sitemap',        href: '#sitemap'        },
-      { label: 'Related Links',  href: '#related-links'  },
-      { label: 'Accessibility',  href: '#accessibility'  },
-      { label: 'Disclaimer',     href: '#disclaimer'     },
+      { label: 'Sitemap',        pageKey: 'sitemap'        },
+      { label: 'Related Links',  pageKey: 'related-links'  },
+      { label: 'Accessibility',  pageKey: 'accessibility'  },
+      { label: 'Disclaimer',     pageKey: 'disclaimer'     },
     ],
   },
 ];
 
-const LAST_UPDATED = '24 June 2026';
+// Bumped whenever footer/policy content actually changes — this is a manually
+// maintained marker (no CMS backs this portal), not a live "today" timestamp.
+const LAST_UPDATED = '27 July 2026';
 
 export default function Footer() {
+  const [openPage, setOpenPage] = useState(null); // pageKey | null
+  const [showScreenReader, setShowScreenReader] = useState(false);
+
+  function openLink(pageKey) {
+    if (pageKey === 'screen-reader') setShowScreenReader(true);
+    else setOpenPage(pageKey);
+  }
+
   return (
     <footer
       role="contentinfo"
       aria-label="Site footer"
       style={{
-        background: 'var(--primary-dark)',
+        // Fixed black — deliberately not `var(--primary-dark)`, which is repointed to
+        // green by the high-contrast accessibility mode; a footer band should stay a
+        // stable dark colour under both the default theme and high-contrast mode.
+        background: '#0d0d0d',
         color: 'rgba(255,255,255,0.85)',
         marginTop: 'auto',
       }}
@@ -44,37 +64,29 @@ export default function Footer() {
       {/* ── Main footer body ─────────────────────────────── */}
       <div style={{
         maxWidth: 1200, margin: '0 auto',
-        padding: '32px 28px 24px',
+        padding: '18px 24px 14px',
         display: 'grid',
-        gridTemplateColumns: '1.8fr 1fr 1fr 1fr',
-        gap: 32,
+        gridTemplateColumns: '1.6fr 1fr 1fr 1fr',
+        gap: 20,
       }}>
         {/* Brand column */}
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-            {/* Ashoka chakra placeholder */}
-            <div style={{
-              width: 40, height: 40, borderRadius: '50%',
-              background: 'rgba(255,255,255,0.15)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 18, flexShrink: 0,
-            }} aria-hidden="true">⚖️</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+            {/* State Emblem on a dark background must render white per DBIM 5.3 —
+                the source SVG is solid black, so it's flipped via filter rather
+                than maintaining a second white-fill copy of the asset. */}
+            <img src={ashokEmblem} alt="Emblem of India" style={{ height: 48, width: 'auto', objectFit: 'contain', flexShrink: 0, filter: 'brightness(0) invert(1)' }} />
             <div>
-              <div style={{ fontSize: 13.5, fontWeight: 700, color: '#fff', lineHeight: 1.2 }}>
-                Haryana Digital Repository
-              </div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>
+              <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: '#fff', lineHeight: 1.2 }}>
                 Government of Haryana
+              </div>
+              <div style={{ fontSize: 'var(--font-size-small)', color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>
+                Haryana Digital Repository
               </div>
             </div>
           </div>
-          <p style={{ fontSize: 12, lineHeight: 1.6, color: 'rgba(255,255,255,0.65)', maxWidth: 280 }}>
-            Centralized repository of legal instruments — Acts, Rules, Notifications and Circulars —
-            issued by the Government of Haryana.
-          </p>
-          <p style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.5)', marginTop: 12 }}>
-            Developed &amp; maintained by{' '}
-            <span style={{ color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>HARTRON</span>
+          <p style={{ fontSize: 'var(--font-size-small)', lineHeight: 1.55, color: 'rgba(255,255,255,0.6)', maxWidth: 280, margin: 0 }}>
+            Centralized repository of Acts, Rules, Notifications and Circulars issued by the Government of Haryana.
           </p>
         </div>
 
@@ -82,21 +94,24 @@ export default function Footer() {
         {FOOTER_LINKS.map(section => (
           <div key={section.heading}>
             <h3 style={{
-              fontSize: 12, fontWeight: 700, color: '#fff',
+              fontSize: 'var(--font-size-small)', fontWeight: 700, color: '#fff',
               textTransform: 'uppercase', letterSpacing: '0.06em',
-              marginBottom: 12, paddingBottom: 8,
+              marginBottom: 8, paddingBottom: 5,
               borderBottom: '1px solid rgba(255,255,255,0.15)',
             }}>
               {section.heading}
             </h3>
-            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 7 }}>
+            <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 5 }}>
               {section.links.map(link => (
                 <li key={link.label}>
-                  <a
-                    href={link.href}
+                  <button
+                    type="button"
+                    onClick={() => openLink(link.pageKey)}
                     style={{
-                      fontSize: 12.5, color: 'rgba(255,255,255,0.7)',
+                      fontSize: 11.5, color: 'rgba(255,255,255,0.7)',
                       textDecoration: 'none', transition: 'color .15s',
+                      background: 'transparent', border: 'none', padding: 0, cursor: 'pointer',
+                      fontFamily: 'inherit', textAlign: 'left',
                     }}
                     onMouseEnter={e => e.currentTarget.style.color = '#fff'}
                     onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.7)'}
@@ -104,7 +119,7 @@ export default function Footer() {
                     onBlur={e => e.currentTarget.style.color = 'rgba(255,255,255,0.7)'}
                   >
                     {link.label}
-                  </a>
+                  </button>
                 </li>
               ))}
             </ul>
@@ -112,29 +127,51 @@ export default function Footer() {
         ))}
       </div>
 
+      {/* ── Co-branding (DBIM 5.4 — flagship program logos, max 2) ── */}
+      <div style={{
+        padding: '20px 28px',
+        maxWidth: 1200, margin: '0 auto',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 20,
+      }}>
+        <a
+          href="https://www.digitalindia.gov.in"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ display: 'inline-flex', alignItems: 'center', opacity: 0.9, transition: 'opacity .15s' }}
+          onMouseEnter={e => e.currentTarget.style.opacity = 1}
+          onMouseLeave={e => e.currentTarget.style.opacity = 0.9}
+        >
+          <img src={digitalIndiaLogo} alt="Digital India" style={{ height: 48, width: 'auto' }} />
+        </a>
+      </div>
+
       {/* ── Bottom bar ───────────────────────────────────── */}
       <div style={{
         borderTop: '1px solid rgba(255,255,255,0.12)',
-        padding: '14px 28px',
+        padding: '9px 24px',
         maxWidth: 1200, margin: '0 auto',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        flexWrap: 'wrap', gap: 8,
+        flexWrap: 'wrap', gap: 6,
       }}>
-        <p style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.55)', margin: 0 }}>
-          This website belongs to the{' '}
-          <strong style={{ color: 'rgba(255,255,255,0.8)' }}>Government of Haryana</strong>.
-          {' '}TOR: HARTRON/PM(ICT)/ToR-CSO/2026-27/03
+        <p style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.5)', margin: 0 }}>
+          This website belongs to the Government of Haryana, developed &amp; maintained by HARTRON.
+         
         </p>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.55)' }}>
-            Last Updated:{' '}
-            <strong style={{ color: 'rgba(255,255,255,0.75)' }}>{LAST_UPDATED}</strong>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.5)' }}>
+            Last Updated: <strong style={{ color: 'rgba(255,255,255,0.7)' }}>{LAST_UPDATED}</strong>
           </span>
-          <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.4)' }}>
-            WCAG 2.1 AA Compliant
-          </span>
+          {/* Not a compliance certification — points to the actual statement, which is
+              honest about what's done vs. still in progress, instead of asserting it outright. */}
+          <button type="button" onClick={() => setOpenPage('accessibility')}
+            style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.55)', background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline' }}>
+            Accessibility Statement
+          </button>
         </div>
       </div>
+
+      {openPage && <FooterInfoModal pageKey={openPage} onClose={() => setOpenPage(null)} />}
+      {showScreenReader && <ScreenReaderAccessModal onClose={() => setShowScreenReader(false)} />}
     </footer>
   );
 }
