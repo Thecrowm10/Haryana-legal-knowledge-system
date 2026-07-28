@@ -6,8 +6,7 @@ import {
   ZoomIn, ZoomOut, RotateCw, ExternalLink, Plus, Highlighter, MessageCircle,
 } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
-import pdfjsWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl;
+pdfjsLib.GlobalWorkerOptions.workerSrc = import.meta.env.BASE_URL + 'pdf.worker.min.js';
 import mammoth from 'mammoth';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';

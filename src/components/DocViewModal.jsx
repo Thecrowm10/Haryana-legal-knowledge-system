@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { FileText, CheckCircle, XCircle, Clock, Eye, ZoomIn, ZoomOut, RotateCw, ExternalLink, X, MessageCircle } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
-import pdfjsWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl;
+pdfjsLib.GlobalWorkerOptions.workerSrc = import.meta.env.BASE_URL + 'pdf.worker.min.js';
 import mammoth from 'mammoth';
 import { getPdfFile } from '../services/pdf';
 

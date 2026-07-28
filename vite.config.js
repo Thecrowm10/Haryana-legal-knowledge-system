@@ -1,39 +1,25 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import fs from 'node:fs'
+import path from 'node:path'
 
-// Nginx (and some other servers) don't serve .mjs with application/javascript,
-// causing the PDF.js worker to fail with a MIME type error.
-// This plugin renames all .mjs output assets to .js and updates the URL
-// references in the bundle so the app still finds the renamed file.
-const renameMjsToJs = {
-  name: 'rename-mjs-to-js',
-  generateBundle(_, bundle) {
-    const renamed = {}
-    for (const key of Object.keys(bundle)) {
-      if (key.endsWith('.mjs')) {
-        const newKey = key.slice(0, -4) + '.js'
-        const chunk = bundle[key]
-        chunk.fileName = newKey
-        bundle[newKey] = chunk
-        delete bundle[key]
-        renamed[key.split('/').pop()] = newKey.split('/').pop()
-      }
-    }
-    // Patch URL string references inside JS chunks
-    for (const chunk of Object.values(bundle)) {
-      if (chunk.type === 'chunk' && typeof chunk.code === 'string') {
-        for (const [oldName, newName] of Object.entries(renamed)) {
-          chunk.code = chunk.code.replaceAll(oldName, newName)
-        }
-      }
-    }
+// pdfjs-dist 6.x only ships .mjs workers. Nginx (and most servers) won't
+// serve .mjs as application/javascript, causing the worker to fail.
+// This plugin copies the worker to the output directory as .js after each build.
+const copyPdfWorkerAsJs = {
+  name: 'copy-pdf-worker-as-js',
+  writeBundle({ dir }) {
+    const src = path.resolve('node_modules/pdfjs-dist/build/pdf.worker.min.mjs')
+    const dest = path.join(dir || 'dist', 'pdf.worker.min.js')
+    fs.copyFileSync(src, dest)
+    console.log(`[copy-pdf-worker-as-js] copied → ${dest}`)
   },
 }
 
 export default defineConfig({
   plugins: [
     react(),
-    renameMjsToJs,
+    copyPdfWorkerAsJs,
   ],
   server: {
     proxy: {
