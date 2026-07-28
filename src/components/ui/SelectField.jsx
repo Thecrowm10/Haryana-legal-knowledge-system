@@ -76,7 +76,7 @@ export default function SelectField({ value, onChange, required, placeholder, ch
           color: selected ? 'var(--text-color)' : 'var(--text-color-secondary)',
           fontWeight: selected ? 500 : 400,
           borderColor: open ? 'var(--primary)' : 'var(--surface-border)',
-          boxShadow: open ? '0 0 0 3px rgba(26,86,219,.1)' : 'none',
+          boxShadow: open ? '0 0 0 3px rgba(33, 74, 171,.1)' : 'none',
         }}
       >
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -115,7 +115,7 @@ export default function SelectField({ value, onChange, required, placeholder, ch
                   transition: 'background .12s',
                   background: 'transparent',
                 }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(26,86,219,0.08)'}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(33, 74, 171,0.08)'}
                 onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
               >
                 <span>{opt.label}</span>

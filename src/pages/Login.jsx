@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Search, Eye, EyeOff, Shield, Lock, User, ArrowRight, ShieldAlert } from 'lucide-react';
+import { Search, Eye, EyeOff, Shield, Lock, User, ArrowRight, ShieldAlert, UploadCloud, CheckCircle2, BarChart3, Settings, FileSearch } from 'lucide-react';
 import haryanaLogo from '../assets/haryana-logo.png';
 import bannerBg from '../assets/banner-1-768x217.png';
 import ForgotPasswordScreen from './ForgotPasswordScreen';
@@ -54,7 +54,7 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
     <>
       <style>{`
         .lk * { box-sizing:border-box; margin:0; padding:0; }
-        .lk { font-family:'Plus Jakarta Sans Variable','Plus Jakarta Sans',sans-serif; }
+        .lk { font-family:var(--font); }
         @keyframes fadeLeft  { from{opacity:0;transform:translateX(-24px)} to{opacity:1;transform:none} }
         @keyframes fadeUp    { from{opacity:0;transform:translateY(20px)}  to{opacity:1;transform:none} }
         @keyframes pulse     { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.8)} }
@@ -86,7 +86,7 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
             <h1 style={{ fontSize:'clamp(26px,3.5vw,46px)', fontWeight:800, color:'#fff', lineHeight:1.15, letterSpacing:'-.02em', marginBottom:12 }}>
               {t('heroLine1')}<br/><span style={{ color:'#4ade80' }}>{t('heroLine2')}</span>
             </h1>
-            <p style={{ fontSize:14, color:'rgba(255,255,255,.72)', maxWidth:440, margin:'0 auto' }}>
+            <p style={{ fontSize: 'var(--font-size-p2)', color:'rgba(255,255,255,.72)', maxWidth:440, margin:'0 auto' }}>
               {t('heroSubtitle')}
             </p>
           </div>
@@ -107,8 +107,8 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
                 <Search size={28} color='#4ade80' strokeWidth={1.8} />
               </div>
               <div>
-                <div style={{ fontSize:18, fontWeight:800, color:'#fff', marginBottom:8 }}>{t('publicAccessTitle')}</div>
-                <div style={{ fontSize:13, color:'rgba(255,255,255,.75)', lineHeight:1.65 }}>
+                <div style={{ fontSize: 'var(--font-size-h3)', fontWeight:800, color:'#fff', marginBottom:8 }}>{t('publicAccessTitle')}</div>
+                <div style={{ fontSize: 'var(--font-size-p2)', color:'rgba(255,255,255,.75)', lineHeight:1.65 }}>
                   {t('publicAccessDesc')}
                 </div>
               </div>
@@ -131,8 +131,8 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
                 <Shield size={28} color='#818cf8' strokeWidth={1.8} />
               </div>
               <div>
-                <div style={{ fontSize:18, fontWeight:800, color:'#fff', marginBottom:8 }}>{t('officialAccessTitle')}</div>
-                <div style={{ fontSize:13, color:'rgba(255,255,255,.75)', lineHeight:1.65 }}>
+                <div style={{ fontSize: 'var(--font-size-h3)', fontWeight:800, color:'#fff', marginBottom:8 }}>{t('officialAccessTitle')}</div>
+                <div style={{ fontSize: 'var(--font-size-p2)', color:'rgba(255,255,255,.75)', lineHeight:1.65 }}>
                   {t('officialAccessDesc')}
                 </div>
               </div>
@@ -155,8 +155,8 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
                 <ShieldAlert size={28} color='#a5b4fc' strokeWidth={1.8} />
               </div>
               <div>
-                <div style={{ fontSize:18, fontWeight:800, color:'#fff', marginBottom:8 }}>{t('adminAccessTitle')}</div>
-                <div style={{ fontSize:13, color:'rgba(255,255,255,.75)', lineHeight:1.65 }}>
+                <div style={{ fontSize: 'var(--font-size-h3)', fontWeight:800, color:'#fff', marginBottom:8 }}>{t('adminAccessTitle')}</div>
+                <div style={{ fontSize: 'var(--font-size-p2)', color:'rgba(255,255,255,.75)', lineHeight:1.65 }}>
                   {t('adminAccessDesc')}
                 </div>
               </div>
@@ -171,7 +171,6 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
 
         <div style={{ position:'absolute', bottom:0, left:0, right:0, zIndex:3, padding:'10px 6%', display:'flex', justifyContent:'space-between' }}>
           <div style={{ fontSize:11, color:'rgba(255,255,255,.16)' }}>{t('footerCopyright')}</div>
-          <div style={{ fontSize:11, fontFamily:'monospace', color:'rgba(255,255,255,.13)' }}>TOR: HARTRON/PM(ICT)/ToR-CSO/2026-27/03</div>
         </div>
       </div>
     </>
@@ -182,7 +181,7 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
     <>
       <style>{`
         .lk * { box-sizing:border-box; margin:0; padding:0; }
-        .lk { font-family:'Plus Jakarta Sans Variable','Plus Jakarta Sans',sans-serif; }
+        .lk { font-family:var(--font); }
 
         @keyframes fadeLeft  { from{opacity:0;transform:translateX(-24px)} to{opacity:1;transform:none} }
         @keyframes fadeRight { from{opacity:0;transform:translateX(24px)}  to{opacity:1;transform:none} }
@@ -194,11 +193,11 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
         .lk-left { animation: fadeLeft  .65s cubic-bezier(.22,1,.36,1) both; }
         .lk-card { animation: fadeRight .65s .1s cubic-bezier(.22,1,.36,1) both; }
 
-        .lk-btn { transition:all .18s ease; cursor:pointer; border:none; font-family:'Plus Jakarta Sans',sans-serif; }
-        .lk-btn:hover:not(:disabled) { filter:brightness(1.1); transform:translateY(-2px); box-shadow:0 10px 30px rgba(34,197,94,.45) !important; }
+        .lk-btn { transition:all .18s ease; cursor:pointer; border:none; font-family:var(--font); }
+        .lk-btn:hover:not(:disabled) { filter:brightness(1.1); transform:translateY(-2px); box-shadow:0 10px 30px rgba(25, 135, 84,.45) !important; }
         .lk-btn:active:not(:disabled) { transform:translateY(0); filter:brightness(.97); }
 
-        .lk-inp { outline:none; font-family:'Plus Jakarta Sans',sans-serif; transition:border-color .15s,box-shadow .15s,background .15s; }
+        .lk-inp { outline:none; font-family:var(--font); transition:border-color .15s,box-shadow .15s,background .15s; }
         .lk-inp:focus { border-color:rgba(74,222,128,.7) !important; box-shadow:0 0 0 3px rgba(74,222,128,.15) !important; background:rgba(255,255,255,.15) !important; }
 
         .lk-trigger { transition:border-color .15s,box-shadow .15s; }
@@ -239,14 +238,26 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
             <h1 style={{ fontSize:'clamp(30px,3.8vw,52px)', fontWeight:800, lineHeight:1.1, letterSpacing:'-.025em', color:'#fff', marginBottom:16 }}>
               {t('brandHaryana')}<br/><span style={{ color:'#4ade80' }}>{t('brandLegal')}</span><br/>{t('brandSystem')}
             </h1>
-            <p style={{ fontSize:14.5, color:'rgba(255,255,255,.42)', lineHeight:1.8, maxWidth:360, marginBottom:40 }}>
+            <p style={{ fontSize: 'var(--font-size-p2)', color:'rgba(255,255,255,.42)', lineHeight:1.8, maxWidth:360, marginBottom:0 }}>
               {t('heroDescription')}
             </p>
-            <div style={{ display:'flex', gap:'clamp(20px,3vw,44px)' }}>
-              {[['5','statOfficialRoles'],['100%','statAuditTrail'],['2026','statActiveSince']].map(([v,lKey])=>(
-                <div key={lKey}>
-                  <div style={{ fontSize:'clamp(20px,2.5vw,30px)', fontWeight:800, color:'#fff' }}>{v}</div>
-                  <div style={{ fontSize:10.5, color:'rgba(255,255,255,.3)', textTransform:'uppercase', letterSpacing:'.08em', marginTop:4, fontWeight:600 }}>{t(lKey)}</div>
+
+            {/* Role strip — the 5 official roles this portal serves, purely iconographic.
+                Pinned to the same 360px column as the paragraph above (justify-between, no
+                gap/wrap) so the two blocks share one consistent left edge AND right edge. */}
+            <div style={{ marginTop:30, maxWidth:360, display:'flex', justifyContent:'space-between' }}>
+              {[
+                [UploadCloud,  t('roleUploader')],
+                [CheckCircle2, t('roleApprover')],
+                [BarChart3,    t('roleCsOffice')],
+                [Settings,     t('roleAdmin')],
+                [FileSearch,   t('roleAuditor')],
+              ].map(([Icon, label]) => (
+                <div key={label} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:9, width:56 }}>
+                  <div style={{ width:40, height:40, borderRadius:12, background:'rgba(255,255,255,.06)', border:'1px solid rgba(255,255,255,.14)', display:'flex', alignItems:'center', justifyContent:'center', transition:'background .15s, border-color .15s' }}>
+                    <Icon size={17} color="rgba(74,222,128,.85)" strokeWidth={1.8}/>
+                  </div>
+                  <div style={{ fontSize:10, color:'rgba(255,255,255,.38)', textAlign:'center', lineHeight:1.3, letterSpacing:'.01em' }}>{label}</div>
                 </div>
               ))}
             </div>
@@ -290,7 +301,7 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
               <button onClick={() => { setScreen('portal'); setUsername(''); setPassword(''); setFormError(''); }}
-                style={{ background:'transparent', border:'none', color:'rgba(255,255,255,.4)', fontSize:11.5, fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', gap:5, padding:0, fontFamily:'Plus Jakarta Sans,sans-serif', letterSpacing:'.04em' }}>
+                style={{ background:'transparent', border:'none', color:'rgba(255,255,255,.4)', fontSize:11.5, fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', gap:5, padding:0, fontFamily:'var(--font)', letterSpacing:'.04em' }}>
                 {t('backToPortal')}
               </button>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -298,8 +309,8 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
                 <AccessibilityMenu iconButtonStyle={{ ...loginIconStyle, width: 26, height: 26 }} />
               </div>
             </div>
-            <h2 style={{ fontSize:21, fontWeight:800, color:'#fff', letterSpacing:'-.02em', marginBottom:3 }}>{t('officialLogin')}</h2>
-            <p style={{ fontSize:12.5, color:'rgba(255,255,255,.42)', marginBottom:20 }}>{t('departmentPortalSubtitle')}</p>
+            <h2 style={{ fontSize: 'var(--font-size-h3)', fontWeight:800, color:'#fff', letterSpacing:'-.02em', marginBottom:3 }}>{t('officialLogin')}</h2>
+            <p style={{ fontSize: 'var(--font-size-small)', color:'rgba(255,255,255,.42)', marginBottom:20 }}>{t('departmentPortalSubtitle')}</p>
 
             {/* Username */}
             <div style={{ marginBottom:14 }}>
@@ -363,13 +374,13 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
             <button className="lk-btn" onClick={handleLogin} disabled={loading}
               style={{
                 width:'100%', padding:'12px', marginBottom:12,
-                background: canSubmit ? 'linear-gradient(135deg,#22c55e,#16a34a)' : 'rgba(255,255,255,.04)',
+                background: canSubmit ? 'linear-gradient(135deg,#198754,#16a34a)' : 'rgba(255,255,255,.04)',
                 borderRadius:11, color: canSubmit ? '#fff' : 'rgba(255,255,255,.32)', fontSize:14, fontWeight:700,
                 display:'flex', alignItems:'center', justifyContent:'center', gap:8,
                 letterSpacing:'.01em',
                 border: canSubmit ? 'none' : '1.5px dashed rgba(255,255,255,.2)',
                 cursor: canSubmit ? 'pointer' : 'not-allowed',
-                boxShadow: canSubmit ? '0 4px 18px rgba(34,197,94,.38)' : 'none',
+                boxShadow: canSubmit ? '0 4px 18px rgba(25, 135, 84,.38)' : 'none',
               }}
             >
               {loading
@@ -385,7 +396,7 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
               <button
                 type="button"
                 onClick={() => setScreen('forgot')}
-                style={{ background:'none', border:'none', color:'rgba(255,255,255,.38)', fontSize:12, cursor:'pointer', fontFamily:'Plus Jakarta Sans,sans-serif', textDecoration:'underline', padding:0 }}
+                style={{ background:'none', border:'none', color:'rgba(255,255,255,.38)', fontSize:12, cursor:'pointer', fontFamily:'var(--font)', textDecoration:'underline', padding:0 }}
               >
                 {t('forgotPassword')}
               </button>
@@ -399,7 +410,6 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
         {/* Footer */}
         <div style={{ position:'absolute', bottom:0, left:0, right:0, zIndex:3, padding:'10px 6%', display:'flex', justifyContent:'space-between' }}>
           <div style={{ fontSize:11, color:'rgba(255,255,255,.16)' }}>{t('footerCopyright')}</div>
-          <div style={{ fontSize:11, fontFamily:'monospace', color:'rgba(255,255,255,.13)' }}>TOR: HARTRON/PM(ICT)/ToR-CSO/2026-27/03</div>
         </div>
       </div>
     </>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BarChart2, GitBranch, ClipboardList, ChevronDown, Users, Settings, Activity, FileSearch, BarChart, Layers, Link2 } from 'lucide-react';
+import { BarChart2, GitBranch, ClipboardList, ChevronDown, Users, Settings, Activity, FileSearch, BarChart, Layers, Link2, BookOpen } from 'lucide-react';
 import haryanaLogo from '../../assets/haryana-logo.png';
 const MENU_CONFIG = {
   // uploader and approver have no sidebar — see Layout.jsx (single-page dashboard instead)
@@ -39,6 +39,7 @@ const MENU_CONFIG = {
       { icon: Users,         label: 'sidebar.items.userManagement',  id: 'nodalusers' },
       { icon: Layers,        label: 'sidebar.items.allUploads',      id: 'nodaluploads' },
       { icon: Link2,         label: 'sidebar.items.linkedDocuments', id: 'nodallinkedocs' },
+      { icon: BookOpen,      label: 'sidebar.items.actPartsReview',  id: 'nodalactparts' },
       { icon: ClipboardList, label: 'sidebar.items.misReport',       id: 'nodalauditfull' },
     ]},
   ],

@@ -34,7 +34,8 @@
       "fullMisReport": "पूर्ण एमआईएस रिपोर्ट",
       "auditLog": "लेखा परीक्षा लॉग",
       "queryHistory": "प्रश्न इतिहास",
-      "complianceReport": "अनुपालन रिपोर्ट"
+      "complianceReport": "अनुपालन रिपोर्ट",
+      "actPartsReview": "अधिनियम भाग समीक्षा"
     }
   },
   "topbar": {
@@ -71,7 +72,8 @@
       "fullMisReport": "पूर्ण एमआईएस रिपोर्ट",
       "allUploads": "सभी अपलोड",
       "auditorLabel": "लेखा परीक्षक",
-      "nodalOfficerLabel": "नोडल अधिकारी"
+      "nodalOfficerLabel": "नोडल अधिकारी",
+      "actPartsReview": "अधिनियम भाग समीक्षा"
     },
     "userFallback": "उपयोगकर्ता",
     "profile": "प्रोफ़ाइल",

@@ -98,22 +98,22 @@ button {
   --surface-border:  #dee2e6;
   --surface-hover:   #e9ecef;
 
-  /* Government green primary (replaces Diamond's indigo) */
-  --primary:        #1a56db;
-  --primary-dark:   #1341a0;
-  --primary-light:  rgba(26, 86, 219, 0.1);
-  --primary-border: rgba(26, 86, 219, 0.25);
+  /* DBIM 2.1 official 'Blue' colour group: #162F6A / #214AAB / #5279D7 / #A3BBF3 / #D2DFFF */
+  --primary:        #214AAB;
+  --primary-dark:   #162F6A;
+  --primary-light:  #D2DFFF;
+  --primary-border: #A3BBF3;
 
-  /* Text */
-  --text-color:           #495057;
+  /* Text — DBIM 2.2 Deep Earthy Brown */
+  --text-color:           #150202;
   --text-color-secondary: #6c757d;
   --text-heading:         #343a40;
 
-  /* Status */
-  --green:  #22c55e;
-  --amber:  #f59e0b;
-  --red:    #ef4444;
-  --blue:   #3b82f6;
+  /* Status — DBIM 2.2 functional palette */
+  --green:  #198754;
+  --amber:  #FFC107;
+  --red:    #DC3545;
+  --blue:   #0D6EFD;
 
   /* Card shadow — Diamond's signature 3-layer */
   --card-shadow: 0px 3px 5px rgba(0,0,0,.02), 0px 0px 2px rgba(0,0,0,.05), 0px 1px 4px rgba(0,0,0,.08);
@@ -123,6 +123,25 @@ button {
   --font: 'Noto Sans', 'Segoe UI', Inter, system-ui, -apple-system, Roboto, sans-serif;
   --font-devanagari: 'Noto Sans Devanagari', 'Noto Sans', sans-serif;
   --mono: 'Consolas', 'IBM Plex Mono', ui-monospace, monospace;
+
+  /* DBIM 4.3 / Table 3-4 type scale (desktop values; mobile override below) */
+  --font-size-h1:    36px;
+  --font-size-h2:    24px;
+  --font-size-h3:    20px;
+  --font-size-p1:    16px;
+  --font-size-p2:    14px;
+  --font-size-small: 12px;
+}
+
+@media (max-width: 640px) {
+  :root {
+    --font-size-h1:    24px;
+    --font-size-h2:    20px;
+    --font-size-h3:    16px;
+    --font-size-p1:    14px;
+    --font-size-p2:    12px;
+    --font-size-small: 10px;
+  }
 }
 
 html { scroll-behavior: smooth; }
@@ -153,7 +172,13 @@ body {
 @keyframes fadeSlideInUp { from { opacity: 0; transform: translateY(100%); } to { opacity: 1; transform: translateY(0); } }
 @keyframes spin          { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
-:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 4px; }
+:focus-visible {
+  outline: 2px solid var(--primary) !important;
+  outline-offset: 2px;
+  border-radius: 4px;
+  box-shadow: 0 0 0 5px rgba(33, 74, 171, .18) !important;
+  transition: box-shadow .15s ease;
+}
 
 .skip-nav {
   position: absolute; left: -9999px; top: auto;

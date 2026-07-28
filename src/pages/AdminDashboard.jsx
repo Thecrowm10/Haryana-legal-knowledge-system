@@ -432,9 +432,9 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
           {[
-            { label: 'Total Users',    value: users.length, color: 'var(--primary)',  bg: 'rgba(26,86,219,.12)',  icon: Users,       key: null },
-            { label: 'Active',         value: active,       color: '#22c55e',         bg: 'rgba(34,197,94,.12)',  icon: CheckCircle, key: 'active' },
-            { label: 'Inactive',       value: inactive,     color: '#f59e0b',         bg: 'rgba(245,158,11,.12)', icon: XCircle,     key: 'inactive' },
+            { label: 'Total Users',    value: users.length, color: 'var(--primary)',  bg: 'rgba(33, 74, 171,.12)',  icon: Users,       key: null },
+            { label: 'Active',         value: active,       color: '#198754',         bg: 'rgba(25, 135, 84,.12)',  icon: CheckCircle, key: 'active' },
+            { label: 'Inactive',       value: inactive,     color: '#b45309',         bg: 'rgba(255, 193, 7,.12)', icon: XCircle,     key: 'inactive' },
           ].map(s => {
             const isActive = statusFilter === s.key;
             return (
@@ -456,9 +456,9 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
         <Card padding="0">
           <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>System Users</div>
+              <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>System Users</div>
               {statusFilter && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px 4px 10px', borderRadius: 20, background: statusFilter === 'active' ? 'rgba(34,197,94,.1)' : 'rgba(245,158,11,.1)', border: `1px solid ${statusFilter === 'active' ? 'rgba(34,197,94,.3)' : 'rgba(245,158,11,.3)'}`, fontSize: 11.5, fontWeight: 600, color: statusFilter === 'active' ? '#16a34a' : '#b45309', whiteSpace: 'nowrap' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px 4px 10px', borderRadius: 20, background: statusFilter === 'active' ? 'rgba(25, 135, 84,.1)' : 'rgba(255, 193, 7,.1)', border: `1px solid ${statusFilter === 'active' ? 'rgba(25, 135, 84,.3)' : 'rgba(255, 193, 7,.3)'}`, fontSize: 11.5, fontWeight: 600, color: statusFilter === 'active' ? '#16a34a' : '#b45309', whiteSpace: 'nowrap' }}>
                   {statusFilter === 'active' ? 'Active' : 'Inactive'}
                   <button onClick={() => setStatusFilter(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'inherit', display: 'flex', padding: 0 }}><X size={11} /></button>
                 </div>
@@ -482,7 +482,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
             </div>
           )}
           {usersError && (
-            <div style={{ padding: '20px 18px', fontSize: 13, color: '#ef4444' }}>
+            <div style={{ padding: '20px 18px', fontSize: 13, color: '#dc3545' }}>
               {usersError}
             </div>
           )}
@@ -495,8 +495,8 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
-                {['Name', 'Username', 'Role', 'Department', 'Status', 'Last Login', 'Actions'].map(h => (
-                  <th key={h} scope="col" style={{ ...LABEL, padding: '11px 16px', textAlign: 'left' }}>{h}</th>
+                {['Name', 'Username', 'Role', 'Department', 'Status', 'Last Login', 'Actions'].map((h, i) => (
+                  <th key={h} scope="col" style={{ ...LABEL, padding: '11px 16px', textAlign: 'left', ...(i > 0 && { borderLeft: '1px solid var(--surface-border)' }) }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -509,17 +509,17 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                     <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>{u.name}</div>
                     <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 2 }}>{u.email}</div>
                   </td>
-                  <td style={{ padding: '12px 16px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)' }}>{u.username}</td>
-                  <td style={{ padding: '12px 16px' }}><Badge label={u.role} variant={u.role} /></td>
-                  <td style={{ padding: '12px 16px', fontSize: 12.5, color: 'var(--text-color-secondary)' }}>{u.dept}</td>
-                  <td style={{ padding: '12px 16px' }}>
+                  <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)' }}>{u.username}</td>
+                  <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)' }}><Badge label={u.role} variant={u.role} /></td>
+                  <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)', fontSize: 12.5, color: 'var(--text-color-secondary)' }}>{u.dept}</td>
+                  <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)' }}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: u.status === 'active' ? '#1e40af' : '#b45309' }}>
-                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: u.status === 'active' ? '#22c55e' : '#f59e0b', display: 'inline-block' }} />
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: u.status === 'active' ? '#198754' : '#ffc107', display: 'inline-block' }} />
                       {u.status}
                     </span>
                   </td>
-                  <td style={{ padding: '12px 16px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)' }}>{u.lastLogin}</td>
-                  <td style={{ padding: '12px 16px' }}>
+                  <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)' }}>{u.lastLogin}</td>
+                  <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)' }}>
                     <div style={{ display: 'flex', gap: 6 }}>
                       <button title="Edit" onClick={() => openEdit(u)}
                         style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 6, padding: '5px 8px', cursor: 'pointer', color: 'var(--primary)', display: 'flex' }}>
@@ -529,7 +529,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                         title={u.isActive ? 'Deactivate' : 'Activate'}
                         disabled={togglingId === u.id}
                         onClick={() => handleToggle(u)}
-                        style={{ background: u.isActive ? 'rgba(239,68,68,.08)' : 'rgba(34,197,94,.08)', border: `1px solid ${u.isActive ? 'rgba(239,68,68,.2)' : 'rgba(34,197,94,.2)'}`, borderRadius: 6, padding: '5px 8px', cursor: togglingId === u.id ? 'not-allowed' : 'pointer', color: u.isActive ? '#ef4444' : '#22c55e', display: 'flex', opacity: togglingId === u.id ? 0.5 : 1 }}>
+                        style={{ background: u.isActive ? 'rgba(220, 53, 69,.08)' : 'rgba(25, 135, 84,.08)', border: `1px solid ${u.isActive ? 'rgba(220, 53, 69,.2)' : 'rgba(25, 135, 84,.2)'}`, borderRadius: 6, padding: '5px 8px', cursor: togglingId === u.id ? 'not-allowed' : 'pointer', color: u.isActive ? '#dc3545' : '#198754', display: 'flex', opacity: togglingId === u.id ? 0.5 : 1 }}>
                         {u.isActive ? <XCircle size={12} /> : <CheckCircle size={12} />}
                       </button>
                     </div>
@@ -555,8 +555,8 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
               {/* Header */}
               <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)' }}>Add New User</div>
-                  <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 1 }}>Create a new system account</div>
+                  <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)' }}>Add New User</div>
+                  <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-color-secondary)', marginTop: 1 }}>Create a new system account</div>
                 </div>
                 <button onClick={() => setAddingUser(false)}
                   style={{ width: 30, height: 30, borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-color-secondary)', flexShrink: 0 }}>
@@ -571,7 +571,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
                     <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Username *</label>
-                    <input style={{ ...INP_STYLE, borderColor: addError.toLowerCase().includes('username') ? 'rgba(239,68,68,.6)' : undefined }}
+                    <input style={{ ...INP_STYLE, borderColor: addError.toLowerCase().includes('username') ? 'rgba(220, 53, 69,.6)' : undefined }}
                       placeholder="e.g. firstname.lastname"
                       autoComplete="off"
                       value={addForm.username}
@@ -579,7 +579,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                   </div>
                   <div>
                     <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Email *</label>
-                    <input style={{ ...INP_STYLE, borderColor: addError.toLowerCase().includes('email') ? 'rgba(239,68,68,.6)' : undefined }}
+                    <input style={{ ...INP_STYLE, borderColor: addError.toLowerCase().includes('email') ? 'rgba(220, 53, 69,.6)' : undefined }}
                       type="email" placeholder="user@example.com"
                       autoComplete="off"
                       value={addForm.email}
@@ -592,7 +592,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                   <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Password *</label>
                   <div style={{ position: 'relative' }}>
                     <input
-                      style={{ ...INP_STYLE, paddingRight: 38, borderColor: addError.toLowerCase().includes('password') ? 'rgba(239,68,68,.6)' : undefined }}
+                      style={{ ...INP_STYLE, paddingRight: 38, borderColor: addError.toLowerCase().includes('password') ? 'rgba(220, 53, 69,.6)' : undefined }}
                       type={showAddPass ? 'text' : 'password'}
                       placeholder="Set a password"
                       autoComplete="new-password"
@@ -678,7 +678,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 })()}
 
                 {addError && (
-                  <div style={{ padding: '9px 12px', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, fontSize: 12.5, color: '#ef4444', display: 'flex', gap: 7, alignItems: 'center' }}>
+                  <div style={{ padding: '9px 12px', background: 'rgba(220, 53, 69,.08)', border: '1px solid rgba(220, 53, 69,.25)', borderRadius: 8, fontSize: 12.5, color: '#dc3545', display: 'flex', gap: 7, alignItems: 'center' }}>
                     <span>⚠</span> {addError}
                   </div>
                 )}
@@ -718,7 +718,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
               {/* Modal header */}
               <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
-                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)' }}>Edit User</div>
+                  <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)' }}>Edit User</div>
                   <div style={{ fontSize: 12, color: 'var(--text-color-secondary)', marginTop: 2 }}>{editingUser.username}</div>
                 </div>
                 <button onClick={() => setEditingUser(null)}
@@ -795,20 +795,20 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 {/* Active status toggle */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: 'var(--surface-ground)', borderRadius: 10, border: '1px solid var(--surface-border)' }}>
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>Account Status</div>
-                    <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 2 }}>
+                    <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 600, color: 'var(--text-heading)' }}>Account Status</div>
+                    <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-color-secondary)', marginTop: 2 }}>
                       {editForm.is_active ? 'User can log in and access the system' : 'User is blocked from logging in'}
                     </div>
                   </div>
                   <button type="button"
                     onClick={() => setEditForm(f => ({ ...f, is_active: !f.is_active }))}
-                    style={{ width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer', background: editForm.is_active ? '#22c55e' : 'var(--surface-border)', position: 'relative', transition: 'background .2s', flexShrink: 0 }}>
+                    style={{ width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer', background: editForm.is_active ? '#198754' : 'var(--surface-border)', position: 'relative', transition: 'background .2s', flexShrink: 0 }}>
                     <span style={{ position: 'absolute', top: 3, width: 18, height: 18, borderRadius: '50%', background: '#fff', transition: 'left .2s', left: editForm.is_active ? 23 : 3, boxShadow: '0 1px 4px rgba(0,0,0,.25)' }} />
                   </button>
                 </div>
 
                 {editError && (
-                  <div style={{ padding: '9px 12px', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, fontSize: 12.5, color: '#ef4444', display: 'flex', gap: 7, alignItems: 'center' }}>
+                  <div style={{ padding: '9px 12px', background: 'rgba(220, 53, 69,.08)', border: '1px solid rgba(220, 53, 69,.25)', borderRadius: 8, fontSize: 12.5, color: '#dc3545', display: 'flex', gap: 7, alignItems: 'center' }}>
                     <span>⚠</span> {editError}
                   </div>
                 )}
@@ -866,7 +866,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
           <Card key={t.category}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, paddingBottom: 12, borderBottom: '1px solid var(--surface-border)' }}>
               <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)' }}>{t.category}</div>
+                <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>{t.category}</div>
                 <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 2 }}>
                   {isApiDriven
                     ? (apiLoading ? 'Loading…' : `${activeCount} active · ${apiItems.length} total`)
@@ -902,7 +902,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 return (
                   <div key={isApiItem ? item.id : item + idx} style={{
                     display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px', borderRadius: 7,
-                    background: isEditing ? 'rgba(26,86,219,.04)' : 'var(--surface-ground)',
+                    background: isEditing ? 'rgba(33, 74, 171,.04)' : 'var(--surface-ground)',
                     border: `1px solid ${isEditing ? 'var(--primary-border)' : 'var(--surface-border)'}`,
                   }}>
                     {isEditing ? (
@@ -925,7 +925,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                             onClick={() => handleMdmToggle(t.category, item)}
                             disabled={isToggling}
                             title={isActive ? 'Deactivate' : 'Activate'}
-                            style={{ background: 'transparent', border: 'none', cursor: isToggling ? 'not-allowed' : 'pointer', color: isActive ? '#ef4444' : '#22c55e', padding: 2, display: 'flex' }}>
+                            style={{ background: 'transparent', border: 'none', cursor: isToggling ? 'not-allowed' : 'pointer', color: isActive ? '#dc3545' : '#198754', padding: 2, display: 'flex' }}>
                             {isToggling
                               ? <div style={{ width: 10, height: 10, border: '2px solid currentColor', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin .6s linear infinite' }} />
                               : isActive ? <Trash2 size={11} /> : <Check size={11} />
@@ -937,7 +937,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                             <button onClick={() => startEdit(t.category, idx, item)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', padding: 2, display: 'flex' }} title="Edit">
                               <Edit2 size={11} />
                             </button>
-                            <button onClick={() => deleteItem(t.category, idx)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 2, display: 'flex' }} title="Delete">
+                            <button onClick={() => deleteItem(t.category, idx)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#dc3545', padding: 2, display: 'flex' }} title="Delete">
                               <Trash2 size={11} />
                             </button>
                           </>
@@ -950,7 +950,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
 
               {(!isApiDriven || canCreateApi) && addState?.category === t.category && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: 4 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px', borderRadius: 7, background: 'rgba(26,86,219,.04)', border: '1px solid var(--primary-border)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px', borderRadius: 7, background: 'rgba(33, 74, 171,.04)', border: '1px solid var(--primary-border)' }}>
                     <input
                       autoFocus
                       placeholder={`New ${t.category.replace(/s$/, '').toLowerCase()}…`}
@@ -964,7 +964,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                     {BTN('var(--text-color-secondary)', 'Cancel', () => setAddState(null))}
                   </div>
                   {addError && (
-                    <div style={{ fontSize: 11, color: '#ef4444', padding: '0 4px' }}>{addError}</div>
+                    <div style={{ fontSize: 11, color: '#dc3545', padding: '0 4px' }}>{addError}</div>
                   )}
                 </div>
               )}
@@ -975,7 +975,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       </div>
 
       {createSuccess && (
-        <div style={{ position: 'fixed', top: 20, right: 20, zIndex: 400, padding: '10px 16px', background: 'var(--surface-card)', border: '1px solid rgba(34,197,94,.25)', borderRadius: 9, fontSize: 12.5, color: '#16a34a', boxShadow: '0 8px 24px rgba(0,0,0,.12)', display: 'flex', gap: 7, alignItems: 'center' }}>
+        <div style={{ position: 'fixed', top: 20, right: 20, zIndex: 400, padding: '10px 16px', background: 'var(--surface-card)', border: '1px solid rgba(25, 135, 84,.25)', borderRadius: 9, fontSize: 12.5, color: '#16a34a', boxShadow: '0 8px 24px rgba(0,0,0,.12)', display: 'flex', gap: 7, alignItems: 'center' }}>
           <CheckCircle size={13} /> {createSuccess}
         </div>
       )}
@@ -995,8 +995,8 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 <Building2 size={16} color="var(--primary)" />
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)' }}>Add Department</div>
-                <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 1 }}>Create a new department record.</div>
+                <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)' }}>Add Department</div>
+                <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-color-secondary)', marginTop: 1 }}>Create a new department record.</div>
               </div>
               <button onClick={closeAddDept}
                 style={{ width: 30, height: 30, borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-color-secondary)', flexShrink: 0 }}>
@@ -1011,7 +1011,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                   autoFocus
                   style={{
                     width: '100%', padding: '10px 13px', background: 'var(--surface-ground)',
-                    border: `1px solid ${createError && !newDept.name.trim() ? 'rgba(239,68,68,.6)' : 'var(--surface-border)'}`,
+                    border: `1px solid ${createError && !newDept.name.trim() ? 'rgba(220, 53, 69,.6)' : 'var(--surface-border)'}`,
                     borderRadius: 9, fontSize: 13, color: 'var(--text-color)', outline: 'none', fontFamily: 'var(--font)',
                   }}
                   placeholder="e.g. Revenue Department"
@@ -1037,7 +1037,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
               </div>
 
               {createError && (
-                <div style={{ padding: '9px 12px', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)', borderRadius: 8, fontSize: 12.5, color: '#ef4444', display: 'flex', gap: 7, alignItems: 'center' }}>
+                <div style={{ padding: '9px 12px', background: 'rgba(220, 53, 69,.08)', border: '1px solid rgba(220, 53, 69,.25)', borderRadius: 8, fontSize: 12.5, color: '#dc3545', display: 'flex', gap: 7, alignItems: 'center' }}>
                   <span>⚠</span> {createError}
                 </div>
               )}
@@ -1094,12 +1094,12 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
           ))}
         </div>
         <Card>
-          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 14 }}>System Health</div>
+          <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)', marginBottom: 14 }}>System Health</div>
           {[['API Server','Operational'],['Database','Operational'],['OCR Service','Operational'],['Search Index','Operational'],['Audit Logger','Operational']].map(([svc, status]) => (
             <div key={svc} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--surface-border)' }}>
               <span style={{ fontSize: 13, color: 'var(--text-color)' }}>{svc}</span>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: '#1e40af' }}>
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} /> {status}
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#198754', display: 'inline-block' }} /> {status}
               </span>
             </div>
           ))}
@@ -1201,22 +1201,22 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
         {/* Table */}
         <Card padding="0">
           <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>User Audit History</div>
+            <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>User Audit History</div>
             <span style={{ ...LABEL }}>{auditTotal} total entries</span>
           </div>
 
           {auditLoading ? (
             <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>Loading audit logs…</div>
           ) : auditError ? (
-            <div style={{ padding: 24, color: '#ef4444', fontSize: 13 }}>{auditError}</div>
+            <div style={{ padding: 24, color: '#dc3545', fontSize: 13 }}>{auditError}</div>
           ) : visibleLogs.length === 0 ? (
             <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>No audit records found.</div>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
-                  {['Timestamp', 'User', 'Action', 'Entity', 'Status', 'IP Address'].map(h => (
-                    <th key={h} scope="col" style={{ ...LABEL, padding: '11px 16px', textAlign: 'left' }}>{h}</th>
+                  {['Timestamp', 'User', 'Action', 'Entity', 'Status', 'IP Address'].map((h, i) => (
+                    <th key={h} scope="col" style={{ ...LABEL, padding: '11px 16px', textAlign: 'left', ...(i > 0 && { borderLeft: '1px solid var(--surface-border)' }) }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -1230,22 +1230,22 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                       <td style={{ padding: '12px 16px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)', whiteSpace: 'nowrap' }}>
                         {new Date(log.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })}
                       </td>
-                      <td style={{ padding: '12px 16px' }}>
+                      <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)' }}>
                         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>{fmtAuditActor(log.actor)}</div>
                         {log.actor?.username && <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>@{log.actor.username}</div>}
                       </td>
-                      <td style={{ padding: '12px 16px', fontSize: 12.5, color: 'var(--text-color)' }}>{fmtAction(log.action)}</td>
-                      <td style={{ padding: '12px 16px' }}>
+                      <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)', fontSize: 12.5, color: 'var(--text-color)' }}>{fmtAction(log.action)}</td>
+                      <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)' }}>
                         <span style={{ fontSize: 11, fontWeight: 600, fontFamily: 'var(--mono)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 5, padding: '2px 7px', color: 'var(--text-color-secondary)' }}>
                           {log.entity_type}{log.entity_id ? ` #${log.entity_id}` : ''}
                         </span>
                       </td>
-                      <td style={{ padding: '12px 16px' }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, borderRadius: 5, padding: '3px 8px', background: isSuccess ? 'rgba(34,197,94,.1)' : 'rgba(239,68,68,.1)', color: isSuccess ? '#16a34a' : '#ef4444' }}>
+                      <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)' }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, borderRadius: 5, padding: '3px 8px', background: isSuccess ? 'rgba(25, 135, 84,.1)' : 'rgba(220, 53, 69,.1)', color: isSuccess ? '#16a34a' : '#dc3545' }}>
                           {log.status}
                         </span>
                       </td>
-                      <td style={{ padding: '12px 16px', fontSize: 11.5, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>
+                      <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)', fontSize: 11.5, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>
                         {log.ip_address || '—'}
                       </td>
                     </tr>
@@ -1380,9 +1380,9 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     }
 
     const SC = {
-      approved: { color: '#16a34a', bg: 'rgba(34,197,94,.1)',   label: 'Approved' },
-      pending:  { color: '#f59e0b', bg: 'rgba(245,158,11,.1)',  label: 'Pending'  },
-      rejected: { color: '#ef4444', bg: 'rgba(239,68,68,.1)',   label: 'Rejected' },
+      approved: { color: '#16a34a', bg: 'rgba(25, 135, 84,.1)',   label: 'Approved' },
+      pending:  { color: '#b45309', bg: 'rgba(255, 193, 7,.1)',  label: 'Pending'  },
+      rejected: { color: '#dc3545', bg: 'rgba(220, 53, 69,.1)',   label: 'Rejected' },
     };
     const cols = '4px 1fr 175px 155px 155px 90px';
     const anyFilter = uploadsSearch || uploadsFilterStatus || uploadsFilterDept || uploadsFilterUploader || uploadsFilterApprover;
@@ -1393,10 +1393,10 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
         {/* Stats */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
           {[
-            { label: 'Total Uploads', value: totalDocs,    color: 'var(--primary)', bg: 'rgba(26,86,219,.12)',  icon: Layers,      key: '' },
-            { label: 'Approved',      value: approvedDocs, color: '#16a34a',        bg: 'rgba(34,197,94,.12)',  icon: CheckCircle, key: 'approved' },
-            { label: 'Pending',       value: pendingDocs,  color: '#f59e0b',        bg: 'rgba(245,158,11,.12)', icon: Clock,       key: 'pending'  },
-            { label: 'Rejected',      value: rejectedDocs, color: '#ef4444',        bg: 'rgba(239,68,68,.12)',  icon: XCircle,     key: 'rejected' },
+            { label: 'Total Uploads', value: totalDocs,    color: 'var(--primary)', bg: 'rgba(33, 74, 171,.12)',  icon: Layers,      key: '' },
+            { label: 'Approved',      value: approvedDocs, color: '#16a34a',        bg: 'rgba(25, 135, 84,.12)',  icon: CheckCircle, key: 'approved' },
+            { label: 'Pending',       value: pendingDocs,  color: '#b45309',        bg: 'rgba(255, 193, 7,.12)', icon: Clock,       key: 'pending'  },
+            { label: 'Rejected',      value: rejectedDocs, color: '#dc3545',        bg: 'rgba(220, 53, 69,.12)',  icon: XCircle,     key: 'rejected' },
           ].map(s => {
             const isActive = uploadsFilterStatus === s.key && s.key !== '';
             return (
@@ -1464,7 +1464,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
             <div style={{ padding: '50px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>Loading documents…</div>
           )}
           {allDocsError && (
-            <div style={{ padding: '20px 18px', fontSize: 13, color: '#ef4444' }}>{allDocsError}</div>
+            <div style={{ padding: '20px 18px', fontSize: 13, color: '#dc3545' }}>{allDocsError}</div>
           )}
 
           {!allDocsLoading && !allDocsError && (
@@ -1473,10 +1473,10 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
               <div style={{ display: 'grid', gridTemplateColumns: cols, background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
                 <div />
                 <div style={{ ...LABEL, padding: '10px 16px 10px 68px' }}>Document</div>
-                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Uploader</div>
-                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Status</div>
-                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Dates</div>
-                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Actions</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>Uploader</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>Status</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>Dates</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>Actions</div>
               </div>
 
               {filteredDocs.length === 0 ? (
@@ -1555,9 +1555,9 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                     {/* Actions */}
                     <div style={{ padding: '10px 14px', borderLeft: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <button onClick={() => setViewDoc(mapDocForViewer(doc))}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 7, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'background .15s' }}
-                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(26,86,219,.14)'}
-                        onMouseLeave={e => e.currentTarget.style.background = 'rgba(26,86,219,.07)'}>
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 7, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'background .15s' }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(33, 74, 171,.14)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'rgba(33, 74, 171,.07)'}>
                         <Eye size={12} /> View
                       </button>
                     </div>
@@ -1577,9 +1577,9 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   // Linked Documents view
   if (activePage === 'linkedocs') {
     const LS = {
-      approved: { color: '#16a34a', bg: 'rgba(34,197,94,.1)',  label: 'Approved' },
-      pending:  { color: '#f59e0b', bg: 'rgba(245,158,11,.1)', label: 'Pending'  },
-      rejected: { color: '#ef4444', bg: 'rgba(239,68,68,.1)',  label: 'Rejected' },
+      approved: { color: '#16a34a', bg: 'rgba(25, 135, 84,.1)',  label: 'Approved' },
+      pending:  { color: '#b45309', bg: 'rgba(255, 193, 7,.1)', label: 'Pending'  },
+      rejected: { color: '#dc3545', bg: 'rgba(220, 53, 69,.1)',  label: 'Rejected' },
     };
 
     const uniqueLinkedDepts = [...new Set(allLinks.map(l => l.linked_department_name).filter(Boolean))];
@@ -1608,10 +1608,10 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
         {/* Stats */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
           {[
-            { label: 'Total Links', value: totals.all,      color: 'var(--primary)', bg: 'rgba(26,86,219,.12)',  icon: Link2,       key: '' },
-            { label: 'Approved',    value: totals.approved,  color: '#16a34a',       bg: 'rgba(34,197,94,.12)',  icon: CheckCircle, key: 'approved' },
-            { label: 'Pending',     value: totals.pending,   color: '#f59e0b',       bg: 'rgba(245,158,11,.12)', icon: Clock,       key: 'pending'  },
-            { label: 'Rejected',    value: totals.rejected,  color: '#ef4444',       bg: 'rgba(239,68,68,.12)',  icon: XCircle,     key: 'rejected' },
+            { label: 'Total Links', value: totals.all,      color: 'var(--primary)', bg: 'rgba(33, 74, 171,.12)',  icon: Link2,       key: '' },
+            { label: 'Approved',    value: totals.approved,  color: '#16a34a',       bg: 'rgba(25, 135, 84,.12)',  icon: CheckCircle, key: 'approved' },
+            { label: 'Pending',     value: totals.pending,   color: '#b45309',       bg: 'rgba(255, 193, 7,.12)', icon: Clock,       key: 'pending'  },
+            { label: 'Rejected',    value: totals.rejected,  color: '#dc3545',       bg: 'rgba(220, 53, 69,.12)',  icon: XCircle,     key: 'rejected' },
           ].map(s => {
             const isActive = linksFilterStatus === s.key && s.key !== '';
             return (
@@ -1668,18 +1668,18 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
           </div>
 
           {allLinksLoading && <div style={{ padding: '50px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>Loading linked documents…</div>}
-          {allLinksError && <div style={{ padding: '20px 18px', fontSize: 13, color: '#ef4444' }}>{allLinksError}</div>}
+          {allLinksError && <div style={{ padding: '20px 18px', fontSize: 13, color: '#dc3545' }}>{allLinksError}</div>}
 
           {!allLinksLoading && !allLinksError && (
             <>
               {/* Column headers */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px 160px 110px 150px 80px', background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
                 <div style={{ ...LABEL, padding: '10px 16px' }}>Document</div>
-                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Original Dept</div>
-                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Linked-to Dept</div>
-                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Status</div>
-                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Requester / Reviewer</div>
-                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>View</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>Original Dept</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>Linked-to Dept</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>Status</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>Requester / Reviewer</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>View</div>
               </div>
 
               {filteredLinks.length === 0 ? (
@@ -1699,7 +1699,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
 
                     {/* Document */}
                     <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(245,158,11,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(255, 193, 7,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         <Link2 size={14} color="#d97706" strokeWidth={2} />
                       </div>
                       <div style={{ minWidth: 0 }}>
@@ -1707,7 +1707,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                           {link.document_name}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 3 }}>
-                          {link.document_type_name && <span style={{ fontSize: 10, fontWeight: 600, color: '#d97706', background: 'rgba(245,158,11,.1)', borderRadius: 4, padding: '1px 5px' }}>{link.document_type_name}</span>}
+                          {link.document_type_name && <span style={{ fontSize: 10, fontWeight: 600, color: '#d97706', background: 'rgba(255, 193, 7,.1)', borderRadius: 4, padding: '1px 5px' }}>{link.document_type_name}</span>}
                           {link.version_no && <span style={{ fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>v{link.version_no}</span>}
                         </div>
                       </div>
@@ -1767,9 +1767,9 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                             annotations_json:    link.annotations_json       || null,
                           } : null,
                         })}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 10px', borderRadius: 7, border: '1px solid rgba(26,86,219,.3)', background: 'rgba(26,86,219,.07)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'background .15s' }}
-                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(26,86,219,.14)'}
-                        onMouseLeave={e => e.currentTarget.style.background = 'rgba(26,86,219,.07)'}>
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 10px', borderRadius: 7, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'background .15s' }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(33, 74, 171,.14)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'rgba(33, 74, 171,.07)'}>
                         <Eye size={12} /> View
                       </button>
                     </div>
@@ -1813,7 +1813,7 @@ function MultiSelectField({ value = [], onChange, options = [], placeholder = 'S
         padding: '10px 12px 10px 14px', fontFamily: 'var(--font)', fontSize: 13,
         borderRadius: 8, background: 'var(--surface-ground)',
         border: `1px solid ${open ? 'var(--primary)' : 'var(--surface-border)'}`,
-        boxShadow: open ? '0 0 0 3px rgba(26,86,219,.1)' : 'none',
+        boxShadow: open ? '0 0 0 3px rgba(33, 74, 171,.1)' : 'none',
         cursor: 'pointer', outline: 'none', textAlign: 'left',
         color: selectedOptions.length ? 'var(--text-color)' : 'var(--text-color-secondary)',
         transition: 'border-color .2s, box-shadow .2s',
@@ -1850,7 +1850,7 @@ function MultiSelectField({ value = [], onChange, options = [], placeholder = 'S
                 fontWeight: isChecked ? 600 : 400, cursor: 'pointer',
                 transition: 'background .12s', background: 'transparent',
               }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(26,86,219,.08)'}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(33, 74, 171,.08)'}
                 onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
               >
                 <div style={{
@@ -1876,7 +1876,7 @@ function MultiSelectField({ value = [], onChange, options = [], placeholder = 'S
             <span key={o.id} style={{
               display: 'inline-flex', alignItems: 'center', gap: 4,
               padding: '3px 6px 3px 10px', borderRadius: 20,
-              background: 'rgba(26,86,219,.1)', border: '1px solid rgba(26,86,219,.2)',
+              background: 'rgba(33, 74, 171,.1)', border: '1px solid rgba(33, 74, 171,.2)',
               fontSize: 11.5, color: 'var(--primary)', fontWeight: 600,
             }}>
               {o.name}

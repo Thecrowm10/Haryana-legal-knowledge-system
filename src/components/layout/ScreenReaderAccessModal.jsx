@@ -103,7 +103,8 @@ export default function ScreenReaderAccessModal({ onClose }) {
                           type="button"
                           onClick={() => setPendingUrl(sr.url)}
                           style={{
-                            display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, flexShrink: 0,
+                            width: 96,
                             fontSize: 11.5, fontWeight: 600, color: 'var(--primary)',
                             padding: '5px 10px', borderRadius: 7, border: '1px solid var(--primary-border)',
                             background: 'var(--primary-light)', cursor: 'pointer', whiteSpace: 'nowrap',
@@ -162,7 +163,7 @@ function ExternalLinkWarning({ url, onCancel, onConfirm }) {
         boxShadow: '0 24px 80px rgba(0,0,0,.35)', padding: 22, animation: 'fadeSlideIn .15s ease',
       }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 12 }}>
-          <AlertTriangle size={18} color="#f59e0b" style={{ flexShrink: 0, marginTop: 1 }} />
+          <AlertTriangle size={18} color="#ffc107" style={{ flexShrink: 0, marginTop: 1 }} />
           <div id="ext-link-title" style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>
             Leaving this site
           </div>

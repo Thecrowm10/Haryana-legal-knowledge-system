@@ -53,7 +53,7 @@ function draw(canvas, code) {
     ctx.translate(cx, cy);
     ctx.rotate((Math.random() - 0.5) * 0.7);
     const size = h * (0.5 + Math.random() * 0.18);
-    ctx.font = `800 ${Math.floor(size)}px 'Plus Jakarta Sans', sans-serif`;
+    ctx.font = `800 ${Math.floor(size)}px 'Noto Sans', sans-serif`;
     ctx.fillStyle = charColor();
     ctx.globalAlpha = 0.88 + Math.random() * 0.12;
     ctx.textAlign = 'center';

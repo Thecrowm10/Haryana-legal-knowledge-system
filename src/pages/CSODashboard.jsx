@@ -10,13 +10,13 @@ import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 
 /* ─── helpers ─── */
-const CHART_COLORS = ['#1a56db', '#3b82f6', '#f59e0b', '#22c55e', '#8b5cf6', '#ef4444'];
+const CHART_COLORS = ['#214aab', '#0d6efd', '#ffc107', '#198754', '#8b5cf6', '#dc3545'];
 const label = { fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)' };
 
 const TOOLTIP_STYLE = { background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 8, boxShadow: 'var(--card-shadow)', fontSize: 12 };
 
 function SectionTitle({ children }) {
-  return <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 16, letterSpacing: '-.01em' }}>{children}</div>;
+  return <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)', marginBottom: 16, letterSpacing: '-.01em' }}>{children}</div>;
 }
 
 /* ─── Diamond-style stat card ─── */
@@ -35,7 +35,7 @@ function StatCard({ icon: Icon, label: lbl, value, sub, iconBg, iconColor, trend
       </div>
       {trend !== undefined && (
         <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 6 }}>
-          <TrendingUp size={13} color="#22c55e" />
+          <TrendingUp size={13} color="#198754" />
           <span style={{ fontSize: 12, color: '#1e40af', fontWeight: 600 }}>{trend}</span>
           <span style={{ fontSize: 12, color: 'var(--text-color-secondary)' }}>vs. last month</span>
         </div>
@@ -495,11 +495,11 @@ function KnowledgeGraph({ focusId, allNodes = KG_NODES, allLinks = KG_LINKS, onN
 
 /* ─── Action Pill ─── */
 const ACTION_PILL = {
-  approve: ['rgba(34,197,94,.1)','#1e40af','rgba(34,197,94,.25)','APPROVE'],
-  reject:  ['rgba(239,68,68,.1)','#b91c1c','rgba(239,68,68,.25)','REJECT'],
-  submit:  ['rgba(245,158,11,.1)','#b45309','rgba(245,158,11,.25)','UPLOAD'],
-  search:  ['rgba(26,86,219,.1)','#1a56db','rgba(26,86,219,.25)','SEARCH'],
-  view:    ['rgba(59,130,246,.1)','#1d4ed8','rgba(59,130,246,.25)','VIEW'],
+  approve: ['rgba(25, 135, 84,.1)','#1e40af','rgba(25, 135, 84,.25)','APPROVE'],
+  reject:  ['rgba(220, 53, 69,.1)','#b91c1c','rgba(220, 53, 69,.25)','REJECT'],
+  submit:  ['rgba(255, 193, 7,.1)','#b45309','rgba(255, 193, 7,.25)','UPLOAD'],
+  search:  ['rgba(33, 74, 171,.1)','#214aab','rgba(33, 74, 171,.25)','SEARCH'],
+  view:    ['rgba(13, 110, 253,.1)','#1d4ed8','rgba(13, 110, 253,.25)','VIEW'],
 };
 function ActionPill({ action }) {
   const k = action.toLowerCase().includes('approved') ? 'approve'
@@ -513,7 +513,7 @@ function ActionPill({ action }) {
 }
 
 /* ─── Node Detail Panel (full-width, below graph) ─── */
-const CHANGE_COLORS = { Amended: '#f59e0b', Substituted: '#3b82f6', Inserted: '#22c55e', Deleted: '#ef4444', Expanded: '#8b5cf6' };
+const CHANGE_COLORS = { Amended: '#ffc107', Substituted: '#0d6efd', Inserted: '#198754', Deleted: '#dc3545', Expanded: '#8b5cf6' };
 
 function NodeDetailPanel({ node, allNodes, allLinks, onClose }) {
   const [tab, setTab] = useState('timeline');
@@ -551,7 +551,7 @@ function NodeDetailPanel({ node, allNodes, allLinks, onClose }) {
               }}>{history?.status ?? 'Active'}</span>
             </div>
             <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-heading)', lineHeight: 1.25, marginBottom: 6 }}>{node.label}</div>
-            {node.desc && <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', lineHeight: 1.55 }}>{node.desc}</div>}
+            {node.desc && <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-color-secondary)', lineHeight: 1.55 }}>{node.desc}</div>}
           </div>
 
           {/* Right: stats + close */}
@@ -603,8 +603,8 @@ function NodeDetailPanel({ node, allNodes, allLinks, onClose }) {
                     {node.year}
                   </div>
                   <div style={{ flex: 1, paddingTop: 8 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)' }}>Original Enactment — {history.enacted}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-color-secondary)', marginTop: 2 }}>{node.label} came into force on {history.enacted}.</div>
+                    <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>Original Enactment — {history.enacted}</div>
+                    <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-color-secondary)', marginTop: 2 }}>{node.label} came into force on {history.enacted}.</div>
                   </div>
                 </div>
 
@@ -614,7 +614,7 @@ function NodeDetailPanel({ node, allNodes, allLinks, onClose }) {
                   return (
                   <div key={ai} style={{ display: 'flex', gap: 16, marginBottom: 16, position: 'relative', zIndex: 1 }}>
                     {/* Year bubble */}
-                    <div style={{ width: 40, height: 40, borderRadius: '50%', background: isOpen ? 'rgba(59,130,246,.25)' : 'rgba(59,130,246,.12)', border: `2.5px solid #3b82f6`, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9.5, fontWeight: 700, color: '#1d4ed8', fontFamily: 'var(--mono)', textAlign: 'center', lineHeight: 1.1, transition: 'background .2s' }}>
+                    <div style={{ width: 40, height: 40, borderRadius: '50%', background: isOpen ? 'rgba(13, 110, 253,.25)' : 'rgba(13, 110, 253,.12)', border: `2.5px solid #0d6efd`, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9.5, fontWeight: 700, color: '#1d4ed8', fontFamily: 'var(--mono)', textAlign: 'center', lineHeight: 1.1, transition: 'background .2s' }}>
                       {amend.year}
                     </div>
 
@@ -622,11 +622,11 @@ function NodeDetailPanel({ node, allNodes, allLinks, onClose }) {
                       {/* ── Clickable amendment heading ── */}
                       <div
                         onClick={() => setExpandedAmend(isOpen ? null : ai)}
-                        style={{ background: isOpen ? 'rgba(26,86,219,.04)' : 'var(--surface-ground)', border: `1px solid ${isOpen ? 'var(--primary-border)' : 'var(--surface-border)'}`, borderRadius: isOpen ? '10px 10px 0 0' : 10, padding: '11px 16px', cursor: 'pointer', transition: 'background .3s, border-color .3s, border-radius .3s', userSelect: 'none' }}
+                        style={{ background: isOpen ? 'rgba(33, 74, 171,.04)' : 'var(--surface-ground)', border: `1px solid ${isOpen ? 'var(--primary-border)' : 'var(--surface-border)'}`, borderRadius: isOpen ? '10px 10px 0 0' : 10, padding: '11px 16px', cursor: 'pointer', transition: 'background .3s, border-color .3s, border-radius .3s', userSelect: 'none' }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 3 }}>{amend.title}</div>
+                            <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)', marginBottom: 3 }}>{amend.title}</div>
                             <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center' }}>
                               <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
                                 <strong style={{ color: 'var(--text-color)' }}>Authority:</strong> {amend.by}
@@ -634,7 +634,7 @@ function NodeDetailPanel({ node, allNodes, allLinks, onClose }) {
                               <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
                                 <strong style={{ color: 'var(--text-color)' }}>Date:</strong> {amend.date}
                               </span>
-                              <span style={{ fontFamily: 'var(--mono)', fontSize: 10, fontWeight: 700, padding: '2px 9px', borderRadius: 20, background: 'rgba(59,130,246,.1)', color: '#1d4ed8' }}>
+                              <span style={{ fontFamily: 'var(--mono)', fontSize: 10, fontWeight: 700, padding: '2px 9px', borderRadius: 20, background: 'rgba(13, 110, 253,.1)', color: '#1d4ed8' }}>
                                 {amend.changes.length} provision{amend.changes.length !== 1 ? 's' : ''} changed
                               </span>
                             </div>
@@ -691,12 +691,12 @@ function NodeDetailPanel({ node, allNodes, allLinks, onClose }) {
                                     </div>
                                   </div>
                                   {/* Before */}
-                                  <div style={{ padding: '10px 14px', borderBottom: '1px solid rgba(239,68,68,.12)', background: 'rgba(239,68,68,.03)' }}>
+                                  <div style={{ padding: '10px 14px', borderBottom: '1px solid rgba(220, 53, 69,.12)', background: 'rgba(220, 53, 69,.03)' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
-                                      <span style={{ fontFamily: 'var(--mono)', fontSize: 9.5, fontWeight: 800, color: '#ef4444', background: 'rgba(239,68,68,.12)', padding: '2px 8px', borderRadius: 4, letterSpacing: '.06em' }}>BEFORE</span>
+                                      <span style={{ fontFamily: 'var(--mono)', fontSize: 9.5, fontWeight: 800, color: '#dc3545', background: 'rgba(220, 53, 69,.12)', padding: '2px 8px', borderRadius: 4, letterSpacing: '.06em' }}>BEFORE</span>
                                       <span style={{ fontSize: 10.5, color: 'var(--text-color-secondary)', fontStyle: 'italic' }}>Original provision</span>
                                     </div>
-                                    <div style={{ fontSize: 12.5, color: '#7f1d1d', lineHeight: 1.7, fontStyle: 'italic', paddingLeft: 4, borderLeft: '3px solid rgba(239,68,68,.3)' }}>"{ch.before}"</div>
+                                    <div style={{ fontSize: 12.5, color: '#7f1d1d', lineHeight: 1.7, fontStyle: 'italic', paddingLeft: 4, borderLeft: '3px solid rgba(220, 53, 69,.3)' }}>"{ch.before}"</div>
                                   </div>
                                   {/* After */}
                                   <div style={{ padding: '10px 14px', background: 'rgba(22,163,74,.03)' }}>
@@ -728,8 +728,8 @@ function NodeDetailPanel({ node, allNodes, allLinks, onClose }) {
             ].map(({ title, subtitle, items, getOther, dirLabel, arrow }) => (
               <div key={title} style={{ flex: 1, minWidth: 280 }}>
                 <div style={{ marginBottom: 10 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)' }}>{title}</div>
-                  <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)' }}>{subtitle}</div>
+                  <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>{title}</div>
+                  <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-color-secondary)' }}>{subtitle}</div>
                 </div>
                 {items.length === 0
                   ? <div style={{ padding: '16px', borderRadius: 8, background: 'var(--surface-ground)', fontSize: 12.5, color: 'var(--text-color-secondary)', textAlign: 'center' }}>None recorded</div>
@@ -744,7 +744,7 @@ function NodeDetailPanel({ node, allNodes, allLinks, onClose }) {
                         const hasDetail = l.srcSection || l.detail;
 
                         return (
-                          <div key={i} style={{ borderRadius: 10, border: `1px solid ${isOpen ? 'var(--primary-border)' : 'var(--surface-border)'}`, overflow: 'hidden', transition: 'border-color .15s', background: isOpen ? 'rgba(26,86,219,.02)' : 'var(--surface-ground)' }}>
+                          <div key={i} style={{ borderRadius: 10, border: `1px solid ${isOpen ? 'var(--primary-border)' : 'var(--surface-border)'}`, overflow: 'hidden', transition: 'border-color .15s', background: isOpen ? 'rgba(33, 74, 171,.02)' : 'var(--surface-ground)' }}>
                             {/* Card header — always visible */}
                             <div
                               onClick={() => hasDetail && setExpandedLink(isOpen ? null : linkKey)}
@@ -756,7 +756,7 @@ function NodeDetailPanel({ node, allNodes, allLinks, onClose }) {
                                 <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', marginTop: 1 }}>{other?.year} · {other?.dept}</div>
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <span style={{ fontFamily: 'var(--mono)', fontSize: 10, fontWeight: 700, padding: '3px 9px', borderRadius: 20, background: 'rgba(26,86,219,.1)', color: 'var(--primary)', whiteSpace: 'nowrap' }}>{arrow} {l.label}</span>
+                                <span style={{ fontFamily: 'var(--mono)', fontSize: 10, fontWeight: 700, padding: '3px 9px', borderRadius: 20, background: 'rgba(33, 74, 171,.1)', color: 'var(--primary)', whiteSpace: 'nowrap' }}>{arrow} {l.label}</span>
                                 {hasDetail && (
                                   <span style={{ fontSize: 14, color: 'var(--text-color-secondary)', lineHeight: 1, transition: 'transform .2s', display: 'inline-block', transform: isOpen ? 'rotate(180deg)' : 'none' }}>⌄</span>
                                 )}
@@ -858,7 +858,7 @@ function GraphTab({ documents, relationships }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18, flexWrap: 'wrap' }}>
           <div style={{ flex: 1 }}>
             <SectionTitle>Legal Document Knowledge Graph</SectionTitle>
-            <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', marginTop: -8 }}>
+            <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-color-secondary)', marginTop: -8 }}>
               {focusId ? `Showing relationships for: ` : 'Drag nodes · Select a document to focus · Arrows show dependencies'}
               {focusNode && <strong style={{ color: 'var(--primary)' }}>{focusNode.label}</strong>}
             </div>
@@ -979,10 +979,10 @@ export default function CSODashboard({ activePage, auditLog, documents = [], rel
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 24, animation: 'fadeSlideIn .3s ease' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-          <StatCard icon={FileText}    label="Total Documents" value={s.totalDocuments} sub="In the system"         iconBg="rgba(26,86,219,.12)"  iconColor="#1a56db" trend="+12%" />
-          <StatCard icon={CheckCircle} label="Approved"        value={s.approved}       sub="Published docs"        iconBg="rgba(34,197,94,.12)"  iconColor="#22c55e" />
-          <StatCard icon={Clock}       label="Pending"         value={s.pending}        sub="Awaiting review"       iconBg="rgba(245,158,11,.12)" iconColor="#f59e0b" />
-          <StatCard icon={XCircle}     label="Rejected"        value={s.rejected}       sub="Returned to uploader"  iconBg="rgba(239,68,68,.12)"  iconColor="#ef4444" />
+          <StatCard icon={FileText}    label="Total Documents" value={s.totalDocuments} sub="In the system"         iconBg="rgba(33, 74, 171,.12)"  iconColor="#214aab" trend="+12%" />
+          <StatCard icon={CheckCircle} label="Approved"        value={s.approved}       sub="Published docs"        iconBg="rgba(25, 135, 84,.12)"  iconColor="#198754" />
+          <StatCard icon={Clock}       label="Pending"         value={s.pending}        sub="Awaiting review"       iconBg="rgba(255, 193, 7,.12)" iconColor="#ffc107" />
+          <StatCard icon={XCircle}     label="Rejected"        value={s.rejected}       sub="Returned to uploader"  iconBg="rgba(220, 53, 69,.12)"  iconColor="#dc3545" />
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
@@ -1020,7 +1020,7 @@ export default function CSODashboard({ activePage, auditLog, documents = [], rel
               <PieChart>
                 <Pie data={[{name:'Approved',value:s.approved},{name:'Pending',value:s.pending},{name:'Rejected',value:s.rejected}]}
                   cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={3} dataKey="value">
-                  {['#1a56db','#f59e0b','#ef4444'].map((c, i) => <Cell key={i} fill={c} />)}
+                  {['#214aab','#ffc107','#dc3545'].map((c, i) => <Cell key={i} fill={c} />)}
                 </Pie>
                 <Tooltip contentStyle={TOOLTIP_STYLE} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
@@ -1032,9 +1032,9 @@ export default function CSODashboard({ activePage, auditLog, documents = [], rel
             <SectionTitle>System Overview</SectionTitle>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {[
-                { label: 'Total Searches', value: s.totalSearches, color: '#3b82f6', pct: 100 },
-                { label: 'Active Users',   value: s.activeUsers,   color: '#1a56db', pct: 80 },
-                { label: 'Approval Rate',  value: `${Math.round(s.approved / s.totalDocuments * 100)}%`, color: '#22c55e', pct: Math.round(s.approved / s.totalDocuments * 100) },
+                { label: 'Total Searches', value: s.totalSearches, color: '#0d6efd', pct: 100 },
+                { label: 'Active Users',   value: s.activeUsers,   color: '#214aab', pct: 80 },
+                { label: 'Approval Rate',  value: `${Math.round(s.approved / s.totalDocuments * 100)}%`, color: '#198754', pct: Math.round(s.approved / s.totalDocuments * 100) },
               ].map(row => (
                 <div key={row.label}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
@@ -1086,8 +1086,8 @@ export default function CSODashboard({ activePage, auditLog, documents = [], rel
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
-              {['Timestamp', 'User', 'Role', 'Action', 'Detail', 'ZG Verified'].map(h => (
-                <th key={h} scope="col" style={{ ...label, padding: '12px 16px', textAlign: 'left' }}>{h}</th>
+              {['Timestamp', 'User', 'Role', 'Action', 'Detail', 'ZG Verified'].map((h, i) => (
+                <th key={h} scope="col" style={{ ...label, padding: '12px 16px', textAlign: 'left', ...(i > 0 && { borderLeft: '1px solid var(--surface-border)' }) }}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -1100,13 +1100,13 @@ export default function CSODashboard({ activePage, auditLog, documents = [], rel
                 onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
                 onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                 <td style={{ padding: '11px 16px', fontFamily: 'var(--mono)', fontSize: 10.5, color: 'var(--text-color-secondary)', whiteSpace: 'nowrap' }}>{log.time}</td>
-                <td style={{ padding: '11px 16px', fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>{log.user}</td>
-                <td style={{ padding: '11px 16px' }}><Badge label={log.role} variant={log.role} /></td>
-                <td style={{ padding: '11px 16px' }}><ActionPill action={log.action} /></td>
-                <td style={{ padding: '11px 16px', fontSize: 12, color: 'var(--text-color-secondary)', maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.doc !== '—' ? log.doc : log.action}</td>
-                <td style={{ padding: '11px 16px' }}>
+                <td style={{ padding: '11px 16px', borderLeft: '1px solid var(--surface-border)', fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>{log.user}</td>
+                <td style={{ padding: '11px 16px', borderLeft: '1px solid var(--surface-border)' }}><Badge label={log.role} variant={log.role} /></td>
+                <td style={{ padding: '11px 16px', borderLeft: '1px solid var(--surface-border)' }}><ActionPill action={log.action} /></td>
+                <td style={{ padding: '11px 16px', borderLeft: '1px solid var(--surface-border)', fontSize: 12, color: 'var(--text-color-secondary)', maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.doc !== '—' ? log.doc : log.action}</td>
+                <td style={{ padding: '11px 16px', borderLeft: '1px solid var(--surface-border)' }}>
                   {(log.action.toLowerCase().includes('searched') || log.action.toLowerCase().includes('viewed'))
-                    ? <span style={{ fontFamily: 'var(--mono)', fontSize: 10, fontWeight: 700, color: '#1e40af', background: 'rgba(34,197,94,.1)', border: '1px solid rgba(34,197,94,.25)', padding: '2px 8px', borderRadius: 5 }}>ZG ✓</span>
+                    ? <span style={{ fontFamily: 'var(--mono)', fontSize: 10, fontWeight: 700, color: '#1e40af', background: 'rgba(25, 135, 84,.1)', border: '1px solid rgba(25, 135, 84,.25)', padding: '2px 8px', borderRadius: 5 }}>ZG ✓</span>
                     : <span style={{ color: 'var(--surface-200)', fontSize: 13 }}>—</span>}
                 </td>
               </tr>

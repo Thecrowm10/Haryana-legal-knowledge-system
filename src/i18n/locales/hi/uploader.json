@@ -256,6 +256,8 @@
       "setPerFile": "प्रति फ़ाइल निर्धारित करें",
       "autoFilled": "स्वतः भरा गया, आप इसे संपादित कर सकते हैं",
       "descriptionPlaceholder": "संक्षिप्त विवरण या अपलोड टिप्पणियाँ…",
+      "previewButton": "पूर्वावलोकन",
+      "confirmButton": "पुष्टि करें",
       "clearAll": "सभी साफ़ करें",
       "uploadingFile": "फ़ाइल अपलोड हो रही है…",
       "savingDetails": "विवरण सहेजा जा रहा है…",

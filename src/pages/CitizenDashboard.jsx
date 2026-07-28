@@ -9,6 +9,7 @@ import Card from '../components/ui/Card';
 import DocViewModal from '../components/DocViewModal';
 import AccessibilityMenu from '../components/AccessibilityMenu';
 import LanguageToggle from '../components/LanguageToggle';
+import Footer from '../components/layout/Footer';
 import haryanaLogo from '../assets/haryana-logo.png';
 import bannerBg from '../assets/banner-1-768x217.png';
 import { publicSearchDocuments } from '../services/pdf';
@@ -16,11 +17,11 @@ import { getDocumentTypes } from '../services/departments';
 
 // Document types matching backend VALID_DOCUMENT_TYPES
 const DOC_TYPE_META = {
-  'Act':                 { color: '#1a56db', bg: 'rgba(26,86,219,.1)',   border: 'rgba(26,86,219,.25)' },
+  'Act':                 { color: '#214aab', bg: 'rgba(33, 74, 171,.1)',   border: 'rgba(33, 74, 171,.25)' },
   'Amendment':           { color: '#d97706', bg: 'rgba(217,119,6,.1)',   border: 'rgba(217,119,6,.25)' },
   'Notification':        { color: '#7c3aed', bg: 'rgba(124,58,237,.1)',  border: 'rgba(124,58,237,.25)' },
   'Circular':            { color: '#0f766e', bg: 'rgba(20,184,166,.1)',  border: 'rgba(20,184,166,.25)' },
-  'Policy':              { color: '#16a34a', bg: 'rgba(34,197,94,.1)',   border: 'rgba(34,197,94,.25)' },
+  'Policy':              { color: '#16a34a', bg: 'rgba(25, 135, 84,.1)',   border: 'rgba(25, 135, 84,.25)' },
   'Rules & Regulations': { color: '#dc2626', bg: 'rgba(220,38,38,.1)',  border: 'rgba(220,38,38,.25)' },
   'Order/Gazette':       { color: '#a16207', bg: 'rgba(234,179,8,.1)',   border: 'rgba(234,179,8,.25)' },
 };
@@ -93,11 +94,11 @@ function DocumentResultCard({ doc, query, onView }) {
     <div
       onClick={onView}
       style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 12, padding: '16px 18px', cursor: 'pointer', transition: 'box-shadow .2s, border-color .2s' }}
-      onMouseEnter={e => { e.currentTarget.style.boxShadow = 'var(--card-shadow)'; e.currentTarget.style.borderColor = 'rgba(26,86,219,.25)'; }}
+      onMouseEnter={e => { e.currentTarget.style.boxShadow = 'var(--card-shadow)'; e.currentTarget.style.borderColor = 'rgba(33, 74, 171,.25)'; }}
       onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = 'var(--surface-border)'; }}
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-        <div style={{ width: 36, height: 36, borderRadius: 9, background: meta?.bg || 'rgba(26,86,219,.08)', border: `1px solid ${meta?.border || 'rgba(26,86,219,.15)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <div style={{ width: 36, height: 36, borderRadius: 9, background: meta?.bg || 'rgba(33, 74, 171,.08)', border: `1px solid ${meta?.border || 'rgba(33, 74, 171,.15)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <FileText size={16} color={meta?.color || 'var(--primary)'} strokeWidth={1.5} />
         </div>
 
@@ -599,7 +600,7 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
             { label: t('statDocumentTypes'),      value: typeCount,      icon: Layers },
           ].map(s => (
             <div key={s.label} className="cd-stat-item" style={{ padding: '22px 26px', display: 'flex', alignItems: 'center', gap: 16 }}>
-              <div style={{ width: 46, height: 46, borderRadius: 11, background: 'rgba(26,86,219,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <div style={{ width: 46, height: 46, borderRadius: 11, background: 'rgba(33, 74, 171,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <s.icon size={20} color="var(--primary)" strokeWidth={1.8} />
               </div>
               <div>
@@ -670,7 +671,7 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
         {/* Idle state — Recently Published */}
         {!loading && !searched && (
           <Card>
-            <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 14 }}>{t('recentlyPublished')}</div>
+            <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)', marginBottom: 14 }}>{t('recentlyPublished')}</div>
             {recentLoading ? (
               <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-color-secondary)', fontSize: 13 }}>{t('loading')}</div>
             ) : recentDocs.length === 0 ? (
@@ -720,6 +721,8 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
           </div>
         )}
       </div>
+
+      <Footer />
     </div>
   );
 }

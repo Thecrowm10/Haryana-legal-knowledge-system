@@ -61,7 +61,7 @@ export default function AdminOtpLoginScreen({ onBack, onSuccess }) {
     <>
       <style>{`
         .ao * { box-sizing:border-box; margin:0; padding:0; }
-        .ao { font-family:'Plus Jakarta Sans Variable','Plus Jakarta Sans',sans-serif; }
+        .ao { font-family:var(--font); }
         @keyframes aoFade { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
         @keyframes spin   { to{transform:rotate(360deg)} }
         .ao-card { animation:aoFade .4s cubic-bezier(.22,1,.36,1) both; }
