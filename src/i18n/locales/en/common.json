@@ -104,5 +104,36 @@
     "english": "EN",
     "hindi": "हिंदी",
     "switchLabel": "Switch to Hindi"
+  },
+  "footer": {
+    "siteFooterLabel": "Site footer",
+    "emblemAlt": "Emblem of India",
+    "orgName": "Government of Haryana",
+    "orgTagline": "Haryana Digital Repository",
+    "brandDesc": "Centralized repository of Acts, Rules, Notifications and Circulars issued by the Government of Haryana.",
+    "sections": {
+      "websitePolicies": "Website Policies",
+      "helpSupport": "Help & Support",
+      "navigation": "Navigation"
+    },
+    "links": {
+      "privacyPolicy": "Privacy Policy",
+      "termsOfUse": "Terms of Use",
+      "hyperlinkPolicy": "Hyperlink Policy",
+      "copyrightPolicy": "Copyright Policy",
+      "faqs": "FAQs",
+      "screenReaderAccess": "Screen Reader Access",
+      "rti": "Right to Information",
+      "feedback": "Feedback",
+      "contactUs": "Contact Us",
+      "sitemap": "Sitemap",
+      "relatedLinks": "Related Links",
+      "accessibility": "Accessibility",
+      "disclaimer": "Disclaimer"
+    },
+    "digitalIndiaAlt": "Digital India",
+    "maintainedBy": "This website belongs to Government of Haryana. Designed, Developed and Maintained by HARTRON.",
+    "lastUpdated": "Last Updated:",
+    "accessibilityStatement": "Accessibility Statement"
   }
 }

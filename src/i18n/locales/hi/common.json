@@ -104,5 +104,36 @@
     "english": "EN",
     "hindi": "हिंदी",
     "switchLabel": "अंग्रेज़ी में बदलें"
+  },
+  "footer": {
+    "siteFooterLabel": "साइट फ़ुटर",
+    "emblemAlt": "भारत का राजचिह्न",
+    "orgName": "हरियाणा सरकार",
+    "orgTagline": "हरियाणा डिजिटल भंडार",
+    "brandDesc": "हरियाणा सरकार द्वारा जारी अधिनियमों, नियमों, अधिसूचनाओं और परिपत्रों का केंद्रीकृत भंडार।",
+    "sections": {
+      "websitePolicies": "वेबसाइट नीतियां",
+      "helpSupport": "सहायता और समर्थन",
+      "navigation": "नेविगेशन"
+    },
+    "links": {
+      "privacyPolicy": "गोपनीयता नीति",
+      "termsOfUse": "उपयोग की शर्तें",
+      "hyperlinkPolicy": "हाइपरलिंक नीति",
+      "copyrightPolicy": "कॉपीराइट नीति",
+      "faqs": "अक्सर पूछे जाने वाले प्रश्न",
+      "screenReaderAccess": "स्क्रीन रीडर सुविधा",
+      "rti": "सूचना का अधिकार",
+      "feedback": "प्रतिक्रिया",
+      "contactUs": "संपर्क करें",
+      "sitemap": "साइटमैप",
+      "relatedLinks": "संबंधित लिंक",
+      "accessibility": "सुगम्यता",
+      "disclaimer": "अस्वीकरण"
+    },
+    "digitalIndiaAlt": "डिजिटल इंडिया",
+    "maintainedBy": "यह वेबसाइट हरियाणा सरकार की है। इसे हार्ट्रॉन द्वारा डिज़ाइन, विकसित और अनुरक्षित किया गया है।",
+    "lastUpdated": "अंतिम अद्यतन:",
+    "accessibilityStatement": "सुगम्यता विवरण"
   }
 }

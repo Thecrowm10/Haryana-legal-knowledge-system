@@ -4,6 +4,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 pdfjsLib.GlobalWorkerOptions.workerSrc = import.meta.env.BASE_URL + 'pdf.worker.min.js';
 import mammoth from 'mammoth';
 import { getPdfFile } from '../services/pdf';
+import { TYPE_SPECIFIC_FIELD_KEYS } from '../constants/docTypeFields';
 
 const TYPE_CARD_COLORS = {
   'Act':                 { bg: 'rgba(33, 74, 171,.08)',  accent: '#214aab', text: '#1e40af' },
@@ -236,23 +237,25 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
 
   const LS = { fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)' };
 
+  // Always show every common field — blank (not hidden) when it wasn't
+  // filled in, so the full shape of what could have been entered is visible.
   const meta = [
-    ['Short Title',     doc.shortTitle      || null],
-    ['Reference No.',   doc.referenceNumber || null],
-    ['Issue Date',      doc.enactmentDate   || null],
-    ['Effective From',  doc.effectiveFrom   || null],
-    ['Gazette Ref.',    doc.gazette         || null],
-    ['Legal Authority', doc.authority       || null],
-    ['Uploader',        doc.uploader        || null],
-    ['Upload Date',     doc.uploadedAt      || null],
-    ['File',            doc.fileName        || null],
-  ].filter(([, v]) => v);
+    ['Short Title',     doc.shortTitle      || ''],
+    ['Reference No.',   doc.referenceNumber || ''],
+    ['Issue Date',      doc.enactmentDate   || ''],
+    ['Effective From',  doc.effectiveFrom   || ''],
+    ['Gazette Ref.',    doc.gazette         || ''],
+    ['Legal Authority', doc.authority       || ''],
+    ['Uploader',        doc.uploader        || ''],
+    ['Upload Date',     doc.uploadedAt      || ''],
+    ['File',            doc.fileName        || ''],
+  ];
 
-  // Type-specific fields (e.g. Act Year, No. of Rules for an Act; Sector for a Policy) —
-  // everything the uploader entered that isn't already covered by the fixed fields above.
-  const typeExtra = doc.typeFields
-    ? Object.entries(doc.typeFields).filter(([, v]) => v)
-    : [];
+  // Type-specific fields (e.g. Act Year, No. of Rules for an Act; Sector for a
+  // Policy) — always show every field that belongs to this document's own
+  // type, blank if not filled in, never fields belonging to a different type.
+  const typeExtra = (TYPE_SPECIFIC_FIELD_KEYS[doc.type] || [])
+    .map(({ key }) => [key, doc.typeFields?.[key] || '']);
 
   const statusAccent = doc.status === 'approved' ? '#16a34a' : doc.status === 'rejected' ? '#dc3545' : '#ffc107';
   const statusBg     = doc.status === 'approved' ? 'rgba(25, 135, 84,.1)'  : doc.status === 'rejected' ? 'rgba(220, 53, 69,.1)'  : 'rgba(255, 193, 7,.1)';
@@ -463,8 +466,8 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
                 <div style={{ ...LS, marginBottom: 10 }}>Additional Info</div>
                 <div style={{ borderRadius: 10, border: '1px solid var(--surface-border)', overflow: 'hidden' }}>
                   {meta.map(([k, v], idx) => (
-                    <div key={k} style={{ display: 'flex', alignItems: 'flex-start', borderBottom: idx < meta.length - 1 ? '1px solid var(--surface-border)' : 'none' }}>
-                      <div style={{ padding: '10px 14px', minWidth: 128, flexShrink: 0, background: 'var(--surface-50)', fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', fontWeight: 600, borderRight: '1px solid var(--surface-border)' }}>{k}</div>
+                    <div key={k} style={{ display: 'flex', alignItems: 'center', borderBottom: idx < meta.length - 1 ? '1px solid var(--surface-border)' : 'none' }}>
+                      <div style={{ padding: '10px 14px', width: 128, boxSizing: 'border-box', flexShrink: 0, background: 'var(--surface-50)', fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', fontWeight: 600, borderRight: '1px solid var(--surface-border)' }}>{k}</div>
                       <div style={{ padding: '10px 14px', fontSize: 12.5, color: 'var(--text-heading)', fontWeight: 500, flex: 1, wordBreak: 'break-word' }}>{String(v)}</div>
                     </div>
                   ))}
@@ -477,8 +480,8 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
                 <div style={{ ...LS, marginBottom: 10 }}>Type-Specific Fields</div>
                 <div style={{ borderRadius: 10, border: '1px solid var(--surface-border)', overflow: 'hidden' }}>
                   {typeExtra.map(([k, v], idx) => (
-                    <div key={k} style={{ display: 'flex', alignItems: 'flex-start', borderBottom: idx < typeExtra.length - 1 ? '1px solid var(--surface-border)' : 'none' }}>
-                      <div style={{ padding: '10px 14px', minWidth: 128, flexShrink: 0, background: 'var(--surface-50)', fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', fontWeight: 600, borderRight: '1px solid var(--surface-border)' }}>{fieldLabel(k)}</div>
+                    <div key={k} style={{ display: 'flex', alignItems: 'center', borderBottom: idx < typeExtra.length - 1 ? '1px solid var(--surface-border)' : 'none' }}>
+                      <div style={{ padding: '10px 14px', width: 128, boxSizing: 'border-box', flexShrink: 0, background: 'var(--surface-50)', fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', fontWeight: 600, borderRight: '1px solid var(--surface-border)' }}>{fieldLabel(k)}</div>
                       <div style={{ padding: '10px 14px', fontSize: 12.5, color: 'var(--text-heading)', fontWeight: 500, flex: 1, wordBreak: 'break-word' }}>{String(v)}</div>
                     </div>
                   ))}

@@ -1,0 +1,239 @@
+{
+  "common": {
+    "cancel": "रद्द करें",
+    "clear": "साफ़ करें",
+    "edit": "संपादित करें",
+    "view": "देखें",
+    "loading": "लोड हो रहा है…"
+  },
+  "users": {
+    "stats": {
+      "totalUsers": "कुल उपयोगकर्ता",
+      "active": "सक्रिय",
+      "inactive": "निष्क्रिय"
+    },
+    "systemUsers": "सिस्टम उपयोगकर्ता",
+    "allDepartments": "सभी विभाग",
+    "addUser": "उपयोगकर्ता जोड़ें",
+    "loadingUsers": "उपयोगकर्ता लोड हो रहे हैं…",
+    "failedToLoadUsers": "उपयोगकर्ताओं को लोड करने में विफल। कृपया पुनः प्रयास करें।",
+    "noUsersYet": "अभी तक कोई उपयोगकर्ता नहीं",
+    "headers": {
+      "name": "नाम",
+      "username": "उपयोगकर्ता नाम",
+      "role": "भूमिका",
+      "department": "विभाग",
+      "status": "स्थिति",
+      "lastLogin": "अंतिम लॉगिन",
+      "actions": "कार्रवाई"
+    },
+    "edit": "संपादित करें",
+    "deactivate": "निष्क्रिय करें",
+    "activate": "सक्रिय करें",
+    "addDrawer": {
+      "title": "नया उपयोगकर्ता जोड़ें",
+      "subtitle": "एक नया सिस्टम खाता बनाएं",
+      "username": "उपयोगकर्ता नाम *",
+      "usernamePlaceholder": "जैसे firstname.lastname",
+      "email": "ईमेल *",
+      "emailPlaceholder": "user@example.com",
+      "password": "पासवर्ड *",
+      "passwordPlaceholder": "एक पासवर्ड सेट करें",
+      "firstName": "पहला नाम",
+      "firstNamePlaceholder": "पहला नाम",
+      "lastName": "अंतिम नाम",
+      "lastNamePlaceholder": "अंतिम नाम",
+      "mobileNumber": "मोबाइल नंबर",
+      "mobilePlaceholder": "10 अंकों का मोबाइल नंबर (वैकल्पिक)",
+      "role": "भूमिका",
+      "roleSelectPlaceholder": "भूमिका चुनें",
+      "department": "विभाग",
+      "departmentSelectPlaceholder": "विभाग चुनें",
+      "cancel": "रद्द करें",
+      "createUser": "उपयोगकर्ता बनाएं",
+      "creating": "बनाया जा रहा है…"
+    },
+    "editModal": {
+      "title": "उपयोगकर्ता संपादित करें",
+      "firstName": "पहला नाम",
+      "lastName": "अंतिम नाम",
+      "email": "ईमेल",
+      "role": "भूमिका",
+      "department": "विभाग",
+      "selectRole": "भूमिका चुनें",
+      "selectDepartment": "कोई विभाग नहीं",
+      "accountStatus": "खाता स्थिति",
+      "canLogin": "उपयोगकर्ता लॉग इन कर सकता है और सिस्टम एक्सेस कर सकता है",
+      "blocked": "उपयोगकर्ता को लॉगिन करने से रोका गया है",
+      "cancel": "रद्द करें",
+      "saveChanges": "परिवर्तन सहेजें",
+      "saving": "सहेजा जा रहा है…"
+    },
+    "errors": {
+      "usernameRequired": "उपयोगकर्ता नाम आवश्यक है।",
+      "emailRequired": "ईमेल आवश्यक है।",
+      "passwordRequired": "पासवर्ड आवश्यक है।",
+      "createFailed": "उपयोगकर्ता बनाने में विफल।",
+      "saveFailed": "परिवर्तन सहेजने में विफल।"
+    }
+  },
+  "taxonomy": {
+    "loading": "लोड हो रहा है…",
+    "activeOfTotal": "{{total}} में से {{active}} सक्रिय",
+    "itemsCount": "{{count}} आइटम",
+    "add": "जोड़ें",
+    "save": "सहेजें",
+    "cancel": "रद्द करें",
+    "adding": "जोड़ा जा रहा है…",
+    "newItemPlaceholder": "नया {{category}}…",
+    "deactivate": "निष्क्रिय करें",
+    "activate": "सक्रिय करें",
+    "edit": "संपादित करें",
+    "delete": "हटाएं",
+    "addDepartment": {
+      "title": "विभाग जोड़ें",
+      "subtitle": "एक नया विभाग रिकॉर्ड बनाएं।",
+      "name": "विभाग का नाम *",
+      "namePlaceholder": "जैसे राजस्व विभाग",
+      "description": "विवरण",
+      "descriptionPlaceholder": "विभाग के कार्य का संक्षिप्त विवरण…",
+      "cancel": "रद्द करें",
+      "creating": "बनाया जा रहा है…",
+      "addDepartment": "विभाग जोड़ें"
+    },
+    "errors": {
+      "departmentNameRequired": "विभाग का नाम आवश्यक है।",
+      "createDepartmentFailed": "विभाग बनाने में विफल।",
+      "createDocTypeFailed": "दस्तावेज़ प्रकार बनाने में विफल।",
+      "createDeptFailed": "विभाग बनाने में विफल।",
+      "departmentsLoadFailed": "विभाग लोड करने में विफल। कृपया पुनः प्रयास करें।",
+      "docTypesLoadFailed": "दस्तावेज़ प्रकार लोड करने में विफल। कृपया पुनः प्रयास करें।"
+    },
+    "createSuccess": "विभाग \"{{name}}\" सफलतापूर्वक बनाया गया।"
+  },
+  "monitor": {
+    "stats": {
+      "totalDocuments": "कुल दस्तावेज़",
+      "activeSessions": "सक्रिय सत्र",
+      "searchesToday": "आज की खोजें",
+      "storageUsed": "उपयोग किया गया स्टोरेज"
+    },
+    "subs": {
+      "todayCount": "+12 आज",
+      "rightNow": "अभी",
+      "anonymised": "गुमनाम",
+      "of50Gb": "50 जीबी में से"
+    },
+    "systemHealth": "सिस्टम स्वास्थ्य",
+    "services": {
+      "apiServer": "एपीआई सर्वर",
+      "database": "डेटाबेस",
+      "ocrService": "ओसीआर सेवा",
+      "searchIndex": "खोज सूचकांक",
+      "auditLogger": "ऑडिट लॉगर"
+    },
+    "operational": "चालू"
+  },
+  "audit": {
+    "failedToLoad": "ऑडिट लॉग लोड करने में विफल। कृपया पुनः प्रयास करें।",
+    "searchPlaceholder": "उपयोगकर्ता या कार्रवाई खोजें…",
+    "entities": {
+      "all": "सभी इकाइयां",
+      "auth": "प्रमाणीकरण",
+      "user": "उपयोगकर्ता",
+      "pdf": "पीडीएफ़",
+      "department": "विभाग",
+      "documentType": "दस्तावेज़ प्रकार"
+    },
+    "allStatuses": "सभी स्थितियां",
+    "success": "सफल",
+    "failure": "विफल",
+    "to": "से",
+    "clear": "साफ़ करें",
+    "exportCsv": "CSV निर्यात करें",
+    "heading": "उपयोगकर्ता ऑडिट इतिहास",
+    "totalEntries": "कुल {{count}} प्रविष्टियां",
+    "loading": "ऑडिट लॉग लोड हो रहे हैं…",
+    "noRecords": "कोई ऑडिट रिकॉर्ड नहीं मिला।",
+    "headers": {
+      "timestamp": "समय",
+      "user": "उपयोगकर्ता",
+      "action": "कार्रवाई",
+      "entity": "इकाई",
+      "status": "स्थिति",
+      "ipAddress": "आईपी पता"
+    },
+    "pageOf": "पृष्ठ {{page}} / {{total}}",
+    "previous": "पिछला",
+    "next": "अगला"
+  },
+  "uploads": {
+    "failedToLoad": "दस्तावेज़ लोड करने में विफल। कृपया पुनः प्रयास करें।",
+    "stats": {
+      "totalUploads": "कुल अपलोड",
+      "approved": "स्वीकृत",
+      "pending": "लंबित",
+      "rejected": "अस्वीकृत"
+    },
+    "searchPlaceholder": "दस्तावेज़ खोजें…",
+    "allUploaders": "सभी अपलोडर",
+    "allApprovers": "सभी अनुमोदक",
+    "allDepartments": "सभी विभाग",
+    "allStatuses": "सभी स्थितियां",
+    "statusPending": "लंबित",
+    "statusApproved": "स्वीकृत",
+    "statusRejected": "अस्वीकृत",
+    "clear": "साफ़ करें",
+    "countOf": "{{total}} में से {{shown}}",
+    "loadingDocuments": "दस्तावेज़ लोड हो रहे हैं…",
+    "noMatch": "वर्तमान फ़िल्टर से कोई दस्तावेज़ मेल नहीं खाता",
+    "headers": {
+      "document": "दस्तावेज़",
+      "uploader": "अपलोडर",
+      "status": "स्थिति",
+      "dates": "तारीखें",
+      "actions": "कार्रवाई"
+    },
+    "uploaded": "अपलोड किया गया",
+    "approvedLabel": "स्वीकृत",
+    "rejectedLabel": "अस्वीकृत",
+    "reviewedLabel": "समीक्षित",
+    "view": "देखें"
+  },
+  "linkedDocs": {
+    "failedToLoad": "लिंक किए गए दस्तावेज़ लोड करने में विफल।",
+    "stats": {
+      "totalLinks": "कुल लिंक",
+      "approved": "स्वीकृत",
+      "pending": "लंबित",
+      "rejected": "अस्वीकृत"
+    },
+    "searchPlaceholder": "दस्तावेज़ या विभाग द्वारा खोजें…",
+    "countOf": "{{total}} में से {{shown}}",
+    "allDepartments": "सभी विभाग",
+    "allStatuses": "सभी स्थितियां",
+    "statusPending": "लंबित",
+    "statusApproved": "स्वीकृत",
+    "statusRejected": "अस्वीकृत",
+    "clear": "साफ़ करें",
+    "loadingDocuments": "लिंक किए गए दस्तावेज़ लोड हो रहे हैं…",
+    "noMatch": "वर्तमान फ़िल्टर से कोई लिंक किया गया दस्तावेज़ मेल नहीं खाता।",
+    "headers": {
+      "document": "दस्तावेज़",
+      "originalDept": "मूल विभाग",
+      "linkedDept": "लिंक किया गया विभाग",
+      "status": "स्थिति",
+      "requesterReviewer": "अनुरोधकर्ता / समीक्षक",
+      "view": "देखें"
+    },
+    "requestedBy": "{{name}} द्वारा अनुरोधित",
+    "requested": "अनुरोधित",
+    "reviewed": "समीक्षित",
+    "loadingView": "लोड हो रहा है…",
+    "view": "देखें"
+  },
+  "multiSelect": {
+    "selectDepartments": "विभाग चुनें…",
+    "departmentsSelected": "{{count}} विभाग चयनित"
+  }
+}

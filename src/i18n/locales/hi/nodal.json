@@ -1,0 +1,243 @@
+{
+  "common": {
+    "cancel": "रद्द करें",
+    "clear": "साफ़ करें",
+    "save": "सहेजें",
+    "edit": "संपादित करें",
+    "view": "देखें",
+    "close": "बंद करें",
+    "back": "वापस",
+    "loading": "लोड हो रहा है…"
+  },
+  "users": {
+    "stats": {
+      "totalUsers": "कुल उपयोगकर्ता",
+      "active": "सक्रिय",
+      "inactive": "निष्क्रिय"
+    },
+    "systemUsers": "सिस्टम उपयोगकर्ता",
+    "allDepartments": "सभी विभाग",
+    "addUser": "उपयोगकर्ता जोड़ें",
+    "loadingUsers": "उपयोगकर्ता लोड हो रहे हैं…",
+    "failedToLoadUsers": "उपयोगकर्ताओं को लोड करने में विफल। कृपया पुनः प्रयास करें।",
+    "noActiveUsers": "कोई सक्रिय उपयोगकर्ता नहीं मिला",
+    "headers": {
+      "name": "नाम",
+      "username": "उपयोगकर्ता नाम",
+      "role": "भूमिका",
+      "department": "विभाग",
+      "status": "स्थिति",
+      "lastLogin": "अंतिम लॉगिन",
+      "actions": "कार्रवाई"
+    },
+    "edit": "संपादित करें",
+    "deactivate": "निष्क्रिय करें",
+    "activate": "सक्रिय करें",
+    "addDrawer": {
+      "title": "नया उपयोगकर्ता जोड़ें",
+      "subtitle": "एक नया सिस्टम खाता बनाएं",
+      "username": "उपयोगकर्ता नाम *",
+      "usernamePlaceholder": "जैसे firstname.lastname",
+      "email": "ईमेल *",
+      "emailPlaceholder": "user@example.com",
+      "password": "पासवर्ड *",
+      "passwordPlaceholder": "एक पासवर्ड सेट करें",
+      "firstName": "पहला नाम",
+      "firstNamePlaceholder": "पहला नाम",
+      "lastName": "अंतिम नाम",
+      "lastNamePlaceholder": "अंतिम नाम",
+      "mobileNumber": "मोबाइल नंबर",
+      "mobilePlaceholder": "10 अंकों का मोबाइल नंबर (वैकल्पिक)",
+      "role": "भूमिका",
+      "roleSelectPlaceholder": "भूमिका चुनें",
+      "department": "विभाग *",
+      "departmentSelectPlaceholder": "विभाग चुनें",
+      "cancel": "रद्द करें",
+      "createUser": "उपयोगकर्ता बनाएं",
+      "creating": "बनाया जा रहा है…"
+    },
+    "editModal": {
+      "title": "उपयोगकर्ता संपादित करें",
+      "firstName": "पहला नाम",
+      "lastName": "अंतिम नाम",
+      "email": "ईमेल",
+      "role": "भूमिका",
+      "department": "विभाग",
+      "selectDepartment": "विभाग चुनें",
+      "accountStatus": "खाता स्थिति",
+      "canLogin": "उपयोगकर्ता लॉग इन कर सकता है और सिस्टम एक्सेस कर सकता है",
+      "blocked": "उपयोगकर्ता को लॉगिन करने से रोका गया है",
+      "cancel": "रद्द करें",
+      "saveChanges": "परिवर्तन सहेजें",
+      "saving": "सहेजा जा रहा है…"
+    },
+    "confirmToggle": {
+      "deactivateTitle": "उपयोगकर्ता को निष्क्रिय करें",
+      "activateTitle": "उपयोगकर्ता को सक्रिय करें",
+      "confirmDeactivate": "क्या आप वाकई <strong>{{name}}</strong> को निष्क्रिय करना चाहते हैं?",
+      "confirmActivate": "क्या आप वाकई <strong>{{name}}</strong> को सक्रिय करना चाहते हैं?",
+      "loginBlockedNote": "वे अब लॉग इन नहीं कर पाएंगे।",
+      "cancel": "रद्द करें",
+      "deactivate": "निष्क्रिय करें",
+      "activate": "सक्रिय करें"
+    },
+    "errors": {
+      "usernameRequired": "उपयोगकर्ता नाम आवश्यक है।",
+      "emailRequired": "ईमेल आवश्यक है।",
+      "passwordRequired": "पासवर्ड आवश्यक है।",
+      "departmentRequired": "विभाग आवश्यक है।",
+      "createFailed": "उपयोगकर्ता बनाने में विफल।",
+      "saveFailed": "परिवर्तन सहेजने में विफल।"
+    }
+  },
+  "uploads": {
+    "scopeNotice": "आपके अधिकृत विभागों से अपलोड दिखाए जा रहे हैं: <strong>{{depts}}</strong>",
+    "stats": {
+      "totalUploads": "कुल अपलोड",
+      "approved": "स्वीकृत",
+      "pending": "लंबित",
+      "rejected": "अस्वीकृत"
+    },
+    "failedToLoad": "दस्तावेज़ लोड करने में विफल। कृपया पुनः प्रयास करें।",
+    "searchPlaceholder": "दस्तावेज़ खोजें…",
+    "allUploaders": "सभी अपलोडर",
+    "allApprovers": "सभी अनुमोदक",
+    "allDepartments": "सभी विभाग",
+    "allStatuses": "सभी स्थितियां",
+    "statusPending": "लंबित",
+    "statusApproved": "स्वीकृत",
+    "statusRejected": "अस्वीकृत",
+    "clear": "साफ़ करें",
+    "countOf": "{{total}} में से {{shown}}",
+    "loadingDocuments": "दस्तावेज़ लोड हो रहे हैं…",
+    "noMatch": "वर्तमान फ़िल्टर से कोई दस्तावेज़ मेल नहीं खाता",
+    "headers": {
+      "document": "दस्तावेज़",
+      "uploader": "अपलोडर",
+      "status": "स्थिति",
+      "dates": "तारीखें",
+      "actions": "कार्रवाई"
+    },
+    "uploaded": "अपलोड किया गया",
+    "approvedLabel": "स्वीकृत",
+    "rejectedLabel": "अस्वीकृत",
+    "reviewedLabel": "समीक्षित",
+    "view": "देखें"
+  },
+  "audit": {
+    "failedToLoad": "ऑडिट लॉग लोड करने में विफल। कृपया पुनः प्रयास करें।",
+    "scopeNotice": "आपके अधिकृत विभागों के उपयोगकर्ताओं के ऑडिट लॉग दिखाए जा रहे हैं: <strong>{{depts}}</strong>",
+    "searchPlaceholder": "उपयोगकर्ता या कार्रवाई खोजें…",
+    "entities": {
+      "all": "सभी इकाइयां",
+      "user": "उपयोगकर्ता",
+      "pdf": "पीडीएफ़",
+      "system": "सिस्टम"
+    },
+    "allActions": "सभी कार्रवाइयां",
+    "allStatuses": "सभी स्थितियां",
+    "success": "सफल",
+    "failure": "विफल",
+    "to": "से",
+    "clear": "साफ़ करें",
+    "exportCsv": "CSV निर्यात करें",
+    "heading": "विभागीय ऑडिट इतिहास",
+    "totalEntries": "कुल {{count}} प्रविष्टियां",
+    "loading": "ऑडिट लॉग लोड हो रहे हैं…",
+    "noRecords": "कोई ऑडिट रिकॉर्ड नहीं मिला।",
+    "headers": {
+      "timestamp": "समय",
+      "user": "उपयोगकर्ता",
+      "action": "कार्रवाई",
+      "entity": "इकाई",
+      "status": "स्थिति",
+      "ipAddress": "आईपी पता"
+    },
+    "pageOf": "पृष्ठ {{page}} / {{total}}",
+    "previous": "पिछला",
+    "next": "अगला"
+  },
+  "linkedDocs": {
+    "failedToLoad": "लिंक किए गए दस्तावेज़ लोड करने में विफल।",
+    "scopeNotice": "आपके अधिकृत विभागों से जुड़े लिंक दिखाए जा रहे हैं: <strong>{{depts}}</strong>",
+    "stats": {
+      "totalLinks": "कुल लिंक",
+      "approved": "स्वीकृत",
+      "pending": "लंबित",
+      "rejected": "अस्वीकृत"
+    },
+    "searchPlaceholder": "दस्तावेज़ या विभाग द्वारा खोजें…",
+    "countOf": "{{total}} में से {{shown}}",
+    "allStatuses": "सभी स्थितियां",
+    "statusPending": "लंबित",
+    "statusApproved": "स्वीकृत",
+    "statusRejected": "अस्वीकृत",
+    "clear": "साफ़ करें",
+    "loadingDocuments": "लिंक किए गए दस्तावेज़ लोड हो रहे हैं…",
+    "noMatch": "वर्तमान फ़िल्टर से कोई लिंक किया गया दस्तावेज़ मेल नहीं खाता।",
+    "headers": {
+      "document": "दस्तावेज़",
+      "originalDept": "मूल विभाग",
+      "linkedDept": "लिंक किया गया विभाग",
+      "status": "स्थिति",
+      "requesterReviewer": "अनुरोधकर्ता / समीक्षक",
+      "view": "देखें"
+    },
+    "requestedBy": "{{name}} द्वारा अनुरोधित",
+    "requested": "अनुरोधित",
+    "reviewed": "समीक्षित",
+    "loadingView": "लोड हो रहा है…",
+    "view": "देखें"
+  },
+  "actParts": {
+    "failedToLoad": "अधिनियम भाग सबमिशन लोड करने में विफल।",
+    "stats": {
+      "totalSubmissions": "कुल सबमिशन",
+      "pending": "लंबित",
+      "approved": "स्वीकृत",
+      "rejected": "अस्वीकृत"
+    },
+    "loading": "लोड हो रहा है…",
+    "noSubmissions": "कोई सबमिशन नहीं मिला।",
+    "tabLabels": {
+      "sections": "धाराएं",
+      "schedule": "अनुसूची",
+      "annexure": "अनुबंध",
+      "appendix": "परिशिष्ट",
+      "forms": "प्रपत्र"
+    },
+    "headers": {
+      "actTab": "अधिनियम / टैब",
+      "submittedBy": "सबमिट किया गया द्वारा",
+      "submittedAt": "सबमिट करने का समय",
+      "status": "स्थिति",
+      "view": "देखें"
+    },
+    "view": "देखें",
+    "detail": {
+      "actFallback": "अधिनियम #{{id}}",
+      "submittedByLine": "{{name}} द्वारा सबमिट किया गया",
+      "couldNotLoad": "सामग्री लोड नहीं हो सकी।",
+      "noSections": "कोई धारा नहीं जोड़ी गई।",
+      "noEntries": "कोई प्रविष्टि नहीं जोड़ी गई।",
+      "noSectionsInChapter": "कोई धारा नहीं",
+      "comments": "टिप्पणियां",
+      "reasonForRejection": "अस्वीकृति का कारण (आवश्यक)",
+      "optionalComments": "वैकल्पिक टिप्पणियां…",
+      "back": "वापस",
+      "reject": "अस्वीकार करें",
+      "approve": "स्वीकृत करें",
+      "confirmApprove": "स्वीकृति की पुष्टि करें",
+      "confirmReject": "अस्वीकृति की पुष्टि करें",
+      "submitting": "सबमिट हो रहा है…",
+      "close": "बंद करें",
+      "statusLabels": {
+        "draft": "मसौदा",
+        "pending": "लंबित",
+        "approved": "स्वीकृत",
+        "rejected": "अस्वीकृत",
+        "pendingDelete": "हटाना लंबित"
+      }
+    }
+  }
+}

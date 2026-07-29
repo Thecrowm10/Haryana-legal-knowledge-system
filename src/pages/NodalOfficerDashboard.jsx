@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useTranslation, Trans } from 'react-i18next';
 import { Users, CheckCircle, XCircle, Plus, Edit2, X, Eye, EyeOff, Download, Layers, FileText, Clock, Search, Link2, Activity } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
@@ -55,12 +56,14 @@ function exportCSV(data, filename) {
 
 const NODAL_AUDIT_PAGE_SIZE = 10;
 
-const AUDIT_ENTITY_OPTIONS = [
-  { value: '',        label: 'All Entities' },
-  { value: 'user',   label: 'User' },
-  { value: 'pdf',    label: 'PDF' },
-  { value: 'system', label: 'System' },
-];
+function auditEntityOptions(t) {
+  return [
+    { value: '',       label: t('audit.entities.all') },
+    { value: 'user',   label: t('audit.entities.user') },
+    { value: 'pdf',    label: t('audit.entities.pdf') },
+    { value: 'system', label: t('audit.entities.system') },
+  ];
+}
 
 function fmtAuditActor(actor) {
   if (!actor) return 'System';
@@ -91,6 +94,7 @@ const NOD_RESPONSIVE_CSS = `
 `;
 
 export default function NodalOfficerDashboard({ activePage }) {
+  const { t } = useTranslation('nodal');
   const isMobile = useMediaQuery('(max-width: 640px)');
   const [users, setUsers]               = useState([]);
   const [usersLoading, setUsersLoading] = useState(false);
@@ -106,7 +110,7 @@ export default function NodalOfficerDashboard({ activePage }) {
         setUsers(usersRes.data.map(normalizeUser));
         setRoles(rolesRes.data);
       })
-      .catch(() => setUsersError('Failed to load users. Please try again.'))
+      .catch(() => setUsersError(t('users.failedToLoadUsers')))
       .finally(() => setUsersLoading(false));
   }, [activePage]);
 
@@ -140,7 +144,7 @@ export default function NodalOfficerDashboard({ activePage }) {
         setAllDocs(docsRes.data.documents || []);
         setDepts(deptsRes.data);
       })
-      .catch(() => setAllDocsError('Failed to load documents. Please try again.'))
+      .catch(() => setAllDocsError(t('uploads.failedToLoad')))
       .finally(() => setAllDocsLoading(false));
   }, [activePage]);
 
@@ -153,10 +157,10 @@ export default function NodalOfficerDashboard({ activePage }) {
   const [showAddPass, setShowAddPass] = useState(false);
 
   function handleAddUser() {
-    if (!addForm.username.trim())    { setAddError('Username is required.'); return; }
-    if (!addForm.email.trim())       { setAddError('Email is required.'); return; }
-    if (!addForm.password)           { setAddError('Password is required.'); return; }
-    if (!addForm.department_id)      { setAddError('Department is required.'); return; }
+    if (!addForm.username.trim())    { setAddError(t('users.errors.usernameRequired')); return; }
+    if (!addForm.email.trim())       { setAddError(t('users.errors.emailRequired')); return; }
+    if (!addForm.password)           { setAddError(t('users.errors.passwordRequired')); return; }
+    if (!addForm.department_id)      { setAddError(t('users.errors.departmentRequired')); return; }
     setAddSaving(true);
     setAddError('');
     registerUser({
@@ -177,7 +181,7 @@ export default function NodalOfficerDashboard({ activePage }) {
       })
       .catch(err => {
         const detail = err.response?.data?.detail;
-        setAddError(typeof detail === 'string' ? detail : 'Failed to create user.');
+        setAddError(typeof detail === 'string' ? detail : t('users.errors.createFailed'));
       })
       .finally(() => setAddSaving(false));
   }
@@ -219,7 +223,7 @@ export default function NodalOfficerDashboard({ activePage }) {
       })
       .catch(err => {
         const detail = err.response?.data?.detail;
-        setEditError(typeof detail === 'string' ? detail : 'Failed to save changes.');
+        setEditError(typeof detail === 'string' ? detail : t('users.errors.saveFailed'));
       })
       .finally(() => setEditSaving(false));
   }
@@ -373,7 +377,7 @@ export default function NodalOfficerDashboard({ activePage }) {
         setAuditTotal(res.data.total || 0);
         setSeenActionsRaw(prev => [...prev, ...logs.map(l => l.action).filter(Boolean)]);
       })
-      .catch(() => setAuditError('Failed to load audit logs. Please try again.'))
+      .catch(() => setAuditError(t('audit.failedToLoad')))
       .finally(() => setAuditLoading(false));
   }, [activePage, auditPage, auditFilterEntity, auditFilterAction, auditFilterStatus, auditFromDate, auditToDate]);
 
@@ -383,7 +387,7 @@ export default function NodalOfficerDashboard({ activePage }) {
     setNodalLinksError('');
     getAllDepartmentLinks()
       .then(res => setNodalLinks(Array.isArray(res.data) ? res.data : []))
-      .catch(() => setNodalLinksError('Failed to load linked documents.'))
+      .catch(() => setNodalLinksError(t('linkedDocs.failedToLoad')))
       .finally(() => setNodalLinksLoading(false));
   }, [activePage]);
 
@@ -404,7 +408,7 @@ export default function NodalOfficerDashboard({ activePage }) {
     setActPartsError('');
     getAllActPartSubmissions()
       .then(res => setActPartsItems(Array.isArray(res.data) ? res.data : []))
-      .catch(() => setActPartsError('Failed to load act part submissions.'))
+      .catch(() => setActPartsError(t('actParts.failedToLoad')))
       .finally(() => setActPartsLoading(false));
   }, [activePage]);
 
@@ -443,9 +447,9 @@ export default function NodalOfficerDashboard({ activePage }) {
         <style>{NOD_RESPONSIVE_CSS}</style>
         <div className="nod-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
           {[
-            { label: 'Total Users',    value: users.length, color: 'var(--primary)',  bg: 'rgba(33, 74, 171,.12)',  icon: Users,      key: '' },
-            { label: 'Active',         value: active,       color: '#198754',         bg: 'rgba(25, 135, 84,.12)',  icon: CheckCircle, key: 'active' },
-            { label: 'Inactive',       value: inactive,     color: '#b45309',         bg: 'rgba(255, 193, 7,.12)', icon: XCircle,     key: 'inactive' },
+            { label: t('users.stats.totalUsers'), value: users.length, color: 'var(--primary)',  bg: 'rgba(33, 74, 171,.12)',  icon: Users,      key: '' },
+            { label: t('users.stats.active'),      value: active,       color: '#198754',         bg: 'rgba(25, 135, 84,.12)',  icon: CheckCircle, key: 'active' },
+            { label: t('users.stats.inactive'),    value: inactive,     color: '#b45309',         bg: 'rgba(255, 193, 7,.12)', icon: XCircle,     key: 'inactive' },
           ].map(s => {
             const isActive = usersStatusFilter === s.key;
             return (
@@ -468,22 +472,22 @@ export default function NodalOfficerDashboard({ activePage }) {
 
         <Card padding="0">
           <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-            <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>System Users</div>
+            <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>{t('users.systemUsers')}</div>
             <div className="nod-users-actions" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <SelectField value={deptFilter} onChange={e => setDeptFilter(e.target.value)} placeholder="All Departments" style={{ width: 200, maxWidth: '100%' }}>
-                <option value="">All Departments</option>
+              <SelectField value={deptFilter} onChange={e => setDeptFilter(e.target.value)} placeholder={t('users.allDepartments')} style={{ width: 200, maxWidth: '100%' }}>
+                <option value="">{t('users.allDepartments')}</option>
                 {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
               </SelectField>
               <button
                 onClick={() => { setAddingUser(true); setAddError(''); setAddForm({ ...EMPTY_ADD_FORM, department_id: deptFilter }); setShowAddPass(false); }}
                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'var(--primary)', color: 'white', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                <Plus size={13} /> Add User
+                <Plus size={13} /> {t('users.addUser')}
               </button>
             </div>
           </div>
           {usersLoading && (
             <div style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>
-              Loading users…
+              {t('users.loadingUsers')}
             </div>
           )}
           {usersError && (
@@ -493,7 +497,7 @@ export default function NodalOfficerDashboard({ activePage }) {
           )}
           {!usersLoading && !usersError && filteredUsers.length === 0 && (
             <div style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>
-              No active users found
+              {t('users.noActiveUsers')}
             </div>
           )}
           {!usersLoading && !usersError && filteredUsers.length > 0 && (
@@ -518,16 +522,16 @@ export default function NodalOfficerDashboard({ activePage }) {
                       <span style={{ fontFamily: 'var(--mono)' }}>{u.lastLogin}</span>
                     </div>
                     <div style={{ display: 'flex', gap: 8 }}>
-                      <button title="Edit" onClick={() => openEdit(u)}
+                      <button title={t('users.edit')} onClick={() => openEdit(u)}
                         style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '7px 10px', cursor: 'pointer', color: 'var(--primary)', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font)' }}>
-                        <Edit2 size={12} /> Edit
+                        <Edit2 size={12} /> {t('users.edit')}
                       </button>
                       <button
-                        title={u.isActive ? 'Deactivate' : 'Activate'}
+                        title={u.isActive ? t('users.deactivate') : t('users.activate')}
                         disabled={togglingId === u.id}
                         onClick={() => setConfirmToggleUser(u)}
                         style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: u.isActive ? 'rgba(220, 53, 69,.08)' : 'rgba(25, 135, 84,.08)', border: `1px solid ${u.isActive ? 'rgba(220, 53, 69,.2)' : 'rgba(25, 135, 84,.2)'}`, borderRadius: 7, padding: '7px 10px', cursor: togglingId === u.id ? 'not-allowed' : 'pointer', color: u.isActive ? '#dc3545' : '#198754', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font)', opacity: togglingId === u.id ? 0.5 : 1 }}>
-                        {u.isActive ? <XCircle size={12} /> : <CheckCircle size={12} />} {u.isActive ? 'Deactivate' : 'Activate'}
+                        {u.isActive ? <XCircle size={12} /> : <CheckCircle size={12} />} {u.isActive ? t('users.deactivate') : t('users.activate')}
                       </button>
                     </div>
                   </div>
@@ -538,7 +542,7 @@ export default function NodalOfficerDashboard({ activePage }) {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
-                {['Name', 'Username', 'Role', 'Department', 'Status', 'Last Login', 'Actions'].map((h, i) => (
+                {[t('users.headers.name'), t('users.headers.username'), t('users.headers.role'), t('users.headers.department'), t('users.headers.status'), t('users.headers.lastLogin'), t('users.headers.actions')].map((h, i) => (
                   <th key={h} scope="col" style={{ ...LABEL, padding: '11px 16px', textAlign: 'left', ...(i > 0 && { borderLeft: '1px solid var(--surface-border)' }) }}>{h}</th>
                 ))}
               </tr>
@@ -564,12 +568,12 @@ export default function NodalOfficerDashboard({ activePage }) {
                   <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)' }}>{u.lastLogin}</td>
                   <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)' }}>
                     <div style={{ display: 'flex', gap: 6 }}>
-                      <button title="Edit" onClick={() => openEdit(u)}
+                      <button title={t('users.edit')} onClick={() => openEdit(u)}
                         style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 6, padding: '5px 8px', cursor: 'pointer', color: 'var(--primary)', display: 'flex' }}>
                         <Edit2 size={12} />
                       </button>
                       <button
-                        title={u.isActive ? 'Deactivate' : 'Activate'}
+                        title={u.isActive ? t('users.deactivate') : t('users.activate')}
                         disabled={togglingId === u.id}
                         onClick={() => setConfirmToggleUser(u)}
                         style={{ background: u.isActive ? 'rgba(220, 53, 69,.08)' : 'rgba(25, 135, 84,.08)', border: `1px solid ${u.isActive ? 'rgba(220, 53, 69,.2)' : 'rgba(25, 135, 84,.2)'}`, borderRadius: 6, padding: '5px 8px', cursor: togglingId === u.id ? 'not-allowed' : 'pointer', color: u.isActive ? '#dc3545' : '#198754', display: 'flex', opacity: togglingId === u.id ? 0.5 : 1 }}>
@@ -600,8 +604,8 @@ export default function NodalOfficerDashboard({ activePage }) {
               {/* Header */}
               <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
-                  <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)' }}>Add New User</div>
-                  <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-color-secondary)', marginTop: 1 }}>Create a new system account</div>
+                  <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)' }}>{t('users.addDrawer.title')}</div>
+                  <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-color-secondary)', marginTop: 1 }}>{t('users.addDrawer.subtitle')}</div>
                 </div>
                 <button onClick={() => setAddingUser(false)}
                   style={{ width: 30, height: 30, borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-color-secondary)', flexShrink: 0 }}>
@@ -615,17 +619,17 @@ export default function NodalOfficerDashboard({ activePage }) {
                 {/* Username + Email */}
                 <div className="nod-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
-                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Username *</label>
+                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.username')}</label>
                     <input style={{ ...INP_STYLE, borderColor: addError.toLowerCase().includes('username') ? 'rgba(220, 53, 69,.6)' : undefined }}
-                      placeholder="e.g. firstname.lastname"
+                      placeholder={t('users.addDrawer.usernamePlaceholder')}
                       autoComplete="off"
                       value={addForm.username}
                       onChange={e => { setAddForm(f => ({ ...f, username: e.target.value })); setAddError(''); }} />
                   </div>
                   <div>
-                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Email *</label>
+                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.email')}</label>
                     <input style={{ ...INP_STYLE, borderColor: addError.toLowerCase().includes('email') ? 'rgba(220, 53, 69,.6)' : undefined }}
-                      type="email" placeholder="user@example.com"
+                      type="email" placeholder={t('users.addDrawer.emailPlaceholder')}
                       autoComplete="off"
                       value={addForm.email}
                       onChange={e => { setAddForm(f => ({ ...f, email: e.target.value })); setAddError(''); }} />
@@ -634,12 +638,12 @@ export default function NodalOfficerDashboard({ activePage }) {
 
                 {/* Password */}
                 <div>
-                  <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Password *</label>
+                  <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.password')}</label>
                   <div style={{ position: 'relative' }}>
                     <input
                       style={{ ...INP_STYLE, paddingRight: 38, borderColor: addError.toLowerCase().includes('password') ? 'rgba(220, 53, 69,.6)' : undefined }}
                       type={showAddPass ? 'text' : 'password'}
-                      placeholder="Set a password"
+                      placeholder={t('users.addDrawer.passwordPlaceholder')}
                       autoComplete="new-password"
                       value={addForm.password}
                       onChange={e => { setAddForm(f => ({ ...f, password: e.target.value })); setAddError(''); }} />
@@ -653,14 +657,14 @@ export default function NodalOfficerDashboard({ activePage }) {
                 {/* First + Last name */}
                 <div className="nod-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
-                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>First Name</label>
-                    <input style={INP_STYLE} placeholder="First name"
+                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.firstName')}</label>
+                    <input style={INP_STYLE} placeholder={t('users.addDrawer.firstNamePlaceholder')}
                       value={addForm.first_name}
                       onChange={e => setAddForm(f => ({ ...f, first_name: e.target.value }))} />
                   </div>
                   <div>
-                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Last Name</label>
-                    <input style={INP_STYLE} placeholder="Last name"
+                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.lastName')}</label>
+                    <input style={INP_STYLE} placeholder={t('users.addDrawer.lastNamePlaceholder')}
                       value={addForm.last_name}
                       onChange={e => setAddForm(f => ({ ...f, last_name: e.target.value }))} />
                   </div>
@@ -668,12 +672,12 @@ export default function NodalOfficerDashboard({ activePage }) {
 
                 {/* Mobile Number */}
                 <div>
-                  <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Mobile Number</label>
+                  <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.mobileNumber')}</label>
                   <input style={INP_STYLE}
                     type="tel"
                     inputMode="numeric"
                     maxLength={10}
-                    placeholder="10-digit mobile number (optional)"
+                    placeholder={t('users.addDrawer.mobilePlaceholder')}
                     value={addForm.mobile_number}
                     onChange={e => setAddForm(f => ({ ...f, mobile_number: e.target.value.replace(/\D/g, '') }))} />
                 </div>
@@ -681,16 +685,16 @@ export default function NodalOfficerDashboard({ activePage }) {
                 {/* Role + Department */}
                 <div className="nod-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
-                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Role</label>
-                    <SelectField value={addForm.role_id} onChange={e => setAddForm(f => ({ ...f, role_id: e.target.value }))} placeholder="Select Role">
+                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.role')}</label>
+                    <SelectField value={addForm.role_id} onChange={e => setAddForm(f => ({ ...f, role_id: e.target.value }))} placeholder={t('users.addDrawer.roleSelectPlaceholder')}>
                       {assignableRoles(roles).map(r => (
                         <option key={r.id} value={r.id}>{r.name.charAt(0).toUpperCase() + r.name.slice(1)}</option>
                       ))}
                     </SelectField>
                   </div>
                   <div>
-                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Department *</label>
-                    <SelectField value={addForm.department_id} onChange={e => setAddForm(f => ({ ...f, department_id: e.target.value }))} placeholder="Select Department">
+                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.department')}</label>
+                    <SelectField value={addForm.department_id} onChange={e => setAddForm(f => ({ ...f, department_id: e.target.value }))} placeholder={t('users.addDrawer.departmentSelectPlaceholder')}>
                       {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                     </SelectField>
                   </div>
@@ -707,13 +711,13 @@ export default function NodalOfficerDashboard({ activePage }) {
               <div style={{ padding: '16px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
                 <button onClick={() => setAddingUser(false)}
                   style={{ padding: '9px 18px', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'var(--text-color)', fontFamily: 'var(--font)' }}>
-                  Cancel
+                  {t('users.addDrawer.cancel')}
                 </button>
                 <button onClick={handleAddUser} disabled={addSaving}
                   style={{ padding: '9px 20px', background: addSaving ? 'var(--surface-border)' : 'var(--primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: addSaving ? 'not-allowed' : 'pointer', color: addSaving ? 'var(--text-color-secondary)' : 'white', fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 7 }}>
                   {addSaving
-                    ? <><div style={{ width: 12, height: 12, border: '2px solid rgba(0,0,0,.2)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin .7s linear infinite' }} /> Creating…</>
-                    : <><Plus size={13} /> Create User</>
+                    ? <><div style={{ width: 12, height: 12, border: '2px solid rgba(0,0,0,.2)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin .7s linear infinite' }} /> {t('users.addDrawer.creating')}</>
+                    : <><Plus size={13} /> {t('users.addDrawer.createUser')}</>
                   }
                 </button>
               </div>
@@ -737,7 +741,7 @@ export default function NodalOfficerDashboard({ activePage }) {
               {/* Modal header */}
               <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
-                  <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)' }}>Edit User</div>
+                  <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)' }}>{t('users.editModal.title')}</div>
                   <div style={{ fontSize: 12, color: 'var(--text-color-secondary)', marginTop: 2 }}>{editingUser.username}</div>
                 </div>
                 <button onClick={() => setEditingUser(null)}
@@ -751,33 +755,33 @@ export default function NodalOfficerDashboard({ activePage }) {
 
                 <div className="nod-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
-                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>First Name</label>
+                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.firstName')}</label>
                     <input style={INP_STYLE} value={editForm.first_name}
                       onChange={e => setEditForm(f => ({ ...f, first_name: e.target.value }))} />
                   </div>
                   <div>
-                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Last Name</label>
+                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.lastName')}</label>
                     <input style={INP_STYLE} value={editForm.last_name}
                       onChange={e => setEditForm(f => ({ ...f, last_name: e.target.value }))} />
                   </div>
                 </div>
 
                 <div>
-                  <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Email</label>
+                  <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.email')}</label>
                   <input style={INP_STYLE} type="email" value={editForm.email}
                     onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} />
                 </div>
 
                 <div className="nod-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
-                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Role</label>
+                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.role')}</label>
                     <div style={{ ...INP_STYLE, background: 'var(--surface-hover)', color: 'var(--text-color-secondary)', cursor: 'not-allowed' }}>
                       {editingUser.role.replace(/\b\w/g, c => c.toUpperCase())}
                     </div>
                   </div>
                   <div>
-                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Department</label>
-                    <SelectField value={editForm.department_id ?? ''} onChange={e => setEditForm(f => ({ ...f, department_id: e.target.value || null }))} placeholder="Select Department">
+                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.department')}</label>
+                    <SelectField value={editForm.department_id ?? ''} onChange={e => setEditForm(f => ({ ...f, department_id: e.target.value || null }))} placeholder={t('users.editModal.selectDepartment')}>
                       {depts.map(d => (
                         <option key={d.id} value={d.id}>{d.name}</option>
                       ))}
@@ -788,9 +792,9 @@ export default function NodalOfficerDashboard({ activePage }) {
                 {/* Active status toggle */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: 'var(--surface-ground)', borderRadius: 10, border: '1px solid var(--surface-border)' }}>
                   <div>
-                    <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 600, color: 'var(--text-heading)' }}>Account Status</div>
+                    <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 600, color: 'var(--text-heading)' }}>{t('users.editModal.accountStatus')}</div>
                     <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-color-secondary)', marginTop: 2 }}>
-                      {editForm.is_active ? 'User can log in and access the system' : 'User is blocked from logging in'}
+                      {editForm.is_active ? t('users.editModal.canLogin') : t('users.editModal.blocked')}
                     </div>
                   </div>
                   <button type="button"
@@ -811,13 +815,13 @@ export default function NodalOfficerDashboard({ activePage }) {
               <div style={{ padding: '14px 22px', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
                 <button onClick={() => setEditingUser(null)}
                   style={{ padding: '9px 18px', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'var(--text-color)', fontFamily: 'var(--font)' }}>
-                  Cancel
+                  {t('users.editModal.cancel')}
                 </button>
                 <button onClick={handleEditSave} disabled={editSaving}
                   style={{ padding: '9px 20px', background: editSaving ? 'var(--surface-border)' : 'var(--primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: editSaving ? 'not-allowed' : 'pointer', color: editSaving ? 'var(--text-color-secondary)' : 'white', fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 7 }}>
                   {editSaving
-                    ? <><div style={{ width: 12, height: 12, border: '2px solid rgba(0,0,0,.2)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin .7s linear infinite' }} /> Saving…</>
-                    : 'Save Changes'
+                    ? <><div style={{ width: 12, height: 12, border: '2px solid rgba(0,0,0,.2)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin .7s linear infinite' }} /> {t('users.editModal.saving')}</>
+                    : t('users.editModal.saveChanges')
                   }
                 </button>
               </div>
@@ -840,20 +844,22 @@ export default function NodalOfficerDashboard({ activePage }) {
               padding: '22px',
             }}>
               <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)' }}>
-                {confirmToggleUser.isActive ? 'Deactivate User' : 'Activate User'}
+                {confirmToggleUser.isActive ? t('users.confirmToggle.deactivateTitle') : t('users.confirmToggle.activateTitle')}
               </div>
               <div style={{ fontSize: 13, color: 'var(--text-color-secondary)', marginTop: 10, lineHeight: 1.5 }}>
-                Are you sure you want to {confirmToggleUser.isActive ? 'deactivate' : 'activate'} <strong style={{ color: 'var(--text-heading)' }}>{confirmToggleUser.name}</strong>?
-                {confirmToggleUser.isActive && ' They will no longer be able to log in.'}
+                {confirmToggleUser.isActive
+                  ? <Trans t={t} i18nKey="users.confirmToggle.confirmDeactivate" values={{ name: confirmToggleUser.name }} components={[<strong key="s" style={{ color: 'var(--text-heading)' }} />]} />
+                  : <Trans t={t} i18nKey="users.confirmToggle.confirmActivate" values={{ name: confirmToggleUser.name }} components={[<strong key="s" style={{ color: 'var(--text-heading)' }} />]} />}
+                {confirmToggleUser.isActive && ' ' + t('users.confirmToggle.loginBlockedNote')}
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
                 <button onClick={() => setConfirmToggleUser(null)}
                   style={{ padding: '9px 18px', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'var(--text-color)', fontFamily: 'var(--font)' }}>
-                  Cancel
+                  {t('users.confirmToggle.cancel')}
                 </button>
                 <button onClick={() => handleToggle(confirmToggleUser)}
                   style={{ padding: '9px 20px', background: confirmToggleUser.isActive ? '#dc3545' : '#198754', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'white', fontFamily: 'var(--font)' }}>
-                  {confirmToggleUser.isActive ? 'Deactivate' : 'Activate'}
+                  {confirmToggleUser.isActive ? t('users.confirmToggle.deactivate') : t('users.confirmToggle.activate')}
                 </button>
               </div>
             </div>
@@ -918,9 +924,9 @@ export default function NodalOfficerDashboard({ activePage }) {
     });
 
     const SC = {
-      approved: { color: '#16a34a', bg: 'rgba(25, 135, 84,.1)',  label: 'Approved' },
-      pending:  { color: '#b45309', bg: 'rgba(255, 193, 7,.1)', label: 'Pending'  },
-      rejected: { color: '#dc3545', bg: 'rgba(220, 53, 69,.1)',  label: 'Rejected' },
+      approved: { color: '#16a34a', bg: 'rgba(25, 135, 84,.1)',  label: t('uploads.stats.approved') },
+      pending:  { color: '#b45309', bg: 'rgba(255, 193, 7,.1)', label: t('uploads.stats.pending')  },
+      rejected: { color: '#dc3545', bg: 'rgba(220, 53, 69,.1)',  label: t('uploads.stats.rejected') },
     };
     const cols = '4px 1fr 175px 155px 155px 90px';
     const anyFilter = uploadsSearch || uploadsFilterStatus || uploadsFilterDept || uploadsFilterUploader || uploadsFilterApprover;
@@ -934,17 +940,17 @@ export default function NodalOfficerDashboard({ activePage }) {
         {depts.length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderRadius: 10, background: 'rgba(14,165,233,.07)', border: '1px solid rgba(14,165,233,.2)', fontSize: 12.5, color: '#0369a1' }}>
             <Layers size={14} color="#0ea5e9" />
-            <span>Showing uploads from your authorised departments: <strong>{depts.map(d => d.name).join(' · ')}</strong></span>
+            <span><Trans t={t} i18nKey="uploads.scopeNotice" values={{ depts: depts.map(d => d.name).join(' · ') }} components={[<strong key="s" />]} /></span>
           </div>
         )}
 
         {/* Stats */}
         <div className="nod-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
           {[
-            { label: 'Total Uploads', value: totalDocs,    color: 'var(--primary)', bg: 'rgba(33, 74, 171,.12)',  icon: Layers,      key: '' },
-            { label: 'Approved',      value: approvedDocs, color: '#16a34a',        bg: 'rgba(25, 135, 84,.12)',  icon: CheckCircle, key: 'approved' },
-            { label: 'Pending',       value: pendingDocs,  color: '#b45309',        bg: 'rgba(255, 193, 7,.12)', icon: Clock,       key: 'pending'  },
-            { label: 'Rejected',      value: rejectedDocs, color: '#dc3545',        bg: 'rgba(220, 53, 69,.12)',  icon: XCircle,     key: 'rejected' },
+            { label: t('uploads.stats.totalUploads'), value: totalDocs,    color: 'var(--primary)', bg: 'rgba(33, 74, 171,.12)',  icon: Layers,      key: '' },
+            { label: t('uploads.stats.approved'),      value: approvedDocs, color: '#16a34a',        bg: 'rgba(25, 135, 84,.12)',  icon: CheckCircle, key: 'approved' },
+            { label: t('uploads.stats.pending'),       value: pendingDocs,  color: '#b45309',        bg: 'rgba(255, 193, 7,.12)', icon: Clock,       key: 'pending'  },
+            { label: t('uploads.stats.rejected'),      value: rejectedDocs, color: '#dc3545',        bg: 'rgba(220, 53, 69,.12)',  icon: XCircle,     key: 'rejected' },
           ].map(s => {
             const isActive = uploadsFilterStatus === s.key;
             return (
@@ -975,42 +981,42 @@ export default function NodalOfficerDashboard({ activePage }) {
               <input
                 value={uploadsSearch}
                 onChange={e => setUploadsSearch(e.target.value)}
-                placeholder="Search documents…"
+                placeholder={t('uploads.searchPlaceholder')}
                 style={{ width: '100%', padding: '7px 12px 7px 30px', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, color: 'var(--text-color)', outline: 'none', boxSizing: 'border-box' }}
               />
             </div>
             <SelectField value={uploadsFilterUploader} onChange={e => setUploadsFilterUploader(e.target.value)} style={{ flex: '0 0 155px' }}>
-              <option value="">All Uploaders</option>
+              <option value="">{t('uploads.allUploaders')}</option>
               {uploaderOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </SelectField>
             <SelectField value={uploadsFilterApprover} onChange={e => setUploadsFilterApprover(e.target.value)} style={{ flex: '0 0 155px' }}>
-              <option value="">All Approvers</option>
+              <option value="">{t('uploads.allApprovers')}</option>
               {approverOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </SelectField>
             {/* Department filter is limited to the nodal officer's authorised departments */}
             <SelectField value={uploadsFilterDept} onChange={e => setUploadsFilterDept(e.target.value)} style={{ flex: '0 0 155px' }}>
-              <option value="">All Departments</option>
+              <option value="">{t('uploads.allDepartments')}</option>
               {depts.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
             </SelectField>
             <SelectField value={uploadsFilterStatus} onChange={e => setUploadsFilterStatus(e.target.value)} style={{ flex: '0 0 130px' }}>
-              <option value="">All Statuses</option>
-              <option value="pending">Pending</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
+              <option value="">{t('uploads.allStatuses')}</option>
+              <option value="pending">{t('uploads.statusPending')}</option>
+              <option value="approved">{t('uploads.statusApproved')}</option>
+              <option value="rejected">{t('uploads.statusRejected')}</option>
             </SelectField>
             {anyFilter && (
               <button onClick={() => { setUploadsSearch(''); setUploadsFilterStatus(''); setUploadsFilterDept(''); setUploadsFilterUploader(''); setUploadsFilterApprover(''); }}
                 style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'transparent', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '7px 12px', fontSize: 12, cursor: 'pointer', color: 'var(--text-color-secondary)', whiteSpace: 'nowrap' }}>
-                <X size={11} /> Clear
+                <X size={11} /> {t('uploads.clear')}
               </button>
             )}
             <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
-              {filteredDocs.length} of {totalDocs}
+              {t('uploads.countOf', { shown: filteredDocs.length, total: totalDocs })}
             </div>
           </div>
 
           {allDocsLoading && (
-            <div style={{ padding: '50px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>Loading documents…</div>
+            <div style={{ padding: '50px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>{t('uploads.loadingDocuments')}</div>
           )}
           {allDocsError && (
             <div style={{ padding: '20px 18px', fontSize: 13, color: '#dc3545' }}>{allDocsError}</div>
@@ -1019,7 +1025,7 @@ export default function NodalOfficerDashboard({ activePage }) {
           {!allDocsLoading && !allDocsError && (
             filteredDocs.length === 0 ? (
               <div style={{ padding: '50px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>
-                No documents match the current filters
+                {t('uploads.noMatch')}
               </div>
             ) : isMobile ? (
               <div>
@@ -1056,7 +1062,7 @@ export default function NodalOfficerDashboard({ activePage }) {
                       </div>
                       <button onClick={() => setViewDoc(mapDocForViewer(doc))}
                         style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 10px', borderRadius: 7, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                        <Eye size={13} /> View
+                        <Eye size={13} /> {t('uploads.view')}
                       </button>
                     </div>
                   );
@@ -1067,11 +1073,11 @@ export default function NodalOfficerDashboard({ activePage }) {
               {/* Column headers */}
               <div style={{ display: 'grid', gridTemplateColumns: cols, minWidth: 830, background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
                 <div />
-                <div style={{ ...LABEL, padding: '10px 16px 10px 68px' }}>Document</div>
-                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Uploader</div>
-                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Status</div>
-                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Dates</div>
-                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Actions</div>
+                <div style={{ ...LABEL, padding: '10px 16px 10px 68px' }}>{t('uploads.headers.document')}</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>{t('uploads.headers.uploader')}</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>{t('uploads.headers.status')}</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>{t('uploads.headers.dates')}</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>{t('uploads.headers.actions')}</div>
               </div>
 
               {filteredDocs.map(doc => {
@@ -1130,13 +1136,13 @@ export default function NodalOfficerDashboard({ activePage }) {
                     {/* Dates */}
                     <div style={{ padding: '10px 14px', borderLeft: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 5 }}>
                       <div>
-                        <div style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--text-color-secondary)', textTransform: 'uppercase', letterSpacing: '.05em', fontFamily: 'var(--mono)', marginBottom: 2 }}>Uploaded</div>
+                        <div style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--text-color-secondary)', textTransform: 'uppercase', letterSpacing: '.05em', fontFamily: 'var(--mono)', marginBottom: 2 }}>{t('uploads.uploaded')}</div>
                         <div style={{ fontFamily: 'var(--mono)', fontSize: 11.5, color: 'var(--text-color)' }}>{uploadedDate}</div>
                       </div>
                       {lastActionDate && (
                         <div>
                           <div style={{ fontSize: 9.5, fontWeight: 700, color: sc.color, textTransform: 'uppercase', letterSpacing: '.05em', fontFamily: 'var(--mono)', marginBottom: 2 }}>
-                            {doc.status === 'approved' ? 'Approved' : doc.status === 'rejected' ? 'Rejected' : 'Reviewed'}
+                            {doc.status === 'approved' ? t('uploads.approvedLabel') : doc.status === 'rejected' ? t('uploads.rejectedLabel') : t('uploads.reviewedLabel')}
                           </div>
                           <div style={{ fontFamily: 'var(--mono)', fontSize: 11.5, color: sc.color }}>{lastActionDate}</div>
                         </div>
@@ -1148,7 +1154,7 @@ export default function NodalOfficerDashboard({ activePage }) {
                         style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 7, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'background .15s' }}
                         onMouseEnter={e => e.currentTarget.style.background = 'rgba(33, 74, 171,.14)'}
                         onMouseLeave={e => e.currentTarget.style.background = 'rgba(33, 74, 171,.07)'}>
-                        <Eye size={12} /> View
+                        <Eye size={12} /> {t('uploads.view')}
                       </button>
                     </div>
                   </div>
@@ -1175,7 +1181,7 @@ export default function NodalOfficerDashboard({ activePage }) {
         {depts.length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderRadius: 10, background: 'rgba(14,165,233,.07)', border: '1px solid rgba(14,165,233,.2)', fontSize: 12.5, color: '#0369a1' }}>
             <Activity size={14} color="#0ea5e9" />
-            <span>Showing audit logs for users in your authorised departments: <strong>{depts.map(d => d.name).join(' · ')}</strong></span>
+            <span><Trans t={t} i18nKey="audit.scopeNotice" values={{ depts: depts.map(d => d.name).join(' · ') }} components={[<strong key="s" />]} /></span>
           </div>
         )}
 
@@ -1187,34 +1193,34 @@ export default function NodalOfficerDashboard({ activePage }) {
               <input
                 value={auditSearch}
                 onChange={e => setAuditSearch(e.target.value)}
-                placeholder="Search user or action…"
+                placeholder={t('audit.searchPlaceholder')}
                 style={{ width: '100%', paddingLeft: 30, paddingRight: 10, height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, background: 'var(--surface-ground)', color: 'var(--text-color)', boxSizing: 'border-box', outline: 'none' }}
               />
             </div>
             <select value={auditFilterEntity} onChange={e => { setAuditFilterEntity(e.target.value); setAuditPage(0); }}
               style={{ height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, padding: '0 10px', background: 'var(--surface-ground)', color: 'var(--text-color)', cursor: 'pointer' }}>
-              {AUDIT_ENTITY_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              {auditEntityOptions(t).map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
             <select value={auditFilterAction} onChange={e => { setAuditFilterAction(e.target.value); setAuditPage(0); }}
               style={{ height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, padding: '0 10px', background: 'var(--surface-ground)', color: 'var(--text-color)', cursor: 'pointer' }}>
-              <option value="">All Actions</option>
+              <option value="">{t('audit.allActions')}</option>
               {auditActionOptions.map(a => <option key={a} value={a}>{fmtAction(a)}</option>)}
             </select>
             <select value={auditFilterStatus} onChange={e => { setAuditFilterStatus(e.target.value); setAuditPage(0); }}
               style={{ height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, padding: '0 10px', background: 'var(--surface-ground)', color: 'var(--text-color)', cursor: 'pointer' }}>
-              <option value="">All Statuses</option>
-              <option value="success">Success</option>
-              <option value="failure">Failure</option>
+              <option value="">{t('audit.allStatuses')}</option>
+              <option value="success">{t('audit.success')}</option>
+              <option value="failure">{t('audit.failure')}</option>
             </select>
             <input type="date" value={auditFromDate} onChange={e => { setAuditFromDate(e.target.value); setAuditPage(0); }}
               style={{ height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, padding: '0 10px', background: 'var(--surface-ground)', color: 'var(--text-color)' }} />
-            <span style={{ fontSize: 11, color: 'var(--text-color-secondary)' }}>to</span>
+            <span style={{ fontSize: 11, color: 'var(--text-color-secondary)' }}>{t('audit.to')}</span>
             <input type="date" value={auditToDate} onChange={e => { setAuditToDate(e.target.value); setAuditPage(0); }}
               style={{ height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, padding: '0 10px', background: 'var(--surface-ground)', color: 'var(--text-color)' }} />
             {(auditFilterEntity || auditFilterAction || auditFilterStatus || auditFromDate || auditToDate || auditSearch) && (
               <button onClick={() => { setAuditFilterEntity(''); setAuditFilterAction(''); setAuditFilterStatus(''); setAuditFromDate(''); setAuditToDate(''); setAuditSearch(''); setAuditPage(0); }}
                 style={{ height: 34, padding: '0 12px', border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
-                <X size={11} /> Clear
+                <X size={11} /> {t('audit.clear')}
               </button>
             )}
             <div className="nod-audit-spacer" style={{ flex: 1 }} />
@@ -1235,7 +1241,7 @@ export default function NodalOfficerDashboard({ activePage }) {
                 })), 'nodal-mis-report.csv');
               }}
               style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'var(--surface-ground)', color: 'var(--text-color)', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '0 14px', height: 34, fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
-              <Download size={13} /> Export CSV
+              <Download size={13} /> {t('audit.exportCsv')}
             </button>
           </div>
         </Card>
@@ -1243,16 +1249,16 @@ export default function NodalOfficerDashboard({ activePage }) {
         {/* Table */}
         <Card padding="0">
           <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>Department Audit History</div>
-            <span style={{ ...LABEL }}>{auditTotal} total entries</span>
+            <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>{t('audit.heading')}</div>
+            <span style={{ ...LABEL }}>{t('audit.totalEntries', { count: auditTotal })}</span>
           </div>
 
           {auditLoading ? (
-            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>Loading audit logs…</div>
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>{t('audit.loading')}</div>
           ) : auditError ? (
             <div style={{ padding: 24, color: '#dc3545', fontSize: 13 }}>{auditError}</div>
           ) : auditLogs.length === 0 ? (
-            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>No audit records found.</div>
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>{t('audit.noRecords')}</div>
           ) : (() => {
             const filteredLogs = auditLogs.filter(l => {
               if (auditFilterStatus && l.status !== auditFilterStatus) return false;
@@ -1271,7 +1277,7 @@ export default function NodalOfficerDashboard({ activePage }) {
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>{fmtAuditActor(log.actor)}</div>
                         <span style={{ fontSize: 10.5, fontWeight: 700, borderRadius: 5, padding: '3px 8px', background: isSuccess ? 'rgba(25, 135, 84,.1)' : 'rgba(220, 53, 69,.1)', color: isSuccess ? '#16a34a' : '#dc3545', flexShrink: 0 }}>
-                          {log.status}
+                          {isSuccess ? t('audit.success') : t('audit.failure')}
                         </span>
                       </div>
                       <div style={{ fontSize: 12.5, color: 'var(--text-color)' }}>{fmtAction(log.action)}</div>
@@ -1289,7 +1295,7 @@ export default function NodalOfficerDashboard({ activePage }) {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
-                  {['Timestamp', 'User', 'Action', 'Entity', 'Status', 'IP Address'].map((h, i) => (
+                  {[t('audit.headers.timestamp'), t('audit.headers.user'), t('audit.headers.action'), t('audit.headers.entity'), t('audit.headers.status'), t('audit.headers.ipAddress')].map((h, i) => (
                     <th key={h} scope="col" style={{ ...LABEL, padding: '11px 16px', textAlign: 'left', ...(i > 0 && { borderLeft: '1px solid var(--surface-border)' }) }}>{h}</th>
                   ))}
                 </tr>
@@ -1316,7 +1322,7 @@ export default function NodalOfficerDashboard({ activePage }) {
                         </td>
                         <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)' }}>
                           <span style={{ fontSize: 11, fontWeight: 700, borderRadius: 5, padding: '3px 8px', background: isSuccess ? 'rgba(25, 135, 84,.1)' : 'rgba(220, 53, 69,.1)', color: isSuccess ? '#16a34a' : '#dc3545' }}>
-                            {log.status}
+                            {isSuccess ? t('audit.success') : t('audit.failure')}
                           </span>
                         </td>
                         <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)', fontSize: 11.5, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>
@@ -1336,15 +1342,15 @@ export default function NodalOfficerDashboard({ activePage }) {
             const totalPages = Math.max(1, Math.ceil(auditTotal / NODAL_AUDIT_PAGE_SIZE));
             return (
               <div style={{ padding: '12px 18px', borderTop: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ ...LABEL }}>Page {auditPage + 1} of {totalPages}</span>
+                <span style={{ ...LABEL }}>{t('audit.pageOf', { page: auditPage + 1, total: totalPages })}</span>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={() => setAuditPage(p => Math.max(0, p - 1))} disabled={auditPage === 0}
                     style={{ padding: '6px 14px', border: '1px solid var(--surface-border)', borderRadius: 7, fontSize: 12.5, background: 'var(--surface-ground)', color: auditPage === 0 ? 'var(--text-color-secondary)' : 'var(--text-color)', cursor: auditPage === 0 ? 'default' : 'pointer', opacity: auditPage === 0 ? 0.5 : 1 }}>
-                    Previous
+                    {t('audit.previous')}
                   </button>
                   <button onClick={() => setAuditPage(p => Math.min(totalPages - 1, p + 1))} disabled={auditPage >= totalPages - 1}
                     style={{ padding: '6px 14px', border: '1px solid var(--surface-border)', borderRadius: 7, fontSize: 12.5, background: 'var(--surface-ground)', color: auditPage >= totalPages - 1 ? 'var(--text-color-secondary)' : 'var(--text-color)', cursor: auditPage >= totalPages - 1 ? 'default' : 'pointer', opacity: auditPage >= totalPages - 1 ? 0.5 : 1 }}>
-                    Next
+                    {t('audit.next')}
                   </button>
                 </div>
               </div>
@@ -1381,9 +1387,9 @@ export default function NodalOfficerDashboard({ activePage }) {
     });
 
     const LS = {
-      approved: { color: '#16a34a', bg: 'rgba(25, 135, 84,.1)',  label: 'Approved' },
-      pending:  { color: '#b45309', bg: 'rgba(255, 193, 7,.1)', label: 'Pending'  },
-      rejected: { color: '#dc3545', bg: 'rgba(220, 53, 69,.1)',  label: 'Rejected' },
+      approved: { color: '#16a34a', bg: 'rgba(25, 135, 84,.1)',  label: t('linkedDocs.statusApproved') },
+      pending:  { color: '#b45309', bg: 'rgba(255, 193, 7,.1)', label: t('linkedDocs.statusPending')  },
+      rejected: { color: '#dc3545', bg: 'rgba(220, 53, 69,.1)',  label: t('linkedDocs.statusRejected') },
     };
     const totals = { all: scopedLinks.length, pending: 0, approved: 0, rejected: 0 };
     scopedLinks.forEach(l => { if (totals[l.link_status] !== undefined) totals[l.link_status]++; });
@@ -1396,17 +1402,17 @@ export default function NodalOfficerDashboard({ activePage }) {
         {depts.length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderRadius: 10, background: 'rgba(14,165,233,.07)', border: '1px solid rgba(14,165,233,.2)', fontSize: 12.5, color: '#0369a1' }}>
             <Link2 size={14} color="#0ea5e9" />
-            <span>Showing links involving your authorised departments: <strong>{depts.map(d => d.name).join(' · ')}</strong></span>
+            <span><Trans t={t} i18nKey="linkedDocs.scopeNotice" values={{ depts: depts.map(d => d.name).join(' · ') }} components={[<strong key="s" />]} /></span>
           </div>
         )}
 
         {/* Stats */}
         <div className="nod-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
           {[
-            { label: 'Total Links', value: totals.all,      color: 'var(--primary)', bg: 'rgba(33, 74, 171,.12)',  icon: Link2,       key: '' },
-            { label: 'Approved',    value: totals.approved,  color: '#16a34a',       bg: 'rgba(25, 135, 84,.12)',  icon: CheckCircle, key: 'approved' },
-            { label: 'Pending',     value: totals.pending,   color: '#b45309',       bg: 'rgba(255, 193, 7,.12)', icon: Clock,       key: 'pending'  },
-            { label: 'Rejected',    value: totals.rejected,  color: '#dc3545',       bg: 'rgba(220, 53, 69,.12)',  icon: XCircle,     key: 'rejected' },
+            { label: t('linkedDocs.stats.totalLinks'), value: totals.all,      color: 'var(--primary)', bg: 'rgba(33, 74, 171,.12)',  icon: Link2,       key: '' },
+            { label: t('linkedDocs.stats.approved'),    value: totals.approved,  color: '#16a34a',       bg: 'rgba(25, 135, 84,.12)',  icon: CheckCircle, key: 'approved' },
+            { label: t('linkedDocs.stats.pending'),     value: totals.pending,   color: '#b45309',       bg: 'rgba(255, 193, 7,.12)', icon: Clock,       key: 'pending'  },
+            { label: t('linkedDocs.stats.rejected'),    value: totals.rejected,  color: '#dc3545',       bg: 'rgba(220, 53, 69,.12)',  icon: XCircle,     key: 'rejected' },
           ].map(s => {
             const isActive = nodalLinksFilterStatus === s.key;
             return (
@@ -1437,34 +1443,34 @@ export default function NodalOfficerDashboard({ activePage }) {
               <input
                 value={nodalLinksSearch}
                 onChange={e => setNodalLinksSearch(e.target.value)}
-                placeholder="Search by document or department…"
+                placeholder={t('linkedDocs.searchPlaceholder')}
                 style={{ width: '100%', padding: '7px 12px 7px 30px', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, color: 'var(--text-color)', outline: 'none', boxSizing: 'border-box' }}
               />
             </div>
             <select value={nodalLinksFilterStatus} onChange={e => setNodalLinksFilterStatus(e.target.value)}
               style={{ height: 36, padding: '0 10px', border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, background: 'var(--surface-ground)', color: 'var(--text-color)', cursor: 'pointer' }}>
-              <option value="">All Statuses</option>
-              <option value="pending">Pending</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
+              <option value="">{t('linkedDocs.allStatuses')}</option>
+              <option value="pending">{t('linkedDocs.statusPending')}</option>
+              <option value="approved">{t('linkedDocs.statusApproved')}</option>
+              <option value="rejected">{t('linkedDocs.statusRejected')}</option>
             </select>
             {(nodalLinksSearch || nodalLinksFilterStatus) && (
               <button onClick={() => { setNodalLinksSearch(''); setNodalLinksFilterStatus(''); }}
                 style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'transparent', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '7px 12px', fontSize: 12, cursor: 'pointer', color: 'var(--text-color-secondary)' }}>
-                <X size={11} /> Clear
+                <X size={11} /> {t('linkedDocs.clear')}
               </button>
             )}
             <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginLeft: 'auto' }}>
-              {filteredLinks.length} of {scopedLinks.length}
+              {t('linkedDocs.countOf', { shown: filteredLinks.length, total: scopedLinks.length })}
             </div>
           </div>
 
-          {nodalLinksLoading && <div style={{ padding: '50px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>Loading linked documents…</div>}
+          {nodalLinksLoading && <div style={{ padding: '50px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>{t('linkedDocs.loadingDocuments')}</div>}
           {nodalLinksError && <div style={{ padding: '20px 18px', fontSize: 13, color: '#dc3545' }}>{nodalLinksError}</div>}
 
           {!nodalLinksLoading && !nodalLinksError && (
             filteredLinks.length === 0 ? (
-              <div style={{ padding: '50px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>No linked documents match the current filters.</div>
+              <div style={{ padding: '50px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>{t('linkedDocs.noMatch')}</div>
             ) : isMobile ? (
               <div>
                 {filteredLinks.map(link => {
@@ -1490,13 +1496,13 @@ export default function NodalOfficerDashboard({ activePage }) {
                         {link.original_department_name || '—'} <span style={{ opacity: .5 }}>→</span> <strong style={{ color: 'var(--text-heading)' }}>{link.linked_department_name || '—'}</strong>
                       </div>
                       <div style={{ fontSize: 11, color: 'var(--text-color-secondary)' }}>
-                        Requested by {requesterName} · <span style={{ fontFamily: 'var(--mono)' }}>{link.requested_at?.split('T')[0]}</span>
+                        {t('linkedDocs.requestedBy', { name: requesterName })} · <span style={{ fontFamily: 'var(--mono)' }}>{link.requested_at?.split('T')[0]}</span>
                       </div>
                       <button
                         onClick={() => openLinkedDocViewer(link)}
                         disabled={viewLinkLoadingId === link.link_id}
                         style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 10px', borderRadius: 7, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 12, fontWeight: 600, cursor: viewLinkLoadingId === link.link_id ? 'wait' : 'pointer', fontFamily: 'var(--font)', opacity: viewLinkLoadingId === link.link_id ? .6 : 1 }}>
-                        <Eye size={13} /> {viewLinkLoadingId === link.link_id ? 'Loading…' : 'View'}
+                        <Eye size={13} /> {viewLinkLoadingId === link.link_id ? t('linkedDocs.loadingView') : t('linkedDocs.view')}
                       </button>
                     </div>
                   );
@@ -1505,12 +1511,12 @@ export default function NodalOfficerDashboard({ activePage }) {
             ) : (
             <div className="table-scroll-wrap">
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 150px 150px 110px 150px 80px', minWidth: 900, background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
-                <div style={{ ...LABEL, padding: '10px 16px' }}>Document</div>
-                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Original Dept</div>
-                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Linked-to Dept</div>
-                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Status</div>
-                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Requester / Reviewer</div>
-                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>View</div>
+                <div style={{ ...LABEL, padding: '10px 16px' }}>{t('linkedDocs.headers.document')}</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>{t('linkedDocs.headers.originalDept')}</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>{t('linkedDocs.headers.linkedDept')}</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>{t('linkedDocs.headers.status')}</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>{t('linkedDocs.headers.requesterReviewer')}</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>{t('linkedDocs.headers.view')}</div>
               </div>
 
               {filteredLinks.map(link => {
@@ -1548,12 +1554,12 @@ export default function NodalOfficerDashboard({ activePage }) {
                     </div>
                     <div style={{ padding: '10px 14px', borderLeft: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 3 }}>
                       <div style={{ fontSize: 12, color: 'var(--text-color-secondary)' }}>
-                        <span style={{ fontSize: 9.5, fontWeight: 700, fontFamily: 'var(--mono)', letterSpacing: '.05em', textTransform: 'uppercase', display: 'block', marginBottom: 1 }}>Requested</span>
+                        <span style={{ fontSize: 9.5, fontWeight: 700, fontFamily: 'var(--mono)', letterSpacing: '.05em', textTransform: 'uppercase', display: 'block', marginBottom: 1 }}>{t('linkedDocs.requested')}</span>
                         {requesterName} · <span style={{ fontFamily: 'var(--mono)', fontSize: 10.5 }}>{link.requested_at?.split('T')[0]}</span>
                       </div>
                       {reviewerName && (
                         <div style={{ fontSize: 12, color: ls.color }}>
-                          <span style={{ fontSize: 9.5, fontWeight: 700, fontFamily: 'var(--mono)', letterSpacing: '.05em', textTransform: 'uppercase', display: 'block', marginBottom: 1 }}>Reviewed</span>
+                          <span style={{ fontSize: 9.5, fontWeight: 700, fontFamily: 'var(--mono)', letterSpacing: '.05em', textTransform: 'uppercase', display: 'block', marginBottom: 1 }}>{t('linkedDocs.reviewed')}</span>
                           {reviewerName} · <span style={{ fontFamily: 'var(--mono)', fontSize: 10.5 }}>{link.reviewed_at?.split('T')[0]}</span>
                         </div>
                       )}
@@ -1566,7 +1572,7 @@ export default function NodalOfficerDashboard({ activePage }) {
                         style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 10px', borderRadius: 7, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 600, cursor: viewLinkLoadingId === link.link_id ? 'wait' : 'pointer', fontFamily: 'var(--font)', transition: 'background .15s', opacity: viewLinkLoadingId === link.link_id ? .6 : 1 }}
                         onMouseEnter={e => e.currentTarget.style.background = 'rgba(33, 74, 171,.14)'}
                         onMouseLeave={e => e.currentTarget.style.background = 'rgba(33, 74, 171,.07)'}>
-                        <Eye size={12} /> {viewLinkLoadingId === link.link_id ? 'Loading…' : 'View'}
+                        <Eye size={12} /> {viewLinkLoadingId === link.link_id ? t('linkedDocs.loadingView') : t('linkedDocs.view')}
                       </button>
                     </div>
                   </div>
@@ -1584,11 +1590,11 @@ export default function NodalOfficerDashboard({ activePage }) {
 
   // ── Act Parts (view-only for nodal officer) ──────────────────────────────
   if (activePage === 'nodalactparts') {
-    const TAB_LABELS = { sections: 'Sections', schedule: 'Schedule', annexure: 'Annexure', appendix: 'Appendix', forms: 'Forms' };
+    const TAB_LABELS = { sections: t('actParts.tabLabels.sections'), schedule: t('actParts.tabLabels.schedule'), annexure: t('actParts.tabLabels.annexure'), appendix: t('actParts.tabLabels.appendix'), forms: t('actParts.tabLabels.forms') };
     const STATUS_SC  = {
-      pending:  { bg: '#fef3c7', color: '#92400e', border: '#ffc107', label: 'Pending'  },
-      approved: { bg: '#d1fae5', color: '#065f46', border: '#10b981', label: 'Approved' },
-      rejected: { bg: '#fee2e2', color: '#991b1b', border: '#dc3545', label: 'Rejected' },
+      pending:  { bg: '#fef3c7', color: '#92400e', border: '#ffc107', label: t('actParts.stats.pending')  },
+      approved: { bg: '#d1fae5', color: '#065f46', border: '#10b981', label: t('actParts.stats.approved') },
+      rejected: { bg: '#fee2e2', color: '#991b1b', border: '#dc3545', label: t('actParts.stats.rejected') },
     };
     const filtered = actPartsStatusFilter
       ? actPartsItems.filter(i => i.status === actPartsStatusFilter)
@@ -1606,10 +1612,10 @@ export default function NodalOfficerDashboard({ activePage }) {
         {/* Stats */}
         <div className="nod-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
           {[
-            { label: 'Total Submissions', value: actPartsItems.length,   color: 'var(--primary)', bg: 'rgba(33, 74, 171,.12)',  icon: FileText,    key: '' },
-            { label: 'Pending',           value: actPartsCounts.pending,  color: '#b45309',        bg: 'rgba(255, 193, 7,.12)', icon: Clock,       key: 'pending'  },
-            { label: 'Approved',          value: actPartsCounts.approved, color: '#16a34a',        bg: 'rgba(25, 135, 84,.12)',  icon: CheckCircle, key: 'approved' },
-            { label: 'Rejected',          value: actPartsCounts.rejected, color: '#dc3545',        bg: 'rgba(220, 53, 69,.12)',  icon: XCircle,     key: 'rejected' },
+            { label: t('actParts.stats.totalSubmissions'), value: actPartsItems.length,   color: 'var(--primary)', bg: 'rgba(33, 74, 171,.12)',  icon: FileText,    key: '' },
+            { label: t('actParts.stats.pending'),           value: actPartsCounts.pending,  color: '#b45309',        bg: 'rgba(255, 193, 7,.12)', icon: Clock,       key: 'pending'  },
+            { label: t('actParts.stats.approved'),          value: actPartsCounts.approved, color: '#16a34a',        bg: 'rgba(25, 135, 84,.12)',  icon: CheckCircle, key: 'approved' },
+            { label: t('actParts.stats.rejected'),          value: actPartsCounts.rejected, color: '#dc3545',        bg: 'rgba(220, 53, 69,.12)',  icon: XCircle,     key: 'rejected' },
           ].map(s => {
             const isActive = actPartsStatusFilter === s.key;
             return (
@@ -1633,7 +1639,7 @@ export default function NodalOfficerDashboard({ activePage }) {
         </div>
 
         {actPartsLoading && (
-          <div style={{ padding: '60px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>Loading…</div>
+          <div style={{ padding: '60px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>{t('actParts.loading')}</div>
         )}
         {actPartsError && (
           <div style={{ padding: '20px 0', fontSize: 13, color: '#dc3545' }}>{actPartsError}</div>
@@ -1642,7 +1648,7 @@ export default function NodalOfficerDashboard({ activePage }) {
         {!actPartsLoading && !actPartsError && filtered.length === 0 && (
           <Card style={{ padding: '60px 0', textAlign: 'center' }}>
             <FileText size={36} color="var(--surface-200)" style={{ marginBottom: 12 }} />
-            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-color-secondary)' }}>No submissions found.</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-color-secondary)' }}>{t('actParts.noSubmissions')}</div>
           </Card>
         )}
 
@@ -1656,7 +1662,7 @@ export default function NodalOfficerDashboard({ activePage }) {
                   <div key={`${item.pdf_document_id}-${item.part_type}`} style={{ padding: '12px 16px', borderBottom: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.act_name || `Act #${item.pdf_document_id}`}</div>
+                        <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.act_name || t('actParts.detail.actFallback', { id: item.pdf_document_id })}</div>
                         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                           <span style={{ fontSize: 10.5, fontWeight: 700, background: 'rgba(33, 74, 171,.1)', color: '#214aab', borderRadius: 4, padding: '1px 7px' }}>
                             {TAB_LABELS[item.part_type] || item.part_type}
@@ -1675,7 +1681,7 @@ export default function NodalOfficerDashboard({ activePage }) {
                     )}
                     <button onClick={() => openActPartsDetail(item)} disabled={actPartsDetailLoading}
                       style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 10px', borderRadius: 7, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                      <Eye size={13} /> View
+                      <Eye size={13} /> {t('actParts.view')}
                     </button>
                   </div>
                 );
@@ -1684,11 +1690,11 @@ export default function NodalOfficerDashboard({ activePage }) {
           ) : (
             <div className="table-scroll-wrap">
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 150px 140px 140px 100px', minWidth: 800, background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
-              <div style={{ ...LABEL, padding: '10px 18px' }}>Act / Tab</div>
-              <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Submitted By</div>
-              <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Submitted At</div>
-              <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>Status</div>
-              <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>View</div>
+              <div style={{ ...LABEL, padding: '10px 18px' }}>{t('actParts.headers.actTab')}</div>
+              <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>{t('actParts.headers.submittedBy')}</div>
+              <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>{t('actParts.headers.submittedAt')}</div>
+              <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>{t('actParts.headers.status')}</div>
+              <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>{t('actParts.headers.view')}</div>
             </div>
 
             {filtered.map(item => {
@@ -1699,7 +1705,7 @@ export default function NodalOfficerDashboard({ activePage }) {
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                   <div style={{ padding: '10px 18px' }}>
-                    <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 2 }}>{item.act_name || `Act #${item.pdf_document_id}`}</div>
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 2 }}>{item.act_name || t('actParts.detail.actFallback', { id: item.pdf_document_id })}</div>
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                       <span style={{ fontSize: 10.5, fontWeight: 700, background: 'rgba(33, 74, 171,.1)', color: '#214aab', borderRadius: 4, padding: '1px 7px' }}>
                         {TAB_LABELS[item.part_type] || item.part_type}
@@ -1724,7 +1730,7 @@ export default function NodalOfficerDashboard({ activePage }) {
                   <div style={{ padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>
                     <button onClick={() => openActPartsDetail(item)} disabled={actPartsDetailLoading}
                       style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 7, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                      <Eye size={13} /> View
+                      <Eye size={13} /> {t('actParts.view')}
                     </button>
                   </div>
                 </div>
@@ -1752,9 +1758,9 @@ export default function NodalOfficerDashboard({ activePage }) {
 }
 
 // ── Shared detail modal for viewing act part content ─────────────────────────
-const ACT_PART_TAB_LABELS = { sections: 'Sections', schedule: 'Schedule', annexure: 'Annexure', appendix: 'Appendix', forms: 'Forms' };
-
 function ActPartsDetailModal({ item, partsData, onClose, readOnly = false, onApprove, onReject }) {
+  const { t } = useTranslation('nodal');
+  const ACT_PART_TAB_LABELS = { sections: t('actParts.tabLabels.sections'), schedule: t('actParts.tabLabels.schedule'), annexure: t('actParts.tabLabels.annexure'), appendix: t('actParts.tabLabels.appendix'), forms: t('actParts.tabLabels.forms') };
   const [comment, setComment] = useState('');
   const [confirming, setConfirming] = useState(null); // 'approved' | 'rejected'
   const [submitting, setSubmitting] = useState(false);
@@ -1762,13 +1768,13 @@ function ActPartsDetailModal({ item, partsData, onClose, readOnly = false, onApp
   const partType = item?.part_type;
 
   function renderContent() {
-    if (!partsData) return <div style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: '#dc3545' }}>Could not load content.</div>;
+    if (!partsData) return <div style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: '#dc3545' }}>{t('actParts.detail.couldNotLoad')}</div>;
 
     const statusChip = (status) => {
       if (!status) return null;
       const s = { draft: { bg: '#f1f5f9', color: '#64748b', border: '#cbd5e1' }, pending: { bg: '#fef3c7', color: '#92400e', border: '#ffc107' }, approved: { bg: '#d1fae5', color: '#065f46', border: '#10b981' }, rejected: { bg: '#fee2e2', color: '#991b1b', border: '#dc3545' }, pending_delete: { bg: '#fff1f2', color: '#9f1239', border: '#fda4af' } }[status];
       if (!s) return null;
-      const label = { draft: 'Draft', pending: 'Pending', approved: 'Approved', rejected: 'Rejected', pending_delete: 'Del. Pending' }[status] || status;
+      const label = { draft: t('actParts.detail.statusLabels.draft'), pending: t('actParts.detail.statusLabels.pending'), approved: t('actParts.detail.statusLabels.approved'), rejected: t('actParts.detail.statusLabels.rejected'), pending_delete: t('actParts.detail.statusLabels.pendingDelete') }[status] || status;
       return <span style={{ fontSize: 9.5, fontWeight: 700, background: s.bg, color: s.color, border: `1px solid ${s.border}`, borderRadius: 20, padding: '1px 7px', flexShrink: 0, marginLeft: 6 }}>{label}</span>;
     };
 
@@ -1799,13 +1805,13 @@ function ActPartsDetailModal({ item, partsData, onClose, readOnly = false, onApp
               </div>
             ))}
             {(!ch.sections || ch.sections.length === 0) && (
-              <div style={{ marginLeft: 20, fontSize: 12, color: 'var(--text-color-secondary)', fontStyle: 'italic' }}>No sections</div>
+              <div style={{ marginLeft: 20, fontSize: 12, color: 'var(--text-color-secondary)', fontStyle: 'italic' }}>{t('actParts.detail.noSectionsInChapter')}</div>
             )}
           </div>
         ));
       }
       const flat = partsData.flat_sections || [];
-      if (flat.length === 0) return <div style={{ fontSize: 13, color: 'var(--text-color-secondary)', fontStyle: 'italic' }}>No sections added.</div>;
+      if (flat.length === 0) return <div style={{ fontSize: 13, color: 'var(--text-color-secondary)', fontStyle: 'italic' }}>{t('actParts.detail.noSections')}</div>;
       return flat.map(sec => (
         <div key={sec.id} style={{ marginBottom: 10, padding: '10px 14px', background: 'var(--surface-ground)', borderRadius: 8, border: '1px solid var(--surface-border)' }}>
           <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 4, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
@@ -1825,7 +1831,7 @@ function ActPartsDetailModal({ item, partsData, onClose, readOnly = false, onApp
     // Flat entries (schedule / annexure / appendix / forms)
     const keyMap = { schedule: 'schedules', annexure: 'annexures', appendix: 'appendices', forms: 'forms' };
     const entries = partsData[keyMap[partType]] || [];
-    if (entries.length === 0) return <div style={{ fontSize: 13, color: 'var(--text-color-secondary)', fontStyle: 'italic' }}>No entries added.</div>;
+    if (entries.length === 0) return <div style={{ fontSize: 13, color: 'var(--text-color-secondary)', fontStyle: 'italic' }}>{t('actParts.detail.noEntries')}</div>;
     return entries.map(e => (
       <div key={e.id} style={{ marginBottom: 10, padding: '10px 14px', background: 'var(--surface-ground)', borderRadius: 8, border: '1px solid var(--surface-border)' }}>
         <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 4, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
@@ -1862,14 +1868,14 @@ function ActPartsDetailModal({ item, partsData, onClose, readOnly = false, onApp
         <div style={{ padding: '18px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 800, color: 'var(--text-heading)' }}>
-              {item?.act_name || `Act #${item?.pdf_document_id}`}
+              {item?.act_name || t('actParts.detail.actFallback', { id: item?.pdf_document_id })}
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4 }}>
               <span style={{ fontSize: 11, fontWeight: 700, background: 'rgba(33, 74, 171,.1)', color: '#214aab', borderRadius: 4, padding: '2px 8px' }}>
                 {ACT_PART_TAB_LABELS[partType] || partType}
               </span>
               <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
-                Submitted by {[item?.submitter_first_name, item?.submitter_last_name].filter(Boolean).join(' ') || item?.submitter_username}
+                {t('actParts.detail.submittedByLine', { name: [item?.submitter_first_name, item?.submitter_last_name].filter(Boolean).join(' ') || item?.submitter_username })}
                 {item?.submitted_at ? ` · ${new Date(item.submitted_at).toLocaleDateString()}` : ''}
               </span>
             </div>
@@ -1889,11 +1895,11 @@ function ActPartsDetailModal({ item, partsData, onClose, readOnly = false, onApp
           <div style={{ padding: '16px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end', gap: 10, flexShrink: 0 }}>
             <button onClick={() => setConfirming('rejected')}
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 18px', borderRadius: 9, border: '1.5px solid #dc3545', background: '#fee2e2', color: '#991b1b', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-              <XCircle size={14} /> Reject
+              <XCircle size={14} /> {t('actParts.detail.reject')}
             </button>
             <button onClick={() => setConfirming('approved')}
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 18px', borderRadius: 9, border: 'none', background: '#10b981', color: 'white', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-              <CheckCircle size={14} /> Approve
+              <CheckCircle size={14} /> {t('actParts.detail.approve')}
             </button>
           </div>
         )}
@@ -1901,15 +1907,15 @@ function ActPartsDetailModal({ item, partsData, onClose, readOnly = false, onApp
         {!readOnly && confirming && (
           <div style={{ padding: '16px 24px', borderTop: '1px solid var(--surface-border)', flexShrink: 0 }}>
             <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-color-secondary)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.06em' }}>
-              Comments {confirming === 'rejected' && <span style={{ color: '#dc3545' }}>*</span>}
+              {t('actParts.detail.comments')} {confirming === 'rejected' && <span style={{ color: '#dc3545' }}>*</span>}
             </div>
             <textarea value={comment} onChange={e => setComment(e.target.value)} rows={2}
-              placeholder={confirming === 'rejected' ? 'Reason for rejection (required)' : 'Optional comments…'}
+              placeholder={confirming === 'rejected' ? t('actParts.detail.reasonForRejection') : t('actParts.detail.optionalComments')}
               style={{ width: '100%', borderRadius: 8, border: '1px solid var(--surface-border)', padding: '8px 12px', fontSize: 13, fontFamily: 'var(--font)', resize: 'none', boxSizing: 'border-box', background: 'var(--surface-ground)', color: 'var(--text-color)' }} />
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 10 }}>
               <button onClick={() => setConfirming(null)} disabled={submitting}
                 style={{ padding: '8px 18px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'transparent', color: 'var(--text-color-secondary)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                Back
+                {t('actParts.detail.back')}
               </button>
               <button
                 disabled={submitting || (confirming === 'rejected' && !comment.trim())}
@@ -1922,7 +1928,7 @@ function ActPartsDetailModal({ item, partsData, onClose, readOnly = false, onApp
                   } finally { setSubmitting(false); }
                 }}
                 style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: confirming === 'approved' ? '#10b981' : '#dc3545', color: 'white', fontSize: 13, fontWeight: 700, cursor: (submitting || (confirming === 'rejected' && !comment.trim())) ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: (submitting || (confirming === 'rejected' && !comment.trim())) ? .5 : 1 }}>
-                {submitting ? 'Submitting…' : confirming === 'approved' ? 'Confirm Approve' : 'Confirm Reject'}
+                {submitting ? t('actParts.detail.submitting') : confirming === 'approved' ? t('actParts.detail.confirmApprove') : t('actParts.detail.confirmReject')}
               </button>
             </div>
           </div>
@@ -1930,7 +1936,7 @@ function ActPartsDetailModal({ item, partsData, onClose, readOnly = false, onApp
 
         {readOnly && (
           <div style={{ padding: '14px 24px', borderTop: '1px solid var(--surface-border)', textAlign: 'right', flexShrink: 0 }}>
-            <button onClick={onClose} style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'transparent', color: 'var(--text-color-secondary)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>Close</button>
+            <button onClick={onClose} style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'transparent', color: 'var(--text-color-secondary)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>{t('actParts.detail.close')}</button>
           </div>
         )}
       </div>

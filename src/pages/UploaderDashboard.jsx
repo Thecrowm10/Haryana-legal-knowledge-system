@@ -19,6 +19,7 @@ import { uploadPdfFile, uploadPdfMetadata, updatePdfMetadata, getMyDocuments, se
 import { uploadActPartFile, saveActPartSections, saveActPartEntries, getActPartSections, getActPartEntries, getActPartFile, getActPartApprovals, submitActPartForApproval } from '../services/act_parts';
 import { createNotification } from '../services/notifications';
 import HindiKeyboardInput from '../components/HindiKeyboardInput';
+import { TYPE_SPECIFIC_FIELD_KEYS } from '../constants/docTypeFields';
 
 // Constants
 
@@ -175,38 +176,10 @@ function fieldLabel(k) {
 }
 
 // Extra type-specific fields shown in the Edit Document form, per document type.
-// Keys mirror the typeFields naming already used by mapApiDoc/DocViewModal.
-const EDIT_TYPE_FIELD_KEYS = {
-  'Act': [
-    { key: 'actYear', inputType: 'number' },
-    { key: 'longTitle', inputType: 'text' },
-    { key: 'regionalTitle', inputType: 'text' },
-    { key: 'notificationNo', inputType: 'text' },
-    { key: 'actCode', inputType: 'text' },
-    { key: 'soReason', inputType: 'text' },
-    { key: 'noOfRules', inputType: 'number' },
-    { key: 'noOfNotifications', inputType: 'number' },
-    { key: 'noOfRegulations', inputType: 'number' },
-    { key: 'noOfCirculars', inputType: 'number' },
-    { key: 'noOfStatutes', inputType: 'number' },
-    { key: 'noOfOrdinances', inputType: 'number' },
-    { key: 'noOfOrders', inputType: 'number' },
-    { key: 'keywords', inputType: 'text' },
-    { key: 'repealed', inputType: 'checkbox' },
-  ],
-  'Amendment': [],
-  'Circular': [{ key: 'validity', inputType: 'date' }],
-  'Notification': [],
-  'Order/Gazette': [],
-  'Policy': [
-    { key: 'sector', inputType: 'text' },
-    { key: 'implementingAgency', inputType: 'text' },
-    { key: 'reviewDate', inputType: 'date' },
-  ],
-  'Rules & Regulations': [{ key: 'ruleAuthority', inputType: 'text' }],
-  'Bye Laws': [{ key: 'ruleAuthority', inputType: 'text' }],
-  'Miscellaneous': [{ key: 'validity', inputType: 'date' }],
-};
+// Keys mirror the typeFields naming already used by mapApiDoc/DocViewModal —
+// canonical definition lives in constants/docTypeFields.js so the viewers
+// (DocViewModal, ApproverDashboard) always list the same fields as this form.
+const EDIT_TYPE_FIELD_KEYS = TYPE_SPECIFIC_FIELD_KEYS;
 
 // Workflow statuses: DRAFT → PENDING_REVIEW → PUBLISHED
 const WORKFLOW_STATUS = { DRAFT: 'draft', PENDING: 'pending', PUBLISHED: 'published' };
@@ -653,16 +626,18 @@ function DocViewModal({ doc, onClose }) {
 
   const LS = { fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)' };
 
+  // Always show every common field — blank (not hidden) when the uploader
+  // left it empty, so the full shape of what could have been filled in is visible.
   const meta = [
-    [t('common.referenceNo'),      doc.referenceNumber || null],
-    [t('common.issueDate'),        doc.enactmentDate   || null],
-    [t('common.effectiveFrom'),    doc.effectiveFrom   || null],
-    [t('docViewModal.gazetteRef'), doc.gazette         || null],
-    [t('docViewModal.legalAuthority'), doc.authority   || null],
-    [t('docViewModal.uploader'),   doc.uploader        || null],
-    [t('docViewModal.uploadDate'), doc.uploadedAt      || null],
-    [t('docViewModal.file'),       doc.fileName        || null],
-  ].filter(([, v]) => v);
+    [t('common.referenceNo'),      doc.referenceNumber || ''],
+    [t('common.issueDate'),        doc.enactmentDate   || ''],
+    [t('common.effectiveFrom'),    doc.effectiveFrom   || ''],
+    [t('docViewModal.gazetteRef'), doc.gazette         || ''],
+    [t('docViewModal.legalAuthority'), doc.authority   || ''],
+    [t('docViewModal.uploader'),   doc.uploader        || ''],
+    [t('docViewModal.uploadDate'), doc.uploadedAt      || ''],
+    [t('docViewModal.file'),       doc.fileName        || ''],
+  ];
 
   // Fields already shown in meta — exclude from typeExtra to avoid duplication
   const TYPEEXTRA_SKIP = new Set([
@@ -671,9 +646,11 @@ function DocViewModal({ doc, onClose }) {
     'actNumber', 'amendmentNumber', 'circularNumber',
     'notificationNumber', 'orderNumber', 'policyNumber', 'ruleNumber',
   ]);
-  const typeExtra = doc.typeFields
-    ? Object.entries(doc.typeFields).filter(([k, v]) => v && !TYPEEXTRA_SKIP.has(k))
-    : [];
+  // Always show every field that belongs to this document's own type (blank
+  // if not filled in) — never fields that belong to a different type.
+  const typeExtra = (TYPE_SPECIFIC_FIELD_KEYS[doc.type] || [])
+    .filter(({ key }) => !TYPEEXTRA_SKIP.has(key))
+    .map(({ key }) => [key, doc.typeFields?.[key] || '']);
 
   const statusAccent = doc.status === 'approved' ? '#16a34a' : doc.status === 'rejected' ? '#dc3545' : '#ffc107';
   const statusBg     = doc.status === 'approved' ? 'rgba(25, 135, 84,.1)'  : doc.status === 'rejected' ? 'rgba(220, 53, 69,.1)'  : 'rgba(255, 193, 7,.1)';
@@ -867,8 +844,8 @@ function DocViewModal({ doc, onClose }) {
                 <div style={{ ...LS, marginBottom: 10 }}>{t('docViewModal.additionalInfo')}</div>
                 <div style={{ borderRadius: 10, border: '1px solid var(--surface-border)', overflow: 'hidden' }}>
                   {meta.map(([k, v], idx) => (
-                    <div key={k} style={{ display: 'flex', alignItems: 'flex-start', gap: 0, borderBottom: idx < meta.length - 1 ? '1px solid var(--surface-border)' : 'none' }}>
-                      <div style={{ padding: '10px 14px', minWidth: 128, flexShrink: 0, background: 'var(--surface-50)', fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', fontWeight: 600, borderRight: '1px solid var(--surface-border)' }}>
+                    <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 0, borderBottom: idx < meta.length - 1 ? '1px solid var(--surface-border)' : 'none' }}>
+                      <div style={{ padding: '10px 14px', width: 128, boxSizing: 'border-box', flexShrink: 0, background: 'var(--surface-50)', fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', fontWeight: 600, borderRight: '1px solid var(--surface-border)' }}>
                         {k}
                       </div>
                       <div style={{ padding: '10px 14px', fontSize: 12.5, color: 'var(--text-heading)', fontWeight: 500, flex: 1, wordBreak: 'break-word' }}>
@@ -886,8 +863,8 @@ function DocViewModal({ doc, onClose }) {
                 <div style={{ ...LS, marginBottom: 10 }}>{t('docViewModal.typeSpecificFields')}</div>
                 <div style={{ borderRadius: 10, border: '1px solid var(--surface-border)', overflow: 'hidden' }}>
                   {typeExtra.map(([k, v], idx) => (
-                    <div key={k} style={{ display: 'flex', alignItems: 'flex-start', gap: 0, borderBottom: idx < typeExtra.length - 1 ? '1px solid var(--surface-border)' : 'none' }}>
-                      <div style={{ padding: '10px 14px', minWidth: 128, flexShrink: 0, background: 'var(--surface-50)', fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', fontWeight: 600, borderRight: '1px solid var(--surface-border)' }}>
+                    <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 0, borderBottom: idx < typeExtra.length - 1 ? '1px solid var(--surface-border)' : 'none' }}>
+                      <div style={{ padding: '10px 14px', width: 128, boxSizing: 'border-box', flexShrink: 0, background: 'var(--surface-50)', fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', fontWeight: 600, borderRight: '1px solid var(--surface-border)' }}>
                         {fieldLabel(k)}
                       </div>
                       <div style={{ padding: '10px 14px', fontSize: 12.5, color: 'var(--text-heading)', fontWeight: 500, flex: 1, wordBreak: 'break-word' }}>

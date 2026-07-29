@@ -15,6 +15,7 @@ import { getApproverDocuments, getPdfFile, reviewDocument, getDepartmentLinkRequ
 import { createNotification } from '../services/notifications';
 import { getPendingActParts, getAllActParts, reviewActPart } from '../services/act_parts';
 import { useMediaQuery } from '../hooks/useMediaQuery';
+import { TYPE_SPECIFIC_FIELD_KEYS } from '../constants/docTypeFields';
 
 // Constants
 
@@ -551,23 +552,25 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
 // type-specific fields, legal authorities, relationships, amendment provisions.
 function DocumentDetailsPanel({ doc, reviewAnnotations = [], onScrollToAnnotation }) {
   const { t } = useTranslation('approver');
+  // Always show every field — blank (not hidden) when it wasn't filled in,
+  // so the full shape of what could have been entered is visible.
   const meta = [
     [t('documentDetails.fields.title'),           doc.title],
     [t('documentDetails.fields.type'),            doc.type],
     [t('documentDetails.fields.department'),      doc.dept],
-    [t('documentDetails.fields.year'),            doc.year ? String(doc.year) : null],
+    [t('documentDetails.fields.year'),            doc.year ? String(doc.year) : ''],
     [t('documentDetails.fields.version'),         doc.version || '1.0'],
-    [t('documentDetails.fields.referenceNo'),     doc.referenceNumber || null],
-    [t('documentDetails.fields.issueDate'),       doc.enactmentDate || null],
-    [t('documentDetails.fields.effectiveFrom'),   doc.effectiveFrom || null],
-    [t('documentDetails.fields.gazetteRef'),      doc.gazette || null],
-    [t('documentDetails.fields.legalAuthority'),  doc.authority || null],
-    [t('documentDetails.fields.uploader'),        doc.uploader || null],
-    [t('documentDetails.fields.uploadDate'),      doc.uploadedAt || null],
-    [t('documentDetails.fields.pages'),           doc.pages ? t('documentDetails.pagesValue', { count: doc.pages }) : null],
+    [t('documentDetails.fields.referenceNo'),     doc.referenceNumber || ''],
+    [t('documentDetails.fields.issueDate'),       doc.enactmentDate || ''],
+    [t('documentDetails.fields.effectiveFrom'),   doc.effectiveFrom || ''],
+    [t('documentDetails.fields.gazetteRef'),      doc.gazette || ''],
+    [t('documentDetails.fields.legalAuthority'),  doc.authority || ''],
+    [t('documentDetails.fields.uploader'),        doc.uploader || ''],
+    [t('documentDetails.fields.uploadDate'),      doc.uploadedAt || ''],
+    [t('documentDetails.fields.pages'),           doc.pages ? t('documentDetails.pagesValue', { count: doc.pages }) : ''],
     [t('documentDetails.fields.legalStatus'),     doc.legalStatus || t('documentDetails.activeStatus')],
-    [t('documentDetails.fields.fileName'),        doc.fileName || null],
-  ].filter(([, v]) => v);
+    [t('documentDetails.fields.fileName'),        doc.fileName || ''],
+  ];
 
   // Fields already shown in meta — exclude from typeExtra to avoid duplication
   const TYPEEXTRA_SKIP = new Set([
@@ -576,9 +579,11 @@ function DocumentDetailsPanel({ doc, reviewAnnotations = [], onScrollToAnnotatio
     'actNumber', 'amendmentNumber', 'circularNumber',
     'notificationNumber', 'orderNumber', 'policyNumber', 'ruleNumber',
   ]);
-  const typeExtra = doc.typeFields
-    ? Object.entries(doc.typeFields).filter(([k, v]) => v && !TYPEEXTRA_SKIP.has(k))
-    : [];
+  // Always show every field that belongs to this document's own type, blank
+  // if not filled in, never fields belonging to a different type.
+  const typeExtra = (TYPE_SPECIFIC_FIELD_KEYS[doc.type] || [])
+    .filter(({ key }) => !TYPEEXTRA_SKIP.has(key))
+    .map(({ key }) => [key, doc.typeFields?.[key] || '']);
 
   // Map camelCase keys to readable labels
   const fieldLabel = k => k.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase()).trim();
@@ -602,8 +607,8 @@ function DocumentDetailsPanel({ doc, reviewAnnotations = [], onScrollToAnnotatio
           <div style={{ ...LABEL, marginBottom: 8 }}>{t('documentDetails.metadata')}</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             {meta.map(([k, v]) => (
-              <div key={k} style={{ display: 'flex', gap: 8, padding: '7px 10px', borderRadius: 7, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)' }}>
-                <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', minWidth: 105, flexShrink: 0 }}>{k}</span>
+              <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 7, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)' }}>
+                <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', width: 105, boxSizing: 'border-box', flexShrink: 0 }}>{k}</span>
                 <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(v)}</span>
               </div>
             ))}
@@ -616,8 +621,8 @@ function DocumentDetailsPanel({ doc, reviewAnnotations = [], onScrollToAnnotatio
             <div style={{ ...LABEL, marginBottom: 8 }}>{t('documentDetails.typeSpecificFields')}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
               {typeExtra.map(([k, v]) => (
-                <div key={k} style={{ display: 'flex', gap: 8, padding: '7px 10px', borderRadius: 7, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)' }}>
-                  <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', minWidth: 105, flexShrink: 0 }}>{fieldLabel(k)}</span>
+                <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 7, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)' }}>
+                  <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', width: 105, boxSizing: 'border-box', flexShrink: 0 }}>{fieldLabel(k)}</span>
                   <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(v)}</span>
                 </div>
               ))}
@@ -912,7 +917,7 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, deciding })
         {/* Panel 2 — Document Details */}
         <div className="ap-split-pane" style={{ overflow: 'hidden' }}>
           <DocumentDetailsPanel
-            doc={doc}
+            doc={{ ...doc, pages: totalPages }}
             reviewAnnotations={annotations}
             onScrollToAnnotation={(ann) => pdfScrollRef.current?.(ann)}
           />
@@ -1266,7 +1271,7 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
               that fetch is in flight (or if it fails). */}
           {fullDoc ? (
             <div style={{ borderRadius: 10, border: '1px solid var(--surface-border)', overflow: 'hidden' }}>
-              <DocumentDetailsPanel doc={fullDoc} />
+              <DocumentDetailsPanel doc={{ ...fullDoc, pages: totalPages }} />
             </div>
           ) : (
             <div style={{ padding: '14px 16px', borderRadius: 10, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)' }}>

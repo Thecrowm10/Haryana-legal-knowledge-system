@@ -10,6 +10,10 @@ import uploaderEn from './locales/en/uploader.json';
 import uploaderHi from './locales/hi/uploader.json';
 import approverEn from './locales/en/approver.json';
 import approverHi from './locales/hi/approver.json';
+import nodalEn from './locales/en/nodal.json';
+import nodalHi from './locales/hi/nodal.json';
+import adminEn from './locales/en/admin.json';
+import adminHi from './locales/hi/admin.json';
 
 const STORAGE_KEY = 'hlks-lang';
 
@@ -25,10 +29,10 @@ i18n.use(initReactI18next).init({
   lng: loadStoredLanguage(),
   fallbackLng: 'en',
   defaultNS: 'common',
-  ns: ['common', 'login', 'citizen', 'uploader', 'approver'],
+  ns: ['common', 'login', 'citizen', 'uploader', 'approver', 'nodal', 'admin'],
   resources: {
-    en: { common: commonEn, login: loginEn, citizen: citizenEn, uploader: uploaderEn, approver: approverEn },
-    hi: { common: commonHi, login: loginHi, citizen: citizenHi, uploader: uploaderHi, approver: approverHi },
+    en: { common: commonEn, login: loginEn, citizen: citizenEn, uploader: uploaderEn, approver: approverEn, nodal: nodalEn, admin: adminEn },
+    hi: { common: commonHi, login: loginHi, citizen: citizenHi, uploader: uploaderHi, approver: approverHi, nodal: nodalHi, admin: adminHi },
   },
   interpolation: { escapeValue: false },
   returnEmptyString: false,

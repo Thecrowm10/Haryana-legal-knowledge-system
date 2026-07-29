@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Users, ShieldCheck, Settings, Activity, ClipboardList, Trash2, Edit2, Plus, CheckCircle, XCircle, Building2, X, Eye, EyeOff, ChevronDown, Check, Download, Layers, FileText, Clock, Search, Filter, Link2 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
@@ -53,14 +54,16 @@ function exportCSV(data, filename) {
 
 const AUDIT_PAGE_SIZE = 10;
 
-const AUDIT_ENTITY_OPTIONS = [
-  { value: '',              label: 'All Entities' },
-  { value: 'auth',         label: 'Auth' },
-  { value: 'user',         label: 'User' },
-  { value: 'pdf',          label: 'PDF' },
-  { value: 'department',   label: 'Department' },
-  { value: 'document_type',label: 'Document Type' },
-];
+function auditEntityOptions(t) {
+  return [
+    { value: '',               label: t('audit.entities.all') },
+    { value: 'auth',           label: t('audit.entities.auth') },
+    { value: 'user',           label: t('audit.entities.user') },
+    { value: 'pdf',            label: t('audit.entities.pdf') },
+    { value: 'department',     label: t('audit.entities.department') },
+    { value: 'document_type',  label: t('audit.entities.documentType') },
+  ];
+}
 
 function fmtAction(action) {
   return action.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
@@ -89,6 +92,7 @@ const ADM_RESPONSIVE_CSS = `
 `;
 
 export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxonomy }) {
+  const { t } = useTranslation('admin');
   const isMobile = useMediaQuery('(max-width: 640px)');
   const [users, setUsers]               = useState([]);
   const [usersLoading, setUsersLoading] = useState(false);
@@ -106,7 +110,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
         setUsers(usersRes.data.map(normalizeUser));
         setRoles(rolesRes.data);
       })
-      .catch(() => setUsersError('Failed to load users. Please try again.'))
+      .catch(() => setUsersError(t('users.failedToLoadUsers')))
       .finally(() => setUsersLoading(false));
   }, [activePage]);
 
@@ -125,7 +129,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     setDeptsError('');
     getDepartments()
       .then(res => setDepts(res.data))
-      .catch(() => setDeptsError('Failed to load departments. Please try again.'))
+      .catch(() => setDeptsError(t('taxonomy.errors.departmentsLoadFailed')))
       .finally(() => setDeptsLoading(false));
   }, [activePage]);
 
@@ -145,7 +149,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     setDocTypesError('');
     getDocumentTypes()
       .then(res => setDocTypes(res.data))
-      .catch(() => setDocTypesError('Failed to load document types. Please try again.'))
+      .catch(() => setDocTypesError(t('taxonomy.errors.docTypesLoadFailed')))
       .finally(() => setDocTypesLoading(false));
   }, [activePage]);
 
@@ -172,7 +176,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
         setAllDocs(docsRes.data.documents || []);
         setDepts(deptsRes.data);
       })
-      .catch(() => setAllDocsError('Failed to load documents. Please try again.'))
+      .catch(() => setAllDocsError(t('uploads.failedToLoad')))
       .finally(() => setAllDocsLoading(false));
   }, [activePage]);
 
@@ -200,7 +204,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     if (auditToDate)       params.to_date      = auditToDate + 'T23:59:59';
     getAuditLogs(params)
       .then(res => { setAuditLogs(res.data.logs || []); setAuditTotal(res.data.total || 0); })
-      .catch(() => setAuditError('Failed to load audit logs. Please try again.'))
+      .catch(() => setAuditError(t('audit.failedToLoad')))
       .finally(() => setAuditLoading(false));
   }, [activePage, auditPage, auditFilterEntity, auditFilterAction, auditFilterStatus, auditFromDate, auditToDate]);
 
@@ -313,13 +317,13 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
         setAllLinks(Array.isArray(linksRes.data) ? linksRes.data : []);
         setDepts(deptsRes.data);
       })
-      .catch(() => setAllLinksError('Failed to load linked documents.'))
+      .catch(() => setAllLinksError(t('linkedDocs.failedToLoad')))
       .finally(() => setAllLinksLoading(false));
   }, [activePage]);
 
   function handleCreateDept(e) {
     e.preventDefault();
-    if (!newDept.name.trim()) { setCreateError('Department name is required.'); return; }
+    if (!newDept.name.trim()) { setCreateError(t('taxonomy.errors.departmentNameRequired')); return; }
     setCreating(true);
     setCreateError('');
     setCreateSuccess('');
@@ -328,12 +332,12 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
         setDepts(prev => [...prev, res.data]);
         setNewDept({ name: '', description: '' });
         setAddDeptOpen(false);
-        setCreateSuccess(`Department "${res.data.name}" created successfully.`);
+        setCreateSuccess(t('taxonomy.createSuccess', { name: res.data.name }));
         setTimeout(() => setCreateSuccess(''), 3000);
       })
       .catch(err => {
         const detail = err.response?.data?.detail;
-        setCreateError(typeof detail === 'string' ? detail : 'Failed to create department.');
+        setCreateError(typeof detail === 'string' ? detail : t('taxonomy.errors.createDepartmentFailed'));
       })
       .finally(() => setCreating(false));
   }
@@ -376,7 +380,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       setDocTypeCreateError('');
       createDocumentType({ name, description: '' })
         .then(res => { setDocTypes(prev => [...prev, res.data]); setAddState(null); })
-        .catch(err => setDocTypeCreateError(err.response?.data?.detail || 'Failed to create document type.'))
+        .catch(err => setDocTypeCreateError(err.response?.data?.detail || t('taxonomy.errors.createDocTypeFailed')))
         .finally(() => setDocTypeCreating(false));
       return;
     }
@@ -387,7 +391,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       setDeptMdmCreateError('');
       createDepartment({ name, description: '' })
         .then(res => { setDepts(prev => [...prev, res.data]); setAddState(null); })
-        .catch(err => setDeptMdmCreateError(err.response?.data?.detail || 'Failed to create department.'))
+        .catch(err => setDeptMdmCreateError(err.response?.data?.detail || t('taxonomy.errors.createDeptFailed')))
         .finally(() => setDeptMdmCreating(false));
       return;
     }
@@ -422,9 +426,9 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   const [showAddPass, setShowAddPass] = useState(false);
 
   async function handleAddUser() {
-    if (!addForm.username.trim()) { setAddError('Username is required.'); return; }
-    if (!addForm.email.trim())    { setAddError('Email is required.'); return; }
-    if (!addForm.password)        { setAddError('Password is required.'); return; }
+    if (!addForm.username.trim()) { setAddError(t('users.errors.usernameRequired')); return; }
+    if (!addForm.email.trim())    { setAddError(t('users.errors.emailRequired')); return; }
+    if (!addForm.password)        { setAddError(t('users.errors.passwordRequired')); return; }
     setAddSaving(true);
     setAddError('');
     try {
@@ -447,7 +451,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       setShowAddPass(false);
     } catch (err) {
       const detail = err.response?.data?.detail;
-      setAddError(typeof detail === 'string' ? detail : 'Failed to create user.');
+      setAddError(typeof detail === 'string' ? detail : t('users.errors.createFailed'));
     } finally {
       setAddSaving(false);
     }
@@ -496,7 +500,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       })
       .catch(err => {
         const detail = err.response?.data?.detail;
-        setEditError(typeof detail === 'string' ? detail : 'Failed to save changes.');
+        setEditError(typeof detail === 'string' ? detail : t('users.errors.saveFailed'));
       })
       .finally(() => setEditSaving(false));
   }
@@ -543,9 +547,9 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
         <style>{ADM_RESPONSIVE_CSS}</style>
         <div className="adm-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
           {[
-            { label: 'Total Users',    value: users.length, color: 'var(--primary)',  bg: 'rgba(33, 74, 171,.12)',  icon: Users,       key: null },
-            { label: 'Active',         value: active,       color: '#198754',         bg: 'rgba(25, 135, 84,.12)',  icon: CheckCircle, key: 'active' },
-            { label: 'Inactive',       value: inactive,     color: '#b45309',         bg: 'rgba(255, 193, 7,.12)', icon: XCircle,     key: 'inactive' },
+            { label: t('users.stats.totalUsers'), value: users.length, color: 'var(--primary)',  bg: 'rgba(33, 74, 171,.12)',  icon: Users,       key: null },
+            { label: t('users.stats.active'),      value: active,       color: '#198754',         bg: 'rgba(25, 135, 84,.12)',  icon: CheckCircle, key: 'active' },
+            { label: t('users.stats.inactive'),    value: inactive,     color: '#b45309',         bg: 'rgba(255, 193, 7,.12)', icon: XCircle,     key: 'inactive' },
           ].map(s => {
             const isActive = statusFilter === s.key;
             return (
@@ -567,29 +571,29 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
         <Card padding="0">
           <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>System Users</div>
+              <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>{t('users.systemUsers')}</div>
               {statusFilter && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px 4px 10px', borderRadius: 20, background: statusFilter === 'active' ? 'rgba(25, 135, 84,.1)' : 'rgba(255, 193, 7,.1)', border: `1px solid ${statusFilter === 'active' ? 'rgba(25, 135, 84,.3)' : 'rgba(255, 193, 7,.3)'}`, fontSize: 11.5, fontWeight: 600, color: statusFilter === 'active' ? '#16a34a' : '#b45309', whiteSpace: 'nowrap' }}>
-                  {statusFilter === 'active' ? 'Active' : 'Inactive'}
+                  {statusFilter === 'active' ? t('users.stats.active') : t('users.stats.inactive')}
                   <button onClick={() => setStatusFilter(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'inherit', display: 'flex', padding: 0 }}><X size={11} /></button>
                 </div>
               )}
             </div>
             <div className="adm-users-actions" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <SelectField value={deptFilter} onChange={e => setDeptFilter(e.target.value)} placeholder="All Departments" style={{ width: 200, maxWidth: '100%' }}>
-                <option value="">All Departments</option>
+              <SelectField value={deptFilter} onChange={e => setDeptFilter(e.target.value)} placeholder={t('users.allDepartments')} style={{ width: 200, maxWidth: '100%' }}>
+                <option value="">{t('users.allDepartments')}</option>
                 {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
               </SelectField>
               <button
                 onClick={() => { setAddingUser(true); setAddError(''); setAddForm({ ...EMPTY_ADD_FORM, department_id: deptFilter }); setShowAddPass(false); }}
                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'var(--primary)', color: 'white', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                <Plus size={13} /> Add User
+                <Plus size={13} /> {t('users.addUser')}
               </button>
             </div>
           </div>
           {usersLoading && (
             <div style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>
-              Loading users…
+              {t('users.loadingUsers')}
             </div>
           )}
           {usersError && (
@@ -599,7 +603,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
           )}
           {!usersLoading && !usersError && filteredUsers.length === 0 && (
             <div style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>
-              No users yet
+              {t('users.noUsersYet')}
             </div>
           )}
           {!usersLoading && !usersError && filteredUsers.length > 0 && (
@@ -624,16 +628,16 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                       <span style={{ fontFamily: 'var(--mono)' }}>{u.lastLogin}</span>
                     </div>
                     <div style={{ display: 'flex', gap: 8 }}>
-                      <button title="Edit" onClick={() => openEdit(u)}
+                      <button title={t('users.edit')} onClick={() => openEdit(u)}
                         style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '7px 10px', cursor: 'pointer', color: 'var(--primary)', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font)' }}>
-                        <Edit2 size={12} /> Edit
+                        <Edit2 size={12} /> {t('users.edit')}
                       </button>
                       <button
-                        title={u.isActive ? 'Deactivate' : 'Activate'}
+                        title={u.isActive ? t('users.deactivate') : t('users.activate')}
                         disabled={togglingId === u.id}
                         onClick={() => handleToggle(u)}
                         style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: u.isActive ? 'rgba(220, 53, 69,.08)' : 'rgba(25, 135, 84,.08)', border: `1px solid ${u.isActive ? 'rgba(220, 53, 69,.2)' : 'rgba(25, 135, 84,.2)'}`, borderRadius: 7, padding: '7px 10px', cursor: togglingId === u.id ? 'not-allowed' : 'pointer', color: u.isActive ? '#dc3545' : '#198754', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font)', opacity: togglingId === u.id ? 0.5 : 1 }}>
-                        {u.isActive ? <XCircle size={12} /> : <CheckCircle size={12} />} {u.isActive ? 'Deactivate' : 'Activate'}
+                        {u.isActive ? <XCircle size={12} /> : <CheckCircle size={12} />} {u.isActive ? t('users.deactivate') : t('users.activate')}
                       </button>
                     </div>
                   </div>
@@ -644,7 +648,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
-                {['Name', 'Username', 'Role', 'Department', 'Status', 'Last Login', 'Actions'].map((h, i) => (
+                {[t('users.headers.name'), t('users.headers.username'), t('users.headers.role'), t('users.headers.department'), t('users.headers.status'), t('users.headers.lastLogin'), t('users.headers.actions')].map((h, i) => (
                   <th key={h} scope="col" style={{ ...LABEL, padding: '11px 16px', textAlign: 'left', ...(i > 0 && { borderLeft: '1px solid var(--surface-border)' }) }}>{h}</th>
                 ))}
               </tr>
@@ -670,12 +674,12 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                   <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)' }}>{u.lastLogin}</td>
                   <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)' }}>
                     <div style={{ display: 'flex', gap: 6 }}>
-                      <button title="Edit" onClick={() => openEdit(u)}
+                      <button title={t('users.edit')} onClick={() => openEdit(u)}
                         style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 6, padding: '5px 8px', cursor: 'pointer', color: 'var(--primary)', display: 'flex' }}>
                         <Edit2 size={12} />
                       </button>
                       <button
-                        title={u.isActive ? 'Deactivate' : 'Activate'}
+                        title={u.isActive ? t('users.deactivate') : t('users.activate')}
                         disabled={togglingId === u.id}
                         onClick={() => handleToggle(u)}
                         style={{ background: u.isActive ? 'rgba(220, 53, 69,.08)' : 'rgba(25, 135, 84,.08)', border: `1px solid ${u.isActive ? 'rgba(220, 53, 69,.2)' : 'rgba(25, 135, 84,.2)'}`, borderRadius: 6, padding: '5px 8px', cursor: togglingId === u.id ? 'not-allowed' : 'pointer', color: u.isActive ? '#dc3545' : '#198754', display: 'flex', opacity: togglingId === u.id ? 0.5 : 1 }}>
@@ -706,8 +710,8 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
               {/* Header */}
               <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
-                  <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)' }}>Add New User</div>
-                  <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-color-secondary)', marginTop: 1 }}>Create a new system account</div>
+                  <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)' }}>{t('users.addDrawer.title')}</div>
+                  <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-color-secondary)', marginTop: 1 }}>{t('users.addDrawer.subtitle')}</div>
                 </div>
                 <button onClick={() => setAddingUser(false)}
                   style={{ width: 30, height: 30, borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-color-secondary)', flexShrink: 0 }}>
@@ -721,17 +725,17 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 {/* Username + Email */}
                 <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
-                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Username *</label>
+                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.username')}</label>
                     <input style={{ ...INP_STYLE, borderColor: addError.toLowerCase().includes('username') ? 'rgba(220, 53, 69,.6)' : undefined }}
-                      placeholder="e.g. firstname.lastname"
+                      placeholder={t('users.addDrawer.usernamePlaceholder')}
                       autoComplete="off"
                       value={addForm.username}
                       onChange={e => { setAddForm(f => ({ ...f, username: e.target.value })); setAddError(''); }} />
                   </div>
                   <div>
-                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Email *</label>
+                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.email')}</label>
                     <input style={{ ...INP_STYLE, borderColor: addError.toLowerCase().includes('email') ? 'rgba(220, 53, 69,.6)' : undefined }}
-                      type="email" placeholder="user@example.com"
+                      type="email" placeholder={t('users.addDrawer.emailPlaceholder')}
                       autoComplete="off"
                       value={addForm.email}
                       onChange={e => { setAddForm(f => ({ ...f, email: e.target.value })); setAddError(''); }} />
@@ -740,12 +744,12 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
 
                 {/* Password */}
                 <div>
-                  <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Password *</label>
+                  <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.password')}</label>
                   <div style={{ position: 'relative' }}>
                     <input
                       style={{ ...INP_STYLE, paddingRight: 38, borderColor: addError.toLowerCase().includes('password') ? 'rgba(220, 53, 69,.6)' : undefined }}
                       type={showAddPass ? 'text' : 'password'}
-                      placeholder="Set a password"
+                      placeholder={t('users.addDrawer.passwordPlaceholder')}
                       autoComplete="new-password"
                       value={addForm.password}
                       onChange={e => { setAddForm(f => ({ ...f, password: e.target.value })); setAddError(''); }} />
@@ -759,14 +763,14 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 {/* First + Last name */}
                 <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
-                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>First Name</label>
-                    <input style={INP_STYLE} placeholder="First name"
+                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.firstName')}</label>
+                    <input style={INP_STYLE} placeholder={t('users.addDrawer.firstNamePlaceholder')}
                       value={addForm.first_name}
                       onChange={e => setAddForm(f => ({ ...f, first_name: e.target.value }))} />
                   </div>
                   <div>
-                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Last Name</label>
-                    <input style={INP_STYLE} placeholder="Last name"
+                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.lastName')}</label>
+                    <input style={INP_STYLE} placeholder={t('users.addDrawer.lastNamePlaceholder')}
                       value={addForm.last_name}
                       onChange={e => setAddForm(f => ({ ...f, last_name: e.target.value }))} />
                   </div>
@@ -774,12 +778,12 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
 
                 {/* Mobile Number */}
                 <div>
-                  <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Mobile Number</label>
+                  <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.mobileNumber')}</label>
                   <input style={INP_STYLE}
                     type="tel"
                     inputMode="numeric"
                     maxLength={10}
-                    placeholder="10-digit mobile number (optional)"
+                    placeholder={t('users.addDrawer.mobilePlaceholder')}
                     value={addForm.mobile_number}
                     onChange={e => setAddForm(f => ({ ...f, mobile_number: e.target.value.replace(/\D/g, '') }))} />
                 </div>
@@ -791,11 +795,11 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                     <>
                       <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: isNodal ? '1fr' : '1fr 1fr', gap: 12 }}>
                         <div>
-                          <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Role</label>
+                          <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.role')}</label>
                           <SelectField
                             value={addForm.role_id}
                             onChange={e => setAddForm(f => ({ ...f, role_id: e.target.value, department_id: '', dept_ids: [] }))}
-                            placeholder="Select Role"
+                            placeholder={t('users.addDrawer.roleSelectPlaceholder')}
                           >
                             {assignableRoles(roles).map(r => (
                               <option key={r.id} value={r.id}>{r.name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</option>
@@ -804,8 +808,8 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                         </div>
                         {!isNodal && (
                           <div>
-                            <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Department</label>
-                            <SelectField value={addForm.department_id} onChange={e => setAddForm(f => ({ ...f, department_id: e.target.value }))} placeholder="Select Department">
+                            <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.department')}</label>
+                            <SelectField value={addForm.department_id} onChange={e => setAddForm(f => ({ ...f, department_id: e.target.value }))} placeholder={t('users.addDrawer.departmentSelectPlaceholder')}>
                               {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                             </SelectField>
                           </div>
@@ -815,12 +819,12 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                       {/* Managed Departments — nodal officer only */}
                       {isNodal && (
                         <div>
-                          <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Department</label>
+                          <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.department')}</label>
                           <MultiSelectField
                             value={addForm.dept_ids}
                             onChange={ids => setAddForm(f => ({ ...f, dept_ids: ids }))}
                             options={depts}
-                            placeholder="Select departments…"
+                            placeholder={t('multiSelect.selectDepartments')}
                           />
                         </div>
                       )}
@@ -839,13 +843,13 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
               <div style={{ padding: '16px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
                 <button onClick={() => setAddingUser(false)}
                   style={{ padding: '9px 18px', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'var(--text-color)', fontFamily: 'var(--font)' }}>
-                  Cancel
+                  {t('users.addDrawer.cancel')}
                 </button>
                 <button onClick={handleAddUser} disabled={addSaving}
                   style={{ padding: '9px 20px', background: addSaving ? 'var(--surface-border)' : 'var(--primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: addSaving ? 'not-allowed' : 'pointer', color: addSaving ? 'var(--text-color-secondary)' : 'white', fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 7 }}>
                   {addSaving
-                    ? <><div style={{ width: 12, height: 12, border: '2px solid rgba(0,0,0,.2)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin .7s linear infinite' }} /> Creating…</>
-                    : <><Plus size={13} /> Create User</>
+                    ? <><div style={{ width: 12, height: 12, border: '2px solid rgba(0,0,0,.2)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin .7s linear infinite' }} /> {t('users.addDrawer.creating')}</>
+                    : <><Plus size={13} /> {t('users.addDrawer.createUser')}</>
                   }
                 </button>
               </div>
@@ -869,7 +873,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
               {/* Modal header */}
               <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div>
-                  <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)' }}>Edit User</div>
+                  <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)' }}>{t('users.editModal.title')}</div>
                   <div style={{ fontSize: 12, color: 'var(--text-color-secondary)', marginTop: 2 }}>{editingUser.username}</div>
                 </div>
                 <button onClick={() => setEditingUser(null)}
@@ -883,19 +887,19 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
 
                 <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
-                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>First Name</label>
+                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.firstName')}</label>
                     <input style={INP_STYLE} value={editForm.first_name}
                       onChange={e => setEditForm(f => ({ ...f, first_name: e.target.value }))} />
                   </div>
                   <div>
-                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Last Name</label>
+                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.lastName')}</label>
                     <input style={INP_STYLE} value={editForm.last_name}
                       onChange={e => setEditForm(f => ({ ...f, last_name: e.target.value }))} />
                   </div>
                 </div>
 
                 <div>
-                  <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Email</label>
+                  <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.email')}</label>
                   <input style={INP_STYLE} type="email" value={editForm.email}
                     onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} />
                 </div>
@@ -906,11 +910,11 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                     <>
                       <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: isNodal ? '1fr' : '1fr 1fr', gap: 12 }}>
                         <div>
-                          <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Role</label>
+                          <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.role')}</label>
                           <SelectField
                             value={editForm.role_id ?? ''}
                             onChange={e => setEditForm(f => ({ ...f, role_id: e.target.value ? Number(e.target.value) : null, department_id: '', dept_ids: [] }))}
-                            placeholder="Select Role"
+                            placeholder={t('users.editModal.selectRole')}
                           >
                             {assignableRoles(roles).map(r => (
                               <option key={r.id} value={r.id}>{r.name.charAt(0).toUpperCase() + r.name.slice(1)}</option>
@@ -919,8 +923,8 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                         </div>
                         {!isNodal && (
                           <div>
-                            <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Department</label>
-                            <SelectField value={editForm.department_id ?? ''} onChange={e => setEditForm(f => ({ ...f, department_id: e.target.value || null }))} placeholder="No Department">
+                            <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.department')}</label>
+                            <SelectField value={editForm.department_id ?? ''} onChange={e => setEditForm(f => ({ ...f, department_id: e.target.value || null }))} placeholder={t('users.editModal.selectDepartment')}>
                               {depts.map(d => (
                                 <option key={d.id} value={d.id}>{d.name}</option>
                               ))}
@@ -930,12 +934,12 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                       </div>
                       {isNodal && (
                         <div>
-                          <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Department</label>
+                          <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.department')}</label>
                           <MultiSelectField
                             value={editForm.dept_ids}
                             onChange={ids => setEditForm(f => ({ ...f, dept_ids: ids }))}
                             options={depts}
-                            placeholder="Select departments…"
+                            placeholder={t('multiSelect.selectDepartments')}
                           />
                         </div>
                       )}
@@ -946,9 +950,9 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 {/* Active status toggle */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: 'var(--surface-ground)', borderRadius: 10, border: '1px solid var(--surface-border)' }}>
                   <div>
-                    <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 600, color: 'var(--text-heading)' }}>Account Status</div>
+                    <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 600, color: 'var(--text-heading)' }}>{t('users.editModal.accountStatus')}</div>
                     <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-color-secondary)', marginTop: 2 }}>
-                      {editForm.is_active ? 'User can log in and access the system' : 'User is blocked from logging in'}
+                      {editForm.is_active ? t('users.editModal.canLogin') : t('users.editModal.blocked')}
                     </div>
                   </div>
                   <button type="button"
@@ -969,13 +973,13 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
               <div style={{ padding: '14px 22px', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
                 <button onClick={() => setEditingUser(null)}
                   style={{ padding: '9px 18px', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'var(--text-color)', fontFamily: 'var(--font)' }}>
-                  Cancel
+                  {t('users.editModal.cancel')}
                 </button>
                 <button onClick={handleEditSave} disabled={editSaving}
                   style={{ padding: '9px 20px', background: editSaving ? 'var(--surface-border)' : 'var(--primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: editSaving ? 'not-allowed' : 'pointer', color: editSaving ? 'var(--text-color-secondary)' : 'white', fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 7 }}>
                   {editSaving
-                    ? <><div style={{ width: 12, height: 12, border: '2px solid rgba(0,0,0,.2)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin .7s linear infinite' }} /> Saving…</>
-                    : 'Save Changes'
+                    ? <><div style={{ width: 12, height: 12, border: '2px solid rgba(0,0,0,.2)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin .7s linear infinite' }} /> {t('users.editModal.saving')}</>
+                    : t('users.editModal.saveChanges')
                   }
                 </button>
               </div>
@@ -1004,41 +1008,41 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       <>
       <style>{ADM_RESPONSIVE_CSS}</style>
       <div className="adm-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
-        {taxonomy.map(t => {
-          const isApiDriven  = t.category === 'Departments' || t.category === 'Document Types';
-          const canCreateApi = t.category === 'Document Types' || t.category === 'Departments';
-          const apiItems     = t.category === 'Departments' ? depts : t.category === 'Document Types' ? docTypes : [];
-          const apiLoading   = t.category === 'Departments' ? deptsLoading : docTypesLoading;
-          const displayItems = isApiDriven ? apiItems : t.items;
-          const addCreating  = t.category === 'Document Types' ? docTypeCreating : t.category === 'Departments' ? deptMdmCreating : false;
-          const addError     = t.category === 'Document Types' ? docTypeCreateError : t.category === 'Departments' ? deptMdmCreateError : '';
-          const activeCount  = isApiDriven ? apiItems.filter(d => d.is_active !== false).length : t.items.length;
+        {taxonomy.map(cat => {
+          const isApiDriven  = cat.category === 'Departments' || cat.category === 'Document Types';
+          const canCreateApi = cat.category === 'Document Types' || cat.category === 'Departments';
+          const apiItems     = cat.category === 'Departments' ? depts : cat.category === 'Document Types' ? docTypes : [];
+          const apiLoading   = cat.category === 'Departments' ? deptsLoading : docTypesLoading;
+          const displayItems = isApiDriven ? apiItems : cat.items;
+          const addCreating  = cat.category === 'Document Types' ? docTypeCreating : cat.category === 'Departments' ? deptMdmCreating : false;
+          const addError     = cat.category === 'Document Types' ? docTypeCreateError : cat.category === 'Departments' ? deptMdmCreateError : '';
+          const activeCount  = isApiDriven ? apiItems.filter(d => d.is_active !== false).length : cat.items.length;
 
           return (
-          <Card key={t.category}>
+          <Card key={cat.category}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, paddingBottom: 12, borderBottom: '1px solid var(--surface-border)' }}>
               <div>
-                <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>{t.category}</div>
+                <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>{cat.category}</div>
                 <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 2 }}>
                   {isApiDriven
-                    ? (apiLoading ? 'Loading…' : `${activeCount} active · ${apiItems.length} total`)
-                    : `${t.items.length} items`
+                    ? (apiLoading ? t('taxonomy.loading') : t('taxonomy.activeOfTotal', { active: activeCount, total: apiItems.length }))
+                    : t('taxonomy.itemsCount', { count: cat.items.length })
                   }
                 </div>
               </div>
               {(!isApiDriven || canCreateApi) && (
                 <button
                   onClick={() => {
-                    if (t.category === 'Departments') {
+                    if (cat.category === 'Departments') {
                       setNewDept({ name: '', description: '' });
                       setCreateError('');
                       setAddDeptOpen(true);
                     } else {
-                      startAdd(t.category);
+                      startAdd(cat.category);
                     }
                   }}
                   style={{ background: 'var(--primary)', color: 'white', border: 'none', borderRadius: 6, padding: '4px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <Plus size={11} /> Add
+                  <Plus size={11} /> {t('taxonomy.add')}
                 </button>
               )}
             </div>
@@ -1048,8 +1052,8 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 const isApiItem  = isApiDriven;
                 const itemName   = isApiItem ? item.name : item;
                 const isActive   = isApiItem ? item.is_active !== false : true;
-                const isToggling = isApiItem && mdmToggling?.category === t.category && mdmToggling?.id === item.id;
-                const isEditing  = !isApiDriven && editState?.category === t.category && editState?.index === idx;
+                const isToggling = isApiItem && mdmToggling?.category === cat.category && mdmToggling?.id === item.id;
+                const isEditing  = !isApiDriven && editState?.category === cat.category && editState?.index === idx;
 
                 return (
                   <div key={isApiItem ? item.id : item + idx} style={{
@@ -1066,17 +1070,17 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                           onKeyDown={e => { if (e.key === 'Enter') saveEdit(); if (e.key === 'Escape') setEditState(null); }}
                           style={INPUT_STYLE}
                         />
-                        {BTN('var(--primary)', 'Save', saveEdit)}
-                        {BTN('var(--text-color-secondary)', 'Cancel', () => setEditState(null))}
+                        {BTN('var(--primary)', t('taxonomy.save'), saveEdit)}
+                        {BTN('var(--text-color-secondary)', t('taxonomy.cancel'), () => setEditState(null))}
                       </>
                     ) : (
                       <>
                         <span style={{ fontSize: 12.5, color: 'var(--text-color)', flex: 1 }}>{itemName}</span>
                         {isApiItem && (
                           <button
-                            onClick={() => handleMdmToggle(t.category, item)}
+                            onClick={() => handleMdmToggle(cat.category, item)}
                             disabled={isToggling}
-                            title={isActive ? 'Deactivate' : 'Activate'}
+                            title={isActive ? t('taxonomy.deactivate') : t('taxonomy.activate')}
                             style={{ background: 'transparent', border: 'none', cursor: isToggling ? 'not-allowed' : 'pointer', color: isActive ? '#dc3545' : '#198754', padding: 2, display: 'flex' }}>
                             {isToggling
                               ? <div style={{ width: 10, height: 10, border: '2px solid currentColor', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin .6s linear infinite' }} />
@@ -1086,10 +1090,10 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                         )}
                         {!isApiDriven && (
                           <>
-                            <button onClick={() => startEdit(t.category, idx, item)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', padding: 2, display: 'flex' }} title="Edit">
+                            <button onClick={() => startEdit(cat.category, idx, item)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', padding: 2, display: 'flex' }} title={t('taxonomy.edit')}>
                               <Edit2 size={11} />
                             </button>
-                            <button onClick={() => deleteItem(t.category, idx)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#dc3545', padding: 2, display: 'flex' }} title="Delete">
+                            <button onClick={() => deleteItem(cat.category, idx)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#dc3545', padding: 2, display: 'flex' }} title={t('taxonomy.delete')}>
                               <Trash2 size={11} />
                             </button>
                           </>
@@ -1100,20 +1104,20 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 );
               })}
 
-              {(!isApiDriven || canCreateApi) && addState?.category === t.category && (
+              {(!isApiDriven || canCreateApi) && addState?.category === cat.category && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: 4 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px', borderRadius: 7, background: 'rgba(33, 74, 171,.04)', border: '1px solid var(--primary-border)' }}>
                     <input
                       autoFocus
-                      placeholder={`New ${t.category.replace(/s$/, '').toLowerCase()}…`}
+                      placeholder={t('taxonomy.newItemPlaceholder', { category: cat.category.replace(/s$/, '').toLowerCase() })}
                       value={addState.value}
                       disabled={addCreating}
                       onChange={e => setAddState(s => ({ ...s, value: e.target.value }))}
                       onKeyDown={e => { if (e.key === 'Enter') saveAdd(); if (e.key === 'Escape') setAddState(null); }}
                       style={INPUT_STYLE}
                     />
-                    {BTN('var(--primary)', addCreating ? 'Adding…' : 'Add', saveAdd, addCreating)}
-                    {BTN('var(--text-color-secondary)', 'Cancel', () => setAddState(null))}
+                    {BTN('var(--primary)', addCreating ? t('taxonomy.adding') : t('taxonomy.add'), saveAdd, addCreating)}
+                    {BTN('var(--text-color-secondary)', t('taxonomy.cancel'), () => setAddState(null))}
                   </div>
                   {addError && (
                     <div style={{ fontSize: 11, color: '#dc3545', padding: '0 4px' }}>{addError}</div>
@@ -1147,8 +1151,8 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 <Building2 size={16} color="var(--primary)" />
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)' }}>Add Department</div>
-                <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-color-secondary)', marginTop: 1 }}>Create a new department record.</div>
+                <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)' }}>{t('taxonomy.addDepartment.title')}</div>
+                <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-color-secondary)', marginTop: 1 }}>{t('taxonomy.addDepartment.subtitle')}</div>
               </div>
               <button onClick={closeAddDept}
                 style={{ width: 30, height: 30, borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-color-secondary)', flexShrink: 0 }}>
@@ -1158,7 +1162,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
-                <label style={{ ...LABEL, display: 'block', marginBottom: 7 }}>Department Name *</label>
+                <label style={{ ...LABEL, display: 'block', marginBottom: 7 }}>{t('taxonomy.addDepartment.name')}</label>
                 <input
                   autoFocus
                   style={{
@@ -1166,14 +1170,14 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                     border: `1px solid ${createError && !newDept.name.trim() ? 'rgba(220, 53, 69,.6)' : 'var(--surface-border)'}`,
                     borderRadius: 9, fontSize: 13, color: 'var(--text-color)', outline: 'none', fontFamily: 'var(--font)',
                   }}
-                  placeholder="e.g. Revenue Department"
+                  placeholder={t('taxonomy.addDepartment.namePlaceholder')}
                   value={newDept.name}
                   onChange={e => { setNewDept(p => ({ ...p, name: e.target.value })); setCreateError(''); }}
                 />
               </div>
 
               <div>
-                <label style={{ ...LABEL, display: 'block', marginBottom: 7 }}>Description</label>
+                <label style={{ ...LABEL, display: 'block', marginBottom: 7 }}>{t('taxonomy.addDepartment.description')}</label>
                 <textarea
                   rows={5}
                   style={{
@@ -1182,7 +1186,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                     color: 'var(--text-color)', outline: 'none', fontFamily: 'var(--font)',
                     resize: 'vertical', lineHeight: 1.55,
                   }}
-                  placeholder="Brief description of the department's function…"
+                  placeholder={t('taxonomy.addDepartment.descriptionPlaceholder')}
                   value={newDept.description}
                   onChange={e => setNewDept(p => ({ ...p, description: e.target.value }))}
                 />
@@ -1198,7 +1202,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
             <div style={{ padding: '16px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
               <button type="button" onClick={closeAddDept}
                 style={{ padding: '9px 20px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                Cancel
+                {t('taxonomy.addDepartment.cancel')}
               </button>
               <button
                 type="button"
@@ -1214,8 +1218,8 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 }}
               >
                 {creating
-                  ? <><div style={{ width: 13, height: 13, border: '2px solid rgba(0,0,0,.2)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin .7s linear infinite' }}/> Creating…</>
-                  : <><Plus size={14} /> Add Department</>
+                  ? <><div style={{ width: 13, height: 13, border: '2px solid rgba(0,0,0,.2)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin .7s linear infinite' }}/> {t('taxonomy.addDepartment.creating')}</>
+                  : <><Plus size={14} /> {t('taxonomy.addDepartment.addDepartment')}</>
                 }
               </button>
             </div>
@@ -1229,10 +1233,10 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   // System Monitor
   if (activePage === 'monitor') {
     const stats = [
-      { label: 'Total Documents', value: '1,284', sub: '+12 today' },
-      { label: 'Active Sessions', value: '7',     sub: 'right now' },
-      { label: 'Searches Today',  value: '143',   sub: 'anonymised' },
-      { label: 'Storage Used',    value: '4.2 GB',sub: 'of 50 GB' },
+      { label: t('monitor.stats.totalDocuments'), value: '1,284', sub: t('monitor.subs.todayCount') },
+      { label: t('monitor.stats.activeSessions'), value: '7',     sub: t('monitor.subs.rightNow') },
+      { label: t('monitor.stats.searchesToday'),  value: '143',   sub: t('monitor.subs.anonymised') },
+      { label: t('monitor.stats.storageUsed'),    value: '4.2 GB',sub: t('monitor.subs.of50Gb') },
     ];
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
@@ -1247,8 +1251,14 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
           ))}
         </div>
         <Card>
-          <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)', marginBottom: 14 }}>System Health</div>
-          {[['API Server','Operational'],['Database','Operational'],['OCR Service','Operational'],['Search Index','Operational'],['Audit Logger','Operational']].map(([svc, status]) => (
+          <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)', marginBottom: 14 }}>{t('monitor.systemHealth')}</div>
+          {[
+            [t('monitor.services.apiServer'), t('monitor.operational')],
+            [t('monitor.services.database'), t('monitor.operational')],
+            [t('monitor.services.ocrService'), t('monitor.operational')],
+            [t('monitor.services.searchIndex'), t('monitor.operational')],
+            [t('monitor.services.auditLogger'), t('monitor.operational')],
+          ].map(([svc, status]) => (
             <div key={svc} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 0', borderBottom: '1px solid var(--surface-border)' }}>
               <span style={{ fontSize: 13, color: 'var(--text-color)' }}>{svc}</span>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: '#1e40af' }}>
@@ -1305,7 +1315,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
               <input
                 value={auditSearch}
                 onChange={e => setAuditSearch(e.target.value)}
-                placeholder="Search user or action…"
+                placeholder={t('audit.searchPlaceholder')}
                 style={{ width: '100%', paddingLeft: 30, paddingRight: 10, height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, background: 'var(--surface-ground)', color: 'var(--text-color)', boxSizing: 'border-box', outline: 'none' }}
               />
             </div>
@@ -1315,7 +1325,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
               value={auditFilterEntity}
               onChange={e => { setAuditFilterEntity(e.target.value); setAuditPage(0); }}
               style={{ height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, padding: '0 10px', background: 'var(--surface-ground)', color: 'var(--text-color)', cursor: 'pointer' }}>
-              {AUDIT_ENTITY_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              {auditEntityOptions(t).map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
 
             {/* Status */}
@@ -1323,15 +1333,15 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
               value={auditFilterStatus}
               onChange={e => { setAuditFilterStatus(e.target.value); setAuditPage(0); }}
               style={{ height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, padding: '0 10px', background: 'var(--surface-ground)', color: 'var(--text-color)', cursor: 'pointer' }}>
-              <option value="">All Statuses</option>
-              <option value="success">Success</option>
-              <option value="failure">Failure</option>
+              <option value="">{t('audit.allStatuses')}</option>
+              <option value="success">{t('audit.success')}</option>
+              <option value="failure">{t('audit.failure')}</option>
             </select>
 
             {/* Date from */}
             <input type="date" value={auditFromDate} onChange={e => { setAuditFromDate(e.target.value); setAuditPage(0); }}
               style={{ height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, padding: '0 10px', background: 'var(--surface-ground)', color: 'var(--text-color)' }} />
-            <span style={{ fontSize: 11, color: 'var(--text-color-secondary)' }}>to</span>
+            <span style={{ fontSize: 11, color: 'var(--text-color-secondary)' }}>{t('audit.to')}</span>
             <input type="date" value={auditToDate} onChange={e => { setAuditToDate(e.target.value); setAuditPage(0); }}
               style={{ height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, padding: '0 10px', background: 'var(--surface-ground)', color: 'var(--text-color)' }} />
 
@@ -1339,7 +1349,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
             {(auditFilterEntity || auditFilterStatus || auditFromDate || auditToDate || auditSearch) && (
               <button onClick={() => { setAuditFilterEntity(''); setAuditFilterStatus(''); setAuditFromDate(''); setAuditToDate(''); setAuditSearch(''); setAuditPage(0); }}
                 style={{ height: 34, padding: '0 12px', border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
-                <X size={11} /> Clear
+                <X size={11} /> {t('audit.clear')}
               </button>
             )}
 
@@ -1347,7 +1357,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
 
             <button className="adm-export-btn" onClick={exportAuditCSV}
               style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'var(--surface-ground)', color: 'var(--text-color)', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '0 14px', height: 34, fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
-              <Download size={13} /> Export CSV
+              <Download size={13} /> {t('audit.exportCsv')}
             </button>
           </div>
         </Card>
@@ -1355,16 +1365,16 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
         {/* Table */}
         <Card padding="0">
           <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>User Audit History</div>
-            <span style={{ ...LABEL }}>{auditTotal} total entries</span>
+            <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>{t('audit.heading')}</div>
+            <span style={{ ...LABEL }}>{t('audit.totalEntries', { count: auditTotal })}</span>
           </div>
 
           {auditLoading ? (
-            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>Loading audit logs…</div>
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>{t('audit.loading')}</div>
           ) : auditError ? (
             <div style={{ padding: 24, color: '#dc3545', fontSize: 13 }}>{auditError}</div>
           ) : visibleLogs.length === 0 ? (
-            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>No audit records found.</div>
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>{t('audit.noRecords')}</div>
           ) : isMobile ? (
             <div>
               {visibleLogs.map(log => {
@@ -1374,7 +1384,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                       <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>{fmtAuditActor(log.actor)}</div>
                       <span style={{ fontSize: 10.5, fontWeight: 700, borderRadius: 5, padding: '3px 8px', background: isSuccess ? 'rgba(25, 135, 84,.1)' : 'rgba(220, 53, 69,.1)', color: isSuccess ? '#16a34a' : '#dc3545', flexShrink: 0 }}>
-                        {log.status}
+                        {isSuccess ? t('audit.success') : t('audit.failure')}
                       </span>
                     </div>
                     <div style={{ fontSize: 12.5, color: 'var(--text-color)' }}>{fmtAction(log.action)}</div>
@@ -1392,7 +1402,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
-                  {['Timestamp', 'User', 'Action', 'Entity', 'Status', 'IP Address'].map((h, i) => (
+                  {[t('audit.headers.timestamp'), t('audit.headers.user'), t('audit.headers.action'), t('audit.headers.entity'), t('audit.headers.status'), t('audit.headers.ipAddress')].map((h, i) => (
                     <th key={h} scope="col" style={{ ...LABEL, padding: '11px 16px', textAlign: 'left', ...(i > 0 && { borderLeft: '1px solid var(--surface-border)' }) }}>{h}</th>
                   ))}
                 </tr>
@@ -1419,7 +1429,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                       </td>
                       <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)' }}>
                         <span style={{ fontSize: 11, fontWeight: 700, borderRadius: 5, padding: '3px 8px', background: isSuccess ? 'rgba(25, 135, 84,.1)' : 'rgba(220, 53, 69,.1)', color: isSuccess ? '#16a34a' : '#dc3545' }}>
-                          {log.status}
+                          {isSuccess ? t('audit.success') : t('audit.failure')}
                         </span>
                       </td>
                       <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)', fontSize: 11.5, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>
@@ -1436,15 +1446,15 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
           {/* Pagination */}
           {!auditLoading && auditTotal > AUDIT_PAGE_SIZE && (
             <div style={{ padding: '12px 18px', borderTop: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ ...LABEL }}>Page {auditPage + 1} of {totalPages}</span>
+              <span style={{ ...LABEL }}>{t('audit.pageOf', { page: auditPage + 1, total: totalPages })}</span>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button onClick={() => setAuditPage(p => Math.max(0, p - 1))} disabled={auditPage === 0}
                   style={{ padding: '6px 14px', border: '1px solid var(--surface-border)', borderRadius: 7, fontSize: 12.5, background: 'var(--surface-ground)', color: auditPage === 0 ? 'var(--text-color-secondary)' : 'var(--text-color)', cursor: auditPage === 0 ? 'default' : 'pointer', opacity: auditPage === 0 ? 0.5 : 1 }}>
-                  Previous
+                  {t('audit.previous')}
                 </button>
                 <button onClick={() => setAuditPage(p => Math.min(totalPages - 1, p + 1))} disabled={auditPage >= totalPages - 1}
                   style={{ padding: '6px 14px', border: '1px solid var(--surface-border)', borderRadius: 7, fontSize: 12.5, background: 'var(--surface-ground)', color: auditPage >= totalPages - 1 ? 'var(--text-color-secondary)' : 'var(--text-color)', cursor: auditPage >= totalPages - 1 ? 'default' : 'pointer', opacity: auditPage >= totalPages - 1 ? 0.5 : 1 }}>
-                  Next
+                  {t('audit.next')}
                 </button>
               </div>
             </div>
@@ -1499,9 +1509,9 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     });
 
     const SC = {
-      approved: { color: '#16a34a', bg: 'rgba(25, 135, 84,.1)',   label: 'Approved' },
-      pending:  { color: '#b45309', bg: 'rgba(255, 193, 7,.1)',  label: 'Pending'  },
-      rejected: { color: '#dc3545', bg: 'rgba(220, 53, 69,.1)',   label: 'Rejected' },
+      approved: { color: '#16a34a', bg: 'rgba(25, 135, 84,.1)',   label: t('uploads.stats.approved') },
+      pending:  { color: '#b45309', bg: 'rgba(255, 193, 7,.1)',  label: t('uploads.stats.pending')  },
+      rejected: { color: '#dc3545', bg: 'rgba(220, 53, 69,.1)',   label: t('uploads.stats.rejected') },
     };
     const cols = '4px 1fr 175px 155px 155px 90px';
     const anyFilter = uploadsSearch || uploadsFilterStatus || uploadsFilterDept || uploadsFilterUploader || uploadsFilterApprover;
@@ -1513,10 +1523,10 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
         {/* Stats */}
         <div className="adm-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
           {[
-            { label: 'Total Uploads', value: totalDocs,    color: 'var(--primary)', bg: 'rgba(33, 74, 171,.12)',  icon: Layers,      key: '' },
-            { label: 'Approved',      value: approvedDocs, color: '#16a34a',        bg: 'rgba(25, 135, 84,.12)',  icon: CheckCircle, key: 'approved' },
-            { label: 'Pending',       value: pendingDocs,  color: '#b45309',        bg: 'rgba(255, 193, 7,.12)', icon: Clock,       key: 'pending'  },
-            { label: 'Rejected',      value: rejectedDocs, color: '#dc3545',        bg: 'rgba(220, 53, 69,.12)',  icon: XCircle,     key: 'rejected' },
+            { label: t('uploads.stats.totalUploads'), value: totalDocs,    color: 'var(--primary)', bg: 'rgba(33, 74, 171,.12)',  icon: Layers,      key: '' },
+            { label: t('uploads.stats.approved'),      value: approvedDocs, color: '#16a34a',        bg: 'rgba(25, 135, 84,.12)',  icon: CheckCircle, key: 'approved' },
+            { label: t('uploads.stats.pending'),       value: pendingDocs,  color: '#b45309',        bg: 'rgba(255, 193, 7,.12)', icon: Clock,       key: 'pending'  },
+            { label: t('uploads.stats.rejected'),      value: rejectedDocs, color: '#dc3545',        bg: 'rgba(220, 53, 69,.12)',  icon: XCircle,     key: 'rejected' },
           ].map(s => {
             const isActive = uploadsFilterStatus === s.key && s.key !== '';
             return (
@@ -1547,41 +1557,41 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
               <input
                 value={uploadsSearch}
                 onChange={e => setUploadsSearch(e.target.value)}
-                placeholder="Search documents…"
+                placeholder={t('uploads.searchPlaceholder')}
                 style={{ width: '100%', padding: '7px 12px 7px 30px', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, color: 'var(--text-color)', outline: 'none', boxSizing: 'border-box' }}
               />
             </div>
             <SelectField value={uploadsFilterUploader} onChange={e => setUploadsFilterUploader(e.target.value)} style={{ flex: '0 0 155px' }}>
-              <option value="">All Uploaders</option>
+              <option value="">{t('uploads.allUploaders')}</option>
               {uploaderOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </SelectField>
             <SelectField value={uploadsFilterApprover} onChange={e => setUploadsFilterApprover(e.target.value)} style={{ flex: '0 0 155px' }}>
-              <option value="">All Approvers</option>
+              <option value="">{t('uploads.allApprovers')}</option>
               {approverOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </SelectField>
             <SelectField value={uploadsFilterDept} onChange={e => setUploadsFilterDept(e.target.value)} style={{ flex: '0 0 155px' }}>
-              <option value="">All Departments</option>
+              <option value="">{t('uploads.allDepartments')}</option>
               {depts.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
             </SelectField>
             <SelectField value={uploadsFilterStatus} onChange={e => setUploadsFilterStatus(e.target.value)} style={{ flex: '0 0 130px' }}>
-              <option value="">All Statuses</option>
-              <option value="pending">Pending</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
+              <option value="">{t('uploads.allStatuses')}</option>
+              <option value="pending">{t('uploads.statusPending')}</option>
+              <option value="approved">{t('uploads.statusApproved')}</option>
+              <option value="rejected">{t('uploads.statusRejected')}</option>
             </SelectField>
             {anyFilter && (
               <button onClick={() => { setUploadsSearch(''); setUploadsFilterStatus(''); setUploadsFilterDept(''); setUploadsFilterUploader(''); setUploadsFilterApprover(''); }}
                 style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'transparent', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '7px 12px', fontSize: 12, cursor: 'pointer', color: 'var(--text-color-secondary)', whiteSpace: 'nowrap' }}>
-                <X size={11} /> Clear
+                <X size={11} /> {t('uploads.clear')}
               </button>
             )}
             <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
-              {filteredDocs.length} of {totalDocs}
+              {t('uploads.countOf', { shown: filteredDocs.length, total: totalDocs })}
             </div>
           </div>
 
           {allDocsLoading && (
-            <div style={{ padding: '50px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>Loading documents…</div>
+            <div style={{ padding: '50px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>{t('uploads.loadingDocuments')}</div>
           )}
           {allDocsError && (
             <div style={{ padding: '20px 18px', fontSize: 13, color: '#dc3545' }}>{allDocsError}</div>
@@ -1590,7 +1600,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
           {!allDocsLoading && !allDocsError && (
             filteredDocs.length === 0 ? (
               <div style={{ padding: '50px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>
-                No documents match the current filters
+                {t('uploads.noMatch')}
               </div>
             ) : isMobile ? (
               <div>
@@ -1627,7 +1637,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                       </div>
                       <button onClick={() => setViewDoc(mapDocForViewer(doc))}
                         style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 10px', borderRadius: 7, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                        <Eye size={13} /> View
+                        <Eye size={13} /> {t('uploads.view')}
                       </button>
                     </div>
                   );
@@ -1638,11 +1648,11 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
               {/* Column headers */}
               <div style={{ display: 'grid', gridTemplateColumns: cols, minWidth: 830, background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
                 <div />
-                <div style={{ ...LABEL, padding: '10px 16px 10px 68px' }}>Document</div>
-                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>Uploader</div>
-                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>Status</div>
-                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>Dates</div>
-                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>Actions</div>
+                <div style={{ ...LABEL, padding: '10px 16px 10px 68px' }}>{t('uploads.headers.document')}</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>{t('uploads.headers.uploader')}</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>{t('uploads.headers.status')}</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>{t('uploads.headers.dates')}</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>{t('uploads.headers.actions')}</div>
               </div>
 
               {filteredDocs.map(doc => {
@@ -1702,13 +1712,13 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                     {/* Dates */}
                     <div style={{ padding: '10px 14px', borderLeft: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 5 }}>
                       <div>
-                        <div style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--text-color-secondary)', textTransform: 'uppercase', letterSpacing: '.05em', fontFamily: 'var(--mono)', marginBottom: 2 }}>Uploaded</div>
+                        <div style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--text-color-secondary)', textTransform: 'uppercase', letterSpacing: '.05em', fontFamily: 'var(--mono)', marginBottom: 2 }}>{t('uploads.uploaded')}</div>
                         <div style={{ fontFamily: 'var(--mono)', fontSize: 11.5, color: 'var(--text-color)' }}>{uploadedDate}</div>
                       </div>
                       {lastActionDate && (
                         <div>
                           <div style={{ fontSize: 9.5, fontWeight: 700, color: sc.color, textTransform: 'uppercase', letterSpacing: '.05em', fontFamily: 'var(--mono)', marginBottom: 2 }}>
-                            {doc.status === 'approved' ? 'Approved' : doc.status === 'rejected' ? 'Rejected' : 'Reviewed'}
+                            {doc.status === 'approved' ? t('uploads.approvedLabel') : doc.status === 'rejected' ? t('uploads.rejectedLabel') : t('uploads.reviewedLabel')}
                           </div>
                           <div style={{ fontFamily: 'var(--mono)', fontSize: 11.5, color: sc.color }}>{lastActionDate}</div>
                         </div>
@@ -1720,7 +1730,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                         style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 7, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'background .15s' }}
                         onMouseEnter={e => e.currentTarget.style.background = 'rgba(33, 74, 171,.14)'}
                         onMouseLeave={e => e.currentTarget.style.background = 'rgba(33, 74, 171,.07)'}>
-                        <Eye size={12} /> View
+                        <Eye size={12} /> {t('uploads.view')}
                       </button>
                     </div>
                   </div>
@@ -1740,9 +1750,9 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   // Linked Documents view
   if (activePage === 'linkedocs') {
     const LS = {
-      approved: { color: '#16a34a', bg: 'rgba(25, 135, 84,.1)',  label: 'Approved' },
-      pending:  { color: '#b45309', bg: 'rgba(255, 193, 7,.1)', label: 'Pending'  },
-      rejected: { color: '#dc3545', bg: 'rgba(220, 53, 69,.1)',  label: 'Rejected' },
+      approved: { color: '#16a34a', bg: 'rgba(25, 135, 84,.1)',  label: t('linkedDocs.stats.approved') },
+      pending:  { color: '#b45309', bg: 'rgba(255, 193, 7,.1)', label: t('linkedDocs.stats.pending')  },
+      rejected: { color: '#dc3545', bg: 'rgba(220, 53, 69,.1)',  label: t('linkedDocs.stats.rejected') },
     };
 
     const uniqueLinkedDepts = [...new Set(allLinks.map(l => l.linked_department_name).filter(Boolean))];
@@ -1772,10 +1782,10 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
         {/* Stats */}
         <div className="adm-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
           {[
-            { label: 'Total Links', value: totals.all,      color: 'var(--primary)', bg: 'rgba(33, 74, 171,.12)',  icon: Link2,       key: '' },
-            { label: 'Approved',    value: totals.approved,  color: '#16a34a',       bg: 'rgba(25, 135, 84,.12)',  icon: CheckCircle, key: 'approved' },
-            { label: 'Pending',     value: totals.pending,   color: '#b45309',       bg: 'rgba(255, 193, 7,.12)', icon: Clock,       key: 'pending'  },
-            { label: 'Rejected',    value: totals.rejected,  color: '#dc3545',       bg: 'rgba(220, 53, 69,.12)',  icon: XCircle,     key: 'rejected' },
+            { label: t('linkedDocs.stats.totalLinks'), value: totals.all,      color: 'var(--primary)', bg: 'rgba(33, 74, 171,.12)',  icon: Link2,       key: '' },
+            { label: t('linkedDocs.stats.approved'),    value: totals.approved,  color: '#16a34a',       bg: 'rgba(25, 135, 84,.12)',  icon: CheckCircle, key: 'approved' },
+            { label: t('linkedDocs.stats.pending'),     value: totals.pending,   color: '#b45309',       bg: 'rgba(255, 193, 7,.12)', icon: Clock,       key: 'pending'  },
+            { label: t('linkedDocs.stats.rejected'),    value: totals.rejected,  color: '#dc3545',       bg: 'rgba(220, 53, 69,.12)',  icon: XCircle,     key: 'rejected' },
           ].map(s => {
             const isActive = linksFilterStatus === s.key && s.key !== '';
             return (
@@ -1806,37 +1816,37 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
               <input
                 value={linksSearch}
                 onChange={e => setLinksSearch(e.target.value)}
-                placeholder="Search by document or department…"
+                placeholder={t('linkedDocs.searchPlaceholder')}
                 style={{ width: '100%', padding: '7px 12px 7px 30px', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, color: 'var(--text-color)', outline: 'none', boxSizing: 'border-box' }}
               />
             </div>
             <SelectField value={linksFilterDept} onChange={e => setLinksFilterDept(e.target.value)} style={{ flex: '0 0 180px' }}>
-              <option value="">All Departments</option>
+              <option value="">{t('linkedDocs.allDepartments')}</option>
               {uniqueLinkedDepts.map(d => <option key={d} value={d}>{d}</option>)}
             </SelectField>
             <SelectField value={linksFilterStatus} onChange={e => setLinksFilterStatus(e.target.value)} style={{ flex: '0 0 130px' }}>
-              <option value="">All Statuses</option>
-              <option value="pending">Pending</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
+              <option value="">{t('linkedDocs.allStatuses')}</option>
+              <option value="pending">{t('linkedDocs.statusPending')}</option>
+              <option value="approved">{t('linkedDocs.statusApproved')}</option>
+              <option value="rejected">{t('linkedDocs.statusRejected')}</option>
             </SelectField>
             {(linksSearch || linksFilterStatus || linksFilterDept) && (
               <button onClick={() => { setLinksSearch(''); setLinksFilterStatus(''); setLinksFilterDept(''); }}
                 style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'transparent', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '7px 12px', fontSize: 12, cursor: 'pointer', color: 'var(--text-color-secondary)', whiteSpace: 'nowrap' }}>
-                <X size={11} /> Clear
+                <X size={11} /> {t('linkedDocs.clear')}
               </button>
             )}
             <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
-              {filteredLinks.length} of {allLinks.length}
+              {t('linkedDocs.countOf', { shown: filteredLinks.length, total: allLinks.length })}
             </div>
           </div>
 
-          {allLinksLoading && <div style={{ padding: '50px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>Loading linked documents…</div>}
+          {allLinksLoading && <div style={{ padding: '50px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>{t('linkedDocs.loadingDocuments')}</div>}
           {allLinksError && <div style={{ padding: '20px 18px', fontSize: 13, color: '#dc3545' }}>{allLinksError}</div>}
 
           {!allLinksLoading && !allLinksError && (
             filteredLinks.length === 0 ? (
-              <div style={{ padding: '50px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>No linked documents match the current filters.</div>
+              <div style={{ padding: '50px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>{t('linkedDocs.noMatch')}</div>
             ) : isMobile ? (
               <div>
                 {filteredLinks.map(link => {
@@ -1862,13 +1872,13 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                         {link.original_department_name || '—'} <span style={{ opacity: .5 }}>→</span> <strong style={{ color: 'var(--text-heading)' }}>{link.linked_department_name || '—'}</strong>
                       </div>
                       <div style={{ fontSize: 11, color: 'var(--text-color-secondary)' }}>
-                        Requested by {requesterName} · <span style={{ fontFamily: 'var(--mono)' }}>{link.requested_at?.split('T')[0]}</span>
+                        {t('linkedDocs.requestedBy', { name: requesterName })} · <span style={{ fontFamily: 'var(--mono)' }}>{link.requested_at?.split('T')[0]}</span>
                       </div>
                       <button
                         onClick={() => openLinkedDocViewer(link)}
                         disabled={viewLinkLoadingId === link.link_id}
                         style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 10px', borderRadius: 7, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 12, fontWeight: 600, cursor: viewLinkLoadingId === link.link_id ? 'wait' : 'pointer', fontFamily: 'var(--font)', opacity: viewLinkLoadingId === link.link_id ? .6 : 1 }}>
-                        <Eye size={13} /> {viewLinkLoadingId === link.link_id ? 'Loading…' : 'View'}
+                        <Eye size={13} /> {viewLinkLoadingId === link.link_id ? t('linkedDocs.loadingView') : t('linkedDocs.view')}
                       </button>
                     </div>
                   );
@@ -1878,12 +1888,12 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
             <div className="table-scroll-wrap">
               {/* Column headers */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px 160px 110px 150px 80px', minWidth: 950, background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
-                <div style={{ ...LABEL, padding: '10px 16px' }}>Document</div>
-                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>Original Dept</div>
-                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>Linked-to Dept</div>
-                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>Status</div>
-                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>Requester / Reviewer</div>
-                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>View</div>
+                <div style={{ ...LABEL, padding: '10px 16px' }}>{t('linkedDocs.headers.document')}</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>{t('linkedDocs.headers.originalDept')}</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>{t('linkedDocs.headers.linkedDept')}</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>{t('linkedDocs.headers.status')}</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>{t('linkedDocs.headers.requesterReviewer')}</div>
+                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>{t('linkedDocs.headers.view')}</div>
               </div>
 
               {filteredLinks.map(link => {
@@ -1935,12 +1945,12 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                     {/* Requester / Reviewer */}
                     <div style={{ padding: '10px 14px', borderLeft: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 3 }}>
                       <div style={{ fontSize: 12, color: 'var(--text-color-secondary)' }}>
-                        <span style={{ fontSize: 9.5, fontWeight: 700, fontFamily: 'var(--mono)', letterSpacing: '.05em', textTransform: 'uppercase', color: 'var(--text-color-secondary)', display: 'block', marginBottom: 1 }}>Requested</span>
+                        <span style={{ fontSize: 9.5, fontWeight: 700, fontFamily: 'var(--mono)', letterSpacing: '.05em', textTransform: 'uppercase', color: 'var(--text-color-secondary)', display: 'block', marginBottom: 1 }}>{t('linkedDocs.requested')}</span>
                         {requesterName} · <span style={{ fontFamily: 'var(--mono)', fontSize: 10.5 }}>{link.requested_at?.split('T')[0]}</span>
                       </div>
                       {reviewerName && (
                         <div style={{ fontSize: 12, color: ls.color }}>
-                          <span style={{ fontSize: 9.5, fontWeight: 700, fontFamily: 'var(--mono)', letterSpacing: '.05em', textTransform: 'uppercase', display: 'block', marginBottom: 1 }}>Reviewed</span>
+                          <span style={{ fontSize: 9.5, fontWeight: 700, fontFamily: 'var(--mono)', letterSpacing: '.05em', textTransform: 'uppercase', display: 'block', marginBottom: 1 }}>{t('linkedDocs.reviewed')}</span>
                           {reviewerName} · <span style={{ fontFamily: 'var(--mono)', fontSize: 10.5 }}>{link.reviewed_at?.split('T')[0]}</span>
                         </div>
                       )}
@@ -1954,7 +1964,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                         style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 10px', borderRadius: 7, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 600, cursor: viewLinkLoadingId === link.link_id ? 'wait' : 'pointer', fontFamily: 'var(--font)', transition: 'background .15s', opacity: viewLinkLoadingId === link.link_id ? .6 : 1 }}
                         onMouseEnter={e => e.currentTarget.style.background = 'rgba(33, 74, 171,.14)'}
                         onMouseLeave={e => e.currentTarget.style.background = 'rgba(33, 74, 171,.07)'}>
-                        <Eye size={12} /> {viewLinkLoadingId === link.link_id ? 'Loading…' : 'View'}
+                        <Eye size={12} /> {viewLinkLoadingId === link.link_id ? t('linkedDocs.loadingView') : t('linkedDocs.view')}
                       </button>
                     </div>
                   </div>
@@ -1974,6 +1984,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
 }
 
 function MultiSelectField({ value = [], onChange, options = [], placeholder = 'Select...' }) {
+  const { t } = useTranslation('admin');
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -2008,7 +2019,7 @@ function MultiSelectField({ value = [], onChange, options = [], placeholder = 'S
             ? placeholder
             : selectedOptions.length === 1
             ? selectedOptions[0].name
-            : `${selectedOptions.length} departments selected`}
+            : t('multiSelect.departmentsSelected', { count: selectedOptions.length })}
         </span>
         <ChevronDown size={15} strokeWidth={2} style={{
           flexShrink: 0, color: 'var(--text-color-secondary)',

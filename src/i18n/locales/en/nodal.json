@@ -1,0 +1,243 @@
+{
+  "common": {
+    "cancel": "Cancel",
+    "clear": "Clear",
+    "save": "Save",
+    "edit": "Edit",
+    "view": "View",
+    "close": "Close",
+    "back": "Back",
+    "loading": "Loading…"
+  },
+  "users": {
+    "stats": {
+      "totalUsers": "Total Users",
+      "active": "Active",
+      "inactive": "Inactive"
+    },
+    "systemUsers": "System Users",
+    "allDepartments": "All Departments",
+    "addUser": "Add User",
+    "loadingUsers": "Loading users…",
+    "failedToLoadUsers": "Failed to load users. Please try again.",
+    "noActiveUsers": "No active users found",
+    "headers": {
+      "name": "Name",
+      "username": "Username",
+      "role": "Role",
+      "department": "Department",
+      "status": "Status",
+      "lastLogin": "Last Login",
+      "actions": "Actions"
+    },
+    "edit": "Edit",
+    "deactivate": "Deactivate",
+    "activate": "Activate",
+    "addDrawer": {
+      "title": "Add New User",
+      "subtitle": "Create a new system account",
+      "username": "Username *",
+      "usernamePlaceholder": "e.g. firstname.lastname",
+      "email": "Email *",
+      "emailPlaceholder": "user@example.com",
+      "password": "Password *",
+      "passwordPlaceholder": "Set a password",
+      "firstName": "First Name",
+      "firstNamePlaceholder": "First name",
+      "lastName": "Last Name",
+      "lastNamePlaceholder": "Last name",
+      "mobileNumber": "Mobile Number",
+      "mobilePlaceholder": "10-digit mobile number (optional)",
+      "role": "Role",
+      "roleSelectPlaceholder": "Select Role",
+      "department": "Department *",
+      "departmentSelectPlaceholder": "Select Department",
+      "cancel": "Cancel",
+      "createUser": "Create User",
+      "creating": "Creating…"
+    },
+    "editModal": {
+      "title": "Edit User",
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "email": "Email",
+      "role": "Role",
+      "department": "Department",
+      "selectDepartment": "Select Department",
+      "accountStatus": "Account Status",
+      "canLogin": "User can log in and access the system",
+      "blocked": "User is blocked from logging in",
+      "cancel": "Cancel",
+      "saveChanges": "Save Changes",
+      "saving": "Saving…"
+    },
+    "confirmToggle": {
+      "deactivateTitle": "Deactivate User",
+      "activateTitle": "Activate User",
+      "confirmDeactivate": "Are you sure you want to deactivate <strong>{{name}}</strong>?",
+      "confirmActivate": "Are you sure you want to activate <strong>{{name}}</strong>?",
+      "loginBlockedNote": "They will no longer be able to log in.",
+      "cancel": "Cancel",
+      "deactivate": "Deactivate",
+      "activate": "Activate"
+    },
+    "errors": {
+      "usernameRequired": "Username is required.",
+      "emailRequired": "Email is required.",
+      "passwordRequired": "Password is required.",
+      "departmentRequired": "Department is required.",
+      "createFailed": "Failed to create user.",
+      "saveFailed": "Failed to save changes."
+    }
+  },
+  "uploads": {
+    "scopeNotice": "Showing uploads from your authorised departments: <strong>{{depts}}</strong>",
+    "stats": {
+      "totalUploads": "Total Uploads",
+      "approved": "Approved",
+      "pending": "Pending",
+      "rejected": "Rejected"
+    },
+    "failedToLoad": "Failed to load documents. Please try again.",
+    "searchPlaceholder": "Search documents…",
+    "allUploaders": "All Uploaders",
+    "allApprovers": "All Approvers",
+    "allDepartments": "All Departments",
+    "allStatuses": "All Statuses",
+    "statusPending": "Pending",
+    "statusApproved": "Approved",
+    "statusRejected": "Rejected",
+    "clear": "Clear",
+    "countOf": "{{shown}} of {{total}}",
+    "loadingDocuments": "Loading documents…",
+    "noMatch": "No documents match the current filters",
+    "headers": {
+      "document": "Document",
+      "uploader": "Uploader",
+      "status": "Status",
+      "dates": "Dates",
+      "actions": "Actions"
+    },
+    "uploaded": "Uploaded",
+    "approvedLabel": "Approved",
+    "rejectedLabel": "Rejected",
+    "reviewedLabel": "Reviewed",
+    "view": "View"
+  },
+  "audit": {
+    "failedToLoad": "Failed to load audit logs. Please try again.",
+    "scopeNotice": "Showing audit logs for users in your authorised departments: <strong>{{depts}}</strong>",
+    "searchPlaceholder": "Search user or action…",
+    "entities": {
+      "all": "All Entities",
+      "user": "User",
+      "pdf": "PDF",
+      "system": "System"
+    },
+    "allActions": "All Actions",
+    "allStatuses": "All Statuses",
+    "success": "Success",
+    "failure": "Failure",
+    "to": "to",
+    "clear": "Clear",
+    "exportCsv": "Export CSV",
+    "heading": "Department Audit History",
+    "totalEntries": "{{count}} total entries",
+    "loading": "Loading audit logs…",
+    "noRecords": "No audit records found.",
+    "headers": {
+      "timestamp": "Timestamp",
+      "user": "User",
+      "action": "Action",
+      "entity": "Entity",
+      "status": "Status",
+      "ipAddress": "IP Address"
+    },
+    "pageOf": "Page {{page}} of {{total}}",
+    "previous": "Previous",
+    "next": "Next"
+  },
+  "linkedDocs": {
+    "failedToLoad": "Failed to load linked documents.",
+    "scopeNotice": "Showing links involving your authorised departments: <strong>{{depts}}</strong>",
+    "stats": {
+      "totalLinks": "Total Links",
+      "approved": "Approved",
+      "pending": "Pending",
+      "rejected": "Rejected"
+    },
+    "searchPlaceholder": "Search by document or department…",
+    "countOf": "{{shown}} of {{total}}",
+    "allStatuses": "All Statuses",
+    "statusPending": "Pending",
+    "statusApproved": "Approved",
+    "statusRejected": "Rejected",
+    "clear": "Clear",
+    "loadingDocuments": "Loading linked documents…",
+    "noMatch": "No linked documents match the current filters.",
+    "headers": {
+      "document": "Document",
+      "originalDept": "Original Dept",
+      "linkedDept": "Linked-to Dept",
+      "status": "Status",
+      "requesterReviewer": "Requester / Reviewer",
+      "view": "View"
+    },
+    "requestedBy": "Requested by {{name}}",
+    "requested": "Requested",
+    "reviewed": "Reviewed",
+    "loadingView": "Loading…",
+    "view": "View"
+  },
+  "actParts": {
+    "failedToLoad": "Failed to load act part submissions.",
+    "stats": {
+      "totalSubmissions": "Total Submissions",
+      "pending": "Pending",
+      "approved": "Approved",
+      "rejected": "Rejected"
+    },
+    "loading": "Loading…",
+    "noSubmissions": "No submissions found.",
+    "tabLabels": {
+      "sections": "Sections",
+      "schedule": "Schedule",
+      "annexure": "Annexure",
+      "appendix": "Appendix",
+      "forms": "Forms"
+    },
+    "headers": {
+      "actTab": "Act / Tab",
+      "submittedBy": "Submitted By",
+      "submittedAt": "Submitted At",
+      "status": "Status",
+      "view": "View"
+    },
+    "view": "View",
+    "detail": {
+      "actFallback": "Act #{{id}}",
+      "submittedByLine": "Submitted by {{name}}",
+      "couldNotLoad": "Could not load content.",
+      "noSections": "No sections added.",
+      "noEntries": "No entries added.",
+      "noSectionsInChapter": "No sections",
+      "comments": "Comments",
+      "reasonForRejection": "Reason for rejection (required)",
+      "optionalComments": "Optional comments…",
+      "back": "Back",
+      "reject": "Reject",
+      "approve": "Approve",
+      "confirmApprove": "Confirm Approve",
+      "confirmReject": "Confirm Reject",
+      "submitting": "Submitting…",
+      "close": "Close",
+      "statusLabels": {
+        "draft": "Draft",
+        "pending": "Pending",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "pendingDelete": "Del. Pending"
+      }
+    }
+  }
+}

@@ -1,45 +1,53 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import FooterInfoModal from './FooterInfoModal';
 import ScreenReaderAccessModal from './ScreenReaderAccessModal';
 import ashokEmblem from '../../assets/ashok-emblem.svg';
 import digitalIndiaLogo from '../../assets/digital-india-logo.svg';
 
-const FOOTER_LINKS = [
-  {
-    heading: 'Website Policies',
-    links: [
-      { label: 'Privacy Policy',   pageKey: 'privacy-policy'   },
-      { label: 'Terms of Use',     pageKey: 'terms-of-use'     },
-      { label: 'Hyperlink Policy', pageKey: 'hyperlink-policy' },
-      { label: 'Copyright Policy', pageKey: 'copyright-policy' },
-    ],
-  },
-  {
-    heading: 'Help & Support',
-    links: [
-      { label: 'FAQs',                  pageKey: 'faqs'            },
-      { label: 'Screen Reader Access',  pageKey: 'screen-reader'   },
-      { label: 'Right to Information',  pageKey: 'rti'             },
-      { label: 'Feedback',              pageKey: 'feedback'        },
-      { label: 'Contact Us',            pageKey: 'contact-us'      },
-    ],
-  },
-  {
-    heading: 'Navigation',
-    links: [
-      { label: 'Sitemap',        pageKey: 'sitemap'        },
-      { label: 'Related Links',  pageKey: 'related-links'  },
-      { label: 'Accessibility',  pageKey: 'accessibility'  },
-      { label: 'Disclaimer',     pageKey: 'disclaimer'     },
-    ],
-  },
-];
+function footerLinks(t) {
+  return [
+    {
+      heading: t('footer.sections.websitePolicies'),
+      links: [
+        { label: t('footer.links.privacyPolicy'),   pageKey: 'privacy-policy'   },
+        { label: t('footer.links.termsOfUse'),      pageKey: 'terms-of-use'     },
+        { label: t('footer.links.hyperlinkPolicy'), pageKey: 'hyperlink-policy' },
+        { label: t('footer.links.copyrightPolicy'), pageKey: 'copyright-policy' },
+      ],
+    },
+    {
+      heading: t('footer.sections.helpSupport'),
+      links: [
+        { label: t('footer.links.faqs'),               pageKey: 'faqs'            },
+        { label: t('footer.links.screenReaderAccess'), pageKey: 'screen-reader'   },
+        { label: t('footer.links.rti'),                pageKey: 'rti'             },
+        { label: t('footer.links.feedback'),           pageKey: 'feedback'        },
+        { label: t('footer.links.contactUs'),          pageKey: 'contact-us'      },
+      ],
+    },
+    {
+      heading: t('footer.sections.navigation'),
+      links: [
+        { label: t('footer.links.sitemap'),       pageKey: 'sitemap'        },
+        { label: t('footer.links.relatedLinks'),  pageKey: 'related-links'  },
+        { label: t('footer.links.accessibility'), pageKey: 'accessibility'  },
+        { label: t('footer.links.disclaimer'),    pageKey: 'disclaimer'     },
+      ],
+    },
+  ];
+}
 
-// Bumped whenever footer/policy content actually changes — this is a manually
-// maintained marker (no CMS backs this portal), not a live "today" timestamp.
-const LAST_UPDATED = '27 July 2026';
+// __BUILD_DATE__ is injected by vite.config.js at build time (no CMS backs
+// this portal) — so this always reflects the actual last deploy with no
+// manual editing required.
+const LAST_UPDATED = new Date(__BUILD_DATE__).toLocaleDateString('en-GB', {
+  day: 'numeric', month: 'long', year: 'numeric',
+});
 
 export default function Footer() {
+  const { t } = useTranslation('common');
+  const FOOTER_LINKS = footerLinks(t);
   const [openPage, setOpenPage] = useState(null); // pageKey | null
   const [showScreenReader, setShowScreenReader] = useState(false);
 
@@ -51,7 +59,7 @@ export default function Footer() {
   return (
     <footer
       role="contentinfo"
-      aria-label="Site footer"
+      aria-label={t('footer.siteFooterLabel')}
       style={{
         // Hardcoded to the DBIM Blue group's key/darkest shade (#162F6A) per DBIM 5.6 —
         // deliberately not `var(--primary-dark)`, which is repointed to green by the
@@ -86,18 +94,18 @@ export default function Footer() {
             {/* State Emblem on a dark background must render white per DBIM 5.3 —
                 the source SVG is solid black, so it's flipped via filter rather
                 than maintaining a second white-fill copy of the asset. */}
-            <img src={ashokEmblem} alt="Emblem of India" style={{ height: 34, width: 'auto', objectFit: 'contain', flexShrink: 0, filter: 'brightness(0) invert(1)' }} />
+            <img src={ashokEmblem} alt={t('footer.emblemAlt')} style={{ height: 34, width: 'auto', objectFit: 'contain', flexShrink: 0, filter: 'brightness(0) invert(1)' }} />
             <div>
               <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: '#fff', lineHeight: 1.2 }}>
-                Government of Haryana
+                {t('footer.orgName')}
               </div>
               <div style={{ fontSize: 'var(--font-size-small)', color: 'rgba(255,255,255,0.6)', marginTop: 1 }}>
-                Haryana Digital Repository
+                {t('footer.orgTagline')}
               </div>
             </div>
           </div>
           <p className="ft-brand-desc" style={{ fontSize: 'var(--font-size-small)', lineHeight: 1.45, color: 'rgba(255,255,255,0.6)', maxWidth: 280, margin: 0 }}>
-            Centralized repository of Acts, Rules, Notifications and Circulars issued by the Government of Haryana.
+            {t('footer.brandDesc')}
           </p>
         </div>
 
@@ -152,7 +160,7 @@ export default function Footer() {
           onMouseEnter={e => e.currentTarget.style.opacity = 1}
           onMouseLeave={e => e.currentTarget.style.opacity = 0.9}
         >
-          <img src={digitalIndiaLogo} alt="Digital India" style={{ height: 28, width: 'auto' }} />
+          <img src={digitalIndiaLogo} alt={t('footer.digitalIndiaAlt')} style={{ height: 28, width: 'auto' }} />
         </a>
       </div>
 
@@ -165,17 +173,17 @@ export default function Footer() {
         flexWrap: 'wrap', gap: 6,
       }}>
         <p style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.55)', margin: 0 }}>
-          This website belongs to Government of Haryana. Designed, Developed and Maintained by HARTRON.
+          {t('footer.maintainedBy')}
         </p>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.55)' }}>
-            Last Updated: <strong style={{ color: 'rgba(255,255,255,0.7)' }}>{LAST_UPDATED}</strong>
+            {t('footer.lastUpdated')} <strong style={{ color: 'rgba(255,255,255,0.7)' }}>{LAST_UPDATED}</strong>
           </span>
           {/* Not a compliance certification — points to the actual statement, which is
               honest about what's done vs. still in progress, instead of asserting it outright. */}
           <button type="button" onClick={() => setOpenPage('accessibility')}
             style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.55)', background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline' }}>
-            Accessibility Statement
+            {t('footer.accessibilityStatement')}
           </button>
         </div>
       </div>

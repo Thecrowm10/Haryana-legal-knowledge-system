@@ -21,6 +21,11 @@ export default defineConfig({
     react(),
     copyPdfWorkerAsJs,
   ],
+  // Footer "Last Updated" date — set once here at build time so it always
+  // reflects the actual deploy date with no manual editing required.
+  define: {
+    __BUILD_DATE__: JSON.stringify(new Date().toISOString()),
+  },
   server: {
     proxy: {
       '/api': {
