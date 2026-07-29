@@ -51,7 +51,7 @@ export default function ProfileModal({ user, roleLabel, onClose, onChangePasswor
         animation: 'fadeSlideIn .15s ease',
       }}>
         {/* Header — stays put; only the body below scrolls */}
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+        <div className="modal-header" style={{ padding: '20px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
           <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
             {(user.name || user.username || '?')[0].toUpperCase()}
           </div>
@@ -69,7 +69,7 @@ export default function ProfileModal({ user, roleLabel, onClose, onChangePasswor
 
         <div style={{ overflowY: 'auto' }}>
           {/* Account details */}
-          <div style={{ padding: '20px 24px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
+          <div className="modal-body-pad modal-grid-3" style={{ padding: '20px 24px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14 }}>
             <Detail icon={User} label="Username" value={user.username} />
             {user.dept  && <Detail icon={Building2} label="Department" value={user.dept} />}
             {user.email && <Detail icon={Mail} label="Email" value={user.email} />}
@@ -79,7 +79,7 @@ export default function ProfileModal({ user, roleLabel, onClose, onChangePasswor
           {canChangePassword ? (
             <>
               <div style={{ height: 1, background: 'var(--surface-border)' }} />
-              <form onSubmit={handleChangePassword} style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <form onSubmit={handleChangePassword} className="modal-body-pad" style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
                   <ShieldCheck size={14} color="var(--primary)" />
                   <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)' }}>Change Password</span>
@@ -89,7 +89,7 @@ export default function ProfileModal({ user, roleLabel, onClose, onChangePasswor
                   <div style={{ ...LABEL, marginBottom: 6 }}>Current Password</div>
                   <PwField value={form.current} show={show.current} onToggle={() => toggle('current')} onChange={v => set('current', v)} />
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="modal-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
                     <div style={{ ...LABEL, marginBottom: 6 }}>New Password</div>
                     <PwField value={form.next} show={show.next} onToggle={() => toggle('next')} onChange={v => set('next', v)} />

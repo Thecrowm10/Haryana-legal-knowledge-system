@@ -957,6 +957,17 @@ function GraphTab({ documents, relationships }) {
 
 const AUDIT_FILTERS = ['All', 'Approved', 'Rejected', 'Uploaded', 'Searched', 'Viewed'];
 
+// Shared once per return — mirrors the <style> convention used in the other dashboards.
+const CSO_RESPONSIVE_CSS = `
+  @media (max-width: 1024px) {
+    .cso-stats-grid { grid-template-columns: repeat(2,1fr) !important; }
+  }
+  @media (max-width: 640px) {
+    .cso-stats-grid { grid-template-columns: 1fr !important; }
+    .cso-chart-grid { grid-template-columns: 1fr !important; }
+  }
+`;
+
 /* ─── MAIN ─── */
 export default function CSODashboard({ activePage, auditLog, documents = [], relationships = [] }) {
   const [auditFilter, setAuditFilter] = useState('All');
@@ -978,14 +989,15 @@ export default function CSODashboard({ activePage, auditLog, documents = [], rel
   if (activePage === 'analytics') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 24, animation: 'fadeSlideIn .3s ease' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+        <style>{CSO_RESPONSIVE_CSS}</style>
+        <div className="cso-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
           <StatCard icon={FileText}    label="Total Documents" value={s.totalDocuments} sub="In the system"         iconBg="rgba(33, 74, 171,.12)"  iconColor="#214aab" trend="+12%" />
           <StatCard icon={CheckCircle} label="Approved"        value={s.approved}       sub="Published docs"        iconBg="rgba(25, 135, 84,.12)"  iconColor="#198754" />
           <StatCard icon={Clock}       label="Pending"         value={s.pending}        sub="Awaiting review"       iconBg="rgba(255, 193, 7,.12)" iconColor="#ffc107" />
           <StatCard icon={XCircle}     label="Rejected"        value={s.rejected}       sub="Returned to uploader"  iconBg="rgba(220, 53, 69,.12)"  iconColor="#dc3545" />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div className="cso-chart-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           <Card>
             <SectionTitle>Documents by Department</SectionTitle>
             <ResponsiveContainer width="100%" height={230}>
@@ -1013,7 +1025,7 @@ export default function CSODashboard({ activePage, auditLog, documents = [], rel
           </Card>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div className="cso-chart-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           <Card>
             <SectionTitle>Status Distribution</SectionTitle>
             <ResponsiveContainer width="100%" height={220}>
@@ -1061,6 +1073,7 @@ export default function CSODashboard({ activePage, auditLog, documents = [], rel
   /* ── MIS Report tab ── */
   return (
     <div style={{ animation: 'fadeSlideIn .3s ease' }}>
+      <style>{CSO_RESPONSIVE_CSS}</style>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
         {AUDIT_FILTERS.map(f => (
           <button key={f} onClick={() => setAuditFilter(f)} style={{
@@ -1083,6 +1096,7 @@ export default function CSODashboard({ activePage, auditLog, documents = [], rel
       </div>
 
       <Card padding="0">
+        <div className="table-scroll-wrap">
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
@@ -1113,6 +1127,7 @@ export default function CSODashboard({ activePage, auditLog, documents = [], rel
             ))}
           </tbody>
         </table>
+        </div>
       </Card>
     </div>
   );

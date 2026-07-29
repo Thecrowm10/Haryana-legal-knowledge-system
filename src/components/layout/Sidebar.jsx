@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BarChart2, GitBranch, ClipboardList, ChevronDown, Users, Settings, Activity, FileSearch, BarChart, Layers, Link2, BookOpen } from 'lucide-react';
+import { BarChart2, GitBranch, ClipboardList, Users, Settings, Activity, FileSearch, BarChart, Layers, Link2, BookOpen } from 'lucide-react';
 import haryanaLogo from '../../assets/haryana-logo.png';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
 const MENU_CONFIG = {
   // uploader and approver have no sidebar — see Layout.jsx (single-page dashboard instead)
   csoffice: [
@@ -60,27 +61,51 @@ const MENU_CONFIG = {
   ],
 };
 
-export default function Sidebar({ user, activePage, onNavigate, collapsed, onToggle }) {
+export default function Sidebar({ user, activePage, onNavigate, collapsed, mobileOpen, onCloseMobile }) {
   const { t } = useTranslation('common');
   const groups = MENU_CONFIG[user.role] || [];
   const [hovering, setHovering] = useState(false);
+  // Below 1024px the sidebar can't push content over (no room) — it becomes a
+  // fixed off-canvas drawer instead, toggled by Topbar's hamburger via mobileOpen.
+  const isDrawerMode = useMediaQuery('(max-width: 1024px)');
   // Pinned collapsed: reveal on hover, pushing the main content over (not an overlay).
-  const expanded = !collapsed || hovering;
+  // Hover-to-expand only makes sense with a mouse, so it's disabled in drawer mode.
+  const expanded = isDrawerMode ? true : (!collapsed || hovering);
   const w = expanded ? 250 : 64;
 
+  function handleNavigate(id) {
+    onNavigate(id);
+    if (isDrawerMode) onCloseMobile?.();
+  }
+
   return (
+    <>
+    {isDrawerMode && mobileOpen && (
+      <div
+        onClick={onCloseMobile}
+        aria-hidden="true"
+        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.4)', zIndex: 199 }}
+      />
+    )}
     <div
-      onMouseEnter={() => collapsed && setHovering(true)}
-      onMouseLeave={() => collapsed && setHovering(false)}
-      style={{ width: w, flexShrink: 0, height: '100vh', transition: 'width .2s cubic-bezier(.4,0,.2,1)' }}
+      onMouseEnter={() => !isDrawerMode && collapsed && setHovering(true)}
+      onMouseLeave={() => !isDrawerMode && collapsed && setHovering(false)}
+      style={isDrawerMode
+        ? { width: 0, flexShrink: 0 }
+        : { width: w, flexShrink: 0, height: '100vh', transition: 'width .2s cubic-bezier(.4,0,.2,1)' }}
     >
       <aside style={{
         width: w, height: '100vh',
         background: 'var(--surface-card)',
         borderRight: '1px solid var(--surface-border)',
         display: 'flex', flexDirection: 'column',
-        transition: 'width .2s cubic-bezier(.4,0,.2,1)',
+        transition: isDrawerMode ? 'transform .25s cubic-bezier(.4,0,.2,1)' : 'width .2s cubic-bezier(.4,0,.2,1)',
         overflow: 'hidden',
+        ...(isDrawerMode ? {
+          position: 'fixed', top: 0, left: 0, zIndex: 200,
+          transform: mobileOpen ? 'translateX(0)' : 'translateX(-100%)',
+          boxShadow: mobileOpen ? '0 0 40px rgba(0,0,0,.35)' : 'none',
+        } : null),
       }}>
       {/* Logo */}
       <div style={{
@@ -126,7 +151,7 @@ export default function Sidebar({ user, activePage, onNavigate, collapsed, onTog
                 <button
                   key={id}
                   type="button"
-                  onClick={() => onNavigate(id)}
+                  onClick={() => handleNavigate(id)}
                   title={expanded ? undefined : t(label)}
                   aria-current={active ? 'page' : undefined}
                   style={{
@@ -185,5 +210,6 @@ export default function Sidebar({ user, activePage, onNavigate, collapsed, onTog
       )}
       </aside>
     </div>
+    </>
   );
 }

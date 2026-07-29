@@ -133,6 +133,9 @@ button {
   --font-size-small: 12px;
 }
 
+/* Sanctioned breakpoints for the whole app: 640px (mobile stacking/density)
+   and 1024px (shell-level — sidebar drawer, split layouts that only break
+   because the sidebar/hero eats width). Don't add a third without a proven need. */
 @media (max-width: 640px) {
   :root {
     --font-size-h1:    24px;
@@ -142,6 +145,38 @@ button {
     --font-size-p2:    12px;
     --font-size-small: 10px;
   }
+}
+
+/* Reusable wrapper for any table / fixed-column grid-row list so it scrolls
+   horizontally on narrow viewports instead of overflowing the page. */
+.table-scroll-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* AccessibilityMenu/NotificationBell dropdown panels are positioned relative to
+   their own (small) icon button, not the viewport — on a real phone that icon
+   is rarely near the right edge (other icons sit to its right), so `right:0`
+   lets the panel's fixed width run off the left edge of the screen. Below
+   640px, force both into a viewport-anchored full-width sheet instead. */
+@media (max-width: 640px) {
+  .a11y-panel, .notif-panel {
+    position: fixed !important;
+    top: 64px !important;
+    left: 12px !important;
+    right: 12px !important;
+    width: auto !important;
+    max-width: none !important;
+  }
+}
+
+/* Shared centered-modal primitives (FooterInfoModal, ProfileModal, ...) — tighter
+   padding and single-column grids on narrow viewports. */
+@media (max-width: 640px) {
+  .modal-header   { padding: 14px 16px !important; }
+  .modal-body-pad { padding: 14px 16px !important; }
+  .modal-grid-2, .modal-grid-3 { grid-template-columns: 1fr !important; }
 }
 
 html { scroll-behavior: smooth; }

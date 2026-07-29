@@ -8,11 +8,13 @@ import { getUsers, getRoles, updateUser, registerUser } from '../services/users'
 import { getDepartments, createDepartment, toggleDepartment, getDocumentTypes, createDocumentType, toggleDocumentType } from '../services/departments';
 import { getAllDocumentsAdmin, getAllDepartmentLinks } from '../services/pdf';
 import { getAuditLogs } from '../services/audit';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 
 const LABEL = { fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)' };
 
 // Admin creates/manages every account except other admins — there is only ever one admin, seeded up front.
-const ADMIN_ROLE_NAMES = new Set(['admin', 'super_admin']);
+// Citizens are public users, not staff accounts — no one creates a "citizen" login from a dashboard.
+const ADMIN_ROLE_NAMES = new Set(['admin', 'super_admin', 'citizen']);
 function normalizeRoleName(name) {
   return name?.trim().toLowerCase().replace(/\s+/g, '_');
 }
@@ -49,7 +51,7 @@ function exportCSV(data, filename) {
   URL.revokeObjectURL(url);
 }
 
-const AUDIT_PAGE_SIZE = 20;
+const AUDIT_PAGE_SIZE = 10;
 
 const AUDIT_ENTITY_OPTIONS = [
   { value: '',              label: 'All Entities' },
@@ -70,7 +72,24 @@ function fmtAuditActor(actor) {
   return full || actor.username || `User #${actor.id}`;
 }
 
+// Shared once per return — mirrors the <style> convention used in the other dashboards.
+const ADM_RESPONSIVE_CSS = `
+  @media (max-width: 1024px) {
+    .adm-stats-grid { grid-template-columns: repeat(2,1fr) !important; }
+  }
+  @media (max-width: 640px) {
+    .adm-stats-grid { grid-template-columns: 1fr !important; }
+    .adm-form-grid { grid-template-columns: 1fr !important; }
+    .adm-drawer { width: 100% !important; }
+    .adm-audit-spacer { display: none !important; }
+    .adm-export-btn { width: 100% !important; }
+    .adm-users-actions { width: 100% !important; }
+    .adm-users-actions > * { flex: 1 1 auto !important; min-width: 0 !important; }
+  }
+`;
+
 export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxonomy }) {
+  const isMobile = useMediaQuery('(max-width: 640px)');
   const [users, setUsers]               = useState([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersError, setUsersError]     = useState('');
@@ -193,6 +212,97 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   const [linksFilterStatus, setLinksFilterStatus] = useState('');
   const [linksFilterDept, setLinksFilterDept]     = useState('');
   const [viewingLink, setViewingLink]     = useState(null);
+  const [viewLinkLoadingId, setViewLinkLoadingId] = useState(null);
+
+  // Maps a full document row (from getAllDocumentsAdmin) into the shape
+  // DocViewModal expects — used everywhere a document is opened for viewing
+  // so every viewer shows the complete metadata, not just a handful of fields.
+  function mapDocForViewer(d) {
+    return {
+      id:              d.id,
+      title:           d.document_name || d.original_filename || 'Untitled',
+      type:            d.document_type_name || 'Unclassified',
+      dept:            d.department_name || 'Unassigned',
+      year:            d.issue_date ? new Date(d.issue_date).getFullYear() : (d.created_at ? new Date(d.created_at).getFullYear() : '—'),
+      version:         d.version_no || '1.0',
+      status:          d.status || 'pending',
+      desc:            d.description || '',
+      fileName:        d.original_filename,
+      uploadedAt:      d.created_at?.split('T')[0] || '',
+      referenceNumber: d.reference_number || null,
+      enactmentDate:   d.issue_date?.split('T')[0] || null,
+      effectiveFrom:   d.effective_from?.split('T')[0] || null,
+      gazette:         d.gazette_reference || null,
+      authority:       d.legal_authority || null,
+      approval:        d.latest_approval || null,
+      shortTitle:      d.short_title || null,
+      uploader:        (d.uploader_first_name || d.uploader_last_name)
+                          ? `${d.uploader_first_name || ''} ${d.uploader_last_name || ''}`.trim()
+                          : (d.uploader_username || null),
+      // Extra fields the uploader entered for this specific document type (Act, Policy, etc.)
+      typeFields: {
+        ...(d.valid_until           ? { validity:           d.valid_until }           : {}),
+        ...(d.sector_domain         ? { sector:             d.sector_domain }         : {}),
+        ...(d.implementing_agency   ? { implementingAgency: d.implementing_agency }   : {}),
+        ...(d.next_review_date      ? { reviewDate:         d.next_review_date }      : {}),
+        ...(d.rule_making_authority ? { ruleAuthority:      d.rule_making_authority } : {}),
+        ...(d.act_year              ? { actYear:            d.act_year }              : {}),
+        ...(d.long_title            ? { longTitle:          d.long_title }            : {}),
+        ...(d.regional_title        ? { regionalTitle:      d.regional_title }        : {}),
+        ...(d.notification_no       ? { notificationNo:     d.notification_no }       : {}),
+        ...(d.act_code              ? { actCode:            d.act_code }              : {}),
+        ...(d.so_reason             ? { soReason:           d.so_reason }             : {}),
+        ...(d.no_of_rules           ? { noOfRules:          d.no_of_rules }           : {}),
+        ...(d.no_of_notifications   ? { noOfNotifications:  d.no_of_notifications }   : {}),
+        ...(d.no_of_regulations     ? { noOfRegulations:    d.no_of_regulations }     : {}),
+        ...(d.no_of_circulars       ? { noOfCirculars:      d.no_of_circulars }       : {}),
+        ...(d.no_of_statutes        ? { noOfStatutes:       d.no_of_statutes }        : {}),
+        ...(d.no_of_ordinances      ? { noOfOrdinances:     d.no_of_ordinances }      : {}),
+        ...(d.no_of_orders          ? { noOfOrders:         d.no_of_orders }          : {}),
+        ...(d.keywords              ? { keywords:           d.keywords }              : {}),
+        ...(d.is_repealed           ? { repealed:           'Yes' }                   : {}),
+      },
+      // Amend / replace / issued-under links to other documents
+      docRelations: (d.relationships || [])
+        .filter(r => r.type !== 'parent_act')
+        .map(r => ({
+          label:       (r.type || 'references').replace(/_/g, ' '),
+          targetTitle: r.document_name || `Document #${r.pdf_id}`,
+          targetType:  r.document_type_name || '',
+          note:        '',
+          section:     '',
+          isPending:   false,
+        })),
+    };
+  }
+
+  // Linked-document rows from /pdf/all-department-links don't carry the full
+  // metadata (reference no., gazette, type-specific fields, etc.) — only
+  // enough to render the list. Fetch the full document row on demand so the
+  // viewer shows everything, same as the main Uploads tab.
+  async function openLinkedDocViewer(link) {
+    setViewLinkLoadingId(link.link_id);
+    const fallback = {
+      id: link.pdf_id, title: link.document_name || 'Document', type: link.document_type_name || 'Miscellaneous',
+      dept: link.linked_department_name || link.original_department_name || '',
+      year: link.requested_at ? new Date(link.requested_at).getFullYear() : '—', version: link.version_no || '1.0',
+      status: link.link_status, desc: '', fileName: '', uploadedAt: link.requested_at?.split('T')[0] || '',
+      approval: (link.reviewed_by_username || link.reviewed_by_first_name || link.review_comments) ? {
+        approver_first_name: link.reviewed_by_first_name || null, approver_last_name: link.reviewed_by_last_name || null,
+        approver_username: link.reviewed_by_username || null, acted_at: link.reviewed_at || null,
+        comments: link.review_comments || null, annotations_json: link.annotations_json || null,
+      } : null,
+    };
+    try {
+      const res = await getAllDocumentsAdmin();
+      const full = (res.data.documents || []).find(d => d.id === link.pdf_id);
+      setViewingLink(full ? mapDocForViewer(full) : fallback);
+    } catch {
+      setViewingLink(fallback);
+    } finally {
+      setViewLinkLoadingId(null);
+    }
+  }
 
   useEffect(() => {
     if (activePage !== 'linkedocs') return;
@@ -430,7 +540,8 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
+        <style>{ADM_RESPONSIVE_CSS}</style>
+        <div className="adm-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
           {[
             { label: 'Total Users',    value: users.length, color: 'var(--primary)',  bg: 'rgba(33, 74, 171,.12)',  icon: Users,       key: null },
             { label: 'Active',         value: active,       color: '#198754',         bg: 'rgba(25, 135, 84,.12)',  icon: CheckCircle, key: 'active' },
@@ -454,8 +565,8 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
         </div>
 
         <Card padding="0">
-          <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>System Users</div>
               {statusFilter && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 8px 4px 10px', borderRadius: 20, background: statusFilter === 'active' ? 'rgba(25, 135, 84,.1)' : 'rgba(255, 193, 7,.1)', border: `1px solid ${statusFilter === 'active' ? 'rgba(25, 135, 84,.3)' : 'rgba(255, 193, 7,.3)'}`, fontSize: 11.5, fontWeight: 600, color: statusFilter === 'active' ? '#16a34a' : '#b45309', whiteSpace: 'nowrap' }}>
@@ -464,14 +575,14 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 </div>
               )}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <SelectField value={deptFilter} onChange={e => setDeptFilter(e.target.value)} placeholder="All Departments" style={{ width: 200 }}>
+            <div className="adm-users-actions" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <SelectField value={deptFilter} onChange={e => setDeptFilter(e.target.value)} placeholder="All Departments" style={{ width: 200, maxWidth: '100%' }}>
                 <option value="">All Departments</option>
                 {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
               </SelectField>
               <button
                 onClick={() => { setAddingUser(true); setAddError(''); setAddForm({ ...EMPTY_ADD_FORM, department_id: deptFilter }); setShowAddPass(false); }}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--primary)', color: 'white', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'var(--primary)', color: 'white', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
                 <Plus size={13} /> Add User
               </button>
             </div>
@@ -492,6 +603,44 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
             </div>
           )}
           {!usersLoading && !usersError && filteredUsers.length > 0 && (
+            isMobile ? (
+              <div>
+                {filteredUsers.map(u => (
+                  <div key={u.id} style={{ padding: '12px 16px', borderBottom: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>{u.name}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 2 }}>{u.email}</div>
+                      </div>
+                      <Badge label={u.role} variant={u.role} />
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
+                      <span style={{ fontFamily: 'var(--mono)' }}>@{u.username}</span>
+                      <span>{u.dept}</span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontWeight: 600, color: u.status === 'active' ? '#1e40af' : '#b45309' }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: u.status === 'active' ? '#198754' : '#ffc107', display: 'inline-block' }} />
+                        {u.status}
+                      </span>
+                      <span style={{ fontFamily: 'var(--mono)' }}>{u.lastLogin}</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button title="Edit" onClick={() => openEdit(u)}
+                        style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '7px 10px', cursor: 'pointer', color: 'var(--primary)', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font)' }}>
+                        <Edit2 size={12} /> Edit
+                      </button>
+                      <button
+                        title={u.isActive ? 'Deactivate' : 'Activate'}
+                        disabled={togglingId === u.id}
+                        onClick={() => handleToggle(u)}
+                        style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: u.isActive ? 'rgba(220, 53, 69,.08)' : 'rgba(25, 135, 84,.08)', border: `1px solid ${u.isActive ? 'rgba(220, 53, 69,.2)' : 'rgba(25, 135, 84,.2)'}`, borderRadius: 7, padding: '7px 10px', cursor: togglingId === u.id ? 'not-allowed' : 'pointer', color: u.isActive ? '#dc3545' : '#198754', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font)', opacity: togglingId === u.id ? 0.5 : 1 }}>
+                        {u.isActive ? <XCircle size={12} /> : <CheckCircle size={12} />} {u.isActive ? 'Deactivate' : 'Activate'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+          <div className="table-scroll-wrap">
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
@@ -538,6 +687,8 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
               ))}
             </tbody>
           </table>
+          </div>
+            )
           )}
         </Card>
 
@@ -545,7 +696,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
         {addingUser && (
           <>
             <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.25)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', zIndex: 300, animation: 'drawerFadeIn .2s ease' }} />
-            <div style={{
+            <div className="adm-drawer" style={{
               position: 'fixed', right: 0, top: 0, height: '100vh', width: 460,
               background: 'var(--surface-card)', boxShadow: '-4px 0 40px rgba(0,0,0,.18)',
               zIndex: 301, display: 'flex', flexDirection: 'column',
@@ -568,7 +719,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
               <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
 
                 {/* Username + Email */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
                     <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Username *</label>
                     <input style={{ ...INP_STYLE, borderColor: addError.toLowerCase().includes('username') ? 'rgba(220, 53, 69,.6)' : undefined }}
@@ -606,7 +757,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 </div>
 
                 {/* First + Last name */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
                     <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>First Name</label>
                     <input style={INP_STYLE} placeholder="First name"
@@ -638,7 +789,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                   const isNodal = roles.find(r => String(r.id) === String(addForm.role_id))?.name === 'nodal Officer';
                   return (
                     <>
-                      <div style={{ display: 'grid', gridTemplateColumns: isNodal ? '1fr' : '1fr 1fr', gap: 12 }}>
+                      <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: isNodal ? '1fr' : '1fr 1fr', gap: 12 }}>
                         <div>
                           <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Role</label>
                           <SelectField
@@ -730,7 +881,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
               {/* Modal body */}
               <div style={{ padding: '22px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
                     <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>First Name</label>
                     <input style={INP_STYLE} value={editForm.first_name}
@@ -753,7 +904,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                   const isNodal = roles.find(r => String(r.id) === String(editForm.role_id))?.name === 'nodal Officer';
                   return (
                     <>
-                      <div style={{ display: 'grid', gridTemplateColumns: isNodal ? '1fr' : '1fr 1fr', gap: 12 }}>
+                      <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: isNodal ? '1fr' : '1fr 1fr', gap: 12 }}>
                         <div>
                           <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Role</label>
                           <SelectField
@@ -851,7 +1002,8 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     );
     return (
       <>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
+      <style>{ADM_RESPONSIVE_CSS}</style>
+      <div className="adm-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
         {taxonomy.map(t => {
           const isApiDriven  = t.category === 'Departments' || t.category === 'Document Types';
           const canCreateApi = t.category === 'Document Types' || t.category === 'Departments';
@@ -984,7 +1136,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       {addDeptOpen && (
         <>
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.25)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', zIndex: 300, animation: 'drawerFadeIn .2s ease' }} onClick={closeAddDept} />
-          <div style={{
+          <div className="adm-drawer" style={{
             position: 'fixed', right: 0, top: 0, height: '100vh', width: 420,
             background: 'var(--surface-card)', boxShadow: '-4px 0 40px rgba(0,0,0,.18)',
             zIndex: 301, display: 'flex', flexDirection: 'column',
@@ -1084,7 +1236,8 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     ];
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
+        <style>{ADM_RESPONSIVE_CSS}</style>
+        <div className="adm-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
           {stats.map(s => (
             <Card key={s.label}>
               <div style={{ ...LABEL, marginBottom: 8 }}>{s.label}</div>
@@ -1141,6 +1294,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
 
     return (
       <div style={{ animation: 'fadeSlideIn .3s ease', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <style>{ADM_RESPONSIVE_CSS}</style>
 
         {/* Filter bar */}
         <Card>
@@ -1189,10 +1343,10 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
               </button>
             )}
 
-            <div style={{ flex: 1 }} />
+            <div className="adm-audit-spacer" style={{ flex: 1 }} />
 
-            <button onClick={exportAuditCSV}
-              style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--surface-ground)', color: 'var(--text-color)', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '0 14px', height: 34, fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
+            <button className="adm-export-btn" onClick={exportAuditCSV}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'var(--surface-ground)', color: 'var(--text-color)', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '0 14px', height: 34, fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
               <Download size={13} /> Export CSV
             </button>
           </div>
@@ -1211,7 +1365,30 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
             <div style={{ padding: 24, color: '#dc3545', fontSize: 13 }}>{auditError}</div>
           ) : visibleLogs.length === 0 ? (
             <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>No audit records found.</div>
+          ) : isMobile ? (
+            <div>
+              {visibleLogs.map(log => {
+                const isSuccess = log.status === 'success';
+                return (
+                  <div key={log.id} style={{ padding: '11px 16px', borderBottom: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>{fmtAuditActor(log.actor)}</div>
+                      <span style={{ fontSize: 10.5, fontWeight: 700, borderRadius: 5, padding: '3px 8px', background: isSuccess ? 'rgba(25, 135, 84,.1)' : 'rgba(220, 53, 69,.1)', color: isSuccess ? '#16a34a' : '#dc3545', flexShrink: 0 }}>
+                        {log.status}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 12.5, color: 'var(--text-color)' }}>{fmtAction(log.action)}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 10.5, color: 'var(--text-color-secondary)' }}>
+                      <span style={{ fontFamily: 'var(--mono)' }}>{new Date(log.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })}</span>
+                      <span style={{ fontFamily: 'var(--mono)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 5, padding: '1px 6px' }}>{log.entity_type}{log.entity_id ? ` #${log.entity_id}` : ''}</span>
+                      {log.ip_address && <span style={{ fontFamily: 'var(--mono)' }}>{log.ip_address}</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           ) : (
+            <div className="table-scroll-wrap">
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
@@ -1253,6 +1430,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 })}
               </tbody>
             </table>
+            </div>
           )}
 
           {/* Pagination */}
@@ -1320,65 +1498,6 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       return true;
     });
 
-    function mapDocForViewer(d) {
-      return {
-        id:              d.id,
-        title:           d.document_name || d.original_filename || 'Untitled',
-        type:            d.document_type_name || 'Unclassified',
-        dept:            d.department_name || 'Unassigned',
-        year:            d.issue_date ? new Date(d.issue_date).getFullYear() : (d.created_at ? new Date(d.created_at).getFullYear() : '—'),
-        version:         d.version_no || '1.0',
-        status:          d.status || 'pending',
-        desc:            d.description || '',
-        fileName:        d.original_filename,
-        uploadedAt:      d.created_at?.split('T')[0] || '',
-        referenceNumber: d.reference_number || null,
-        enactmentDate:   d.issue_date?.split('T')[0] || null,
-        effectiveFrom:   d.effective_from?.split('T')[0] || null,
-        gazette:         d.gazette_reference || null,
-        authority:       d.legal_authority || null,
-        approval:        d.latest_approval || null,
-        shortTitle:      d.short_title || null,
-        uploader:        (d.uploader_first_name || d.uploader_last_name)
-                            ? `${d.uploader_first_name || ''} ${d.uploader_last_name || ''}`.trim()
-                            : (d.uploader_username || null),
-        // Extra fields the uploader entered for this specific document type (Act, Policy, etc.)
-        typeFields: {
-          ...(d.valid_until           ? { validity:           d.valid_until }           : {}),
-          ...(d.sector_domain         ? { sector:             d.sector_domain }         : {}),
-          ...(d.implementing_agency   ? { implementingAgency: d.implementing_agency }   : {}),
-          ...(d.next_review_date      ? { reviewDate:         d.next_review_date }      : {}),
-          ...(d.rule_making_authority ? { ruleAuthority:      d.rule_making_authority } : {}),
-          ...(d.act_year              ? { actYear:            d.act_year }              : {}),
-          ...(d.long_title            ? { longTitle:          d.long_title }            : {}),
-          ...(d.regional_title        ? { regionalTitle:      d.regional_title }        : {}),
-          ...(d.notification_no       ? { notificationNo:     d.notification_no }       : {}),
-          ...(d.act_code              ? { actCode:            d.act_code }              : {}),
-          ...(d.so_reason             ? { soReason:           d.so_reason }             : {}),
-          ...(d.no_of_rules           ? { noOfRules:          d.no_of_rules }           : {}),
-          ...(d.no_of_notifications   ? { noOfNotifications:  d.no_of_notifications }   : {}),
-          ...(d.no_of_regulations     ? { noOfRegulations:    d.no_of_regulations }     : {}),
-          ...(d.no_of_circulars       ? { noOfCirculars:      d.no_of_circulars }       : {}),
-          ...(d.no_of_statutes        ? { noOfStatutes:       d.no_of_statutes }        : {}),
-          ...(d.no_of_ordinances      ? { noOfOrdinances:     d.no_of_ordinances }      : {}),
-          ...(d.no_of_orders          ? { noOfOrders:         d.no_of_orders }          : {}),
-          ...(d.keywords              ? { keywords:           d.keywords }              : {}),
-          ...(d.is_repealed           ? { repealed:           'Yes' }                   : {}),
-        },
-        // Amend / replace / issued-under links to other documents
-        docRelations: (d.relationships || [])
-          .filter(r => r.type !== 'parent_act')
-          .map(r => ({
-            label:       (r.type || 'references').replace(/_/g, ' '),
-            targetTitle: r.document_name || `Document #${r.pdf_id}`,
-            targetType:  r.document_type_name || '',
-            note:        '',
-            section:     '',
-            isPending:   false,
-          })),
-      };
-    }
-
     const SC = {
       approved: { color: '#16a34a', bg: 'rgba(25, 135, 84,.1)',   label: 'Approved' },
       pending:  { color: '#b45309', bg: 'rgba(255, 193, 7,.1)',  label: 'Pending'  },
@@ -1390,8 +1509,9 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     return (
       <>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
+        <style>{ADM_RESPONSIVE_CSS}</style>
         {/* Stats */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
+        <div className="adm-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
           {[
             { label: 'Total Uploads', value: totalDocs,    color: 'var(--primary)', bg: 'rgba(33, 74, 171,.12)',  icon: Layers,      key: '' },
             { label: 'Approved',      value: approvedDocs, color: '#16a34a',        bg: 'rgba(25, 135, 84,.12)',  icon: CheckCircle, key: 'approved' },
@@ -1468,9 +1588,55 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
           )}
 
           {!allDocsLoading && !allDocsError && (
-            <>
+            filteredDocs.length === 0 ? (
+              <div style={{ padding: '50px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>
+                No documents match the current filters
+              </div>
+            ) : isMobile ? (
+              <div>
+                {filteredDocs.map(doc => {
+                  const sc = SC[doc.status] || SC.pending;
+                  const uploaderName = [doc.uploader_first_name, doc.uploader_last_name].filter(Boolean).join(' ') || doc.uploader_username || '—';
+                  const uploadedDate = doc.created_at ? doc.created_at.split('T')[0] : '—';
+                  return (
+                    <div key={doc.id} style={{ padding: '12px 14px', borderLeft: `3px solid ${sc.color}`, borderBottom: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                        <div style={{ width: 34, height: 34, borderRadius: 9, background: sc.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <FileText size={15} color={sc.color} strokeWidth={1.8} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {doc.document_name || doc.original_filename}
+                          </div>
+                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 3 }}>
+                            {doc.document_type_name && (
+                              <span style={{ fontSize: 10, fontWeight: 600, color: sc.color, background: sc.bg, borderRadius: 4, padding: '1px 5px' }}>{doc.document_type_name}</span>
+                            )}
+                            {doc.department_name && (
+                              <span style={{ fontSize: 10, color: 'var(--text-color-secondary)' }}>{doc.department_name}</span>
+                            )}
+                          </div>
+                        </div>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', fontSize: 9.5, fontWeight: 700, color: sc.color, background: sc.bg, borderRadius: 12, padding: '3px 8px', textTransform: 'uppercase', letterSpacing: '.04em', flexShrink: 0 }}>
+                          {sc.label}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: 11, color: 'var(--text-color-secondary)' }}>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{uploaderName}</span>
+                        <span style={{ fontFamily: 'var(--mono)', flexShrink: 0 }}>{uploadedDate}</span>
+                      </div>
+                      <button onClick={() => setViewDoc(mapDocForViewer(doc))}
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 10px', borderRadius: 7, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                        <Eye size={13} /> View
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+            <div className="table-scroll-wrap">
               {/* Column headers */}
-              <div style={{ display: 'grid', gridTemplateColumns: cols, background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: cols, minWidth: 830, background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
                 <div />
                 <div style={{ ...LABEL, padding: '10px 16px 10px 68px' }}>Document</div>
                 <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>Uploader</div>
@@ -1479,11 +1645,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>Actions</div>
               </div>
 
-              {filteredDocs.length === 0 ? (
-                <div style={{ padding: '50px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>
-                  No documents match the current filters
-                </div>
-              ) : filteredDocs.map(doc => {
+              {filteredDocs.map(doc => {
                 const sc = SC[doc.status] || SC.pending;
                 const uploaderName = [doc.uploader_first_name, doc.uploader_last_name].filter(Boolean).join(' ') || doc.uploader_username || '—';
                 const approverName = doc.latest_approval
@@ -1492,7 +1654,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 const uploadedDate  = doc.created_at ? doc.created_at.split('T')[0] : '—';
                 const lastActionDate = doc.latest_approval?.acted_at ? doc.latest_approval.acted_at.split('T')[0] : null;
                 return (
-                  <div key={doc.id} style={{ display: 'grid', gridTemplateColumns: cols, borderBottom: '1px solid var(--surface-border)', alignItems: 'stretch', minHeight: 62, transition: 'background .15s' }}
+                  <div key={doc.id} style={{ display: 'grid', gridTemplateColumns: cols, minWidth: 830, borderBottom: '1px solid var(--surface-border)', alignItems: 'stretch', minHeight: 62, transition: 'background .15s' }}
                     onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                     {/* Status strip */}
@@ -1564,7 +1726,8 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                   </div>
                 );
               })}
-            </>
+            </div>
+            )
           )}
         </Card>
       </div>
@@ -1604,9 +1767,10 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     return (
       <>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
+        <style>{ADM_RESPONSIVE_CSS}</style>
 
         {/* Stats */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
+        <div className="adm-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
           {[
             { label: 'Total Links', value: totals.all,      color: 'var(--primary)', bg: 'rgba(33, 74, 171,.12)',  icon: Link2,       key: '' },
             { label: 'Approved',    value: totals.approved,  color: '#16a34a',       bg: 'rgba(25, 135, 84,.12)',  icon: CheckCircle, key: 'approved' },
@@ -1671,9 +1835,49 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
           {allLinksError && <div style={{ padding: '20px 18px', fontSize: 13, color: '#dc3545' }}>{allLinksError}</div>}
 
           {!allLinksLoading && !allLinksError && (
-            <>
+            filteredLinks.length === 0 ? (
+              <div style={{ padding: '50px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>No linked documents match the current filters.</div>
+            ) : isMobile ? (
+              <div>
+                {filteredLinks.map(link => {
+                  const ls = LS[link.link_status] || LS.pending;
+                  const requesterName = link.requested_by_first_name
+                    ? `${link.requested_by_first_name} ${link.requested_by_last_name || ''}`.trim()
+                    : link.requested_by_username || '—';
+                  return (
+                    <div key={link.link_id} style={{ padding: '12px 14px', borderBottom: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                        <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(255, 193, 7,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <Link2 size={14} color="#d97706" strokeWidth={2} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{link.document_name}</div>
+                          {link.document_type_name && (
+                            <span style={{ fontSize: 10, fontWeight: 600, color: '#d97706', background: 'rgba(255, 193, 7,.1)', borderRadius: 4, padding: '1px 5px', marginTop: 3, display: 'inline-block' }}>{link.document_type_name}</span>
+                          )}
+                        </div>
+                        <span style={{ fontSize: 10, fontWeight: 700, background: ls.bg, color: ls.color, padding: '3px 9px', borderRadius: 20, flexShrink: 0 }}>{ls.label}</span>
+                      </div>
+                      <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
+                        {link.original_department_name || '—'} <span style={{ opacity: .5 }}>→</span> <strong style={{ color: 'var(--text-heading)' }}>{link.linked_department_name || '—'}</strong>
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text-color-secondary)' }}>
+                        Requested by {requesterName} · <span style={{ fontFamily: 'var(--mono)' }}>{link.requested_at?.split('T')[0]}</span>
+                      </div>
+                      <button
+                        onClick={() => openLinkedDocViewer(link)}
+                        disabled={viewLinkLoadingId === link.link_id}
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '7px 10px', borderRadius: 7, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 12, fontWeight: 600, cursor: viewLinkLoadingId === link.link_id ? 'wait' : 'pointer', fontFamily: 'var(--font)', opacity: viewLinkLoadingId === link.link_id ? .6 : 1 }}>
+                        <Eye size={13} /> {viewLinkLoadingId === link.link_id ? 'Loading…' : 'View'}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+            <div className="table-scroll-wrap">
               {/* Column headers */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px 160px 110px 150px 80px', background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px 160px 110px 150px 80px', minWidth: 950, background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
                 <div style={{ ...LABEL, padding: '10px 16px' }}>Document</div>
                 <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>Original Dept</div>
                 <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>Linked-to Dept</div>
@@ -1682,9 +1886,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>View</div>
               </div>
 
-              {filteredLinks.length === 0 ? (
-                <div style={{ padding: '50px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>No linked documents match the current filters.</div>
-              ) : filteredLinks.map(link => {
+              {filteredLinks.map(link => {
                 const ls = LS[link.link_status] || LS.pending;
                 const requesterName = link.requested_by_first_name
                   ? `${link.requested_by_first_name} ${link.requested_by_last_name || ''}`.trim()
@@ -1693,7 +1895,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                   ? `${link.reviewed_by_first_name} ${link.reviewed_by_last_name || ''}`.trim()
                   : link.reviewed_by_username || null;
                 return (
-                  <div key={link.link_id} style={{ display: 'grid', gridTemplateColumns: '1fr 160px 160px 110px 150px 80px', borderBottom: '1px solid var(--surface-border)', alignItems: 'stretch', minHeight: 58, transition: 'background .15s' }}
+                  <div key={link.link_id} style={{ display: 'grid', gridTemplateColumns: '1fr 160px 160px 110px 150px 80px', minWidth: 950, borderBottom: '1px solid var(--surface-border)', alignItems: 'stretch', minHeight: 58, transition: 'background .15s' }}
                     onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
 
@@ -1747,36 +1949,19 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                     {/* View */}
                     <div style={{ padding: '10px 12px', borderLeft: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <button
-                        onClick={() => setViewingLink({
-                          id:         link.pdf_id,
-                          title:      link.document_name || 'Document',
-                          type:       link.document_type_name || 'Miscellaneous',
-                          dept:       link.linked_department_name || link.original_department_name || '',
-                          year:       link.requested_at ? new Date(link.requested_at).getFullYear() : '—',
-                          version:    link.version_no || '1.0',
-                          status:     link.link_status,
-                          desc:       '',
-                          fileName:   '',
-                          uploadedAt: link.requested_at?.split('T')[0] || '',
-                          approval:   (link.reviewed_by_username || link.reviewed_by_first_name || link.review_comments) ? {
-                            approver_first_name: link.reviewed_by_first_name || null,
-                            approver_last_name:  link.reviewed_by_last_name  || null,
-                            approver_username:   link.reviewed_by_username   || null,
-                            acted_at:            link.reviewed_at            || null,
-                            comments:            link.review_comments        || null,
-                            annotations_json:    link.annotations_json       || null,
-                          } : null,
-                        })}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 10px', borderRadius: 7, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'background .15s' }}
+                        onClick={() => openLinkedDocViewer(link)}
+                        disabled={viewLinkLoadingId === link.link_id}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 10px', borderRadius: 7, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 600, cursor: viewLinkLoadingId === link.link_id ? 'wait' : 'pointer', fontFamily: 'var(--font)', transition: 'background .15s', opacity: viewLinkLoadingId === link.link_id ? .6 : 1 }}
                         onMouseEnter={e => e.currentTarget.style.background = 'rgba(33, 74, 171,.14)'}
                         onMouseLeave={e => e.currentTarget.style.background = 'rgba(33, 74, 171,.07)'}>
-                        <Eye size={12} /> View
+                        <Eye size={12} /> {viewLinkLoadingId === link.link_id ? 'Loading…' : 'View'}
                       </button>
                     </div>
                   </div>
                 );
               })}
-            </>
+            </div>
+            )
           )}
         </Card>
       </div>

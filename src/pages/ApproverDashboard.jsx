@@ -15,6 +15,7 @@ import { useAuth } from '../hooks/useAuth';
 import { getApproverDocuments, getPdfFile, reviewDocument, getDepartmentLinkRequests, reviewDepartmentLink } from '../services/pdf';
 import { createNotification } from '../services/notifications';
 import { getPendingActParts, getAllActParts, reviewActPart } from '../services/act_parts';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 
 // Constants
 
@@ -893,10 +894,10 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, deciding })
     <div style={{ borderTop: '1px solid var(--surface-border)' }}>
 
       {/* 2-panel grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '55% 45%', height: 520, borderBottom: '1px solid var(--surface-border)' }}>
+      <div className="ap-split-grid" style={{ display: 'grid', gridTemplateColumns: '55% 45%', height: 520, borderBottom: '1px solid var(--surface-border)' }}>
 
         {/* Panel 1 — Original PDF */}
-        <div style={{ borderRight: '1px solid var(--surface-border)', overflow: 'hidden' }}>
+        <div className="ap-split-pane" style={{ borderRight: '1px solid var(--surface-border)', overflow: 'hidden' }}>
           <PdfViewerPanel
             doc={docWithUrl} ocrData={docPageData}
             currentPage={currentPage} onPageChange={setCurrentPage} totalPages={totalPages}
@@ -910,7 +911,7 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, deciding })
         </div>
 
         {/* Panel 2 — Document Details */}
-        <div style={{ overflow: 'hidden' }}>
+        <div className="ap-split-pane" style={{ overflow: 'hidden' }}>
           <DocumentDetailsPanel
             doc={doc}
             reviewAnnotations={annotations}
@@ -1042,6 +1043,9 @@ function mapApiDoc(d) {
     fileSize:        d.file_size,
     desc:            d.description || '',
     uploadedAt:      d.created_at?.split('T')[0] || '',
+    uploader:        (d.uploader_first_name || d.uploader_last_name)
+                        ? `${d.uploader_first_name || ''} ${d.uploader_last_name || ''}`.trim()
+                        : (d.uploader_username || ''),
     enactmentDate:   d.issue_date || '',
     effectiveFrom:   d.effective_from || '',
     referenceNumber: d.reference_number || '',
@@ -1114,6 +1118,24 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
   const [highlightMode, setHighlightMode] = useState(false);
   const [docxHtml, setDocxHtml]           = useState(null);
   const pdfScrollRef                      = useRef(null);
+  const [fullDoc, setFullDoc]             = useState(null);
+
+  // getDepartmentLinkRequests() rows only carry enough to render the request
+  // list (name/type/version/status) — fetch the full document row so the
+  // details panel shows everything the uploader filled in, same as a normal
+  // document review, not just the handful of link-request fields.
+  useEffect(() => {
+    if (!lr.pdf_id || !localStorage.getItem('token')) return;
+    let cancelled = false;
+    getApproverDocuments()
+      .then(res => {
+        if (cancelled) return;
+        const full = (res.data.documents || []).find(d => d.id === lr.pdf_id);
+        setFullDoc(full ? mapApiDoc(full) : null);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [lr.pdf_id]);
 
   // For read-only mode: parse stored annotations from the review
   const storedAnnotations = useMemo(() => {
@@ -1214,10 +1236,10 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
       </div>
 
       {/* 2-panel grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: '58% 42%', height: 560, borderBottom: '1px solid var(--surface-border)' }}>
+      <div className="ap-split-grid" style={{ display: 'grid', gridTemplateColumns: '58% 42%', height: 560, borderBottom: '1px solid var(--surface-border)' }}>
 
         {/* Left — PDF Viewer */}
-        <div style={{ borderRight: '1px solid var(--surface-border)', overflow: 'hidden' }}>
+        <div className="ap-split-pane" style={{ borderRight: '1px solid var(--surface-border)', overflow: 'hidden' }}>
           <PdfViewerPanel
             doc={docForViewer}
             ocrData={docPageData}
@@ -1238,31 +1260,39 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
         </div>
 
         {/* Right — Details */}
-        <div style={{ overflowY: 'auto', padding: '20px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="ap-split-pane" style={{ overflowY: 'auto', padding: '20px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-          {/* Document Info card */}
-          <div style={{ padding: '14px 16px', borderRadius: 10, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)' }}>
-            <div style={{ ...LABEL, marginBottom: 12 }}>{t('linkReview.documentInformation')}</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <InfoRow label={t('linkReview.documentName')} value={lr.document_name} />
-              <InfoRow label={t('linkReview.type')} value={
-                <span style={{ background: typeColor.bg, color: typeColor.text, padding: '2px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
-                  {lr.document_type_name}
-                </span>
-              } />
-              {lr.version_no && <InfoRow label={t('linkReview.version')} value={`v${lr.version_no}`} mono />}
-              <InfoRow label={t('linkReview.documentStatus')} value={
-                <span style={{
-                  background: lr.document_status === 'approved' ? 'rgba(25, 135, 84,.12)' : lr.document_status === 'rejected' ? 'rgba(220, 53, 69,.1)' : 'rgba(255, 193, 7,.1)',
-                  color: lr.document_status === 'approved' ? '#16a34a' : lr.document_status === 'rejected' ? '#dc2626' : '#d97706',
-                  padding: '2px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700, textTransform: 'capitalize',
-                }}>
-                  {lr.document_status}
-                </span>
-              } />
-              <InfoRow label={t('linkReview.originalDepartment')} value={lr.original_department_name || '—'} />
+          {/* Document Info card — full uploader-filled metadata once the
+              source document row has been fetched; a thin fallback while
+              that fetch is in flight (or if it fails). */}
+          {fullDoc ? (
+            <div style={{ borderRadius: 10, border: '1px solid var(--surface-border)', overflow: 'hidden' }}>
+              <DocumentDetailsPanel doc={fullDoc} />
             </div>
-          </div>
+          ) : (
+            <div style={{ padding: '14px 16px', borderRadius: 10, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)' }}>
+              <div style={{ ...LABEL, marginBottom: 12 }}>{t('linkReview.documentInformation')}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <InfoRow label={t('linkReview.documentName')} value={lr.document_name} />
+                <InfoRow label={t('linkReview.type')} value={
+                  <span style={{ background: typeColor.bg, color: typeColor.text, padding: '2px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700 }}>
+                    {lr.document_type_name}
+                  </span>
+                } />
+                {lr.version_no && <InfoRow label={t('linkReview.version')} value={`v${lr.version_no}`} mono />}
+                <InfoRow label={t('linkReview.documentStatus')} value={
+                  <span style={{
+                    background: lr.document_status === 'approved' ? 'rgba(25, 135, 84,.12)' : lr.document_status === 'rejected' ? 'rgba(220, 53, 69,.1)' : 'rgba(255, 193, 7,.1)',
+                    color: lr.document_status === 'approved' ? '#16a34a' : lr.document_status === 'rejected' ? '#dc2626' : '#d97706',
+                    padding: '2px 9px', borderRadius: 20, fontSize: 11, fontWeight: 700, textTransform: 'capitalize',
+                  }}>
+                    {lr.document_status}
+                  </span>
+                } />
+                <InfoRow label={t('linkReview.originalDepartment')} value={lr.original_department_name || '—'} />
+              </div>
+            </div>
+          )}
 
           {/* Link Request card */}
           <div style={{ padding: '14px 16px', borderRadius: 10, background: 'rgba(255, 193, 7,.04)', border: '1px solid rgba(255, 193, 7,.2)' }}>
@@ -1447,6 +1477,8 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
 export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, documents, onApprove }) {
   const { user } = useAuth();
   const { t } = useTranslation('approver');
+  const isMobile = useMediaQuery('(max-width: 640px)');
+  const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
   const [docs, setDocs]           = useState([]);
   const [loading, setLoading]     = useState(false);
   const [apiError, setApiError]   = useState('');
@@ -1622,6 +1654,18 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
+      {/* Mobile/tablet reflow for the split review panes and stat grid — mounted once
+          here since ThreePanelReview/LinkReviewPanel render as descendants of this
+          top-level return, same technique as Uploader/Citizen dashboards' <style> blocks. */}
+      <style>{`
+        @media (max-width: 1024px) {
+          .ap-split-grid { grid-template-columns: 1fr !important; height: auto !important; grid-auto-rows: min-content !important; }
+          .ap-split-pane { max-height: 60vh !important; }
+        }
+        @media (max-width: 640px) {
+          .ap-stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+        }
+      `}</style>
 
       {/* ── Link Requests tab ──────────────────────────────────────────────── */}
       {activePage === 'links' && (
@@ -1832,7 +1876,7 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
       {!['links', 'actparts'].includes(activePage) && (
         <div>
           <div style={{ ...LABEL, marginBottom: 10 }}>{t('dashboard.overviewLabel')}</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+          <div className="ap-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
           {[
             { icon: Clock,       label: t('dashboard.summary.pending'),  value: pending.length,                                       bg: 'rgba(255, 193, 7,.12)', color: '#b45309', key: 'pending'  },
             { icon: CheckCircle, label: t('dashboard.summary.approved'), value: reviewed.filter(d => d.status === 'approved').length, bg: 'rgba(25, 135, 84,.12)',  color: '#198754', key: 'approved' },
@@ -1871,6 +1915,63 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
             {t('dashboard.documentCount', { count: list.length })}
           </span>
         </div>
+        {isMobile ? (
+          <div style={{ position: 'relative' }}>
+            <button type="button" onClick={() => setTypeDropdownOpen(o => !o)}
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                padding: '10px 14px', borderRadius: 12, cursor: 'pointer', fontFamily: 'var(--font)',
+                fontSize: 13, fontWeight: 600,
+                color: filter ? (TYPE_COLORS[filter]?.text || TYPE_COLORS[filter]?.accent) : 'var(--text-color)',
+                background: 'rgba(255,255,255,.5)',
+                backdropFilter: 'blur(16px) saturate(180%)', WebkitBackdropFilter: 'blur(16px) saturate(180%)',
+                border: `1px solid ${filter ? `${TYPE_COLORS[filter]?.accent}55` : 'rgba(255,255,255,.7)'}`,
+                boxShadow: typeDropdownOpen ? '0 4px 18px rgba(0,0,0,.1), inset 0 1px 0 rgba(255,255,255,.6)' : '0 2px 10px rgba(0,0,0,.05), inset 0 1px 0 rgba(255,255,255,.6)',
+                transition: 'all .15s',
+              }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {filter && <span style={{ width: 8, height: 8, borderRadius: '50%', background: TYPE_COLORS[filter]?.accent, flexShrink: 0 }} />}
+                {filter ? (TYPE_LABEL_KEY[filter] ? t(`docTypes.${TYPE_LABEL_KEY[filter]}`) : filter) : t('dashboard.allTypesLabel')}
+              </span>
+              <ChevronDown size={15} color="var(--text-color-secondary)" style={{ transform: typeDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s', flexShrink: 0 }} />
+            </button>
+            {typeDropdownOpen && (
+              <>
+                <div onClick={() => setTypeDropdownOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 150 }} />
+                <div style={{
+                  position: 'absolute', top: 'calc(100% + 8px)', left: 0, right: 0, zIndex: 160,
+                  background: 'rgba(255,255,255,.7)',
+                  backdropFilter: 'blur(24px) saturate(180%)', WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+                  border: '1px solid rgba(255,255,255,.7)', borderRadius: 14,
+                  boxShadow: '0 20px 56px rgba(0,0,0,.2), inset 0 1px 0 rgba(255,255,255,.7)',
+                  padding: 6, maxHeight: 300, overflowY: 'auto',
+                  animation: 'fadeSlideIn .15s ease',
+                }}>
+                  <button type="button" onClick={() => { setFilter(''); setTypeDropdownOpen(false); }}
+                    style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '9px 12px', borderRadius: 9, border: 'none', background: !filter ? 'rgba(33, 74, 171,.12)' : 'transparent', color: !filter ? 'var(--primary)' : 'var(--text-color)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                    {t('dashboard.allTypesLabel')}
+                    <span style={{ fontSize: 11, fontFamily: 'var(--mono)', opacity: .6 }}>{base.length}</span>
+                  </button>
+                  {allTypes.map(type => {
+                    const count  = base.filter(d => d.type === type).length;
+                    const active = filter === type;
+                    const c = TYPE_COLORS[type] || { accent: '#94a3b8', bg: 'rgba(148,163,184,.1)', text: '#64748b' };
+                    return (
+                      <button key={type} type="button" onClick={() => { setFilter(active ? '' : type); setTypeDropdownOpen(false); }}
+                        style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '9px 12px', borderRadius: 9, border: 'none', background: active ? `${c.accent}20` : 'transparent', color: active ? (c.text || c.accent) : 'var(--text-color)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', opacity: count === 0 ? .5 : 1 }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <span style={{ width: 8, height: 8, borderRadius: '50%', background: c.accent, flexShrink: 0 }} />
+                          {TYPE_LABEL_KEY[type] ? t(`docTypes.${TYPE_LABEL_KEY[type]}`) : type}
+                        </span>
+                        <span style={{ fontSize: 11, fontFamily: 'var(--mono)', opacity: .6 }}>{count}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+        ) : (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           {allTypes.map(type => {
             const count  = base.filter(d => d.type === type).length;
@@ -1899,6 +2000,7 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
             </button>
           )}
         </div>
+        )}
       </div>}
 
       {/* Empty state */}
@@ -1932,9 +2034,16 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
 
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 4, letterSpacing: '-.01em' }}>{doc.title}</div>
-                  <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                    {doc.type && (() => {
+                      const c = TYPE_COLORS[doc.type] || TYPE_COLORS['Miscellaneous'];
+                      return (
+                        <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: c.bg, color: c.text || c.accent }}>
+                          {TYPE_LABEL_KEY[doc.type] ? t(`docTypes.${TYPE_LABEL_KEY[doc.type]}`) : doc.type}
+                        </span>
+                      );
+                    })()}
                     {[
-                      doc.type,
                       doc.dept,
                       String(doc.year),
                       doc.pages ? t('dashboard.pagesValue', { count: doc.pages }) : null,
@@ -2029,7 +2138,8 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
 
           {!apLoading && !apError && apItems.length > 0 && (
             <Card style={{ overflow: 'hidden' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px 140px 200px', background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
+              <div className="table-scroll-wrap">
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px 140px 200px', minWidth: 640, background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
                 <div style={{ ...LABEL, padding: '10px 18px' }}>Act / Tab</div>
                 <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>Submitted By</div>
                 <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>Submitted At</div>
@@ -2040,7 +2150,7 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
                 const TAB_LABELS = { sections: 'Sections', schedule: 'Schedule', annexure: 'Annexure', appendix: 'Appendix', forms: 'Forms' };
                 return (
                   <div key={`${item.pdf_document_id}-${item.part_type}`}
-                    style={{ display: 'grid', gridTemplateColumns: '1fr 160px 140px 200px', borderBottom: '1px solid var(--surface-border)', alignItems: 'center', minHeight: 60, transition: 'background .15s' }}
+                    style={{ display: 'grid', gridTemplateColumns: '1fr 160px 140px 200px', minWidth: 640, borderBottom: '1px solid var(--surface-border)', alignItems: 'center', minHeight: 60, transition: 'background .15s' }}
                     onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                     <div style={{ padding: '10px 18px' }}>
@@ -2067,6 +2177,7 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
                   </div>
                 );
               })}
+              </div>
             </Card>
           )}
 

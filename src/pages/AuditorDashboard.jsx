@@ -46,14 +46,25 @@ function exportCSV(data, filename) {
   URL.revokeObjectURL(url);
 }
 
+// Shared once per return — mirrors the <style> convention used in the other dashboards.
+const AUD_RESPONSIVE_CSS = `
+  @media (max-width: 1024px) {
+    .aud-stats-grid { grid-template-columns: repeat(2,1fr) !important; }
+  }
+  @media (max-width: 640px) {
+    .aud-stats-grid { grid-template-columns: 1fr !important; }
+  }
+`;
+
 export default function AuditorDashboard({ activePage }) {
 
   // ── MIS Report ───────────────────────────────────────────────────────────
   if (activePage === 'auditlog') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
+        <style>{AUD_RESPONSIVE_CSS}</style>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
+        <div className="aud-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
           {[
             { label: 'Total Log Entries', value: MOCK_AUDIT.length,                           color: 'var(--primary)', bg: 'rgba(33, 74, 171,.12)',  icon: ClipboardList },
             { label: 'AI Characters Generated', value: '0',                                   color: '#198754',        bg: 'rgba(25, 135, 84,.12)',  icon: CheckCircle   },
@@ -90,6 +101,7 @@ export default function AuditorDashboard({ activePage }) {
               </button>
             </div>
           </div>
+          <div className="table-scroll-wrap">
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
@@ -116,6 +128,7 @@ export default function AuditorDashboard({ activePage }) {
               ))}
             </tbody>
           </table>
+          </div>
         </Card>
       </div>
     );
@@ -136,6 +149,7 @@ export default function AuditorDashboard({ activePage }) {
               <Download size={13} /> Export CSV
             </button>
           </div>
+          <div className="table-scroll-wrap">
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
@@ -158,12 +172,13 @@ export default function AuditorDashboard({ activePage }) {
               ))}
             </tbody>
           </table>
+          </div>
         </Card>
       </div>
     );
   }
 
-  //  Compliance Report 
+  //  Compliance Report
   if (activePage === 'compliance') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
@@ -178,6 +193,7 @@ export default function AuditorDashboard({ activePage }) {
           </div>
 
           <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)', marginBottom: 14 }}>Monthly Compliance Summary</div>
+          <div className="table-scroll-wrap">
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
@@ -203,6 +219,7 @@ export default function AuditorDashboard({ activePage }) {
               ))}
             </tbody>
           </table>
+          </div>
         </Card>
 
         <Card>

@@ -61,8 +61,13 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
         .lk-left { animation: fadeLeft .65s cubic-bezier(.22,1,.36,1) both; }
         .lk-portal-card { animation: fadeUp .55s cubic-bezier(.22,1,.36,1) both; transition: all .25s ease; }
         .lk-portal-card:hover { transform:translateY(-5px) scale(1.01) !important; box-shadow:0 24px 56px rgba(0,0,0,.25), 0 0 0 1px rgba(255,255,255,.22) !important; }
+
+        @media (max-width:640px) {
+          .lk-portal-content { padding:64px 5% 28px !important; gap:32px !important; }
+          .lk-portal-card { width:100% !important; max-width:340px !important; padding:26px 22px !important; }
+        }
       `}</style>
-      <div className="lk" style={{ width:'100vw', height:'100vh', position:'relative', overflow:'hidden', display:'flex', alignItems:'center' }}>
+      <div className="lk" style={{ width:'100vw', minHeight:'100vh', position:'relative', overflowX:'hidden', display:'flex', alignItems:'center' }}>
         <img src={bannerBg} alt=""
           style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', zIndex:0, filter:'blur(2px)', transform:'scale(1.02)' }} />
         <div style={{ position:'absolute', inset:0, zIndex:1, background:'linear-gradient(110deg,rgba(2,10,5,.82) 0%,rgba(2,10,5,.62) 45%,rgba(2,10,5,.42) 100%)' }}/>
@@ -72,7 +77,7 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
           <AccessibilityMenu iconButtonStyle={loginIconStyle} />
         </div>
 
-        <div style={{ position:'relative', zIndex:2, width:'100%', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'40px 6%', gap:48 }}>
+        <div className="lk-portal-content" style={{ position:'relative', zIndex:2, width:'100%', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'40px 6%', gap:48 }}>
 
           {/* Header */}
           <div className="lk-left" style={{ textAlign:'center', position: 'relative' }}>
@@ -214,9 +219,19 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
         .lk-roles::-webkit-scrollbar { width:4px; }
         .lk-roles::-webkit-scrollbar-track { background:transparent; }
         .lk-roles::-webkit-scrollbar-thumb { background:rgba(255,255,255,.15); border-radius:4px; }
+
+        @media (max-width:1024px) {
+          .lk-row { flex-direction:column !important; align-items:stretch !important; justify-content:flex-start !important; padding:64px 6% 32px !important; gap:28px !important; }
+          .lk-left { max-width:100% !important; text-align:center; }
+          .lk-hero-desc, .lk-role-strip { margin-left:auto !important; margin-right:auto !important; }
+          .lk-card { width:100% !important; max-width:420px !important; margin:0 auto; }
+        }
+        @media (max-width:640px) {
+          .lk-role-strip { display:none !important; }
+        }
       `}</style>
 
-      <div className="lk" style={{ width:'100vw', height:'100vh', position:'relative', overflow:'hidden', display:'flex', alignItems:'center' }}>
+      <div className="lk" style={{ width:'100vw', minHeight:'100vh', position:'relative', overflowX:'hidden', display:'flex', alignItems:'center' }}>
 
         {/* BG */}
         <img
@@ -227,7 +242,7 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
         <div style={{ position:'absolute', inset:0, zIndex:1, background:'linear-gradient(110deg, rgba(2,10,5,.82) 0%, rgba(2,10,5,.62) 45%, rgba(2,10,5,.42) 100%)' }}/>
 
         {/* Main content */}
-        <div style={{ position:'relative', zIndex:2, width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 6%', gap:40 }}>
+        <div className="lk-row" style={{ position:'relative', zIndex:2, width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 6%', gap:40 }}>
 
           {/* LEFT */}
           <div className="lk-left" style={{ flex:'1 1 0', minWidth:0, maxWidth:500 }}>
@@ -238,14 +253,15 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
             <h1 style={{ fontSize:'clamp(30px,3.8vw,52px)', fontWeight:800, lineHeight:1.1, letterSpacing:'-.025em', color:'#fff', marginBottom:16 }}>
               {t('brandHaryana')}<br/><span style={{ color:'#4ade80' }}>{t('brandLegal')}</span><br/>{t('brandSystem')}
             </h1>
-            <p style={{ fontSize: 'var(--font-size-p2)', color:'rgba(255,255,255,.42)', lineHeight:1.8, maxWidth:360, marginBottom:0 }}>
+            <p className="lk-hero-desc" style={{ fontSize: 'var(--font-size-p2)', color:'rgba(255,255,255,.42)', lineHeight:1.8, maxWidth:360, marginBottom:0 }}>
               {t('heroDescription')}
             </p>
 
             {/* Role strip — the 5 official roles this portal serves, purely iconographic.
                 Pinned to the same 360px column as the paragraph above (justify-between, no
-                gap/wrap) so the two blocks share one consistent left edge AND right edge. */}
-            <div style={{ marginTop:30, maxWidth:360, display:'flex', justifyContent:'space-between' }}>
+                gap/wrap) so the two blocks share one consistent left edge AND right edge.
+                Hidden below 640px (see .lk-role-strip media rule) — no room to shrink further. */}
+            <div className="lk-role-strip" style={{ marginTop:30, maxWidth:360, display:'flex', justifyContent:'space-between' }}>
               {[
                 [UploadCloud,  t('roleUploader')],
                 [CheckCircle2, t('roleApprover')],

@@ -169,7 +169,7 @@ export default function FooterInfoModal({ pageKey, onClose }) {
         maxHeight: '88vh', overflow: 'hidden', boxShadow: '0 24px 80px rgba(0,0,0,.3)',
         display: 'flex', flexDirection: 'column', animation: 'fadeSlideIn .15s ease',
       }}>
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+        <div className="modal-header" style={{ padding: '20px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
           <div style={{ width: 44, height: 44, borderRadius: 11, background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <Icon size={20} color="var(--primary)" />
           </div>
@@ -183,7 +183,7 @@ export default function FooterInfoModal({ pageKey, onClose }) {
           </button>
         </div>
 
-        <div style={{ overflowY: 'auto', padding: '20px 24px' }}>
+        <div className="modal-body-pad" style={{ overflowY: 'auto', padding: '20px 24px' }}>
           {page.type === 'faq' && <FaqBody items={page.items} />}
           {page.type === 'sitemap' && <SitemapBody groups={page.groups} />}
           {page.type === 'list' && <ListBody note={page.note} items={page.items} />}

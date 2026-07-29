@@ -19,6 +19,7 @@ import { getDepartments, getDocumentTypes } from '../services/departments';
 import { uploadPdfFile, uploadPdfMetadata, updatePdfMetadata, getMyDocuments, searchDocuments, getPdfFile, checkDuplicateDocument, linkDocumentToDepartment, getLinkedDocuments, getActChildren, getMyDepartmentActs, getMyDepartmentDocsByType } from '../services/pdf';
 import { uploadActPartFile, saveActPartSections, saveActPartEntries, getActPartSections, getActPartEntries, getActPartFile, getActPartApprovals, submitActPartForApproval } from '../services/act_parts';
 import { createNotification } from '../services/notifications';
+import HindiKeyboardInput from '../components/HindiKeyboardInput';
 
 // Constants
 
@@ -136,6 +137,10 @@ const TYPE_FIELDS = {
 // technique as CitizenDashboard's <style> block. Mounted once per top-level return (the
 // component has three) since modals/sections are reused across all of them.
 const UD_RESPONSIVE_CSS = `
+  @media (max-width: 1024px) {
+    .ud-docview-grid { grid-template-columns: 1fr !important; grid-auto-rows: min-content !important; overflow-y: auto !important; }
+    .ud-docview-preview { max-height: 60vh !important; }
+  }
   @media (max-width: 640px) {
     .ud-welcome-title { font-size: 18px !important; }
     .ud-grid-2, .ud-grid-3 { grid-template-columns: 1fr !important; }
@@ -143,8 +148,6 @@ const UD_RESPONSIVE_CSS = `
     .ud-search-row { flex-direction: column !important; align-items: stretch !important; }
     .ud-search-box { max-width: none !important; width: 100% !important; }
     .ud-sort-row { margin-left: 0 !important; }
-    .ud-docview-grid { grid-template-columns: 1fr !important; grid-auto-rows: min-content !important; overflow-y: auto !important; }
-    .ud-docview-preview { max-height: 60vh !important; }
     .ud-docview-topbar { padding: 10px 14px !important; gap: 8px !important; }
     .ud-editlist-refno, .ud-editlist-version { display: none !important; }
     .ud-editlist-table { font-size: 12px !important; }
@@ -2859,20 +2862,17 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
               const linkBorder  = isApproved ? 'rgba(25, 135, 84,.25)' : isRejected ? 'rgba(220, 53, 69,.25)' : 'rgba(255, 193, 7,.25)';
               const linkLabel   = isApproved ? t('linkedDocs.linkApproved') : isRejected ? t('linkedDocs.linkRejected') : t('linkedDocs.linkPending');
               const LinkIcon    = isApproved ? CheckCircle : isRejected ? XCircle : Clock;
+              // getLinkedDocuments() returns full document rows (same shape mapApiDoc
+              // parses) plus link-specific fields — reuse mapApiDoc for everything
+              // (typeFields, shortTitle, gazette, authority, uploader, etc.) and only
+              // override status/approval with the cross-department link's own review,
+              // which is distinct from the document's original approval.
               const mapLinkedDocForViewer = () => {
                 const hasLinkReview = l.link_reviewed_by_username || l.link_reviewed_by_first_name || l.review_comments || l.link_annotations_json;
                 return {
-                  id:          l.id,
-                  title:       l.document_name || l.original_filename || 'Document',
-                  type:        l.document_type_name || 'Miscellaneous',
-                  dept:        l.department_name || '',
-                  year:        l.created_at ? new Date(l.created_at).getFullYear() : '—',
-                  version:     l.version_no || '1.0',
+                  ...mapApiDoc(l),
                   status:      l.link_status || 'pending',
                   reviewTitle: l.link_status === 'approved' ? t('linkedDocs.linkApprovedTitle') : l.link_status === 'rejected' ? t('linkedDocs.linkRejectedTitle') : t('linkedDocs.linkPendingTitle'),
-                  desc:        '',
-                  fileName:    l.original_filename || '',
-                  uploadedAt:  l.created_at?.split('T')[0] || '',
                   approval: hasLinkReview ? {
                     approver_first_name: l.link_reviewed_by_first_name || null,
                     approver_last_name:  l.link_reviewed_by_last_name  || null,
@@ -3095,6 +3095,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
               <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', padding: '10px 0' }}>{t('common.loading')}</div>
             ) : (
               <div style={{ border: '1px solid var(--surface-border)', borderRadius: 10, overflow: 'hidden' }}>
+                <div className="table-scroll-wrap">
                 <table className="ud-editlist-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
                   <thead>
                     <tr style={{ background: 'var(--surface-ground)' }}>
@@ -3151,6 +3152,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                     })}
                   </tbody>
                 </table>
+                </div>
               </div>
             )}
           </Card>
@@ -4874,8 +4876,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                 </div>
                 <div>
                   <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.act.regionalTitle')}</div>
-                  <input value={typeFields.regionalTitle || ''} onChange={e => setTypeFields(f => ({ ...f, regionalTitle: e.target.value }))}
-                    placeholder={t('wizard.placeholders.act.regionalTitle')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  <HindiKeyboardInput value={typeFields.regionalTitle || ''} onChange={e => setTypeFields(f => ({ ...f, regionalTitle: e.target.value }))}
+                    placeholder={t('wizard.placeholders.act.regionalTitle')} label={t('wizard.fields.act.regionalTitle')} style={INPUT_BASE} />
                 </div>
               </div>
               <div>
@@ -5408,6 +5410,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
               const list = extractTypeChildren(actChildren, form.type);
               return (
                 <div style={{ border: '1px solid var(--surface-border)', borderRadius: 10, overflow: 'hidden' }}>
+                  <div className="table-scroll-wrap">
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
                     <thead>
                       <tr style={{ background: 'var(--surface-ground)' }}>
@@ -5446,6 +5449,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                       ))}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               );
             })()}
@@ -5465,6 +5469,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
               <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', padding: '10px 0' }}>{t('common.loading')}</div>
             ) : (
               <div style={{ border: '1px solid var(--surface-border)', borderRadius: 10, overflow: 'hidden' }}>
+                <div className="table-scroll-wrap">
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
                   <thead>
                     <tr style={{ background: 'var(--surface-ground)' }}>
@@ -5503,6 +5508,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
             )}
           </Card>

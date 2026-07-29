@@ -162,6 +162,7 @@
       "total": "कुल"
     },
     "searchPlaceholder": "शीर्षक से खोजें…",
+    "allTypesLabel": "सभी प्रकार",
     "filterChip": {
       "all": "सभी",
       "pending": "लंबित",

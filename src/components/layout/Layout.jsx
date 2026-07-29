@@ -2,12 +2,30 @@ import { useState } from 'react';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 import Footer from './Footer';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
 
 // These roles get a single-page dashboard (no left nav) — see their Topbar branding block instead.
 const NO_SIDEBAR_ROLES = ['citizen', 'uploader', 'approver'];
 
 export default function Layout({ user, activePage, onNavigate, onLogout, onChangePassword, children }) {
   const [collapsed, setCollapsed] = useState(true);
+  // Below 1024px the Sidebar renders as an off-canvas drawer instead of an in-flow
+  // column (see Sidebar.jsx) — mobileOpen tracks that drawer's visibility, separate
+  // from `collapsed` which only governs the desktop pinned/hover-expand behavior.
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const isDrawerMode = useMediaQuery('(max-width: 1024px)');
+
+  // Adjust state during render rather than in an effect (React's "you might not
+  // need an effect" pattern) — resizing past the breakpoint (rotating a tablet,
+  // resizing a window mid-demo) shouldn't leave the drawer stuck open once it's
+  // no longer in drawer mode.
+  const [prevDrawerMode, setPrevDrawerMode] = useState(isDrawerMode);
+  if (isDrawerMode !== prevDrawerMode) {
+    setPrevDrawerMode(isDrawerMode);
+    if (!isDrawerMode) setMobileOpen(false);
+  }
+
+  const toggleSidebar = () => isDrawerMode ? setMobileOpen(o => !o) : setCollapsed(c => !c);
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--surface-ground)' }}>
@@ -19,7 +37,8 @@ export default function Layout({ user, activePage, onNavigate, onLogout, onChang
             activePage={activePage}
             onNavigate={onNavigate}
             collapsed={collapsed}
-            onToggle={() => setCollapsed(c => !c)}
+            mobileOpen={mobileOpen}
+            onCloseMobile={() => setMobileOpen(false)}
           />
         )}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
@@ -30,7 +49,7 @@ export default function Layout({ user, activePage, onNavigate, onLogout, onChang
               onNavigate={onNavigate}
               onLogout={onLogout}
               onChangePassword={onChangePassword}
-              onToggleSidebar={() => setCollapsed(c => !c)}
+              onToggleSidebar={toggleSidebar}
             />
           )}
           {/* Sticky-footer pattern: main is a flex column so Footer can sit flush at the very

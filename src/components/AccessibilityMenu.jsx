@@ -60,6 +60,7 @@ export default function AccessibilityMenu({ iconButtonStyle, panelAnchor = 'fixe
           <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 55 }} />
           <div
             id={panelId}
+            className="a11y-panel"
             role="region"
             aria-label={t('a11y.toolsPanelTitle')}
             style={{

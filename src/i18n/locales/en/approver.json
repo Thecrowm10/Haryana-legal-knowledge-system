@@ -162,6 +162,7 @@
       "total": "Total"
     },
     "searchPlaceholder": "Search by title…",
+    "allTypesLabel": "All Types",
     "filterChip": {
       "all": "All",
       "pending": "Pending",

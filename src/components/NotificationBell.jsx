@@ -87,7 +87,7 @@ export default function NotificationBell({ role }) {
 
       {/* Dropdown */}
       {open && (
-        <div style={{
+        <div className="notif-panel" style={{
           position: 'absolute', top: 42, right: 0, zIndex: 999,
           width: 340, borderRadius: 12,
           background: 'var(--surface-card)',

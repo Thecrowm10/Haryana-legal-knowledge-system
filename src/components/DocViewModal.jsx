@@ -269,6 +269,15 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', flexDirection: 'column', background: 'var(--surface-card)' }}>
+      <style>{`
+        @media (max-width: 1024px) {
+          .dvm-grid { grid-template-columns: 1fr !important; grid-auto-rows: min-content !important; overflow-y: auto !important; }
+          .dvm-pane { max-height: 60vh !important; }
+        }
+        @media (max-width: 640px) {
+          .dvm-meta-grid { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
 
       {/* Top bar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 24px', borderBottom: '1px solid var(--surface-border)', background: 'var(--surface-50)', flexShrink: 0, minHeight: 64 }}>
@@ -299,11 +308,11 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
       </div>
 
       {/* 2-panel body */}
-      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '57% 43%', overflow: 'hidden' }}>
+      <div className="dvm-grid" style={{ flex: 1, display: 'grid', gridTemplateColumns: '57% 43%', overflow: 'hidden' }}>
 
         {/* Left: PDF viewer */}
-        <div style={{ borderRight: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#3a3d40' }}>
-          <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10, background: '#2d2f31', flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,.08)' }}>
+        <div className="dvm-pane" style={{ borderRight: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#3a3d40' }}>
+          <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', rowGap: 8, background: '#2d2f31', flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,.08)' }}>
             <Eye size={14} color="rgba(255,255,255,.7)" />
             <span style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(255,255,255,.85)' }}>{docxHtml ? 'Document Preview' : 'Original PDF'}</span>
             {searchQuery && !docxHtml && searchPages && searchPages.length > 0 && (
@@ -427,7 +436,7 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
         </div>
 
         {/* Right: Document details */}
-        <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--surface-card)' }}>
+        <div className="dvm-pane" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--surface-card)' }}>
           <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, background: 'var(--surface-50)', flexShrink: 0 }}>
             <div style={{ width: 30, height: 30, borderRadius: 8, background: 'rgba(33, 74, 171,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <FileText size={14} color="var(--primary)" />
@@ -436,7 +445,7 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
           </div>
 
           <div style={{ flex: 1, overflow: 'auto', padding: '20px 20px 28px' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 22 }}>
+            <div className="dvm-meta-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 22 }}>
               {[
                 { label: 'Type',       value: doc.type,                   color: typeColor.accent, bg: typeColor.bg },
                 { label: 'Department', value: doc.dept,                   color: 'var(--primary)', bg: 'rgba(33, 74, 171,.07)' },

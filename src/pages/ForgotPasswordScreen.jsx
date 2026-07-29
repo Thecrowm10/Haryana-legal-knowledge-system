@@ -109,9 +109,9 @@ export default function ForgotPasswordScreen({ onBack }) {
       `}</style>
 
       <div className="fp" style={{
-        width: '100vw', height: '100vh', position: 'relative',
+        width: '100vw', minHeight: '100vh', position: 'relative',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        overflow: 'hidden',
+        overflowX: 'hidden', padding: '48px 16px',
       }}>
         <img
           src={bannerBg}
