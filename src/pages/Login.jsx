@@ -28,8 +28,8 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
   const captchaRef                = useRef(null);
 
   useEffect(() => {
-    // Pre-import the crypto key so encryption is instant on submit
-    warmupCrypto().catch(() => {});
+    // Pre-initialise the JSEncrypt instance so first login is instant
+    warmupCrypto();
   }, []);
 
   useEffect(() => {

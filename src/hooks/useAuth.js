@@ -80,8 +80,13 @@ export function useAuth() {
       setUser(userFromPayload(payload));
     } catch (err) {
       localStorage.removeItem('token');
-      const detail = err.response?.data?.detail;
-      setError(typeof detail === 'string' ? detail : 'Login failed. Please try again.');
+      if (!err.response) {
+        // Network error or crypto failure (not an API response)
+        setError(err.message || 'Login failed. Please try again.');
+      } else {
+        const detail = err.response?.data?.detail;
+        setError(typeof detail === 'string' ? detail : 'Login failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
