@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
 import { changePassword as changePasswordApi } from '../services/pdf';
+import { encryptLoginPayload } from '../services/crypto';
 
 const CITIZEN_PROFILE = { username: 'citizen', role: 'citizen', name: 'Guest', dept: '', mustChangePassword: false };
 // const DEV_UPLOADER  = { username: 'dept.uploader', role: 'uploader', name: 'Dev Uploader (Mock)', dept: 'Urban Local Bodies', mustChangePassword: false };
@@ -63,7 +64,8 @@ export function useAuth() {
     setLoading(true);
     setError('');
     try {
-      const res = await api.post('/auth/login', { username, password });
+      const encrypted_payload = await encryptLoginPayload(username, password);
+      const res = await api.post('/auth/login', { encrypted_payload });
       const token = res.data.access_token;
       const payload = decodeJwt(token);
       if (!payload) throw new Error('Invalid token received');

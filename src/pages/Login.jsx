@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { warmupCrypto } from '../services/crypto';
 import { useTranslation } from 'react-i18next';
 import { Search, Eye, EyeOff, Shield, Lock, User, ArrowRight, ShieldAlert, UploadCloud, CheckCircle2, BarChart3, Settings, FileSearch } from 'lucide-react';
 import haryanaLogo from '../assets/haryana-logo.png';
@@ -25,6 +26,11 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
   const [shake, setShake]         = useState(false);
   const [captchaStatus, setCaptchaStatus] = useState({ touched: false, valid: false });
   const captchaRef                = useRef(null);
+
+  useEffect(() => {
+    // Pre-import the crypto key so encryption is instant on submit
+    warmupCrypto().catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (authError) {
