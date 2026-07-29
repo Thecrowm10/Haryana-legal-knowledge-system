@@ -8,8 +8,7 @@ import {
   Save, ArrowRight, Paperclip, Send,
 } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
-import pdfjsWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl;
+pdfjsLib.GlobalWorkerOptions.workerSrc = import.meta.env.BASE_URL + 'pdf.worker.min.js';
 import mammoth from 'mammoth';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
@@ -3419,7 +3418,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                     section_number: `Section ${si + 1}`,
                     section_title: sec.name || '',
                     section_content: sec.description || '',
-                    file_ref: sec.isDeleted ? null : await uploadSecFile(sec.file),
+                    file_ref: sec.isDeleted ? null : (await uploadSecFile(sec.file) || sec.existingFileRef || null),
                     is_deleted: sec.isDeleted,
                   }))
                 )).filter(s => !(s.is_deleted && s.id == null)),
@@ -3433,7 +3432,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                 section_number: `Section ${si + 1}`,
                 section_title: sec.name || '',
                 section_content: sec.description || '',
-                file_ref: sec.isDeleted ? null : await uploadSecFile(sec.file),
+                file_ref: sec.isDeleted ? null : (await uploadSecFile(sec.file) || sec.existingFileRef || null),
                 is_deleted: sec.isDeleted,
               }))
             )).filter(s => !(s.is_deleted && s.id == null));
@@ -3453,12 +3452,13 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
           const entries = subDocEntries[subDocTab] || [];
           const builtEntries = (await Promise.all(
             entries.map(async (entry, i) => {
-              let fileRef = entry.fileRef;
-              if (!entry.isDeleted && entry.file && !fileRef) {
+              // Use existing file ref as fallback so re-saving without a new file doesn't wipe the stored path
+              let fileRef = entry.fileRef || entry.existingFileRef || null;
+              if (!entry.isDeleted && entry.file) {
                 const fd = new FormData();
                 fd.append('file', entry.file);
                 const res = await uploadActPartFile(fd);
-                fileRef = res.data?.file_ref || null;
+                fileRef = res.data?.file_ref || fileRef;
               }
               return {
                 id: entry.id ?? null,
