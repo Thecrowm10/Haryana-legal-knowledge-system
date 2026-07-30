@@ -3,6 +3,7 @@ import { useAuth } from './hooks/useAuth';
 import Login from './pages/Login';
 import ChangePasswordScreen from './pages/ChangePasswordScreen';
 import Layout from './components/layout/Layout';
+import CookieBanner from './components/CookieBanner';
 import CitizenDashboard from './pages/CitizenDashboard';
 import UploaderDashboard from './pages/UploaderDashboard';
 import ApproverDashboard from './pages/ApproverDashboard';
@@ -103,9 +104,9 @@ export default function App() {
     addAuditLog(`Approved document: ${doc?.title}`);
   }
 
-  if (!user) return <Login onLogin={loginAsRole} loading={loading} authError={authError} />;
-  if (user.mustChangePassword) return <ChangePasswordScreen user={user} onPasswordChanged={changePass} onLogout={logout} reason={user.passwordExpired ? 'expired' : 'first_login'} />;
-  if (activePage === null) return null;
+  if (!user) return <><Login onLogin={loginAsRole} loading={loading} authError={authError} /><CookieBanner /></>;
+  if (user.mustChangePassword) return <><ChangePasswordScreen user={user} onPasswordChanged={changePass} onLogout={logout} reason={user.passwordExpired ? 'expired' : 'first_login'} /><CookieBanner /></>;
+  if (activePage === null) return <CookieBanner />;
 
   function renderDashboard() {
     switch (user.role) {
@@ -160,8 +161,11 @@ export default function App() {
   }
 
   return (
-    <Layout user={user} activePage={activePage} onNavigate={navigate} onLogout={logout} onChangePassword={changePass}>
-      {renderDashboard()}
-    </Layout>
+    <>
+      <Layout user={user} activePage={activePage} onNavigate={navigate} onLogout={logout} onChangePassword={changePass}>
+        {renderDashboard()}
+      </Layout>
+      <CookieBanner />
+    </>
   );
 }

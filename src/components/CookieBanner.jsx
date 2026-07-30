@@ -1,7 +1,57 @@
 import { useState, useEffect } from 'react';
-import { Cookie, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Cookie, X, ShieldCheck } from 'lucide-react';
 
 const STORAGE_KEY = 'hlks-cookie-consent';
+
+const CATEGORIES = [
+  {
+    key: 'essential',
+    label: 'Essential Cookies',
+    desc: 'Required for the website to function. Cannot be disabled.',
+    locked: true,
+  },
+  {
+    key: 'analytics',
+    label: 'Analytics Cookies',
+    desc: 'Help us understand how visitors use the website (anonymised data).',
+    locked: false,
+  },
+  {
+    key: 'functional',
+    label: 'Functional Cookies',
+    desc: 'Remember your preferences such as language and accessibility settings.',
+    locked: false,
+  },
+];
+
+// Toggle-switch pill — same shape/size as the Account Status toggle used in the
+// Admin/Nodal edit-user modals, so this feels native to the app rather than a
+// bolted-on widget.
+function ToggleSwitch({ checked, disabled, onChange, label }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => !disabled && onChange(!checked)}
+      style={{
+        width: 38, height: 21, borderRadius: 12, border: 'none', flexShrink: 0,
+        cursor: disabled ? 'default' : 'pointer',
+        background: checked ? '#4ade80' : 'rgba(255,255,255,.22)',
+        opacity: disabled ? 0.6 : 1,
+        position: 'relative', transition: 'background .2s',
+      }}
+    >
+      <span style={{
+        position: 'absolute', top: 3, width: 15, height: 15, borderRadius: '50%',
+        background: '#fff', transition: 'left .2s', left: checked ? 20 : 3,
+        boxShadow: '0 1px 3px rgba(0,0,0,.3)',
+      }} />
+    </button>
+  );
+}
 
 export default function CookieBanner() {
   const [visible, setVisible]     = useState(false);
@@ -41,128 +91,135 @@ export default function CookieBanner() {
       aria-label="Cookie consent"
       style={{
         position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9999,
-        background: '#1a1a2e', color: '#f0f0f0',
-        boxShadow: '0 -4px 24px rgba(0,0,0,.35)',
+        // Glassmorphism, matching the auth-screen glass cards (Login/AdminOtpLogin/
+        // ChangePasswordScreen) elsewhere in the app: a translucent tint over blur
+        // rather than a flat fill. Tint is the DBIM Blue group's primary shade
+        // (#214AAB — the app's actual --primary token, same blue used for every
+        // button/heading accent) rather than Footer's darkest shade, so it reads
+        // lighter/friendlier while staying on-palette. Hardcoded (not var(--primary))
+        // so it doesn't get repointed to green by the high-contrast accessibility mode.
+        background: 'rgba(33,74,171,.90)',
+        backdropFilter: 'blur(20px) saturate(160%)',
+        WebkitBackdropFilter: 'blur(20px) saturate(160%)',
+        borderTop: '1px solid rgba(255,255,255,.22)',
+        boxShadow: '0 -12px 32px rgba(0,0,0,.28)',
         fontFamily: 'var(--font)',
-        animation: 'fadeSlideInUp .3s ease',
+        animation: 'fadeSlideInUp .35s cubic-bezier(.22,1,.36,1)',
       }}
     >
-      {/* ── Main bar ────────────────────────────────────── */}
-      <div style={{
-        maxWidth: 1200, margin: '0 auto',
-        padding: '16px 24px',
-        display: 'flex', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap',
-      }}>
-        <Cookie size={20} color="#4ade80" style={{ flexShrink: 0, marginTop: 2 }} aria-hidden="true" />
+      <style>{`
+        @media (max-width: 640px) {
+          .cb-body { flex-direction: column !important; }
+          .cb-actions { width: 100% !important; }
+          .cb-actions > button { flex: 1 1 auto !important; }
+        }
+      `}</style>
 
-        <div style={{ flex: 1, minWidth: 280 }}>
-          <p style={{ fontSize: 13, lineHeight: 1.6, color: 'rgba(255,255,255,0.85)', margin: 0 }}>
-            This website uses cookies to enhance your experience and comply with the{' '}
-            <strong style={{ color: '#fff' }}>Digital Personal Data Protection (DPDP) Act, 2023</strong>.
-            {' '}Essential cookies are always active. You may accept, reject, or customise other categories.
+      {/* ── Main bar — compact single row by default; only the expandable
+           preferences panel below adds height, on demand ── */}
+      <div className="cb-body" style={{
+        maxWidth: 1200, margin: '0 auto',
+        padding: '11px 22px',
+        display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap',
+      }}>
+        <div style={{
+          width: 30, height: 30, borderRadius: 8, flexShrink: 0,
+          background: 'rgba(255,255,255,.14)', border: '1px solid rgba(255,255,255,.24)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Cookie size={15} color="#fff" strokeWidth={1.8} aria-hidden="true" />
+        </div>
+
+        <div style={{ flex: 1, minWidth: 260 }}>
+          <p style={{ fontSize: 12.5, lineHeight: 1.5, color: 'rgba(255,255,255,.82)', margin: 0 }}>
+            <strong style={{ color: '#fff', fontWeight: 700 }}>We value your privacy.</strong>
+            {' '}Cookies help us comply with the{' '}
+            <strong style={{ color: '#D2DFFF', fontWeight: 700 }}>DPDP Act, 2023</strong>.
+            {' '}Essential cookies stay on; you choose the rest.{' '}
+            <button
+              onClick={() => setExpanded(e => !e)}
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: '#D2DFFF', fontSize: 12.5, fontWeight: 700, textDecoration: 'underline',
+                padding: 0, fontFamily: 'inherit',
+              }}
+              aria-expanded={expanded}
+            >
+              {expanded ? 'Hide options' : 'Manage preferences'}
+            </button>
           </p>
 
-          {/* ── Expandable preferences ─────────────────── */}
+          {/* ── Expandable preferences panel ─────────────── */}
           {expanded && (
             <div style={{
-              marginTop: 14, display: 'flex', flexDirection: 'column', gap: 10,
-              borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 14,
+              marginTop: 10, display: 'flex', flexDirection: 'column', gap: 4,
+              background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)',
+              borderRadius: 10, padding: '4px 14px',
             }}>
-              {[
-                {
-                  key: 'essential',
-                  label: 'Essential Cookies',
-                  desc: 'Required for the website to function. Cannot be disabled.',
-                  locked: true,
-                },
-                {
-                  key: 'analytics',
-                  label: 'Analytics Cookies',
-                  desc: 'Help us understand how visitors use the website (anonymised data).',
-                  locked: false,
-                },
-                {
-                  key: 'functional',
-                  label: 'Functional Cookies',
-                  desc: 'Remember your preferences such as language and accessibility settings.',
-                  locked: false,
-                },
-              ].map(({ key, label, desc, locked }) => (
-                <label key={key} style={{
-                  display: 'flex', alignItems: 'flex-start', gap: 12, cursor: locked ? 'default' : 'pointer',
+              {CATEGORIES.map(({ key, label, desc, locked }, i) => (
+                <div key={key} style={{
+                  display: 'flex', alignItems: 'center', gap: 14, padding: '8px 0',
+                  borderTop: i > 0 ? '1px solid rgba(255,255,255,.08)' : 'none',
                 }}>
-                  <input
-                    type="checkbox"
-                    checked={prefs[key]}
-                    disabled={locked}
-                    onChange={e => !locked && setPrefs(p => ({ ...p, [key]: e.target.checked }))}
-                    style={{ marginTop: 3, accentColor: '#4ade80', width: 15, height: 15 }}
-                    aria-label={label}
-                  />
-                  <div>
-                    <div style={{ fontSize: 12.5, fontWeight: 600, color: '#fff' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12.5, fontWeight: 600, color: '#fff', display: 'flex', alignItems: 'center', gap: 8 }}>
                       {label}
                       {locked && (
                         <span style={{
-                          fontSize: 10, background: 'rgba(74,222,128,0.2)', color: '#4ade80',
-                          borderRadius: 4, padding: '1px 6px', marginLeft: 6,
-                        }}>Always Active</span>
+                          fontSize: 9.5, fontWeight: 700, letterSpacing: '.03em',
+                          background: 'rgba(74,222,128,.16)', color: '#4ade80',
+                          borderRadius: 20, padding: '2px 8px',
+                        }}>ALWAYS ACTIVE</span>
                       )}
                     </div>
-                    <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>{desc}</div>
+                    <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,.68)', marginTop: 2, lineHeight: 1.5 }}>{desc}</div>
                   </div>
-                </label>
+                  <ToggleSwitch
+                    checked={prefs[key]}
+                    disabled={locked}
+                    onChange={v => setPrefs(p => ({ ...p, [key]: v }))}
+                    label={label}
+                  />
+                </div>
               ))}
             </div>
           )}
-
-          <button
-            onClick={() => setExpanded(e => !e)}
-            style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              color: '#4ade80', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4,
-              marginTop: 8, padding: 0,
-            }}
-            aria-expanded={expanded}
-          >
-            {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-            {expanded ? 'Hide preferences' : 'Manage cookie preferences'}
-          </button>
         </div>
 
         {/* ── Action buttons ──────────────────────────── */}
-        <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <div className="cb-actions" style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'flex-start', flexWrap: 'wrap' }}>
           <button onClick={rejectAll} style={{
-            padding: '8px 16px', borderRadius: 6, cursor: 'pointer', fontSize: 12.5, fontWeight: 600,
-            background: 'transparent', border: '1.5px solid rgba(255,255,255,0.3)', color: 'rgba(255,255,255,0.8)',
-            transition: 'border-color .15s, color .15s',
+            padding: '9px 16px', borderRadius: 8, cursor: 'pointer', fontSize: 12.5, fontWeight: 600,
+            background: 'transparent', border: '1.5px solid rgba(255,255,255,.28)', color: 'rgba(255,255,255,.85)',
+            fontFamily: 'var(--font)', transition: 'border-color .15s, color .15s', whiteSpace: 'nowrap',
           }}
             onMouseEnter={e => { e.currentTarget.style.borderColor = '#fff'; e.currentTarget.style.color = '#fff'; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)'; e.currentTarget.style.color = 'rgba(255,255,255,0.8)'; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,.28)'; e.currentTarget.style.color = 'rgba(255,255,255,.85)'; }}
           >
             Reject All
           </button>
           {expanded && (
             <button onClick={savePrefs} style={{
-              padding: '8px 16px', borderRadius: 6, cursor: 'pointer', fontSize: 12.5, fontWeight: 600,
-              background: 'rgba(74,222,128,0.15)', border: '1.5px solid #4ade80', color: '#4ade80',
-              transition: 'background .15s',
+              padding: '9px 16px', borderRadius: 8, cursor: 'pointer', fontSize: 12.5, fontWeight: 600,
+              background: 'rgba(163,187,243,.12)', border: '1.5px solid #A3BBF3', color: '#D2DFFF',
+              fontFamily: 'var(--font)', transition: 'background .15s', whiteSpace: 'nowrap',
             }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(74,222,128,0.25)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'rgba(74,222,128,0.15)'}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(163,187,243,.22)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'rgba(163,187,243,.12)'}
             >
               Save Preferences
             </button>
           )}
           <button onClick={acceptAll} style={{
-            padding: '8px 16px', borderRadius: 6, cursor: 'pointer', fontSize: 12.5, fontWeight: 600,
-            background: '#4ade80', border: '1.5px solid #4ade80', color: '#14532d',
-            transition: 'background .15s',
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '9px 18px', borderRadius: 8, cursor: 'pointer', fontSize: 12.5, fontWeight: 700,
+            background: '#fff', border: '1.5px solid #fff', color: '#214AAB',
+            fontFamily: 'var(--font)', transition: 'background .15s', whiteSpace: 'nowrap',
           }}
-            onMouseEnter={e => e.currentTarget.style.background = '#198754'}
-            onMouseLeave={e => e.currentTarget.style.background = '#4ade80'}
+            onMouseEnter={e => e.currentTarget.style.background = '#D2DFFF'}
+            onMouseLeave={e => e.currentTarget.style.background = '#fff'}
           >
-            Accept All
+            <ShieldCheck size={13} /> Accept All
           </button>
         </div>
 
@@ -171,8 +228,11 @@ export default function CookieBanner() {
           aria-label="Close cookie banner"
           style={{
             background: 'none', border: 'none', cursor: 'pointer',
-            color: 'rgba(255,255,255,0.4)', flexShrink: 0,
+            color: 'rgba(255,255,255,.45)', flexShrink: 0, display: 'flex', padding: 4,
+            transition: 'color .15s',
           }}
+          onMouseEnter={e => e.currentTarget.style.color = 'rgba(255,255,255,.85)'}
+          onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,.45)'}
         >
           <X size={16} />
         </button>

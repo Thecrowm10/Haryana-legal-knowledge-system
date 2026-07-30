@@ -8,7 +8,8 @@ import {
   Save, ArrowRight, Paperclip, Send,
 } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
-pdfjsLib.GlobalWorkerOptions.workerSrc = import.meta.env.BASE_URL + 'pdf.worker.min.js';
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 import mammoth from 'mammoth';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
@@ -119,6 +120,13 @@ const SUBDOC_TABS = [
   { key: 'appendices', labelKey: 'addDocuments.tabs.appendix', descKey: 'addDocuments.tabDesc.appendix', accent: '#ffc107', bg: 'rgba(255, 193, 7,.08)', text: '#d97706' },
   { key: 'forms',    labelKey: 'addDocuments.tabs.forms',    descKey: 'addDocuments.tabDesc.forms',    accent: '#8b5cf6', bg: 'rgba(139,92,246,.08)', text: '#7c3aed' },
 ];
+
+// The save-entries endpoints are dedicated routes using the plural SUBDOC_TABS keys above
+// (/schedules, /annexures, /appendices), but the submit-for-approval route
+// (/act-parts/{id}/{part_type}/submit) and the approvals list identify a part by the
+// singular form instead — this bridges the two so the right string reaches each endpoint.
+const PART_TYPE_FOR_API = { sections: 'sections', schedules: 'schedule', annexures: 'annexure', appendices: 'appendix', forms: 'forms' };
+const TAB_FOR_PART_TYPE = Object.fromEntries(Object.entries(PART_TYPE_FOR_API).map(([tab, pt]) => [pt, tab]));
 
 // Per-type metadata fields
 const TYPE_FIELDS = {
@@ -358,6 +366,8 @@ function extractTypeChildren(data, type) {
   }
   return [];
 }
+// DBIM 7.1.3.3 recommends PDF-only uploads, but the department explicitly requires
+// Word support too — PDF + DOC/DOCX are accepted, everything else is rejected.
 function isAccepted(f) {
   return (
     f.type === 'application/pdf' || f.name.endsWith('.pdf') ||
@@ -365,6 +375,12 @@ function isAccepted(f) {
     f.type === 'application/msword' ||
     f.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
   );
+}
+// DBIM 6.1.1 / Table 6 upload size ceiling — the guideline's own tiers are photo-oriented
+// (banner/thumbnail/high-res), so the closest fit for a document upload is its "high-res" cap.
+const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
+function isUnderSizeLimit(f) {
+  return f.size <= MAX_UPLOAD_SIZE_BYTES;
 }
 function focusStyle(e) {
   e.target.style.borderColor = 'var(--primary)';
@@ -1366,6 +1382,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const [typeFields, setTypeFields]  = useState({});
   const [hierarchy, setHierarchy]   = useState({ act: '', actId: null, chapter: '', section: '', subsection: '' });
   const [rejected, setRejected]     = useState([]);
+  const [oversizedFiles, setOversizedFiles] = useState([]); // [{ name, size }] — files rejected for exceeding MAX_UPLOAD_SIZE_BYTES
   const [versionModal, setVersionModal] = useState(null);
   const [conflictModal, setConflictModal] = useState(null); // { existingDoc, pendingDocs, pendingRelations }
   const [duplicateModal, setDuplicateModal] = useState(null); // { matches: DuplicateCheckItem[] }
@@ -1504,8 +1521,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     try {
       const res = await getActPartEntries(actId, tab);
       const rows = res.data || [];
-      const ENTRY_SINGULAR = { schedule: 'Schedule', annexure: 'Annexure', appendix: 'Appendix', forms: 'Form' };
-      const label = ENTRY_SINGULAR[tab] || '';
+      const ENTRY_SINGULAR = { schedules: 'Schedule', annexures: 'Annexure', appendices: 'Appendix', forms: 'Form' };
+      const label = ENTRY_SINGULAR[tab] || tab;
       function parseEntryPos(s) {
         if (!label) return null;
         const m = (s || '').match(new RegExp(`^${label}\\s+(\\d+)$`, 'i'));
@@ -1531,7 +1548,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     try {
       const res = await getActPartApprovals(actId);
       const map = {};
-      (res.data || []).forEach(a => { map[a.part_type] = a; });
+      (res.data || []).forEach(a => { map[TAB_FOR_PART_TYPE[a.part_type] || a.part_type] = a; });
       setSubDocApprovals(map);
     } catch { /* ignore */ }
   }, []);
@@ -1742,7 +1759,9 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   async function addFiles(fileList) {
     const arr = Array.from(fileList);
     setRejected(arr.filter(f => !isAccepted(f)).map(f => f.name));
-    const accepted = arr.filter(f => isAccepted(f));
+    const typeOk = arr.filter(f => isAccepted(f));
+    setOversizedFiles(typeOk.filter(f => !isUnderSizeLimit(f)).map(f => ({ name: f.name, size: f.size })));
+    const accepted = typeOk.filter(f => isUnderSizeLimit(f));
     setFiles(prev => {
       const names = new Set(prev.map(f => f.name));
       return [...prev, ...accepted.filter(f => !names.has(f.name))];
@@ -3417,14 +3436,16 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
           }
           await saveActPartSections(subDocAct, payload);
           try {
-            const submitRes = await submitActPartForApproval(subDocAct, subDocTab);
+            const submitRes = await submitActPartForApproval(subDocAct, PART_TYPE_FOR_API[subDocTab] || subDocTab);
             setSubDocApprovals(prev => ({ ...prev, [subDocTab]: submitRes.data }));
-          } catch { /* save succeeded; approval state refreshes on reload */ }
-          showToast('success', 'Sections saved and submitted for approval.');
-          await loadActPartSections(subDocAct);
+            showToast('success', 'Sections saved and submitted for approval.');
+          } catch (submitErr) {
+            showToast('error', `Sections saved, but submitting for approval failed: ${submitErr?.response?.data?.detail || submitErr?.message || 'unknown error'}`);
+          }
+          resetSubDocFormAfterSave('sections');
         } else {
           // Non-sections tab: upload per-entry files then save entries
-          const ENTRY_SINGULAR = { schedule: 'Schedule', annexure: 'Annexure', appendix: 'Appendix', forms: 'Form' };
+          const ENTRY_SINGULAR = { schedules: 'Schedule', annexures: 'Annexure', appendices: 'Appendix', forms: 'Form' };
           const entryLabel = ENTRY_SINGULAR[subDocTab] || subDocTab;
           const entries = subDocEntries[subDocTab] || [];
           const builtEntries = (await Promise.all(
@@ -3449,12 +3470,13 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
           )).filter(e => !(e.is_deleted && e.id == null));
           await saveActPartEntries(subDocAct, subDocTab, { entries: builtEntries });
           try {
-            const submitRes = await submitActPartForApproval(subDocAct, subDocTab);
+            const submitRes = await submitActPartForApproval(subDocAct, PART_TYPE_FOR_API[subDocTab] || subDocTab);
             setSubDocApprovals(prev => ({ ...prev, [subDocTab]: submitRes.data }));
-          } catch { /* save succeeded; approval state refreshes on reload */ }
-          showToast('success', `${subDocTab.charAt(0).toUpperCase() + subDocTab.slice(1)} saved and submitted for approval.`);
-          await loadActPartEntries(subDocAct, subDocTab);
-          setActiveEntryIdx(-1);
+            showToast('success', `${subDocTab.charAt(0).toUpperCase() + subDocTab.slice(1)} saved and submitted for approval.`);
+          } catch (submitErr) {
+            showToast('error', `${entryLabel} saved, but submitting for approval failed: ${submitErr?.response?.data?.detail || submitErr?.message || 'unknown error'}`);
+          }
+          resetSubDocFormAfterSave(subDocTab);
         }
       } catch (err) {
         const msg = err?.response?.data?.detail || err?.message || 'Save failed.';
@@ -3462,6 +3484,39 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       } finally {
         setSubDocSaving(false);
       }
+    }
+
+    // After a successful save the form collapses back to the "pick an Act" prompt instead of
+    // staying open on the just-saved Act — adding another one means picking again, on purpose.
+    function resetSubDocFormAfterSave(tab) {
+      setSubDocActByTab(prev => ({ ...prev, [tab]: '' }));
+      if (tab === 'sections') {
+        setSecHasChapters(null); setSecChapters([]); setSecFlatSections([]);
+        setSectionsBaseline(sectionsSignature(null, [], []));
+        setActiveChapterIdx(-1); setActiveSectionIdx(0); setActiveFlatSectionIdx(0);
+      } else {
+        setSubDocEntries(prev => ({ ...prev, [tab]: [] }));
+        setEntriesBaseline(prev => ({ ...prev, [tab]: entriesSignature([]) }));
+        setActiveEntryIdx(-1);
+      }
+      setSubDocLoadedFor({ actId: null, tab: null });
+      setSubDocApprovals({});
+    }
+
+    // Switching tabs (Sections/Schedule/Annexure/Appendix/Forms) always drops back to the
+    // "pick an Act" prompt too — no tab keeps a previously opened Act sitting expanded once
+    // you've navigated away from it.
+    function handleSubDocTabChange(newTab) {
+      setSubDocActByTab({});
+      setSecHasChapters(null); setSecChapters([]); setSecFlatSections([]);
+      setSectionsBaseline(sectionsSignature(null, [], []));
+      setActiveChapterIdx(-1); setActiveSectionIdx(0); setActiveFlatSectionIdx(0);
+      setSubDocEntries({});
+      setEntriesBaseline({});
+      setActiveEntryIdx(-1);
+      setSubDocLoadedFor({ actId: null, tab: null });
+      setSubDocApprovals({});
+      setSubDocTab(newTab);
     }
 
     // Shared by the structure/entries card headers (status badge) and the footer save button
@@ -3500,7 +3555,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
               <div className="ud-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(240px, 1fr))', gap: 20 }}>
                 {SUBDOC_TABS.map(tab => (
                   <button key={tab.key} type="button"
-                      onClick={() => setSubDocTab(tab.key)}
+                      onClick={() => handleSubDocTabChange(tab.key)}
                       style={{
                         display: 'flex', alignItems: 'center', gap: 16,
                         padding: '22px 20px', borderRadius: 14, textAlign: 'left',
@@ -3532,7 +3587,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
           <div style={{ padding: '14px 22px', display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ ...LABEL, fontSize: 10.5, color: 'var(--text-heading)', flexShrink: 0 }}>{t('addDocuments.pickLabel')}</div>
             {isMobile ? (
-              <select value={subDocTab} onChange={e => setSubDocTab(e.target.value)}
+              <select value={subDocTab} onChange={e => handleSubDocTabChange(e.target.value)}
                 style={{ ...INPUT_BASE, flex: 1, cursor: 'pointer', appearance: 'none', fontSize: 12.5 }}
                 onFocus={focusStyle} onBlur={blurStyle}>
                 {SUBDOC_TABS.map(tab => (
@@ -3544,7 +3599,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
               {SUBDOC_TABS.map(tab => {
                 const active = subDocTab === tab.key;
                 return (
-                  <button key={tab.key} type="button" onClick={() => setSubDocTab(tab.key)}
+                  <button key={tab.key} type="button" onClick={() => handleSubDocTabChange(tab.key)}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 6,
                       padding: '6px 10px', borderRadius: 8,
@@ -3816,7 +3871,12 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                                       <input type="file" accept=".pdf,.doc,.docx" style={{ display: 'none' }}
                                         id={`sec-file-ch${ci}-s${si}`}
-                                        onChange={e => { const f = e.target.files?.[0] || null; setChapterSectionField(ci, si, 'file', f); setChapterSectionField(ci, si, 'fileRef', null); e.target.value = ''; }} />
+                                        onChange={e => {
+                                          const f = e.target.files?.[0] || null;
+                                          if (f && !isAccepted(f)) { showToast('error', t('wizard.unsupportedFileToast', { name: f.name })); e.target.value = ''; return; }
+                                          if (f && !isUnderSizeLimit(f)) { showToast('error', t('wizard.fileTooLargeToast', { name: f.name, size: formatSize(MAX_UPLOAD_SIZE_BYTES) })); e.target.value = ''; return; }
+                                          setChapterSectionField(ci, si, 'file', f); setChapterSectionField(ci, si, 'fileRef', null); e.target.value = '';
+                                        }} />
                                       {sec.file ? (
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', flex: 1 }}>
                                           <Paperclip size={12} color={activeSubTab.accent} />
@@ -3969,7 +4029,12 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                             <input type="file" accept=".pdf,.doc,.docx" style={{ display: 'none' }}
                               id={`sec-flat-file-${si}`}
-                              onChange={e => { const f = e.target.files?.[0] || null; setFlatSectionField(si, 'file', f); setFlatSectionField(si, 'fileRef', null); e.target.value = ''; }} />
+                              onChange={e => {
+                                const f = e.target.files?.[0] || null;
+                                if (f && !isAccepted(f)) { showToast('error', t('wizard.unsupportedFileToast', { name: f.name })); e.target.value = ''; return; }
+                                if (f && !isUnderSizeLimit(f)) { showToast('error', t('wizard.fileTooLargeToast', { name: f.name, size: formatSize(MAX_UPLOAD_SIZE_BYTES) })); e.target.value = ''; return; }
+                                setFlatSectionField(si, 'file', f); setFlatSectionField(si, 'fileRef', null); e.target.value = '';
+                              }} />
                             {sec.file ? (
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', flex: 1 }}>
                                 <Paperclip size={12} color="var(--primary)" />
@@ -4029,7 +4094,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
               return { ...prev, [subDocTab]: [...list, { id: null, number: '', title: '', description: '', file: null, fileRef: null, existingFilename: null, existingFileRef: null, isDeleted: false }] };
             });
           }
-          const ENTRY_SINGULAR = { schedule: 'Schedule', annexure: 'Annexure', appendix: 'Appendix', forms: 'Form' };
+          const ENTRY_SINGULAR = { schedules: 'Schedule', annexures: 'Annexure', appendices: 'Appendix', forms: 'Form' };
           function singularLabel(tab) { return ENTRY_SINGULAR[tab] || tab; }
           function removeEntry(idx) {
             const entry = (subDocEntries[subDocTab] || [])[idx];
@@ -4161,7 +4226,12 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <input type="file" accept=".pdf,.doc,.docx" style={{ display: 'none' }}
                       id={`entry-file-${subDocTab}-${i}`}
-                      onChange={e => { const f = e.target.files?.[0] || null; setEntryField(i, 'file', f); setEntryField(i, 'fileRef', null); e.target.value = ''; }} />
+                      onChange={e => {
+                        const f = e.target.files?.[0] || null;
+                        if (f && !isAccepted(f)) { showToast('error', t('wizard.unsupportedFileToast', { name: f.name })); e.target.value = ''; return; }
+                        if (f && !isUnderSizeLimit(f)) { showToast('error', t('wizard.fileTooLargeToast', { name: f.name, size: formatSize(MAX_UPLOAD_SIZE_BYTES) })); e.target.value = ''; return; }
+                        setEntryField(i, 'file', f); setEntryField(i, 'fileRef', null); e.target.value = '';
+                      }} />
                     {entry.file ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-card)', flex: 1 }}>
                         {fileIcon(entry.file)}
@@ -4478,6 +4548,18 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
           </div>
         )}
 
+        {/* Oversized files alert — DBIM 6.1.1 upload size ceiling */}
+        {oversizedFiles.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px', borderRadius: 10, background: 'rgba(220, 53, 69,.08)', border: '1px solid rgba(220, 53, 69,.2)', color: '#dc2626' }}>
+            <AlertCircle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 1 }}>{t('wizard.step2.fileTooLarge', { size: formatSize(MAX_UPLOAD_SIZE_BYTES) })}</div>
+              <div style={{ fontSize: 11.5, fontFamily: 'var(--mono)' }}>{oversizedFiles.map(f => `${f.name} (${formatSize(f.size)})`).join(', ')}</div>
+            </div>
+            <button onClick={() => setOversizedFiles([])} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', display: 'flex' }}><X size={13} /></button>
+          </div>
+        )}
+
         {/* ── STEP 1 + 2 merged: once the type is picked AND every file is checked, show one compact
              card instead of two stacked ones — less scrolling, less wasted space. ── */}
         {form.type && allFilesChecked ? (
@@ -4668,7 +4750,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                 <div>
                   <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 8 }}>{t('wizard.step2.dropHere')} <span style={{ color: 'var(--primary)' }}>{t('wizard.step2.clickToBrowse')}</span></div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>{t('wizard.step2.fileTypeHint')}</span>
+                      <span style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>{t('wizard.step2.fileTypeHint', { size: formatSize(MAX_UPLOAD_SIZE_BYTES) })}</span>
                       <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--primary)', background: 'rgba(33, 74, 171,.08)', border: '1px solid rgba(33, 74, 171,.2)', padding: '2px 7px', borderRadius: 20 }}>.PDF</span>
                       <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: '#2b579a', background: 'rgba(43,87,154,.08)', border: '1px solid rgba(43,87,154,.3)', padding: '2px 7px', borderRadius: 20 }}>.DOC</span>
                     </div>

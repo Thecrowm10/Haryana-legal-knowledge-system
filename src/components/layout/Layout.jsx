@@ -28,7 +28,7 @@ export default function Layout({ user, activePage, onNavigate, onLogout, onChang
   const toggleSidebar = () => isDrawerMode ? setMobileOpen(o => !o) : setCollapsed(c => !c);
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--surface-ground)' }}>
+    <div className="full-vh" style={{ display: 'flex', overflow: 'hidden', background: 'var(--surface-ground)' }}>
       <a href="#main-content" className="skip-nav">Skip to main content</a>
       <div className="a11y-zoom-scope" style={{ display: 'flex', width: '100%', height: '100%' }}>
         {!NO_SIDEBAR_ROLES.includes(user.role) && (

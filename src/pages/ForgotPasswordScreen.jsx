@@ -108,17 +108,18 @@ export default function ForgotPasswordScreen({ onBack }) {
         .fp-otp-inp::placeholder { letter-spacing:normal; font-size:14px; font-weight:400; }
       `}</style>
 
-      <div className="fp" style={{
-        width: '100vw', minHeight: '100vh', position: 'relative',
+      <div className="fp full-vh-min" style={{
+        width: '100vw', position: 'relative',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         overflowX: 'hidden', padding: '48px 16px',
       }}>
         <img
           src={bannerBg}
           alt=""
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0, filter: 'blur(2px)', transform: 'scale(1.02)' }}
+          className="fixed-bg-img"
+          style={{ objectFit: 'cover', zIndex: 0, filter: 'blur(2px)', transform: 'scale(1.02)' }}
         />
-        <div style={{ position: 'absolute', inset: 0, zIndex: 1, background: 'linear-gradient(110deg, rgba(2,10,5,.82) 0%, rgba(2,10,5,.62) 45%, rgba(2,10,5,.42) 100%)' }}/>
+        <div className="fixed-bg-img" style={{ zIndex: 1, background: 'linear-gradient(110deg, rgba(2,10,5,.82) 0%, rgba(2,10,5,.62) 45%, rgba(2,10,5,.42) 100%)' }}/>
 
         <div className="fp-card" style={{
           position: 'relative', zIndex: 2,
@@ -134,7 +135,7 @@ export default function ForgotPasswordScreen({ onBack }) {
         }}>
           {/* Brand */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid rgba(255,255,255,.1)' }}>
-            <img src={haryanaLogo} alt="" style={{ width: 40, height: 40, objectFit: 'contain' }} />
+            <img src={haryanaLogo} alt="Haryana Government" style={{ width: 40, height: 40, objectFit: 'contain' }} />
             <div>
               <div style={{ fontSize: 13.5, fontWeight: 700, color: '#fff' }}>Haryana Government</div>
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)' }}>Digital Repository</div>

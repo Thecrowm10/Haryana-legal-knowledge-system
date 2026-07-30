@@ -1,0 +1,92 @@
+{
+  "stats": {
+    "totalDocuments": "कुल दस्तावेज़",
+    "totalDocumentsSub": "सिस्टम में",
+    "approved": "स्वीकृत",
+    "approvedSub": "प्रकाशित दस्तावेज़",
+    "pending": "लंबित",
+    "pendingSub": "समीक्षा हेतु लंबित",
+    "rejected": "अस्वीकृत",
+    "rejectedSub": "अपलोडर को वापस भेजा गया",
+    "vsLastMonth": "पिछले महीने की तुलना में"
+  },
+  "charts": {
+    "byDepartment": "विभाग अनुसार दस्तावेज़",
+    "monthlyTrend": "मासिक अपलोड रुझान",
+    "statusDistribution": "स्थिति वितरण",
+    "systemOverview": "सिस्टम अवलोकन",
+    "totalSearches": "कुल खोजें",
+    "activeUsers": "सक्रिय उपयोगकर्ता",
+    "approvalRate": "स्वीकृति दर"
+  },
+  "graph": {
+    "legend": {
+      "central": "केंद्रीय / संवैधानिक अधिनियम",
+      "state": "हरियाणा राज्य अधिनियम",
+      "rules": "नियम और विनियम",
+      "amend": "संशोधन",
+      "notif": "अधिसूचनाएं / आदेश"
+    },
+    "title": "विधिक दस्तावेज़ ज्ञान ग्राफ़",
+    "hintDefault": "नोड्स खींचें · फ़ोकस के लिए दस्तावेज़ चुनें · तीर निर्भरता दर्शाते हैं",
+    "showingRelationshipsFor": "संबंध दिखाए जा रहे हैं:",
+    "showAll": "सभी दिखाएं",
+    "searchPlaceholder": "दस्तावेज़ खोजें और चुनें…",
+    "clickNodeHint": "संशोधन इतिहास देखने के लिए किसी भी नोड पर क्लिक करें"
+  },
+  "actionPill": {
+    "approve": "स्वीकृत",
+    "reject": "अस्वीकृत",
+    "submit": "अपलोड",
+    "search": "खोज",
+    "view": "देखें"
+  },
+  "detail": {
+    "close": "✕ बंद करें",
+    "enacted": "अधिनियमित",
+    "amendments": "संशोधन",
+    "provisionsChanged": "बदले गए प्रावधान",
+    "timelineTab": "संशोधन समयरेखा ({{count}})",
+    "relationsTab": "संबंध ({{count}})",
+    "noHistory": "इस भंडार में इस दस्तावेज़ के लिए कोई संशोधन इतिहास दर्ज नहीं है।",
+    "originalEnactment": "मूल अधिनियमन — {{date}}",
+    "cameIntoForce": "{{label}} {{date}} को प्रभावी हुआ।",
+    "authority": "प्राधिकरण:",
+    "date": "तारीख़:",
+    "provisionsChangedPill": "{{count}} प्रावधान बदले गए",
+    "before": "पहले",
+    "originalProvision": "मूल प्रावधान",
+    "after": "बाद में",
+    "asAmended": "संशोधित रूप में",
+    "outgoingTitle": "बाह्य संबंध",
+    "outgoingSubtitle": "वे दस्तावेज़ जिन्हें यह अधिनियम सशक्त, संशोधित या नियंत्रित करता है — विशिष्ट प्रावधान देखने के लिए क्लिक करें",
+    "incomingTitle": "आंतरिक संबंध",
+    "incomingSubtitle": "वे अधिनियम और उपकरण जो इस दस्तावेज़ का संदर्भ लेते हैं या इस पर निर्भर हैं — विशिष्ट प्रावधान देखने के लिए क्लिक करें",
+    "noneRecorded": "कोई दर्ज नहीं",
+    "fromThisDoc": "इस दस्तावेज़ से",
+    "fromOtherDoc": "अन्य दस्तावेज़ से",
+    "subSection": "उप-धारा: {{value}}",
+    "chapter": "अध्याय: {{value}}"
+  },
+  "audit": {
+    "filters": {
+      "all": "सभी",
+      "approved": "स्वीकृत",
+      "rejected": "अस्वीकृत",
+      "uploaded": "अपलोड किया गया",
+      "searched": "खोजा गया",
+      "viewed": "देखा गया"
+    },
+    "searchPlaceholder": "लॉग खोजें…",
+    "headers": {
+      "timestamp": "समय",
+      "user": "उपयोगकर्ता",
+      "role": "भूमिका",
+      "action": "कार्रवाई",
+      "detail": "विवरण",
+      "zgVerified": "ZG सत्यापित"
+    },
+    "noMatch": "फ़िल्टर से कोई लॉग प्रविष्टि मेल नहीं खाती।",
+    "zgVerifiedBadge": "ZG ✓"
+  }
+}

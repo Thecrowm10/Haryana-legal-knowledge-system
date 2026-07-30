@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Search, FileText, X, BookOpen, Bookmark, BookmarkCheck,
-  ChevronRight, ChevronDown, AlertCircle, Building2, Layers, User,
+  ChevronRight, ChevronDown, AlertCircle, Building2, Layers, User, Sparkles,
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import DocViewModal from '../components/DocViewModal';
@@ -12,7 +12,7 @@ import LanguageToggle from '../components/LanguageToggle';
 import Footer from '../components/layout/Footer';
 import haryanaLogo from '../assets/haryana-logo.png';
 import bannerBg from '../assets/banner-1-768x217.png';
-import { publicSearchDocuments } from '../services/pdf';
+import { publicSearchDocuments, publicSemanticSearch } from '../services/pdf';
 import { getDocumentTypes } from '../services/departments';
 
 // Document types matching backend VALID_DOCUMENT_TYPES
@@ -102,6 +102,41 @@ function mapPublicDocForViewer(d) {
   };
 }
 
+// The semantic-search endpoint returns one row per matched *page/chunk*, so the
+// same document can appear several times (e.g. 5 different pages of the same Act).
+// Groups those rows into one card per document, keeping every matched page number
+// (fed to DocViewModal as searchPages for its existing "Match X of Y · p.N" nav)
+// and surfacing the highest-scoring page's snippet as the card's preview text.
+function groupSemanticSources(sources) {
+  const byId = new Map();
+  for (const s of sources) {
+    const existing = byId.get(s.pdf_id);
+    if (!existing) {
+      byId.set(s.pdf_id, {
+        id:                  s.pdf_id,
+        document_name:       s.document_name,
+        document_type_name:  s.document_type,
+        department_name:     s.department,
+        description:         s.snippet,
+        file_url:            s.file_url,
+        _pages:              [s.page_number],
+        _bestPage:           s.page_number,
+        _bestScore:          s.relevance_score,
+      });
+    } else {
+      existing._pages.push(s.page_number);
+      if (s.relevance_score > existing._bestScore) {
+        existing._bestScore  = s.relevance_score;
+        existing._bestPage   = s.page_number;
+        existing.description = s.snippet;
+      }
+    }
+  }
+  return [...byId.values()]
+    .map(d => ({ ...d, _pages: [...new Set(d._pages)].sort((a, b) => a - b) }))
+    .sort((a, b) => b._bestScore - a._bestScore);
+}
+
 function loadBookmarks() {
   try { return JSON.parse(localStorage.getItem('hlks_bookmarks') || '[]'); } catch { return []; }
 }
@@ -167,6 +202,11 @@ function DocumentResultCard({ doc, query, onView }) {
             {year && (
               <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{year}</span>
             )}
+            {doc._pages?.length > 0 && (
+              <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--primary)', background: 'var(--primary-light)', padding: '2px 8px', borderRadius: 20 }}>
+                {t('matchedPagesSuffix', { count: doc._pages.length })} · p.{doc._bestPage}
+              </span>
+            )}
           </div>
 
           {doc.description && (
@@ -195,6 +235,7 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
   const [query, setQuery]           = useState('');
   const [results, setResults]       = useState([]);
   const [total, setTotal]           = useState(0);
+  const [answer, setAnswer]         = useState(null); // AI answer text from the Search button's semantic search
   const [loading, setLoading]       = useState(false);
   const [searched, setSearched]     = useState(false);
   const [error, setError]           = useState(null);
@@ -274,16 +315,19 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
 
   async function doSearch(q = query) {
     const trimmed = (q || '').trim();
-    if (trimmed.length < 2) return;
+    if (trimmed.length < 5) return; // matches the semantic-search endpoint's minLength on `q`
     setQuery(trimmed);
     setShowSugg(false);
     setLoading(true);
     setSearched(false);
     setError(null);
+    setAnswer(null);
     try {
-      const res = await publicSearchDocuments({ name: trimmed, document_type_id: docTypeId || undefined, skip: 0, limit: 50 });
-      setResults(res.data.documents || []);
-      setTotal(res.data.total || 0);
+      const res = await publicSemanticSearch(trimmed);
+      const grouped = groupSemanticSources(res.data.sources || []);
+      setResults(grouped);
+      setTotal(grouped.length);
+      setAnswer(res.data.answer || null);
       onAuditLog?.(`Searched: "${trimmed}"`);
     } catch {
       setError(true);
@@ -294,7 +338,7 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
   }
 
   function clearSearch() {
-    setQuery(''); setResults([]); setTotal(0);
+    setQuery(''); setResults([]); setTotal(0); setAnswer(null);
     setSearched(false); setError(null); setViewDoc(null);
   }
 
@@ -307,7 +351,16 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
   }
 
   function openDoc(doc) {
-    setViewDoc(mapPublicDocForViewer(doc));
+    const mapped = mapPublicDocForViewer(doc);
+    // Semantic search results carry which page(s) matched — jump straight to the
+    // best one and let DocViewModal's existing "Match X of Y · p.N" nav step
+    // through the rest, same mechanism it already supports for any doc.
+    if (doc._pages) {
+      mapped._initialPage = doc._bestPage || doc._pages[0];
+      mapped._searchQuery = query;
+      mapped._searchPages = doc._pages;
+    }
+    setViewDoc(mapped);
     onAuditLog?.(`Viewed: ${doc.document_name || doc.original_filename}`);
   }
 
@@ -470,7 +523,7 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
                     onBlurCapture={e => e.currentTarget.style.borderColor = 'transparent'}>
                     <span style={{
                       padding: scrolled ? '0 10px' : '0 14px', display: 'flex', alignItems: 'center',
-                      color: 'var(--text-color-secondary)', flexShrink: 0, transition: `padding ${TOP_BAR_EASE}`,
+                      color: 'var(--text-color-secondary)', flexShrink: 0,
                     }}>
                       <Search size={scrolled ? 14 : 18} />
                     </span>
@@ -485,7 +538,6 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
                       style={{
                         flex: 1, minWidth: 0, padding: scrolled ? '9px 0' : '18px 0', background: 'transparent', border: 'none', outline: 'none',
                         fontFamily: 'var(--font)', fontSize: scrolled ? 13 : 16, color: 'var(--text-color)',
-                        transition: `padding ${TOP_BAR_EASE}, font-size ${TOP_BAR_EASE}`,
                       }}
                     />
                     {query && (
@@ -494,7 +546,7 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
                         <X size={14} />
                       </button>
                     )}
-                    <div style={{
+                    <div className="cd-type-pill" style={{
                       position: 'relative', alignSelf: 'stretch', display: 'flex', alignItems: 'center',
                       margin: scrolled ? '5px 5px 5px 0' : '9px 9px 9px 0',
                       background: 'rgba(148,163,184,.12)',
@@ -502,10 +554,10 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
                       border: '1px solid rgba(255,255,255,.7)',
                       boxShadow: 'inset 0 1px 1px rgba(255,255,255,.8), 0 1px 2px rgba(15,23,42,.05)',
                       borderRadius: scrolled ? 8 : 10,
-                      flexShrink: 0, transition: `margin ${TOP_BAR_EASE}`,
+                      flexShrink: 0,
                     }}>
                       <Layers size={scrolled ? 12 : 14} color="var(--text-color-secondary)"
-                        style={{ marginLeft: scrolled ? 8 : 11, flexShrink: 0, pointerEvents: 'none', transition: `margin ${TOP_BAR_EASE}` }} />
+                        style={{ marginLeft: scrolled ? 8 : 11, flexShrink: 0, pointerEvents: 'none' }} />
                       <select
                         value={docTypeId}
                         onChange={e => setDocTypeId(e.target.value)}
@@ -516,7 +568,6 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
                           fontFamily: 'var(--font)', color: docTypeId ? 'var(--text-heading)' : 'var(--text-color-secondary)',
                           fontSize: scrolled ? 11.5 : 13, fontWeight: 600,
                           padding: scrolled ? '0 22px 0 6px' : '0 28px 0 8px', maxWidth: scrolled ? 100 : 160,
-                          transition: `padding ${TOP_BAR_EASE}, font-size ${TOP_BAR_EASE}`,
                         }}>
                       <option value="">{t('allTypes')}</option>
                       {typeOptions.map(dt => (
@@ -524,7 +575,7 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
                       ))}
                       </select>
                       <ChevronDown size={scrolled ? 11 : 13} color="var(--text-color-secondary)"
-                        style={{ position: 'absolute', right: scrolled ? 7 : 9, pointerEvents: 'none', transition: `right ${TOP_BAR_EASE}` }} />
+                        style={{ position: 'absolute', right: scrolled ? 7 : 9, pointerEvents: 'none' }} />
                     </div>
                     <button
                       className="cd-search-btn"
@@ -534,7 +585,6 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
                         background: 'var(--primary)', color: 'white', border: 'none',
                         padding: scrolled ? '0 16px' : '0 32px', fontFamily: 'var(--font)', fontSize: scrolled ? 11.5 : 14,
                         fontWeight: 700, cursor: 'pointer', letterSpacing: '.04em', textTransform: 'uppercase', flexShrink: 0,
-                        transition: `padding ${TOP_BAR_EASE}, font-size ${TOP_BAR_EASE}`,
                       }}
                     >
                       {t('searchButton')}
@@ -687,6 +737,27 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
         {/* Results */}
         {!loading && searched && !error && (
           <>
+            {answer && (
+              <Card style={{ marginBottom: 16, borderLeft: '3px solid var(--primary)' }}>
+                <div style={{ display: 'flex', gap: 12 }}>
+                  <div style={{ width: 34, height: 34, borderRadius: 9, background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Sparkles size={16} color="var(--primary)" />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6, fontFamily: 'var(--mono)' }}>
+                      {t('aiAnswerLabel')}
+                    </div>
+                    <div style={{ fontSize: 14, lineHeight: 1.65, color: 'var(--text-color)', whiteSpace: 'pre-line' }}>
+                      {answer}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 10 }}>
+                      {t('aiAnswerDisclaimer')}
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            )}
+
             <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', marginBottom: 14, fontFamily: 'var(--mono)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span>
                 <strong style={{ color: 'var(--primary)' }}>{results.length}</strong> {t('documentsSuffix', { count: results.length })}

@@ -6,14 +6,15 @@ import {
   ZoomIn, ZoomOut, RotateCw, ExternalLink, Plus, Highlighter, MessageCircle,
 } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
-pdfjsLib.GlobalWorkerOptions.workerSrc = import.meta.env.BASE_URL + 'pdf.worker.min.js';
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 import mammoth from 'mammoth';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import { useAuth } from '../hooks/useAuth';
 import { getApproverDocuments, getPdfFile, reviewDocument, getDepartmentLinkRequests, reviewDepartmentLink } from '../services/pdf';
 import { createNotification } from '../services/notifications';
-import { getPendingActParts, getAllActParts, reviewActPart } from '../services/act_parts';
+import { getAllActPartSubmissions, getAllActParts, reviewActPart } from '../services/act_parts';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { TYPE_SPECIFIC_FIELD_KEYS } from '../constants/docTypeFields';
 
@@ -49,6 +50,63 @@ const LABEL = {
   fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)',
   letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)',
 };
+
+// Centered confirmation modal — used in place of window.confirm() for the
+// approve/reject "are you sure?" prompt, styled to match the app's own
+// dialogs (ProfileModal etc.) and themed via the shared CSS variables so it
+// adapts automatically to light/dark mode.
+function ConfirmDialog({ decision, docTitle, onConfirm, onCancel }) {
+  const { t } = useTranslation('approver');
+  const isApprove = decision === 'approved';
+  const accent    = isApprove ? 'var(--green)' : 'var(--red)';
+  const accentBg  = isApprove ? 'rgba(25, 135, 84,.12)' : 'rgba(220, 53, 69,.12)';
+  const Icon      = isApprove ? CheckCircle : XCircle;
+
+  useEffect(() => {
+    const onKey = e => { if (e.key === 'Escape') onCancel(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onCancel]);
+
+  return (
+    <div role="dialog" aria-modal="true" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', zIndex: 4000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+      onClick={onCancel}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: 'var(--surface-card)', borderRadius: 16, width: 420, maxWidth: '100%',
+        boxShadow: '0 24px 80px rgba(0,0,0,.35)', borderTop: `3px solid ${accent}`,
+        padding: '26px 26px 20px', animation: 'fadeSlideIn .18s ease',
+      }}>
+        <div style={{ display: 'flex', gap: 14, marginBottom: 22 }}>
+          <div style={{ width: 46, height: 46, borderRadius: '50%', background: accentBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Icon size={22} color={accent} />
+          </div>
+          <div style={{ flex: 1, paddingTop: 6, minWidth: 0 }}>
+            <div style={{ fontSize: 14.5, color: 'var(--text-color)', lineHeight: 1.5, fontFamily: 'var(--font)', wordBreak: 'break-word', marginBottom: 8, fontWeight: 600 }}>
+              {t(isApprove ? 'common.confirmApproveQuestion' : 'common.confirmRejectQuestion', { title: docTitle })}
+            </div>
+            <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', lineHeight: 1.55, fontFamily: 'var(--font)', wordBreak: 'break-word' }}>
+              {t(isApprove ? 'common.confirmApproveBody' : 'common.confirmRejectBody')}
+            </div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+          <button onClick={onCancel} autoFocus
+            style={{ padding: '9px 18px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color)', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 600, cursor: 'pointer', transition: 'background .15s' }}
+            onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'var(--surface-ground)'}>
+            {t('common.cancel')}
+          </button>
+          <button onClick={onConfirm}
+            style={{ padding: '9px 20px', borderRadius: 8, border: 'none', background: accent, color: '#fff', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, boxShadow: `0 4px 14px ${isApprove ? 'rgba(25,135,84,.35)' : 'rgba(220,53,69,.35)'}`, transition: 'filter .15s' }}
+            onMouseEnter={e => e.currentTarget.style.filter = 'brightness(0.92)'}
+            onMouseLeave={e => e.currentTarget.style.filter = 'none'}>
+            <Icon size={14} /> {isApprove ? t('common.approve') : t('common.reject')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function parseDisplayRemarks(str) {
   if (!str) return [];
@@ -204,6 +262,9 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
     }
   }
 
+  // clientX/clientY exist on PointerEvent the same way they do on MouseEvent, so
+  // wiring the SVG to pointer events (below) instead of mouse events makes this
+  // math work for touch/pen input too, not just a mouse.
   function getSvgFractional(e, pageIdx) {
     const svg = svgRefs.current[pageIdx];
     if (!svg) return null;
@@ -218,6 +279,7 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
   function handleSvgMouseDown(e, pageIdx) {
     if (drawState !== 'idle') return;
     e.preventDefault();
+    e.currentTarget.setPointerCapture?.(e.pointerId);
     const pt = getSvgFractional(e, pageIdx);
     if (!pt) return;
     setDragStart(pt);
@@ -343,35 +405,37 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Toolbar */}
-      <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surface-50)', flexShrink: 0 }}>
-        <Eye size={13} color="var(--primary)" />
-        <span style={{ fontSize: 'var(--font-size-small)', fontWeight: 700, color: 'var(--text-heading)', flex: 1 }}>{docxHtml ? t('pdfViewer.documentPreview') : t('pdfViewer.originalPdf')}</span>
+      {/* Toolbar — horizontally scrollable below the point where Rotate/Zoom/Highlight
+          all stop fitting, so the Highlight button scrolls into view instead of being
+          clipped off the edge of the panel on phones/tablets. */}
+      <div className="table-scroll-wrap" style={{ padding: '10px 14px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surface-50)', flexShrink: 0 }}>
+        <Eye size={13} color="var(--primary)" style={{ flexShrink: 0 }} />
+        <span style={{ fontSize: 'var(--font-size-small)', fontWeight: 700, color: 'var(--text-heading)', flex: '1 1 auto', minWidth: 40, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{docxHtml ? t('pdfViewer.documentPreview') : t('pdfViewer.originalPdf')}</span>
         {blobUrl && !docxHtml && (
           <a href={blobUrl} target="_blank" rel="noreferrer" title={t('pdfViewer.openInNewTab')}
-            style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 9px', borderRadius: 5, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)', textDecoration: 'none', fontSize: 11, fontWeight: 600, fontFamily: 'var(--font)' }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 9px', borderRadius: 5, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)', textDecoration: 'none', fontSize: 11, fontWeight: 600, fontFamily: 'var(--font)', flexShrink: 0, whiteSpace: 'nowrap' }}>
             <ExternalLink size={11} /> {t('common.open')}
           </a>
         )}
         {!docxHtml && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
             <button onClick={onRotate} title={t('pdfViewer.rotate')}
-              style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 5, width: 24, height: 24, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-color-secondary)' }}>
+              style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 5, width: 24, height: 24, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-color-secondary)', flexShrink: 0 }}>
               <RotateCw size={11} />
             </button>
             <button onClick={() => setZoom(z => Math.max(70, z - 10))}
-              style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 5, width: 24, height: 24, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-color-secondary)' }}>
+              style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 5, width: 24, height: 24, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-color-secondary)', flexShrink: 0 }}>
               <ZoomOut size={11} />
             </button>
-            <span style={{ fontSize: 10.5, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', minWidth: 34, textAlign: 'center' }}>{zoom}%</span>
+            <span style={{ fontSize: 10.5, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', minWidth: 34, textAlign: 'center', flexShrink: 0 }}>{zoom}%</span>
             <button onClick={() => setZoom(z => Math.min(150, z + 10))}
-              style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 5, width: 24, height: 24, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-color-secondary)' }}>
+              style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 5, width: 24, height: 24, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-color-secondary)', flexShrink: 0 }}>
               <ZoomIn size={11} />
             </button>
           </div>
         )}
         {/* Highlight mode toggle + color palette */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 6, flexShrink: 0 }}>
           <button
             onClick={() => onHighlightModeChange?.(!highlightMode)}
             title={highlightMode ? t('pdfViewer.exitHighlightMode') : docxHtml ? t('pdfViewer.selectTextToHighlight') : t('pdfViewer.drawHighlightOnPdf')}
@@ -391,6 +455,7 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
         <div
           ref={docxContainerRef}
           onMouseUp={handleDocxMouseUp}
+          onTouchEnd={handleDocxMouseUp}
           style={{ flex: 1, overflow: 'auto', background: 'white', padding: '32px 40px', color: '#1a1a1a', lineHeight: 1.8, fontSize: 13, cursor: highlightMode ? 'text' : 'auto' }}
         />
       ) : doc.fileUrl ? (
@@ -409,10 +474,15 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
               <svg ref={el => { svgRefs.current[i] = el; }}
                 style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
                   cursor: highlightMode ? 'crosshair' : 'default',
+                  // Pointer events unify mouse/touch/pen, but a touch-drag on this SVG
+                  // would otherwise still be interpreted as a page-scroll gesture by the
+                  // browser before our handlers ever see it — touch-action:none hands
+                  // that gesture to us instead, which is what makes drawing work on phones.
+                  touchAction: highlightMode ? 'none' : 'auto',
                   pointerEvents: highlightMode || annotations.some(a => a.page === i + 1) ? 'auto' : 'none' }}
-                onMouseDown={e => highlightMode && handleSvgMouseDown(e, i)}
-                onMouseMove={e => highlightMode && handleSvgMouseMove(e, i)}
-                onMouseUp={e => highlightMode && handleSvgMouseUp(e, i)}>
+                onPointerDown={e => highlightMode && handleSvgMouseDown(e, i)}
+                onPointerMove={e => highlightMode && handleSvgMouseMove(e, i)}
+                onPointerUp={e => highlightMode && handleSvgMouseUp(e, i)}>
 
                 {/* Existing annotations */}
                 {annotations.filter(a => a.page === i + 1).map(ann => (
@@ -828,6 +898,7 @@ function DocumentDetailsPanel({ doc, reviewAnnotations = [], onScrollToAnnotatio
 // PDF on the left, uploader-filled document details on the right.
 function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, deciding }) {
   const { t } = useTranslation('approver');
+  const [confirmDecision, setConfirmDecision] = useState(null); // 'approved' | 'rejected' | null
   const [currentPage, setCurrentPage]   = useState(1);
   const [rotation, setRotation]         = useState(0);
   const [blobUrl, setBlobUrl]           = useState(null);
@@ -982,13 +1053,13 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, deciding })
               <Plus size={13} /> {t('common.addRemark')}
             </button>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={() => onDecide('rejected', annotations)} disabled={!!deciding}
+              <button onClick={() => setConfirmDecision('rejected')} disabled={!!deciding}
                 style={{ background: 'rgba(220, 53, 69,.08)', border: '1px solid rgba(220, 53, 69,.3)', color: '#b91c1c', padding: '9px 18px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 600, cursor: deciding ? 'not-allowed' : 'pointer', opacity: deciding && deciding !== 'rejected' ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
                 onMouseEnter={e => { if (!deciding) e.currentTarget.style.background = 'rgba(220, 53, 69,.15)'; }}
                 onMouseLeave={e => { if (!deciding) e.currentTarget.style.background = 'rgba(220, 53, 69,.08)'; }}>
                 <X size={14} /> {deciding === 'rejected' ? t('common.rejecting') : t('common.reject')}
               </button>
-              <button onClick={() => onDecide('approved', annotations)} disabled={!!deciding}
+              <button onClick={() => setConfirmDecision('approved')} disabled={!!deciding}
                 style={{ background: 'rgba(25, 135, 84,.1)', border: '1px solid rgba(25, 135, 84,.3)', color: '#1e40af', padding: '9px 20px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700, cursor: deciding ? 'not-allowed' : 'pointer', opacity: deciding && deciding !== 'approved' ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
                 onMouseEnter={e => { if (!deciding) e.currentTarget.style.background = 'rgba(25, 135, 84,.18)'; }}
                 onMouseLeave={e => { if (!deciding) e.currentTarget.style.background = 'rgba(25, 135, 84,.1)'; }}>
@@ -997,6 +1068,15 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, deciding })
             </div>
           </div>
         </div>
+      )}
+
+      {confirmDecision && (
+        <ConfirmDialog
+          decision={confirmDecision}
+          docTitle={doc.title}
+          onCancel={() => setConfirmDecision(null)}
+          onConfirm={() => { onDecide(confirmDecision, annotations); setConfirmDecision(null); }}
+        />
       )}
 
       {/* Remarks display for already-reviewed documents */}
@@ -1112,6 +1192,7 @@ function mapApiDoc(d) {
 function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
   const { t } = useTranslation('approver');
   const isReadOnly = lr.link_status !== 'pending';
+  const [confirmDecision, setConfirmDecision] = useState(null); // 'approved' | 'rejected' | null
 
   const [blobUrl, setBlobUrl]             = useState(null);
   const [currentPage, setCurrentPage]     = useState(1);
@@ -1455,7 +1536,7 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
               <Plus size={13} /> {t('common.addRemark')}
             </button>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={() => onReview(lr.link_id, 'rejected', buildComments(), buildAnnotationsJson())}
+              <button onClick={() => setConfirmDecision('rejected')}
                 disabled={deciding === lr.link_id || !hasRemarks}
                 title={!hasRemarks ? t('linkReview.enterRemarkBeforeRejecting') : undefined}
                 style={{ background: 'rgba(220, 53, 69,.08)', border: '1px solid rgba(220, 53, 69,.3)', color: '#b91c1c', padding: '9px 18px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 600, cursor: (deciding === lr.link_id || !hasRemarks) ? 'not-allowed' : 'pointer', opacity: (deciding === lr.link_id || !hasRemarks) ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
@@ -1463,7 +1544,7 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
                 onMouseLeave={e => { if (!deciding) e.currentTarget.style.background = 'rgba(220, 53, 69,.08)'; }}>
                 <X size={14} /> {deciding === lr.link_id ? t('common.rejecting') : t('common.reject')}
               </button>
-              <button onClick={() => onReview(lr.link_id, 'approved', buildComments(), buildAnnotationsJson())}
+              <button onClick={() => setConfirmDecision('approved')}
                 disabled={deciding === lr.link_id}
                 style={{ background: 'rgba(25, 135, 84,.1)', border: '1px solid rgba(25, 135, 84,.3)', color: '#1e40af', padding: '9px 20px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700, cursor: deciding === lr.link_id ? 'not-allowed' : 'pointer', opacity: deciding === lr.link_id ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
                 onMouseEnter={e => { if (!deciding) e.currentTarget.style.background = 'rgba(25, 135, 84,.18)'; }}
@@ -1473,6 +1554,19 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
             </div>
           </div>
         </div>
+      )}
+
+      {confirmDecision && (
+        <ConfirmDialog
+          decision={confirmDecision}
+          docTitle={lr.document_name}
+          onCancel={() => setConfirmDecision(null)}
+          onConfirm={() => {
+            if (confirmDecision === 'approved') onReview(lr.link_id, 'approved', buildComments(), buildAnnotationsJson());
+            else onReview(lr.link_id, 'rejected', buildComments(), buildAnnotationsJson());
+            setConfirmDecision(null);
+          }}
+        />
       )}
     </div>
   );
@@ -1493,6 +1587,7 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
   const [linkLoading, setLinkLoading]     = useState(false);
   const [linkDeciding, setLinkDeciding]   = useState(null); // link_id being actioned
   const [viewingLink, setViewingLink]     = useState(null); // lr being viewed in detail
+  const [confirmLinkRow, setConfirmLinkRow] = useState(null); // { lr, decision } | null — table-row quick approve/reject
   const [linkFilter, setLinkFilter]       = useState('pending'); // 'pending' | 'approved' | 'rejected'
   const [filter, setFilter]       = useState('');
   const [searchQ, setSearchQ]     = useState('');
@@ -1507,14 +1602,15 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
   const [apViewing, setApViewing]       = useState(null); // { item, partsData }
   const [apDetailLoading, setApDetailLoading] = useState(false);
   const [apToast, setApToast]           = useState(null); // { type, msg }
+  const [apStatusFilter, setApStatusFilter] = useState(''); // '' = All, else 'pending' | 'approved' | 'rejected'
 
   useEffect(() => {
     if (activePage !== 'actparts') return;
     setApLoading(true);
     setApError('');
-    getPendingActParts()
+    getAllActPartSubmissions()
       .then(res => setApItems(Array.isArray(res.data) ? res.data : []))
-      .catch(() => setApError('Failed to load pending act part submissions.'))
+      .catch(() => setApError('Failed to load act part submissions.'))
       .finally(() => setApLoading(false));
   }, [activePage]);
 
@@ -1541,7 +1637,11 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
     const { item } = apViewing;
     try {
       await reviewActPart({ pdf_document_id: item.pdf_document_id, part_type: item.part_type, action, comments: comment });
-      setApItems(prev => prev.filter(i => !(i.pdf_document_id === item.pdf_document_id && i.part_type === item.part_type)));
+      // The list now holds every status (not just pending) — update this item in place so it
+      // moves to the Approved/Rejected tab instead of disappearing from the table.
+      setApItems(prev => prev.map(i => (i.pdf_document_id === item.pdf_document_id && i.part_type === item.part_type)
+        ? { ...i, status: action, comments: comment }
+        : i));
       setApToast({ type: 'success', msg: `${item.part_type} ${action === 'approved' ? 'approved' : 'rejected'} successfully.` });
     } catch (err) {
       setApToast({ type: 'error', msg: err?.response?.data?.detail || 'Could not submit review.' });
@@ -1569,21 +1669,32 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
     if (activePage !== 'links') { setViewingLink(null); return; } // reset when leaving link requests
     if (!localStorage.getItem('token')) return;
     setLinkLoading(true);
-    getDepartmentLinkRequests(linkFilter)
+    // Fetch every status once so the Total/Pending/Approved/Rejected tiles can
+    // all show live counts at the same time; the tab filter below is applied client-side.
+    getDepartmentLinkRequests('')
       .then(res => setLinkRequests(Array.isArray(res.data) ? res.data : []))
       .catch(() => {})
       .finally(() => setLinkLoading(false));
-  }, [activePage, linkFilter]);
+  }, [activePage]);
+
+  const filteredLinkRequests = linkFilter ? linkRequests.filter(l => l.link_status === linkFilter) : linkRequests;
 
   async function handleReviewLink(link_id, action, comments, annotations_json) {
+    const lr = linkRequests.find(l => l.link_id === link_id);
     setLinkDeciding(link_id);
     try {
       await reviewDepartmentLink(link_id, action, comments, annotations_json);
       setViewingLink(null);
-      // Refetch for current filter so the list stays accurate
-      const res = await getDepartmentLinkRequests(linkFilter);
+      // Refetch the full list so all four status tiles stay accurate
+      const res = await getDepartmentLinkRequests('');
       setLinkRequests(Array.isArray(res.data) ? res.data : []);
-    } catch (_) {}
+      setApToast({
+        type: 'success',
+        msg: t(action === 'approved' ? 'toasts.linkApproved' : 'toasts.linkRejected', { title: lr?.document_name || '' }),
+      });
+    } catch (err) {
+      setApToast({ type: 'error', msg: err.response?.data?.detail || t('toasts.actionFailed') });
+    }
     setLinkDeciding(null);
   }
 
@@ -1623,6 +1734,10 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
         docTitle: doc?.title,
       });
       if (expanded === id) setExpanded(null);
+      setApToast({
+        type: 'success',
+        msg: t(decision === 'approved' ? 'toasts.documentApproved' : 'toasts.documentRejected', { title: doc?.title || '' }),
+      });
     }
 
     if (!hasToken) {
@@ -1634,8 +1749,8 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
     reviewDocument(id, decision, remark || undefined, annotationsJson)
       .then(() => apply())
       .catch(err => {
-        const detail = err.response?.data?.detail || 'Action failed. Please try again.';
-        setApiError(detail);
+        const detail = err.response?.data?.detail || t('toasts.actionFailed');
+        setApToast({ type: 'error', msg: detail });
       })
       .finally(() => setDeciding(null));
   }
@@ -1658,6 +1773,31 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
+      {/* Toast — top-level so it's visible no matter which tab is active */}
+      {apToast && (
+        <div style={{ position: 'fixed', top: 20, right: 20, zIndex: 3000, display: 'flex', alignItems: 'flex-start', gap: 10, padding: '13px 16px', borderRadius: 10, background: 'var(--surface-card)', border: `1px solid ${apToast.type === 'success' ? '#16a34a' : '#dc3545'}44`, boxShadow: '0 12px 32px rgba(0,0,0,.18)', maxWidth: 380, animation: 'fadeSlideIn .25s ease' }}>
+          <div style={{ width: 26, height: 26, borderRadius: 7, background: apToast.type === 'success' ? 'rgba(25, 135, 84,.08)' : 'rgba(220, 53, 69,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            {apToast.type === 'success'
+              ? <CheckCircle size={14} color="#16a34a" />
+              : <XCircle size={14} color="#dc3545" />}
+          </div>
+          <span style={{ fontSize: 13, color: 'var(--text-color)', lineHeight: 1.5, flex: 1, paddingTop: 3, fontFamily: 'var(--font)' }}>{apToast.msg}</span>
+          <button type="button" onClick={() => setApToast(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', flexShrink: 0, padding: 3 }}>
+            <X size={13} />
+          </button>
+        </div>
+      )}
+
+      {/* Table-row quick approve/reject confirmation (Link Requests tab) */}
+      {confirmLinkRow && (
+        <ConfirmDialog
+          decision={confirmLinkRow.decision}
+          docTitle={confirmLinkRow.lr.document_name}
+          onCancel={() => setConfirmLinkRow(null)}
+          onConfirm={() => { handleReviewLink(confirmLinkRow.lr.link_id, confirmLinkRow.decision); setConfirmLinkRow(null); }}
+        />
+      )}
+
       {/* Mobile/tablet reflow for the split review panes and stat grid — mounted once
           here since ThreePanelReview/LinkReviewPanel render as descendants of this
           top-level return, same technique as Uploader/Citizen dashboards' <style> blocks. */}
@@ -1668,6 +1808,14 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
         }
         @media (max-width: 640px) {
           .ap-stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          /* Document row: at full width the icon + title + status badge + chevron
+             all fought for the same line, squeezing the title into a column so
+             narrow it wrapped one word per line. Below 640px, let the title take
+             its own full-width row up top, and wrap the icon + badge + chevron
+             onto a second row underneath instead. */
+          .ap-doc-row { flex-wrap: wrap !important; row-gap: 8px !important; }
+          .ap-doc-title-block { flex-basis: 100% !important; order: -1 !important; }
+          .ap-doc-actions { margin-left: auto !important; }
         }
       `}</style>
 
@@ -1682,50 +1830,67 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
           />
         ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
             <span style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)' }}>{t('linkRequests.heading')}</span>
-            <div style={{ display: 'flex', background: 'var(--surface-ground)', borderRadius: 8, padding: 3, gap: 2, border: '1px solid var(--surface-border)', marginLeft: 'auto' }}>
-              {[
-                { key: 'pending',  label: t('linkRequests.tabs.pending'),  color: '#d97706', bg: 'rgba(255, 193, 7,.12)' },
-                { key: 'approved', label: t('linkRequests.tabs.approved'), color: '#16a34a', bg: 'rgba(25, 135, 84,.12)' },
-                { key: 'rejected', label: t('linkRequests.tabs.rejected'), color: '#dc2626', bg: 'rgba(220, 53, 69,.1)' },
-              ].map(tab => {
-                const active = linkFilter === tab.key;
-                return (
-                  <button key={tab.key} onClick={() => setLinkFilter(tab.key)}
-                    style={{ padding: '5px 14px', borderRadius: 6, border: 'none', fontFamily: 'var(--font)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', transition: 'all .15s',
-                      background: active ? tab.bg : 'transparent',
-                      color: active ? tab.color : 'var(--text-color-secondary)',
-                      outline: active ? `1px solid ${tab.color}44` : 'none',
-                    }}>
-                    {tab.label}
-                    {linkRequests.length > 0 && active && (
-                      <span style={{ marginLeft: 5, background: active ? tab.color : 'var(--surface-border)', color: active ? 'white' : 'var(--text-color-secondary)', fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, padding: '1px 5px', borderRadius: 10 }}>
-                        {linkRequests.length}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
           </div>
+
+          {(() => {
+            const lrCounts = {
+              pending:  linkRequests.filter(l => l.link_status === 'pending').length,
+              approved: linkRequests.filter(l => l.link_status === 'approved').length,
+              rejected: linkRequests.filter(l => l.link_status === 'rejected').length,
+            };
+            const LR_STATUS_TABS = [
+              { key: '',         label: t('linkRequests.tabs.all'),      value: linkRequests.length,  color: 'var(--primary)', bg: 'rgba(33, 74, 171,.12)', icon: FileText },
+              { key: 'pending',  label: t('linkRequests.tabs.pending'),  value: lrCounts.pending,     color: '#b45309',        bg: 'rgba(255, 193, 7,.12)', icon: Clock },
+              { key: 'approved', label: t('linkRequests.tabs.approved'), value: lrCounts.approved,    color: '#16a34a',        bg: 'rgba(25, 135, 84,.12)', icon: CheckCircle },
+              { key: 'rejected', label: t('linkRequests.tabs.rejected'), value: lrCounts.rejected,    color: '#dc3545',        bg: 'rgba(220, 53, 69,.12)', icon: XCircle },
+            ];
+            return (
+              <div className="ap-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }}>
+                {LR_STATUS_TABS.map(s => {
+                  const isActive = linkFilter === s.key;
+                  return (
+                    <Card key={s.label}
+                      onClick={() => setLinkFilter(s.key)}
+                      style={{ cursor: 'pointer', outline: isActive ? `2px solid ${s.color}` : '2px solid transparent', transition: 'all .2s' }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                        <div>
+                          <div style={{ ...LABEL, marginBottom: 8, color: isActive ? s.color : undefined }}>{s.label}</div>
+                          <div style={{ fontSize: 26, fontWeight: 700, color: isActive ? s.color : 'var(--text-heading)', fontFamily: 'var(--mono)', lineHeight: 1 }}>
+                            {linkLoading ? '–' : s.value}
+                          </div>
+                        </div>
+                        <div style={{ width: 40, height: 40, borderRadius: 10, background: isActive ? s.color + '22' : s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background .2s' }}>
+                          <s.icon size={18} color={s.color} strokeWidth={1.8} />
+                        </div>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            );
+          })()}
+
           {linkLoading && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {[1, 2].map(i => <div key={i} style={{ height: 72, borderRadius: 12, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', animation: 'pulse 1.4s ease-in-out infinite' }} />)}
             </div>
           )}
-          {!linkLoading && linkRequests.length === 0 && (
+          {!linkLoading && filteredLinkRequests.length === 0 && (
             <Card style={{ textAlign: 'center', padding: '64px 0' }}>
               <CheckCircle size={44} color="var(--surface-200)" style={{ margin: '0 auto 14px', display: 'block' }} />
               <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-color-secondary)', marginBottom: 6 }}>
-                {t('linkRequests.noRequestsOfType', { status: t(`linkRequests.statusLower.${linkFilter}`) })}
+                {linkFilter === '' ? t('linkRequests.noRequestsAll') : t('linkRequests.noRequestsOfType', { status: t(`linkRequests.statusLower.${linkFilter}`) })}
               </div>
               <div style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>
-                {linkFilter === 'pending' ? t('linkRequests.pendingHint') : t('linkRequests.genericHint', { status: t(`linkRequests.statusLower.${linkFilter}`) })}
+                {linkFilter === 'pending' ? t('linkRequests.pendingHint')
+                  : linkFilter === '' ? t('linkRequests.allHint')
+                  : t('linkRequests.genericHint', { status: t(`linkRequests.statusLower.${linkFilter}`) })}
               </div>
             </Card>
           )}
-          {linkRequests.map(lr => {
+          {filteredLinkRequests.map(lr => {
             const lsColor = lr.link_status === 'approved' ? '#16a34a' : lr.link_status === 'rejected' ? '#dc2626' : '#d97706';
             const lsBg    = lr.link_status === 'approved' ? 'rgba(25, 135, 84,.1)' : lr.link_status === 'rejected' ? 'rgba(220, 53, 69,.1)' : 'rgba(255, 193, 7,.1)';
             const reviewerName = lr.reviewed_by_first_name
@@ -1781,12 +1946,12 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
                     <Eye size={13} /> {t('linkRequests.viewDocument')}
                   </button>
                   {lr.link_status === 'pending' && (<>
-                    <button onClick={() => handleReviewLink(lr.link_id, 'rejected')}
+                    <button onClick={() => setConfirmLinkRow({ lr, decision: 'rejected' })}
                       disabled={linkDeciding === lr.link_id}
                       style={{ padding: '7px 16px', borderRadius: 8, border: '1px solid rgba(220, 53, 69,.3)', background: 'rgba(220, 53, 69,.06)', color: '#dc2626', fontSize: 12.5, fontWeight: 700, cursor: linkDeciding === lr.link_id ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: linkDeciding === lr.link_id ? 0.6 : 1 }}>
                       {t('common.reject')}
                     </button>
-                    <button onClick={() => handleReviewLink(lr.link_id, 'approved')}
+                    <button onClick={() => setConfirmLinkRow({ lr, decision: 'approved' })}
                       disabled={linkDeciding === lr.link_id}
                       style={{ padding: '7px 16px', borderRadius: 8, border: 'none', background: linkDeciding === lr.link_id ? 'rgba(25, 135, 84,.5)' : '#16a34a', color: 'white', fontSize: 12.5, fontWeight: 700, cursor: linkDeciding === lr.link_id ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)' }}>
                       {linkDeciding === lr.link_id ? t('linkRequests.processing') : t('common.approve')}
@@ -1846,8 +2011,8 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
                 <FileText size={21} color="#0ea5e9" strokeWidth={1.8} />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)', lineHeight: 1.3 }}>Act Parts Review</div>
-                <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-color-secondary)', lineHeight: 1.45, marginTop: 3 }}>Review sections, schedules, annexures, appendices and forms submitted by uploaders</div>
+                <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)', lineHeight: 1.3 }}>{t('dashboard.quickActions.actPartsTitle')}</div>
+                <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-color-secondary)', lineHeight: 1.45, marginTop: 3 }}>{t('dashboard.quickActions.actPartsDesc')}</div>
               </div>
               <ArrowRight size={16} color="#0ea5e9" style={{ flexShrink: 0, opacity: .8 }} />
             </Card>
@@ -2029,14 +2194,14 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
             <Card style={{ padding: 0, borderColor: isOpen ? 'rgba(33, 74, 171,.3)' : 'var(--surface-border)', transition: 'border-color .2s', overflow: 'hidden' }}>
 
               {/* Header row — click to expand */}
-              <div onClick={() => setExpanded(isOpen ? null : doc.id)}
+              <div className="ap-doc-row" onClick={() => setExpanded(isOpen ? null : doc.id)}
                 style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '16px 20px', cursor: 'pointer' }}>
                 <div style={{ width: 38, height: 44, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, flexShrink: 0 }}>
                   <FileText size={14} color="var(--primary)" />
                   <span style={{ fontFamily: 'var(--mono)', fontSize: 7, color: 'var(--primary)', fontWeight: 700 }}>{t('dashboard.pdfBadge')}</span>
                 </div>
 
-                <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="ap-doc-title-block" style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 4, letterSpacing: '-.01em' }}>{doc.title}</div>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                     {doc.type && (() => {
@@ -2071,7 +2236,7 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
                   })()}
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                <div className="ap-doc-actions" style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
                   {/* Panel labels hint (pending only) */}
                   {!isOpen && doc.status === 'pending' && (
                     <div style={{ display: 'flex', gap: 6 }}>
@@ -2110,17 +2275,47 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
       {/* ── Act Parts Review tab ──────────────────────────────────────────── */}
       {activePage === 'actparts' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* Toast */}
-          {apToast && (
-            <div style={{ position: 'fixed', top: 24, right: 28, zIndex: 3000, background: apToast.type === 'success' ? '#d1fae5' : '#fee2e2', color: apToast.type === 'success' ? '#065f46' : '#991b1b', border: `1px solid ${apToast.type === 'success' ? '#10b981' : '#dc3545'}`, borderRadius: 12, padding: '13px 22px', fontSize: 13.5, fontWeight: 600, boxShadow: '0 4px 20px rgba(0,0,0,.12)', fontFamily: 'var(--font)' }}>
-              {apToast.msg}
-            </div>
-          )}
-
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 'var(--font-size-p1)', fontWeight: 800, color: 'var(--text-heading)' }}>Act Parts Review</span>
-            <span style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-color-secondary)' }}>Pending submissions awaiting your decision</span>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <span style={{ fontSize: 'var(--font-size-p1)', fontWeight: 800, color: 'var(--text-heading)' }}>{t('actParts.heading')}</span>
           </div>
+
+          {(() => {
+            const apCounts = {
+              pending:  apItems.filter(i => i.status === 'pending').length,
+              approved: apItems.filter(i => i.status === 'approved').length,
+              rejected: apItems.filter(i => i.status === 'rejected').length,
+            };
+            const AP_STATUS_TABS = [
+              { key: '',         label: t('actParts.stats.total'),    value: apItems.length,    color: 'var(--primary)', bg: 'rgba(33, 74, 171,.12)', icon: FileText },
+              { key: 'pending',  label: t('actParts.stats.pending'),  value: apCounts.pending,  color: '#b45309',        bg: 'rgba(255, 193, 7,.12)', icon: Clock },
+              { key: 'approved', label: t('actParts.stats.approved'), value: apCounts.approved, color: '#16a34a',        bg: 'rgba(25, 135, 84,.12)', icon: CheckCircle },
+              { key: 'rejected', label: t('actParts.stats.rejected'), value: apCounts.rejected, color: '#dc3545',        bg: 'rgba(220, 53, 69,.12)', icon: XCircle },
+            ];
+            return (
+              <div className="ap-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }}>
+                {AP_STATUS_TABS.map(s => {
+                  const isActive = apStatusFilter === s.key;
+                  return (
+                    <Card key={s.label}
+                      onClick={() => setApStatusFilter(s.key)}
+                      style={{ cursor: 'pointer', outline: isActive ? `2px solid ${s.color}` : '2px solid transparent', transition: 'all .2s' }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                        <div>
+                          <div style={{ ...LABEL, marginBottom: 8, color: isActive ? s.color : undefined }}>{s.label}</div>
+                          <div style={{ fontSize: 26, fontWeight: 700, color: isActive ? s.color : 'var(--text-heading)', fontFamily: 'var(--mono)', lineHeight: 1 }}>
+                            {apLoading ? '–' : s.value}
+                          </div>
+                        </div>
+                        <div style={{ width: 40, height: 40, borderRadius: 10, background: isActive ? s.color + '22' : s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background .2s' }}>
+                          <s.icon size={18} color={s.color} strokeWidth={1.8} />
+                        </div>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            );
+          })()}
 
           {apLoading && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -2132,65 +2327,94 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
             <div style={{ padding: '14px 18px', borderRadius: 10, background: 'rgba(220, 53, 69,.08)', border: '1px solid rgba(220, 53, 69,.2)', color: '#dc2626', fontSize: 13 }}>{apError}</div>
           )}
 
-          {!apLoading && !apError && apItems.length === 0 && (
-            <Card style={{ textAlign: 'center', padding: '64px 0' }}>
-              <CheckCircle size={44} color="var(--surface-200)" style={{ margin: '0 auto 14px', display: 'block' }} />
-              <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-color-secondary)', marginBottom: 6 }}>No pending act part submissions</div>
-              <div style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>All caught up — nothing requires your review right now.</div>
-            </Card>
-          )}
+          {(() => {
+            const apFiltered = apStatusFilter ? apItems.filter(i => i.status === apStatusFilter) : apItems;
+            const AP_STATUS_SC = {
+              pending:  { bg: '#fef3c7', color: '#92400e', border: '#ffc107', label: t('actParts.stats.pending') },
+              approved: { bg: '#d1fae5', color: '#065f46', border: '#10b981', label: t('actParts.stats.approved') },
+              rejected: { bg: '#fee2e2', color: '#991b1b', border: '#dc3545', label: t('actParts.stats.rejected') },
+            };
 
-          {!apLoading && !apError && apItems.length > 0 && (
-            <Card style={{ overflow: 'hidden' }}>
-              <div className="table-scroll-wrap">
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px 140px 200px', minWidth: 640, background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
-                <div style={{ ...LABEL, padding: '10px 18px' }}>Act / Tab</div>
-                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>Submitted By</div>
-                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>Submitted At</div>
-                <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>Actions</div>
-              </div>
+            if (!apLoading && !apError && apFiltered.length === 0) {
+              return (
+                <Card style={{ textAlign: 'center', padding: '64px 0' }}>
+                  <CheckCircle size={44} color="var(--surface-200)" style={{ margin: '0 auto 14px', display: 'block' }} />
+                  <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-color-secondary)', marginBottom: 6 }}>
+                    {apStatusFilter ? t('actParts.emptyState.noSubmissionsOfType', { status: t(`actParts.statusLower.${apStatusFilter}`) }) : t('actParts.emptyState.noSubmissions')}
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>
+                    {apStatusFilter === 'pending' || !apStatusFilter ? t('actParts.emptyState.allCaughtUp') : t('actParts.emptyState.nothingHereYet')}
+                  </div>
+                </Card>
+              );
+            }
 
-              {apItems.map(item => {
-                const TAB_LABELS = { sections: 'Sections', schedule: 'Schedule', annexure: 'Annexure', appendix: 'Appendix', forms: 'Forms' };
-                return (
-                  <div key={`${item.pdf_document_id}-${item.part_type}`}
-                    style={{ display: 'grid', gridTemplateColumns: '1fr 160px 140px 200px', minWidth: 640, borderBottom: '1px solid var(--surface-border)', alignItems: 'center', minHeight: 60, transition: 'background .15s' }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                    <div style={{ padding: '10px 18px' }}>
-                      <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 2 }}>{item.act_name || `Act #${item.pdf_document_id}`}</div>
-                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                        <span style={{ fontSize: 10.5, fontWeight: 700, background: 'rgba(14,165,233,.1)', color: '#0369a1', borderRadius: 4, padding: '1px 7px' }}>
-                          {TAB_LABELS[item.part_type] || item.part_type}
-                        </span>
-                        {item.act_type && <span style={{ fontSize: 10.5, color: 'var(--text-color-secondary)' }}>{item.act_type}</span>}
+            if (apLoading || apError || apFiltered.length === 0) return null;
+
+            return (
+              <Card style={{ overflow: 'hidden' }}>
+                <div className="table-scroll-wrap">
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 150px 130px 130px 160px', minWidth: 760, background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
+                  <div style={{ ...LABEL, padding: '10px 18px' }}>{t('actParts.headers.actTab')}</div>
+                  <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>{t('actParts.headers.submittedBy')}</div>
+                  <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>{t('actParts.headers.submittedAt')}</div>
+                  <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>{t('actParts.headers.status')}</div>
+                  <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>{t('actParts.headers.actions')}</div>
+                </div>
+
+                {apFiltered.map(item => {
+                  const TAB_LABELS = { sections: t('actParts.tabLabels.sections'), schedule: t('actParts.tabLabels.schedule'), annexure: t('actParts.tabLabels.annexure'), appendix: t('actParts.tabLabels.appendix'), forms: t('actParts.tabLabels.forms') };
+                  const sc = AP_STATUS_SC[item.status] || AP_STATUS_SC.pending;
+                  const isPending = item.status === 'pending';
+                  return (
+                    <div key={`${item.pdf_document_id}-${item.part_type}`}
+                      style={{ display: 'grid', gridTemplateColumns: '1fr 150px 130px 130px 160px', minWidth: 760, borderBottom: '1px solid var(--surface-border)', alignItems: 'center', minHeight: 60, transition: 'background .15s' }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                      <div style={{ padding: '10px 18px' }}>
+                        <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 2 }}>{item.act_name || t('actParts.detail.actFallback', { id: item.pdf_document_id })}</div>
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <span style={{ fontSize: 10.5, fontWeight: 700, background: 'rgba(14,165,233,.1)', color: '#0369a1', borderRadius: 4, padding: '1px 7px' }}>
+                            {TAB_LABELS[item.part_type] || item.part_type}
+                          </span>
+                          {item.act_type && <span style={{ fontSize: 10.5, color: 'var(--text-color-secondary)' }}>{item.act_type}</span>}
+                        </div>
+                      </div>
+                      <div style={{ padding: '10px 16px', borderLeft: '1px solid var(--surface-border)', fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>
+                        {[item.submitter_first_name, item.submitter_last_name].filter(Boolean).join(' ') || item.submitter_username || '—'}
+                      </div>
+                      <div style={{ padding: '10px 16px', borderLeft: '1px solid var(--surface-border)', fontSize: 12, color: 'var(--text-color-secondary)' }}>
+                        {item.submitted_at ? new Date(item.submitted_at).toLocaleDateString() : '—'}
+                      </div>
+                      <div style={{ padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, background: sc.bg, color: sc.color, border: `1px solid ${sc.border}`, borderRadius: 20, padding: '3px 10px' }}>{sc.label}</span>
+                        {item.status === 'rejected' && item.comments && (
+                          <div style={{ fontSize: 11, color: '#991b1b', marginTop: 3, fontStyle: 'italic', maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.comments}>
+                            {item.comments}
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ padding: '10px 16px', borderLeft: '1px solid var(--surface-border)', display: 'flex', gap: 8 }}>
+                        <button onClick={() => openApDetail(item)} disabled={apDetailLoading}
+                          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px', borderRadius: 7, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                          <Eye size={13} /> {isPending ? t('actParts.viewDecide') : t('actParts.view')}
+                        </button>
                       </div>
                     </div>
-                    <div style={{ padding: '10px 16px', borderLeft: '1px solid var(--surface-border)', fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>
-                      {[item.submitter_first_name, item.submitter_last_name].filter(Boolean).join(' ') || item.submitter_username || '—'}
-                    </div>
-                    <div style={{ padding: '10px 16px', borderLeft: '1px solid var(--surface-border)', fontSize: 12, color: 'var(--text-color-secondary)' }}>
-                      {item.submitted_at ? new Date(item.submitted_at).toLocaleDateString() : '—'}
-                    </div>
-                    <div style={{ padding: '10px 16px', borderLeft: '1px solid var(--surface-border)', display: 'flex', gap: 8 }}>
-                      <button onClick={() => openApDetail(item)} disabled={apDetailLoading}
-                        style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px', borderRadius: 7, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                        <Eye size={13} /> View & Decide
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-              </div>
-            </Card>
-          )}
+                  );
+                })}
+                </div>
+              </Card>
+            );
+          })()}
 
-          {/* Detail + decision modal */}
+          {/* Detail + decision modal — decide actions only apply to pending items */}
           {apViewing && (
             <ApproverActPartsModal
               item={apViewing.item}
               partsData={apViewing.partsData}
               onClose={() => setApViewing(null)}
+              readOnly={apViewing.item?.status !== 'pending'}
               onApprove={({ comment }) => handleApReview('approved', { comment })}
               onReject={({ comment }) => handleApReview('rejected', { comment })}
             />
@@ -2202,22 +2426,22 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
 }
 
 // ── Approver Act Parts detail + decision modal ────────────────────────────────
-const AP_TAB_LABELS = { sections: 'Sections', schedule: 'Schedule', annexure: 'Annexure', appendix: 'Appendix', forms: 'Forms' };
-
-function ApproverActPartsModal({ item, partsData, onClose, onApprove, onReject }) {
+function ApproverActPartsModal({ item, partsData, onClose, readOnly = false, onApprove, onReject }) {
+  const { t } = useTranslation('approver');
   const [comment, setComment] = useState('');
   const [confirming, setConfirming] = useState(null); // 'approved' | 'rejected'
   const [submitting, setSubmitting] = useState(false);
   const partType = item?.part_type;
+  const AP_TAB_LABELS = { sections: t('actParts.tabLabels.sections'), schedule: t('actParts.tabLabels.schedule'), annexure: t('actParts.tabLabels.annexure'), appendix: t('actParts.tabLabels.appendix'), forms: t('actParts.tabLabels.forms') };
 
   function renderContent() {
-    if (!partsData) return <div style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: '#dc3545' }}>Could not load content.</div>;
+    if (!partsData) return <div style={{ padding: '40px 0', textAlign: 'center', fontSize: 13, color: '#dc3545' }}>{t('actParts.detail.couldNotLoad')}</div>;
 
     const statusChip = (status) => {
       if (!status) return null;
       const s = { draft: { bg: '#f1f5f9', color: '#64748b', border: '#cbd5e1' }, pending: { bg: '#fef3c7', color: '#92400e', border: '#ffc107' }, approved: { bg: '#d1fae5', color: '#065f46', border: '#10b981' }, rejected: { bg: '#fee2e2', color: '#991b1b', border: '#dc3545' }, pending_delete: { bg: '#fff1f2', color: '#9f1239', border: '#fda4af' } }[status];
       if (!s) return null;
-      const label = { draft: 'Draft', pending: 'Pending', approved: 'Approved', rejected: 'Rejected', pending_delete: 'Del. Pending' }[status] || status;
+      const label = { draft: t('actParts.detail.statusLabels.draft'), pending: t('actParts.detail.statusLabels.pending'), approved: t('actParts.detail.statusLabels.approved'), rejected: t('actParts.detail.statusLabels.rejected'), pending_delete: t('actParts.detail.statusLabels.pendingDelete') }[status] || status;
       return <span style={{ fontSize: 9.5, fontWeight: 700, background: s.bg, color: s.color, border: `1px solid ${s.border}`, borderRadius: 20, padding: '1px 7px', flexShrink: 0, marginLeft: 6 }}>{label}</span>;
     };
 
@@ -2230,7 +2454,7 @@ function ApproverActPartsModal({ item, partsData, onClose, onApprove, onReject }
               <span style={{ background: 'rgba(33, 74, 171,.1)', color: '#214aab', borderRadius: 6, padding: '3px 10px', fontFamily: 'var(--mono)', fontSize: 11 }}>
                 {ch.chapter_number || '—'}
               </span>
-              {ch.chapter_title || '(No title)'}
+              {ch.chapter_title || t('actParts.detail.noTitle')}
               {statusChip(ch.status)}
             </div>
             {(ch.sections || []).map(sec => (
@@ -2246,13 +2470,13 @@ function ApproverActPartsModal({ item, partsData, onClose, onApprove, onReject }
               </div>
             ))}
             {(!ch.sections || ch.sections.length === 0) && (
-              <div style={{ marginLeft: 20, fontSize: 12, color: 'var(--text-color-secondary)', fontStyle: 'italic' }}>No sections</div>
+              <div style={{ marginLeft: 20, fontSize: 12, color: 'var(--text-color-secondary)', fontStyle: 'italic' }}>{t('actParts.detail.noSectionsInChapter')}</div>
             )}
           </div>
         ));
       }
       const flat = partsData.flat_sections || [];
-      if (flat.length === 0) return <div style={{ fontSize: 13, color: 'var(--text-color-secondary)', fontStyle: 'italic' }}>No sections added.</div>;
+      if (flat.length === 0) return <div style={{ fontSize: 13, color: 'var(--text-color-secondary)', fontStyle: 'italic' }}>{t('actParts.detail.noSections')}</div>;
       return flat.map(sec => (
         <div key={sec.id} style={{ marginBottom: 10, padding: '10px 14px', background: 'var(--surface-ground)', borderRadius: 8, border: '1px solid var(--surface-border)' }}>
           <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 4, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
@@ -2269,7 +2493,7 @@ function ApproverActPartsModal({ item, partsData, onClose, onApprove, onReject }
 
     const keyMap = { schedule: 'schedules', annexure: 'annexures', appendix: 'appendices', forms: 'forms' };
     const entries = partsData[keyMap[partType]] || [];
-    if (entries.length === 0) return <div style={{ fontSize: 13, color: 'var(--text-color-secondary)', fontStyle: 'italic' }}>No entries added.</div>;
+    if (entries.length === 0) return <div style={{ fontSize: 13, color: 'var(--text-color-secondary)', fontStyle: 'italic' }}>{t('actParts.detail.noEntries')}</div>;
     return entries.map(e => (
       <div key={e.id} style={{ marginBottom: 10, padding: '10px 14px', background: 'var(--surface-ground)', borderRadius: 8, border: '1px solid var(--surface-border)' }}>
         <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 4, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4 }}>
@@ -2294,16 +2518,22 @@ function ApproverActPartsModal({ item, partsData, onClose, onApprove, onReject }
         <div style={{ padding: '18px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 800, color: 'var(--text-heading)' }}>
-              {item?.act_name || `Act #${item?.pdf_document_id}`}
+              {item?.act_name || t('actParts.detail.actFallback', { id: item?.pdf_document_id })}
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4 }}>
               <span style={{ fontSize: 11, fontWeight: 700, background: 'rgba(14,165,233,.1)', color: '#0369a1', borderRadius: 4, padding: '2px 8px' }}>
                 {AP_TAB_LABELS[partType] || partType}
               </span>
               <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
-                Submitted by {[item?.submitter_first_name, item?.submitter_last_name].filter(Boolean).join(' ') || item?.submitter_username}
+                {t('actParts.detail.submittedByLine', { name: [item?.submitter_first_name, item?.submitter_last_name].filter(Boolean).join(' ') || item?.submitter_username })}
                 {item?.submitted_at ? ` · ${new Date(item.submitted_at).toLocaleDateString()}` : ''}
               </span>
+              {readOnly && item?.status && (
+                (() => {
+                  const sc = { approved: { bg: '#d1fae5', color: '#065f46', border: '#10b981' }, rejected: { bg: '#fee2e2', color: '#991b1b', border: '#dc3545' } }[item.status];
+                  return sc ? <span style={{ fontSize: 10.5, fontWeight: 700, background: sc.bg, color: sc.color, border: `1px solid ${sc.border}`, borderRadius: 20, padding: '2px 9px' }}>{t(`actParts.detail.statusLabels.${item.status}`)}</span> : null;
+                })()
+              )}
             </div>
           </div>
           <button onClick={onClose} style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '5px 8px', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', flexShrink: 0 }}>
@@ -2314,32 +2544,42 @@ function ApproverActPartsModal({ item, partsData, onClose, onApprove, onReject }
         {/* Content */}
         <div style={{ flex: 1, overflowY: 'auto', padding: 24, minHeight: 0 }}>
           {renderContent()}
+          {readOnly && item?.status === 'rejected' && item?.comments && (
+            <div style={{ marginTop: 16, padding: '10px 14px', borderRadius: 8, background: '#fee2e2', border: '1px solid #fda4af' }}>
+              <div style={{ fontSize: 10.5, fontWeight: 700, color: '#991b1b', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 3 }}>{t('actParts.detail.rejectionComments')}</div>
+              <div style={{ fontSize: 12.5, color: '#991b1b' }}>{item.comments}</div>
+            </div>
+          )}
         </div>
 
-        {/* Footer */}
-        {!confirming ? (
+        {/* Footer — approve/reject only when a decision is still pending */}
+        {readOnly ? (
+          <div style={{ padding: '14px 24px', borderTop: '1px solid var(--surface-border)', textAlign: 'right', flexShrink: 0 }}>
+            <button onClick={onClose} style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'transparent', color: 'var(--text-color-secondary)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>{t('actParts.detail.close')}</button>
+          </div>
+        ) : !confirming ? (
           <div style={{ padding: '16px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end', gap: 10, flexShrink: 0 }}>
             <button onClick={() => setConfirming('rejected')}
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 18px', borderRadius: 9, border: '1.5px solid #dc3545', background: '#fee2e2', color: '#991b1b', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-              <XCircle size={14} /> Reject
+              <XCircle size={14} /> {t('actParts.detail.reject')}
             </button>
             <button onClick={() => setConfirming('approved')}
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 18px', borderRadius: 9, border: 'none', background: '#10b981', color: 'white', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-              <CheckCircle size={14} /> Approve
+              <CheckCircle size={14} /> {t('actParts.detail.approve')}
             </button>
           </div>
         ) : (
           <div style={{ padding: '16px 24px', borderTop: '1px solid var(--surface-border)', flexShrink: 0 }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-color-secondary)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.06em' }}>
-              Comments {confirming === 'rejected' && <span style={{ color: '#dc3545' }}>*</span>}
+              {t('actParts.detail.comments')} {confirming === 'rejected' && <span style={{ color: '#dc3545' }}>*</span>}
             </div>
             <textarea value={comment} onChange={e => setComment(e.target.value)} rows={2}
-              placeholder={confirming === 'rejected' ? 'Reason for rejection (required)' : 'Optional comments…'}
+              placeholder={confirming === 'rejected' ? t('actParts.detail.reasonForRejection') : t('actParts.detail.optionalComments')}
               style={{ width: '100%', borderRadius: 8, border: '1px solid var(--surface-border)', padding: '8px 12px', fontSize: 13, fontFamily: 'var(--font)', resize: 'none', boxSizing: 'border-box', background: 'var(--surface-ground)', color: 'var(--text-color)' }} />
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 10 }}>
               <button onClick={() => setConfirming(null)} disabled={submitting}
                 style={{ padding: '8px 18px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'transparent', color: 'var(--text-color-secondary)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                Back
+                {t('actParts.detail.back')}
               </button>
               <button
                 disabled={submitting || (confirming === 'rejected' && !comment.trim())}
@@ -2352,7 +2592,7 @@ function ApproverActPartsModal({ item, partsData, onClose, onApprove, onReject }
                   } catch { /* toast shown by parent */ } finally { setSubmitting(false); }
                 }}
                 style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: confirming === 'approved' ? '#10b981' : '#dc3545', color: 'white', fontSize: 13, fontWeight: 700, cursor: (submitting || (confirming === 'rejected' && !comment.trim())) ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: (submitting || (confirming === 'rejected' && !comment.trim())) ? .5 : 1 }}>
-                {submitting ? 'Submitting…' : confirming === 'approved' ? 'Confirm Approve' : 'Confirm Reject'}
+                {submitting ? t('actParts.detail.submitting') : confirming === 'approved' ? t('actParts.detail.confirmApprove') : t('actParts.detail.confirmReject')}
               </button>
             </div>
           </div>

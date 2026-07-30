@@ -1,0 +1,92 @@
+{
+  "stats": {
+    "totalDocuments": "Total Documents",
+    "totalDocumentsSub": "In the system",
+    "approved": "Approved",
+    "approvedSub": "Published docs",
+    "pending": "Pending",
+    "pendingSub": "Awaiting review",
+    "rejected": "Rejected",
+    "rejectedSub": "Returned to uploader",
+    "vsLastMonth": "vs. last month"
+  },
+  "charts": {
+    "byDepartment": "Documents by Department",
+    "monthlyTrend": "Monthly Upload Trend",
+    "statusDistribution": "Status Distribution",
+    "systemOverview": "System Overview",
+    "totalSearches": "Total Searches",
+    "activeUsers": "Active Users",
+    "approvalRate": "Approval Rate"
+  },
+  "graph": {
+    "legend": {
+      "central": "Central / Constitutional Acts",
+      "state": "Haryana State Acts",
+      "rules": "Rules & Regulations",
+      "amend": "Amendments",
+      "notif": "Notifications / Orders"
+    },
+    "title": "Legal Document Knowledge Graph",
+    "hintDefault": "Drag nodes · Select a document to focus · Arrows show dependencies",
+    "showingRelationshipsFor": "Showing relationships for:",
+    "showAll": "Show All",
+    "searchPlaceholder": "Search & select a document…",
+    "clickNodeHint": "Click any node to view amendment history"
+  },
+  "actionPill": {
+    "approve": "APPROVE",
+    "reject": "REJECT",
+    "submit": "UPLOAD",
+    "search": "SEARCH",
+    "view": "VIEW"
+  },
+  "detail": {
+    "close": "✕ Close",
+    "enacted": "Enacted",
+    "amendments": "Amendments",
+    "provisionsChanged": "Provisions changed",
+    "timelineTab": "Amendment Timeline ({{count}})",
+    "relationsTab": "Relationships ({{count}})",
+    "noHistory": "No amendment history recorded for this document in the repository.",
+    "originalEnactment": "Original Enactment — {{date}}",
+    "cameIntoForce": "{{label}} came into force on {{date}}.",
+    "authority": "Authority:",
+    "date": "Date:",
+    "provisionsChangedPill": "{{count}} provision{{plural}} changed",
+    "before": "BEFORE",
+    "originalProvision": "Original provision",
+    "after": "AFTER",
+    "asAmended": "As amended",
+    "outgoingTitle": "Outgoing Relationships",
+    "outgoingSubtitle": "Documents this act empowers, amends, or governs — click to see the specific provision",
+    "incomingTitle": "Incoming Relationships",
+    "incomingSubtitle": "Acts and instruments that reference or depend on this document — click to see the specific provision",
+    "noneRecorded": "None recorded",
+    "fromThisDoc": "FROM THIS DOC",
+    "fromOtherDoc": "FROM OTHER DOC",
+    "subSection": "Sub-sec: {{value}}",
+    "chapter": "Chapter: {{value}}"
+  },
+  "audit": {
+    "filters": {
+      "all": "All",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "uploaded": "Uploaded",
+      "searched": "Searched",
+      "viewed": "Viewed"
+    },
+    "searchPlaceholder": "Search logs…",
+    "headers": {
+      "timestamp": "Timestamp",
+      "user": "User",
+      "role": "Role",
+      "action": "Action",
+      "detail": "Detail",
+      "zgVerified": "ZG Verified"
+    },
+    "noMatch": "No log entries match the filter.",
+    "zgVerifiedBadge": "ZG ✓"
+  }
+}

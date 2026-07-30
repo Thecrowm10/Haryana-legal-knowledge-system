@@ -92,10 +92,10 @@ export default function Sidebar({ user, activePage, onNavigate, collapsed, mobil
       onMouseLeave={() => !isDrawerMode && collapsed && setHovering(false)}
       style={isDrawerMode
         ? { width: 0, flexShrink: 0 }
-        : { width: w, flexShrink: 0, height: '100vh', transition: 'width .2s cubic-bezier(.4,0,.2,1)' }}
+        : { width: w, flexShrink: 0, height: '100%', transition: 'width .2s cubic-bezier(.4,0,.2,1)' }}
     >
       <aside style={{
-        width: w, height: '100vh',
+        width: w, height: '100%',
         background: 'var(--surface-card)',
         borderRight: '1px solid var(--surface-border)',
         display: 'flex', flexDirection: 'column',

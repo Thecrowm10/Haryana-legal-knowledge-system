@@ -73,12 +73,16 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
           .lk-portal-card { width:100% !important; max-width:340px !important; padding:26px 22px !important; }
         }
       `}</style>
-      <div className="lk" style={{ width:'100vw', minHeight:'100vh', position:'relative', overflowX:'hidden', display:'flex', alignItems:'center' }}>
-        <img src={bannerBg} alt=""
-          style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', zIndex:0, filter:'blur(2px)', transform:'scale(1.02)' }} />
-        <div style={{ position:'absolute', inset:0, zIndex:1, background:'linear-gradient(110deg,rgba(2,10,5,.82) 0%,rgba(2,10,5,.62) 45%,rgba(2,10,5,.42) 100%)' }}/>
+      <div className="lk full-vh-min" style={{ width:'100vw', position:'relative', overflowX:'hidden', display:'flex', alignItems:'center' }}>
+        {/* Fixed (not absolute) so the browser only ever has to raster a viewport-sized
+            bitmap instead of stretching it across this screen's full, taller-than-viewport
+            scroll height (3 stacked cards on mobile) — and since it's pinned, it never has
+            to be repositioned/recomposited on scroll either. Both were real jank sources. */}
+        <img src={bannerBg} alt="" className="fixed-bg-img"
+          style={{ objectFit:'cover', zIndex:0, filter:'blur(2px)', transform:'scale(1.02)' }} />
+        <div className="fixed-bg-img" style={{ zIndex:1, background:'linear-gradient(110deg,rgba(2,10,5,.82) 0%,rgba(2,10,5,.62) 45%,rgba(2,10,5,.42) 100%)' }}/>
 
-        <div style={{ position: 'fixed', top: 24, right: 32, zIndex: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ position: 'absolute', top: 24, right: 32, zIndex: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
           <LanguageToggle variant="dark" iconOnly buttonStyle={loginIconStyle} />
           <AccessibilityMenu iconButtonStyle={loginIconStyle} />
         </div>
@@ -237,15 +241,16 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
         }
       `}</style>
 
-      <div className="lk" style={{ width:'100vw', minHeight:'100vh', position:'relative', overflowX:'hidden', display:'flex', alignItems:'center' }}>
+      <div className="lk full-vh-min" style={{ width:'100vw', position:'relative', overflowX:'hidden', display:'flex', alignItems:'center' }}>
 
-        {/* BG */}
+        {/* BG — fixed so it's a viewport-sized raster that never recomposites on scroll */}
         <img
           src={bannerBg}
           alt=""
-          style={{ position:'absolute', inset:0, width:'100%', height:'100%', objectFit:'cover', zIndex:0, filter:'blur(2px)', transform:'scale(1.02)' }}
+          className="fixed-bg-img"
+          style={{ objectFit:'cover', zIndex:0, filter:'blur(2px)', transform:'scale(1.02)' }}
         />
-        <div style={{ position:'absolute', inset:0, zIndex:1, background:'linear-gradient(110deg, rgba(2,10,5,.82) 0%, rgba(2,10,5,.62) 45%, rgba(2,10,5,.42) 100%)' }}/>
+        <div className="fixed-bg-img" style={{ zIndex:1, background:'linear-gradient(110deg, rgba(2,10,5,.82) 0%, rgba(2,10,5,.62) 45%, rgba(2,10,5,.42) 100%)' }}/>
 
         {/* Main content */}
         <div className="lk-row" style={{ position:'relative', zIndex:2, width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 6%', gap:40 }}>

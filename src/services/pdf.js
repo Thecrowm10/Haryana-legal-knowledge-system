@@ -15,6 +15,9 @@ export const fullTextSearch       = (q, skip = 0, limit = 50, document_type_id) 
 // Public citizen document browse/filter — no token required (unlike getAllDocumentsAdmin below,
 // which hits an admin-gated endpoint and 401s for anonymous citizens).
 export const publicSearchDocuments = (params = {}) => publicApi.get('/pdf/public/search', { params });
+// AI/semantic search — natural-language question in, ranked matching documents (+ an
+// AI-synthesised answer where available) out. No token required.
+export const publicSemanticSearch  = (q, top_k = 5) => publicApi.get('/pdf/public/semantic-search', { params: { q, top_k } });
 export const getApproverDocuments = (status, skip = 0, limit = 100) => api.get('/pdf/approver/documents', { params: { skip, limit, ...(status ? { status } : {}) } });
 export const reviewDocument       = (pdf_id, action, comments, annotations_json) => api.post('/pdf/review', { pdf_id, action, ...(comments ? { comments } : {}), ...(annotations_json ? { annotations_json } : {}) });
 export const getPdfFile           = (id)                              => api.get(`/pdf/${id}/file`, { responseType: 'arraybuffer' });
@@ -22,7 +25,7 @@ export const getAllDocumentsAdmin  = (status, skip = 0, limit = 500)  => publicA
 export const checkDuplicateDocument    = (document_name, document_type_id) => api.get('/pdf/check-duplicate', { params: { document_name, document_type_id } });
 export const linkDocumentToDepartment  = (pdf_id)                       => api.post('/pdf/link-department', { pdf_id });
 export const getLinkedDocuments        = (link_status)                  => api.get('/pdf/linked-documents', { params: link_status ? { link_status } : {} });
-export const getDepartmentLinkRequests = (link_status = 'pending')      => api.get('/pdf/department-link-requests', { params: { link_status } });
+export const getDepartmentLinkRequests = (link_status = 'pending')      => api.get('/pdf/department-link-requests', { params: link_status ? { link_status } : {} });
 export const getAllDepartmentLinks      = (link_status, department_id)   => api.get('/pdf/all-department-links', { params: { ...(link_status ? { link_status } : {}), ...(department_id ? { department_id } : {}) } });
 export const reviewDepartmentLink      = (link_id, action, comments, annotations_json) => api.post('/pdf/review-link', { link_id, action, comments: comments || null, annotations_json: annotations_json || null });
 export const getActChildren            = (pdf_id)                       => api.get(`/pdf/${pdf_id}/children`);

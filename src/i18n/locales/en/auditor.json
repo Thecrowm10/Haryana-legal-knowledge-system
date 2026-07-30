@@ -1,0 +1,55 @@
+{
+  "roleGuest": "Guest",
+  "auditLog": {
+    "stats": {
+      "totalEntries": "Total Log Entries",
+      "aiCharsGenerated": "AI Characters Generated",
+      "complianceStatus": "Compliance Status"
+    },
+    "heading": "System MIS Report",
+    "subheading": "Read-only · Tamper-evident · Append-only",
+    "exportCsv": "Export CSV",
+    "exportJson": "Export JSON",
+    "headers": {
+      "timestamp": "Timestamp",
+      "user": "User",
+      "role": "Role",
+      "action": "Action",
+      "aiGenerated": "AI Generated"
+    },
+    "none": "None"
+  },
+  "queryHistory": {
+    "heading": "Search Query History",
+    "subheading": "Guests anonymised · No AI text in any response",
+    "exportCsv": "Export CSV",
+    "headers": {
+      "timestamp": "Timestamp",
+      "userType": "User Type",
+      "query": "Query",
+      "results": "Results",
+      "pointers": "Document Pointers Returned"
+    }
+  },
+  "compliance": {
+    "passedTitle": "Zero Generation Compliance — PASSED",
+    "passedDesc": "No AI-generated text was present in any system response. All results are verbatim document pointers only.",
+    "monthlySummary": "Monthly Compliance Summary",
+    "headers": {
+      "month": "Month",
+      "totalQueries": "Total Queries Sampled",
+      "aiChars": "AI Characters in Responses",
+      "status": "Status"
+    },
+    "compliantBadge": "Compliant",
+    "certificateTitle": "Compliance Certificate",
+    "downloadReport": "Download Report",
+    "certificateBody": "This report certifies that the Haryana Digital Repository has operated in full compliance with the <strong>Zero Generation Constraint</strong> (TOR Module B, Requirement B-04 to B-08). All search results returned during the audit period contained exclusively verbatim document pointers with no AI-generated textual content.",
+    "stats": {
+      "auditPeriod": "Audit Period",
+      "totalQueriesReviewed": "Total Queries Reviewed",
+      "aiViolationsFound": "AI Violations Found",
+      "complianceRate": "Compliance Rate"
+    }
+  }
+}

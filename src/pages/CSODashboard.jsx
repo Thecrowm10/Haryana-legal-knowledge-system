@@ -1,4 +1,5 @@
 ﻿import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import * as d3 from 'd3';
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -21,6 +22,7 @@ function SectionTitle({ children }) {
 
 /* ─── Diamond-style stat card ─── */
 function StatCard({ icon: Icon, label: lbl, value, sub, iconBg, iconColor, trend }) {
+  const { t } = useTranslation('cso');
   return (
     <Card>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
@@ -37,7 +39,7 @@ function StatCard({ icon: Icon, label: lbl, value, sub, iconBg, iconColor, trend
         <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 6 }}>
           <TrendingUp size={13} color="#198754" />
           <span style={{ fontSize: 12, color: '#1e40af', fontWeight: 600 }}>{trend}</span>
-          <span style={{ fontSize: 12, color: 'var(--text-color-secondary)' }}>vs. last month</span>
+          <span style={{ fontSize: 12, color: 'var(--text-color-secondary)' }}>{t('stats.vsLastMonth')}</span>
         </div>
       )}
     </Card>
@@ -288,16 +290,19 @@ const NODE_COLORS = {
   notif:   '#ff4d6a',
 };
 
-const LEGEND_ITEMS = [
-  ['Central / Constitutional Acts', '#00c9a7'],
-  ['Haryana State Acts',            '#5b8af7'],
-  ['Rules & Regulations',           '#f5a623'],
-  ['Amendments',                    '#3ecf8e'],
-  ['Notifications / Orders',        '#ff4d6a'],
-];
+function legendItems(t) {
+  return [
+    [t('graph.legend.central'), '#00c9a7'],
+    [t('graph.legend.state'),   '#5b8af7'],
+    [t('graph.legend.rules'),   '#f5a623'],
+    [t('graph.legend.amend'),   '#3ecf8e'],
+    [t('graph.legend.notif'),   '#ff4d6a'],
+  ];
+}
 
 /* ─── Knowledge Graph component ─── */
 function KnowledgeGraph({ focusId, allNodes = KG_NODES, allLinks = KG_LINKS, onNodeClick }) {
+  const { t } = useTranslation('cso');
   const svgRef         = useRef(null);
   const tooltipRef     = useRef(null);
   const onNodeClickRef = useRef(onNodeClick);
@@ -482,7 +487,7 @@ function KnowledgeGraph({ focusId, allNodes = KG_NODES, allLinks = KG_LINKS, onN
         padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 7,
         backdropFilter: 'blur(4px)',
       }}>
-        {LEGEND_ITEMS.map(([lbl, color]) => (
+        {legendItems(t).map(([lbl, color]) => (
           <div key={lbl} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: '#6b7280', fontFamily: 'var(--mono)' }}>
             <span style={{ width: 10, height: 10, borderRadius: '50%', background: color, flexShrink: 0 }} />
             {lbl}
@@ -494,21 +499,24 @@ function KnowledgeGraph({ focusId, allNodes = KG_NODES, allLinks = KG_LINKS, onN
 }
 
 /* ─── Action Pill ─── */
-const ACTION_PILL = {
-  approve: ['rgba(25, 135, 84,.1)','#1e40af','rgba(25, 135, 84,.25)','APPROVE'],
-  reject:  ['rgba(220, 53, 69,.1)','#b91c1c','rgba(220, 53, 69,.25)','REJECT'],
-  submit:  ['rgba(255, 193, 7,.1)','#b45309','rgba(255, 193, 7,.25)','UPLOAD'],
-  search:  ['rgba(33, 74, 171,.1)','#214aab','rgba(33, 74, 171,.25)','SEARCH'],
-  view:    ['rgba(13, 110, 253,.1)','#1d4ed8','rgba(13, 110, 253,.25)','VIEW'],
-};
+function actionPillStyles(t) {
+  return {
+    approve: ['rgba(25, 135, 84,.1)','#1e40af','rgba(25, 135, 84,.25)', t('actionPill.approve')],
+    reject:  ['rgba(220, 53, 69,.1)','#b91c1c','rgba(220, 53, 69,.25)', t('actionPill.reject')],
+    submit:  ['rgba(255, 193, 7,.1)','#b45309','rgba(255, 193, 7,.25)', t('actionPill.submit')],
+    search:  ['rgba(33, 74, 171,.1)','#214aab','rgba(33, 74, 171,.25)', t('actionPill.search')],
+    view:    ['rgba(13, 110, 253,.1)','#1d4ed8','rgba(13, 110, 253,.25)', t('actionPill.view')],
+  };
+}
 function ActionPill({ action }) {
+  const { t } = useTranslation('cso');
   const k = action.toLowerCase().includes('approved') ? 'approve'
     : action.toLowerCase().includes('rejected') ? 'reject'
     : action.toLowerCase().includes('uploaded') ? 'submit'
     : action.toLowerCase().includes('searched') ? 'search'
     : action.toLowerCase().includes('viewed') ? 'view'
     : null;
-  const [bg, c, b, lbl] = ACTION_PILL[k] || ['var(--surface-100)','var(--text-color-secondary)','var(--surface-200)', action.split(' ')[0].toUpperCase()];
+  const [bg, c, b, lbl] = actionPillStyles(t)[k] || ['var(--surface-100)','var(--text-color-secondary)','var(--surface-200)', action.split(' ')[0].toUpperCase()];
   return <span style={{ fontFamily: 'var(--mono)', fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 5, letterSpacing: '.04em', textTransform: 'uppercase', background: bg, color: c, border: `1px solid ${b}`, whiteSpace: 'nowrap' }}>{lbl}</span>;
 }
 
@@ -516,6 +524,7 @@ function ActionPill({ action }) {
 const CHANGE_COLORS = { Amended: '#ffc107', Substituted: '#0d6efd', Inserted: '#198754', Deleted: '#dc3545', Expanded: '#8b5cf6' };
 
 function NodeDetailPanel({ node, allNodes, allLinks, onClose }) {
+  const { t } = useTranslation('cso');
   const [tab, setTab] = useState('timeline');
   const [expandedLink, setExpandedLink] = useState(null);
   const [expandedAmend, setExpandedAmend] = useState(null); // index of open amendment, null = all collapsed
@@ -556,12 +565,12 @@ function NodeDetailPanel({ node, allNodes, allLinks, onClose }) {
 
           {/* Right: stats + close */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10, flexShrink: 0 }}>
-            <button onClick={onClose} style={{ background: 'transparent', border: '1px solid var(--surface-border)', borderRadius: 6, cursor: 'pointer', color: 'var(--text-color-secondary)', padding: '4px 10px', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font)' }}>✕ Close</button>
+            <button onClick={onClose} style={{ background: 'transparent', border: '1px solid var(--surface-border)', borderRadius: 6, cursor: 'pointer', color: 'var(--text-color-secondary)', padding: '4px 10px', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font)' }}>{t('detail.close')}</button>
             <div style={{ display: 'flex', gap: 12 }}>
               {[
-                { label: 'Enacted', value: history?.enacted ?? node.year },
-                { label: 'Amendments', value: history ? history.amendments.length : 0 },
-                { label: 'Provisions changed', value: totalAmendCount },
+                { label: t('detail.enacted'), value: history?.enacted ?? node.year },
+                { label: t('detail.amendments'), value: history ? history.amendments.length : 0 },
+                { label: t('detail.provisionsChanged'), value: totalAmendCount },
               ].map(({ label: lbl, value }) => (
                 <div key={lbl} style={{ textAlign: 'center' }}>
                   <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-heading)', fontFamily: 'var(--mono)', lineHeight: 1 }}>{value}</div>
@@ -574,7 +583,7 @@ function NodeDetailPanel({ node, allNodes, allLinks, onClose }) {
 
         {/* Tab bar */}
         <div style={{ display: 'flex', gap: 4, marginTop: 14 }}>
-          {[['timeline', `Amendment Timeline (${history?.amendments.length ?? 0})`], ['relations', `Relationships (${outgoing.length + incoming.length})`]].map(([key, lbl]) => (
+          {[['timeline', t('detail.timelineTab', { count: history?.amendments.length ?? 0 })], ['relations', t('detail.relationsTab', { count: outgoing.length + incoming.length })]].map(([key, lbl]) => (
             <button key={key} onClick={() => setTab(key)} style={{
               padding: '6px 14px', borderRadius: 7, border: `1px solid ${tab === key ? nodeColor : 'var(--surface-border)'}`,
               cursor: 'pointer', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font)',
@@ -592,7 +601,7 @@ function NodeDetailPanel({ node, allNodes, allLinks, onClose }) {
         {/* ── Timeline tab ── */}
         {tab === 'timeline' && (
           !history
-            ? <div style={{ padding: '28px 0', textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>No amendment history recorded for this document in the repository.</div>
+            ? <div style={{ padding: '28px 0', textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>{t('detail.noHistory')}</div>
             : <div style={{ position: 'relative' }}>
                 {/* Spine line */}
                 <div style={{ position: 'absolute', left: 19, top: 20, bottom: 0, width: 2, background: 'var(--surface-border)' }} />
@@ -603,8 +612,8 @@ function NodeDetailPanel({ node, allNodes, allLinks, onClose }) {
                     {node.year}
                   </div>
                   <div style={{ flex: 1, paddingTop: 8 }}>
-                    <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>Original Enactment — {history.enacted}</div>
-                    <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-color-secondary)', marginTop: 2 }}>{node.label} came into force on {history.enacted}.</div>
+                    <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>{t('detail.originalEnactment', { date: history.enacted })}</div>
+                    <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-color-secondary)', marginTop: 2 }}>{t('detail.cameIntoForce', { label: node.label, date: history.enacted })}</div>
                   </div>
                 </div>
 
@@ -629,13 +638,13 @@ function NodeDetailPanel({ node, allNodes, allLinks, onClose }) {
                             <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)', marginBottom: 3 }}>{amend.title}</div>
                             <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center' }}>
                               <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
-                                <strong style={{ color: 'var(--text-color)' }}>Authority:</strong> {amend.by}
+                                <strong style={{ color: 'var(--text-color)' }}>{t('detail.authority')}</strong> {amend.by}
                               </span>
                               <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
-                                <strong style={{ color: 'var(--text-color)' }}>Date:</strong> {amend.date}
+                                <strong style={{ color: 'var(--text-color)' }}>{t('detail.date')}</strong> {amend.date}
                               </span>
                               <span style={{ fontFamily: 'var(--mono)', fontSize: 10, fontWeight: 700, padding: '2px 9px', borderRadius: 20, background: 'rgba(13, 110, 253,.1)', color: '#1d4ed8' }}>
-                                {amend.changes.length} provision{amend.changes.length !== 1 ? 's' : ''} changed
+                                {t('detail.provisionsChangedPill', { count: amend.changes.length, plural: amend.changes.length !== 1 ? 's' : '' })}
                               </span>
                             </div>
                           </div>
@@ -684,25 +693,25 @@ function NodeDetailPanel({ node, allNodes, allLinks, onClose }) {
                                     <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
                                       <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--text-heading)', fontFamily: 'var(--mono)' }}>{ch.section}</span>
                                       {ch.subsection && ch.subsection !== '—' && (
-                                        <span style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>Sub-sec: {ch.subsection}</span>
+                                        <span style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>{t('detail.subSection', { value: ch.subsection })}</span>
                                       )}
-                                      <span style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>Chapter: {ch.chapter}</span>
+                                      <span style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>{t('detail.chapter', { value: ch.chapter })}</span>
                                       <span style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', fontWeight: 600 }}>{ch.page}</span>
                                     </div>
                                   </div>
                                   {/* Before */}
                                   <div style={{ padding: '10px 14px', borderBottom: '1px solid rgba(220, 53, 69,.12)', background: 'rgba(220, 53, 69,.03)' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
-                                      <span style={{ fontFamily: 'var(--mono)', fontSize: 9.5, fontWeight: 800, color: '#dc3545', background: 'rgba(220, 53, 69,.12)', padding: '2px 8px', borderRadius: 4, letterSpacing: '.06em' }}>BEFORE</span>
-                                      <span style={{ fontSize: 10.5, color: 'var(--text-color-secondary)', fontStyle: 'italic' }}>Original provision</span>
+                                      <span style={{ fontFamily: 'var(--mono)', fontSize: 9.5, fontWeight: 800, color: '#dc3545', background: 'rgba(220, 53, 69,.12)', padding: '2px 8px', borderRadius: 4, letterSpacing: '.06em' }}>{t('detail.before')}</span>
+                                      <span style={{ fontSize: 10.5, color: 'var(--text-color-secondary)', fontStyle: 'italic' }}>{t('detail.originalProvision')}</span>
                                     </div>
                                     <div style={{ fontSize: 12.5, color: '#7f1d1d', lineHeight: 1.7, fontStyle: 'italic', paddingLeft: 4, borderLeft: '3px solid rgba(220, 53, 69,.3)' }}>"{ch.before}"</div>
                                   </div>
                                   {/* After */}
                                   <div style={{ padding: '10px 14px', background: 'rgba(22,163,74,.03)' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
-                                      <span style={{ fontFamily: 'var(--mono)', fontSize: 9.5, fontWeight: 800, color: '#16a34a', background: 'rgba(22,163,74,.12)', padding: '2px 8px', borderRadius: 4, letterSpacing: '.06em' }}>AFTER</span>
-                                      <span style={{ fontSize: 10.5, color: 'var(--text-color-secondary)', fontStyle: 'italic' }}>As amended</span>
+                                      <span style={{ fontFamily: 'var(--mono)', fontSize: 9.5, fontWeight: 800, color: '#16a34a', background: 'rgba(22,163,74,.12)', padding: '2px 8px', borderRadius: 4, letterSpacing: '.06em' }}>{t('detail.after')}</span>
+                                      <span style={{ fontSize: 10.5, color: 'var(--text-color-secondary)', fontStyle: 'italic' }}>{t('detail.asAmended')}</span>
                                     </div>
                                     <div style={{ fontSize: 12.5, color: '#14532d', lineHeight: 1.7, paddingLeft: 4, borderLeft: '3px solid rgba(22,163,74,.4)', fontWeight: 500 }}>"{ch.after}"</div>
                                   </div>
@@ -723,8 +732,8 @@ function NodeDetailPanel({ node, allNodes, allLinks, onClose }) {
         {tab === 'relations' && (
           <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
             {[
-              { title: 'Outgoing Relationships', subtitle: 'Documents this act empowers, amends, or governs — click to see the specific provision', items: outgoing, getOther: l => getNodeId(l.target), dirLabel: 'FROM THIS DOC', arrow: '→' },
-              { title: 'Incoming Relationships', subtitle: 'Acts and instruments that reference or depend on this document — click to see the specific provision', items: incoming, getOther: l => getNodeId(l.source), dirLabel: 'FROM OTHER DOC', arrow: '←' },
+              { title: t('detail.outgoingTitle'), subtitle: t('detail.outgoingSubtitle'), items: outgoing, getOther: l => getNodeId(l.target), dirLabel: t('detail.fromThisDoc'), arrow: '→' },
+              { title: t('detail.incomingTitle'), subtitle: t('detail.incomingSubtitle'), items: incoming, getOther: l => getNodeId(l.source), dirLabel: t('detail.fromOtherDoc'), arrow: '←' },
             ].map(({ title, subtitle, items, getOther, dirLabel, arrow }) => (
               <div key={title} style={{ flex: 1, minWidth: 280 }}>
                 <div style={{ marginBottom: 10 }}>
@@ -732,7 +741,7 @@ function NodeDetailPanel({ node, allNodes, allLinks, onClose }) {
                   <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-color-secondary)' }}>{subtitle}</div>
                 </div>
                 {items.length === 0
-                  ? <div style={{ padding: '16px', borderRadius: 8, background: 'var(--surface-ground)', fontSize: 12.5, color: 'var(--text-color-secondary)', textAlign: 'center' }}>None recorded</div>
+                  ? <div style={{ padding: '16px', borderRadius: 8, background: 'var(--surface-ground)', fontSize: 12.5, color: 'var(--text-color-secondary)', textAlign: 'center' }}>{t('detail.noneRecorded')}</div>
                   : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       {items.map((l, i) => {
@@ -810,6 +819,7 @@ function NodeDetailPanel({ node, allNodes, allLinks, onClose }) {
 
 /* ─── Graph Tab with selector ─── */
 function GraphTab({ documents, relationships }) {
+  const { t } = useTranslation('cso');
   const [focusId, setFocusId]       = useState(null);
   const [search, setSearch]         = useState('');
   const [showDrop, setShowDrop]     = useState(false);
@@ -857,9 +867,9 @@ function GraphTab({ documents, relationships }) {
         {/* Top bar */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18, flexWrap: 'wrap' }}>
           <div style={{ flex: 1 }}>
-            <SectionTitle>Legal Document Knowledge Graph</SectionTitle>
+            <SectionTitle>{t('graph.title')}</SectionTitle>
             <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-color-secondary)', marginTop: -8 }}>
-              {focusId ? `Showing relationships for: ` : 'Drag nodes · Select a document to focus · Arrows show dependencies'}
+              {focusId ? t('graph.showingRelationshipsFor') + ' ' : t('graph.hintDefault')}
               {focusNode && <strong style={{ color: 'var(--primary)' }}>{focusNode.label}</strong>}
             </div>
           </div>
@@ -873,7 +883,7 @@ function GraphTab({ documents, relationships }) {
                   value={search}
                   onChange={e => { setSearch(e.target.value); setShowDrop(true); }}
                   onFocus={() => setShowDrop(true)}
-                  placeholder="Search & select a document…"
+                  placeholder={t('graph.searchPlaceholder')}
                   style={{ width: '100%', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 8, color: 'var(--text-color)', fontFamily: 'var(--font)', fontSize: 12.5, padding: '8px 12px 8px 30px', outline: 'none', transition: 'border-color .2s', boxSizing: 'border-box' }}
                   onBlur={() => setTimeout(() => setShowDrop(false), 150)}
                 />
@@ -881,7 +891,7 @@ function GraphTab({ documents, relationships }) {
               {focusId && (
                 <button onClick={() => { setFocusId(null); setSearch(''); }}
                   style={{ padding: '7px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', whiteSpace: 'nowrap' }}>
-                  Show All
+                  {t('graph.showAll')}
                 </button>
               )}
             </div>
@@ -934,7 +944,7 @@ function GraphTab({ documents, relationships }) {
           />
           {!selectedNode && (
             <div style={{ position: 'absolute', bottom: 58, left: '50%', transform: 'translateX(-50%)', background: 'rgba(0,0,0,.55)', color: '#fff', fontSize: 11.5, fontWeight: 500, padding: '5px 14px', borderRadius: 20, pointerEvents: 'none', whiteSpace: 'nowrap', backdropFilter: 'blur(4px)' }}>
-              Click any node to view amendment history
+              {t('graph.clickNodeHint')}
             </div>
           )}
         </div>
@@ -955,7 +965,12 @@ function GraphTab({ documents, relationships }) {
   );
 }
 
+// Values stay in English — they're matched directly against AUDIT_LOGS mock action text,
+// which is English-only demo content (out of scope for translation, see cso.json comment).
 const AUDIT_FILTERS = ['All', 'Approved', 'Rejected', 'Uploaded', 'Searched', 'Viewed'];
+function auditFilterLabel(t, f) {
+  return t(`audit.filters.${f.toLowerCase()}`);
+}
 
 // Shared once per return — mirrors the <style> convention used in the other dashboards.
 const CSO_RESPONSIVE_CSS = `
@@ -970,6 +985,7 @@ const CSO_RESPONSIVE_CSS = `
 
 /* ─── MAIN ─── */
 export default function CSODashboard({ activePage, auditLog, documents = [], relationships = [] }) {
+  const { t } = useTranslation('cso');
   const [auditFilter, setAuditFilter] = useState('All');
   const [auditSearch, setAuditSearch] = useState('');
   const s = ANALYTICS_STATS;
@@ -991,15 +1007,15 @@ export default function CSODashboard({ activePage, auditLog, documents = [], rel
       <div style={{ display: 'flex', flexDirection: 'column', gap: 24, animation: 'fadeSlideIn .3s ease' }}>
         <style>{CSO_RESPONSIVE_CSS}</style>
         <div className="cso-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-          <StatCard icon={FileText}    label="Total Documents" value={s.totalDocuments} sub="In the system"         iconBg="rgba(33, 74, 171,.12)"  iconColor="#214aab" trend="+12%" />
-          <StatCard icon={CheckCircle} label="Approved"        value={s.approved}       sub="Published docs"        iconBg="rgba(25, 135, 84,.12)"  iconColor="#198754" />
-          <StatCard icon={Clock}       label="Pending"         value={s.pending}        sub="Awaiting review"       iconBg="rgba(255, 193, 7,.12)" iconColor="#ffc107" />
-          <StatCard icon={XCircle}     label="Rejected"        value={s.rejected}       sub="Returned to uploader"  iconBg="rgba(220, 53, 69,.12)"  iconColor="#dc3545" />
+          <StatCard icon={FileText}    label={t('stats.totalDocuments')} value={s.totalDocuments} sub={t('stats.totalDocumentsSub')} iconBg="rgba(33, 74, 171,.12)"  iconColor="#214aab" trend="+12%" />
+          <StatCard icon={CheckCircle} label={t('stats.approved')}        value={s.approved}       sub={t('stats.approvedSub')}        iconBg="rgba(25, 135, 84,.12)"  iconColor="#198754" />
+          <StatCard icon={Clock}       label={t('stats.pending')}         value={s.pending}        sub={t('stats.pendingSub')}       iconBg="rgba(255, 193, 7,.12)" iconColor="#ffc107" />
+          <StatCard icon={XCircle}     label={t('stats.rejected')}        value={s.rejected}       sub={t('stats.rejectedSub')}  iconBg="rgba(220, 53, 69,.12)"  iconColor="#dc3545" />
         </div>
 
         <div className="cso-chart-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           <Card>
-            <SectionTitle>Documents by Department</SectionTitle>
+            <SectionTitle>{t('charts.byDepartment')}</SectionTitle>
             <ResponsiveContainer width="100%" height={230}>
               <BarChart data={s.deptBreakdown} barSize={28} margin={{ top: 0, right: 0, bottom: 0, left: -20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--surface-border)" vertical={false} />
@@ -1012,7 +1028,7 @@ export default function CSODashboard({ activePage, auditLog, documents = [], rel
           </Card>
 
           <Card>
-            <SectionTitle>Monthly Upload Trend</SectionTitle>
+            <SectionTitle>{t('charts.monthlyTrend')}</SectionTitle>
             <ResponsiveContainer width="100%" height={230}>
               <LineChart data={s.monthlyUploads} margin={{ top: 5, right: 10, bottom: 0, left: -20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--surface-border)" vertical={false} />
@@ -1027,10 +1043,10 @@ export default function CSODashboard({ activePage, auditLog, documents = [], rel
 
         <div className="cso-chart-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           <Card>
-            <SectionTitle>Status Distribution</SectionTitle>
+            <SectionTitle>{t('charts.statusDistribution')}</SectionTitle>
             <ResponsiveContainer width="100%" height={220}>
               <PieChart>
-                <Pie data={[{name:'Approved',value:s.approved},{name:'Pending',value:s.pending},{name:'Rejected',value:s.rejected}]}
+                <Pie data={[{name:t('stats.approved'),value:s.approved},{name:t('stats.pending'),value:s.pending},{name:t('stats.rejected'),value:s.rejected}]}
                   cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={3} dataKey="value">
                   {['#214aab','#ffc107','#dc3545'].map((c, i) => <Cell key={i} fill={c} />)}
                 </Pie>
@@ -1041,12 +1057,12 @@ export default function CSODashboard({ activePage, auditLog, documents = [], rel
           </Card>
 
           <Card>
-            <SectionTitle>System Overview</SectionTitle>
+            <SectionTitle>{t('charts.systemOverview')}</SectionTitle>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {[
-                { label: 'Total Searches', value: s.totalSearches, color: '#0d6efd', pct: 100 },
-                { label: 'Active Users',   value: s.activeUsers,   color: '#214aab', pct: 80 },
-                { label: 'Approval Rate',  value: `${Math.round(s.approved / s.totalDocuments * 100)}%`, color: '#198754', pct: Math.round(s.approved / s.totalDocuments * 100) },
+                { label: t('charts.totalSearches'), value: s.totalSearches, color: '#0d6efd', pct: 100 },
+                { label: t('charts.activeUsers'),   value: s.activeUsers,   color: '#214aab', pct: 80 },
+                { label: t('charts.approvalRate'),  value: `${Math.round(s.approved / s.totalDocuments * 100)}%`, color: '#198754', pct: Math.round(s.approved / s.totalDocuments * 100) },
               ].map(row => (
                 <div key={row.label}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
@@ -1083,12 +1099,12 @@ export default function CSODashboard({ activePage, auditLog, documents = [], rel
             background: auditFilter === f ? 'var(--primary-light)' : 'var(--surface-card)',
             color: auditFilter === f ? 'var(--primary)' : 'var(--text-color-secondary)',
             transition: 'all .18s', textTransform: 'uppercase',
-          }}>{f}</button>
+          }}>{auditFilterLabel(t, f)}</button>
         ))}
         <div style={{ flex: 1 }} />
         <div style={{ position: 'relative' }}>
           <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-color-secondary)' }} />
-          <input value={auditSearch} onChange={e => setAuditSearch(e.target.value)} placeholder="Search logs…"
+          <input value={auditSearch} onChange={e => setAuditSearch(e.target.value)} placeholder={t('audit.searchPlaceholder')}
             style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 8, color: 'var(--text-color)', fontFamily: 'var(--font)', fontSize: 12.5, padding: '7px 14px 7px 32px', outline: 'none', width: 210, transition: 'border-color .2s' }}
             onFocus={e => e.target.style.borderColor = 'var(--primary)'}
             onBlur={e => e.target.style.borderColor = 'var(--surface-border)'} />
@@ -1100,14 +1116,14 @@ export default function CSODashboard({ activePage, auditLog, documents = [], rel
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
-              {['Timestamp', 'User', 'Role', 'Action', 'Detail', 'ZG Verified'].map((h, i) => (
+              {[t('audit.headers.timestamp'), t('audit.headers.user'), t('audit.headers.role'), t('audit.headers.action'), t('audit.headers.detail'), t('audit.headers.zgVerified')].map((h, i) => (
                 <th key={h} scope="col" style={{ ...label, padding: '12px 16px', textAlign: 'left', ...(i > 0 && { borderLeft: '1px solid var(--surface-border)' }) }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {filteredLogs.length === 0 && (
-              <tr><td colSpan={6} style={{ padding: '52px 0', textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>No log entries match the filter.</td></tr>
+              <tr><td colSpan={6} style={{ padding: '52px 0', textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>{t('audit.noMatch')}</td></tr>
             )}
             {filteredLogs.map(log => (
               <tr key={log.id} style={{ borderBottom: '1px solid var(--surface-border)', transition: 'background .15s' }}
@@ -1120,7 +1136,7 @@ export default function CSODashboard({ activePage, auditLog, documents = [], rel
                 <td style={{ padding: '11px 16px', borderLeft: '1px solid var(--surface-border)', fontSize: 12, color: 'var(--text-color-secondary)', maxWidth: 280, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{log.doc !== '—' ? log.doc : log.action}</td>
                 <td style={{ padding: '11px 16px', borderLeft: '1px solid var(--surface-border)' }}>
                   {(log.action.toLowerCase().includes('searched') || log.action.toLowerCase().includes('viewed'))
-                    ? <span style={{ fontFamily: 'var(--mono)', fontSize: 10, fontWeight: 700, color: '#1e40af', background: 'rgba(25, 135, 84,.1)', border: '1px solid rgba(25, 135, 84,.25)', padding: '2px 8px', borderRadius: 5 }}>ZG ✓</span>
+                    ? <span style={{ fontFamily: 'var(--mono)', fontSize: 10, fontWeight: 700, color: '#1e40af', background: 'rgba(25, 135, 84,.1)', border: '1px solid rgba(25, 135, 84,.25)', padding: '2px 8px', borderRadius: 5 }}>{t('audit.zgVerifiedBadge')}</span>
                     : <span style={{ color: 'var(--surface-200)', fontSize: 13 }}>—</span>}
                 </td>
               </tr>

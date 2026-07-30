@@ -26,7 +26,18 @@
     "noComment": "No comment",
     "clear": "Clear",
     "retry": "Retry",
-    "unknown": "Unknown"
+    "unknown": "Unknown",
+    "confirmApproveQuestion": "Are you sure you want to approve \"{{title}}\"?",
+    "confirmRejectQuestion": "Are you sure you want to reject \"{{title}}\"?",
+    "confirmApproveBody": "It will be marked as approved and moved to the Approved list. The uploader will be notified immediately.",
+    "confirmRejectBody": "It will be marked as rejected and sent back to the uploader for revision. The uploader will be notified immediately."
+  },
+  "toasts": {
+    "documentApproved": "\"{{title}}\" has been approved.",
+    "documentRejected": "\"{{title}}\" has been rejected.",
+    "linkApproved": "\"{{title}}\" link request has been approved.",
+    "linkRejected": "\"{{title}}\" link request has been rejected.",
+    "actionFailed": "Action failed. Please try again."
   },
   "pdfViewer": {
     "documentPreview": "Document Preview",
@@ -126,6 +137,7 @@
   "linkRequests": {
     "heading": "Department Link Requests",
     "tabs": {
+      "all": "All",
       "pending": "Pending",
       "approved": "Approved",
       "rejected": "Rejected"
@@ -136,7 +148,9 @@
       "rejected": "rejected"
     },
     "noRequestsOfType": "No {{status}} link requests",
+    "noRequestsAll": "No link requests",
     "pendingHint": "When a department requests to link a shared document, it will appear here.",
+    "allHint": "Link requests from other departments will appear here.",
     "genericHint": "No {{status}} link requests to show.",
     "originallyFromPrefix": "Originally from",
     "requestedByPrefix": "Requested by",
@@ -152,7 +166,9 @@
     "quickActionsLabel": "Quick Actions",
     "quickActions": {
       "linkRequestsTitle": "Link Requests",
-      "linkRequestsDesc": "Review requests from other departments to link a shared document"
+      "linkRequestsDesc": "Review requests from other departments to link a shared document",
+      "actPartsTitle": "Act Parts Review",
+      "actPartsDesc": "Review sections, schedules, annexures, appendices and forms submitted by uploaders"
     },
     "overviewLabel": "Overview",
     "summary": {
@@ -182,5 +198,70 @@
     "remarkSummarySingle": "Remark 1: \"{{text}}\"",
     "remarkSummaryMulti": "{{count}} remarks — Remark 1: \"{{text}}\"",
     "pdfBadge": "PDF"
+  },
+  "actParts": {
+    "heading": "Act Parts Review",
+    "failedToLoad": "Failed to load act part submissions.",
+    "stats": {
+      "total": "Total",
+      "pending": "Pending",
+      "approved": "Approved",
+      "rejected": "Rejected"
+    },
+    "statusLower": {
+      "pending": "pending",
+      "approved": "approved",
+      "rejected": "rejected"
+    },
+    "loading": "Loading…",
+    "tabLabels": {
+      "sections": "Sections",
+      "schedule": "Schedule",
+      "annexure": "Annexure",
+      "appendix": "Appendix",
+      "forms": "Forms"
+    },
+    "headers": {
+      "actTab": "Act / Tab",
+      "submittedBy": "Submitted By",
+      "submittedAt": "Submitted At",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "viewDecide": "View & Decide",
+    "view": "View",
+    "emptyState": {
+      "noSubmissionsOfType": "No {{status}} act part submissions",
+      "noSubmissions": "No act part submissions",
+      "allCaughtUp": "All caught up — nothing requires your review right now.",
+      "nothingHereYet": "Nothing here yet."
+    },
+    "detail": {
+      "actFallback": "Act #{{id}}",
+      "submittedByLine": "Submitted by {{name}}",
+      "couldNotLoad": "Could not load content.",
+      "noSections": "No sections added.",
+      "noEntries": "No entries added.",
+      "noSectionsInChapter": "No sections",
+      "noTitle": "(No title)",
+      "rejectionComments": "Rejection comments",
+      "comments": "Comments",
+      "reasonForRejection": "Reason for rejection (required)",
+      "optionalComments": "Optional comments…",
+      "back": "Back",
+      "reject": "Reject",
+      "approve": "Approve",
+      "confirmApprove": "Confirm Approve",
+      "confirmReject": "Confirm Reject",
+      "submitting": "Submitting…",
+      "close": "Close",
+      "statusLabels": {
+        "draft": "Draft",
+        "pending": "Pending",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "pendingDelete": "Del. Pending"
+      }
+    }
   }
 }

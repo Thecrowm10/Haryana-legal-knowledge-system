@@ -26,7 +26,18 @@
     "noComment": "कोई टिप्पणी नहीं",
     "clear": "साफ़ करें",
     "retry": "पुनः प्रयास करें",
-    "unknown": "अज्ञात"
+    "unknown": "अज्ञात",
+    "confirmApproveQuestion": "क्या आप वाकई \"{{title}}\" को स्वीकृत करना चाहते हैं?",
+    "confirmRejectQuestion": "क्या आप वाकई \"{{title}}\" को अस्वीकार करना चाहते हैं?",
+    "confirmApproveBody": "इसे स्वीकृत के रूप में चिह्नित कर दिया जाएगा और स्वीकृत सूची में ले जाया जाएगा। अपलोडर को तुरंत सूचित किया जाएगा।",
+    "confirmRejectBody": "इसे अस्वीकृत के रूप में चिह्नित कर संशोधन हेतु अपलोडर को वापस भेज दिया जाएगा। अपलोडर को तुरंत सूचित किया जाएगा।"
+  },
+  "toasts": {
+    "documentApproved": "\"{{title}}\" स्वीकृत कर दिया गया है।",
+    "documentRejected": "\"{{title}}\" अस्वीकार कर दिया गया है।",
+    "linkApproved": "\"{{title}}\" लिंक अनुरोध स्वीकृत कर दिया गया है।",
+    "linkRejected": "\"{{title}}\" लिंक अनुरोध अस्वीकार कर दिया गया है।",
+    "actionFailed": "कार्रवाई विफल रही। कृपया पुनः प्रयास करें।"
   },
   "pdfViewer": {
     "documentPreview": "दस्तावेज़ पूर्वावलोकन",
@@ -126,6 +137,7 @@
   "linkRequests": {
     "heading": "विभागीय लिंक अनुरोध",
     "tabs": {
+      "all": "सभी",
       "pending": "लंबित",
       "approved": "स्वीकृत",
       "rejected": "अस्वीकृत"
@@ -136,7 +148,9 @@
       "rejected": "अस्वीकृत"
     },
     "noRequestsOfType": "कोई {{status}} लिंक अनुरोध नहीं",
+    "noRequestsAll": "कोई लिंक अनुरोध नहीं",
     "pendingHint": "जब कोई विभाग साझा दस्तावेज़ को लिंक करने का अनुरोध करेगा, तो वह यहाँ दिखाई देगा।",
+    "allHint": "अन्य विभागों से लिंक अनुरोध यहाँ दिखाई देंगे।",
     "genericHint": "दिखाने के लिए कोई {{status}} लिंक अनुरोध नहीं।",
     "originallyFromPrefix": "मूल रूप से",
     "requestedByPrefix": "अनुरोधकर्ता",
@@ -152,7 +166,9 @@
     "quickActionsLabel": "त्वरित कार्रवाइयाँ",
     "quickActions": {
       "linkRequestsTitle": "लिंक अनुरोध",
-      "linkRequestsDesc": "किसी साझा दस्तावेज़ को लिंक करने के लिए अन्य विभागों के अनुरोधों की समीक्षा करें"
+      "linkRequestsDesc": "किसी साझा दस्तावेज़ को लिंक करने के लिए अन्य विभागों के अनुरोधों की समीक्षा करें",
+      "actPartsTitle": "अधिनियम भाग समीक्षा",
+      "actPartsDesc": "अपलोडर्स द्वारा सबमिट की गई धाराएं, अनुसूचियां, अनुबंध, परिशिष्ट और प्रपत्रों की समीक्षा करें"
     },
     "overviewLabel": "अवलोकन",
     "summary": {
@@ -182,5 +198,70 @@
     "remarkSummarySingle": "टिप्पणी 1: \"{{text}}\"",
     "remarkSummaryMulti": "{{count}} टिप्पणियाँ — टिप्पणी 1: \"{{text}}\"",
     "pdfBadge": "PDF"
+  },
+  "actParts": {
+    "heading": "अधिनियम भाग समीक्षा",
+    "failedToLoad": "अधिनियम भाग सबमिशन लोड करने में विफल।",
+    "stats": {
+      "total": "कुल",
+      "pending": "लंबित",
+      "approved": "स्वीकृत",
+      "rejected": "अस्वीकृत"
+    },
+    "statusLower": {
+      "pending": "लंबित",
+      "approved": "स्वीकृत",
+      "rejected": "अस्वीकृत"
+    },
+    "loading": "लोड हो रहा है…",
+    "tabLabels": {
+      "sections": "धाराएं",
+      "schedule": "अनुसूची",
+      "annexure": "अनुबंध",
+      "appendix": "परिशिष्ट",
+      "forms": "प्रपत्र"
+    },
+    "headers": {
+      "actTab": "अधिनियम / टैब",
+      "submittedBy": "सबमिट किया गया द्वारा",
+      "submittedAt": "सबमिट करने का समय",
+      "status": "स्थिति",
+      "actions": "कार्रवाई"
+    },
+    "viewDecide": "देखें और निर्णय लें",
+    "view": "देखें",
+    "emptyState": {
+      "noSubmissionsOfType": "कोई {{status}} अधिनियम भाग सबमिशन नहीं",
+      "noSubmissions": "कोई अधिनियम भाग सबमिशन नहीं",
+      "allCaughtUp": "सब कुछ पूर्ण हो गया — अभी आपकी समीक्षा के लिए कुछ भी लंबित नहीं है।",
+      "nothingHereYet": "यहाँ अभी कुछ भी नहीं है।"
+    },
+    "detail": {
+      "actFallback": "अधिनियम #{{id}}",
+      "submittedByLine": "{{name}} द्वारा सबमिट किया गया",
+      "couldNotLoad": "सामग्री लोड नहीं हो सकी।",
+      "noSections": "कोई धारा नहीं जोड़ी गई।",
+      "noEntries": "कोई प्रविष्टि नहीं जोड़ी गई।",
+      "noSectionsInChapter": "कोई धारा नहीं",
+      "noTitle": "(कोई शीर्षक नहीं)",
+      "rejectionComments": "अस्वीकृति टिप्पणियां",
+      "comments": "टिप्पणियां",
+      "reasonForRejection": "अस्वीकृति का कारण (आवश्यक)",
+      "optionalComments": "वैकल्पिक टिप्पणियां…",
+      "back": "वापस",
+      "reject": "अस्वीकार करें",
+      "approve": "स्वीकृत करें",
+      "confirmApprove": "स्वीकृति की पुष्टि करें",
+      "confirmReject": "अस्वीकृति की पुष्टि करें",
+      "submitting": "सबमिट हो रहा है…",
+      "close": "बंद करें",
+      "statusLabels": {
+        "draft": "मसौदा",
+        "pending": "लंबित",
+        "approved": "स्वीकृत",
+        "rejected": "अस्वीकृत",
+        "pendingDelete": "हटाना लंबित"
+      }
+    }
   }
 }
