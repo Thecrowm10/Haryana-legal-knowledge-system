@@ -30,7 +30,8 @@
     "confirmApproveQuestion": "Are you sure you want to approve \"{{title}}\"?",
     "confirmRejectQuestion": "Are you sure you want to reject \"{{title}}\"?",
     "confirmApproveBody": "It will be marked as approved and moved to the Approved list. The uploader will be notified immediately.",
-    "confirmRejectBody": "It will be marked as rejected and sent back to the uploader for revision. The uploader will be notified immediately."
+    "confirmRejectBody": "It will be marked as rejected and sent back to the uploader for revision. The uploader will be notified immediately.",
+    "enterRemarkBeforeRejecting": "Enter at least one remark before rejecting"
   },
   "toasts": {
     "documentApproved": "\"{{title}}\" has been approved.",
@@ -50,7 +51,7 @@
     "exitHighlightMode": "Exit highlight mode",
     "selectTextToHighlight": "Select text to highlight",
     "drawHighlightOnPdf": "Draw highlight on PDF",
-    "pickColor": "Pick color",
+    "pickColor": "Pick colour",
     "governmentOfHaryana": "Government of Haryana",
     "yearLabel": "Year",
     "documentContentNotAvailable": "Document content not available.",

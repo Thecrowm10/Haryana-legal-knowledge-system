@@ -10,6 +10,8 @@ export default function AdminOtpLoginScreen({ onBack, onSuccess }) {
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState('');
   const [resendMsg, setResendMsg] = useState('');
+  const canSubmitStep1 = !loading && mobile.replace(/\D/g, '').length === 10;
+  const canSubmitStep2 = !loading && otp.length === 6;
 
   // ── Step 1: request OTP ───────────────────────────────────
   async function handleRequestOtp(e) {
@@ -100,7 +102,7 @@ export default function AdminOtpLoginScreen({ onBack, onSuccess }) {
         }}>
           {/* Brand */}
           <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:20, paddingBottom:16, borderBottom:'1px solid rgba(255,255,255,.08)' }}>
-            <img src={haryanaLogo} alt="Haryana Government" style={{ width:38, height:38, objectFit:'contain' }} />
+            <img src={haryanaLogo} alt="Haryana Government" loading="lazy" style={{ width:38, height:38, objectFit:'contain' }} />
             <div>
               <div style={{ fontSize:13, fontWeight:700, color:'#fff' }}>Admin / Super Admin</div>
               <div style={{ fontSize:11, color:'rgba(255,255,255,.35)' }}>Secure OTP Login</div>
@@ -124,8 +126,9 @@ export default function AdminOtpLoginScreen({ onBack, onSuccess }) {
                 Enter your registered mobile number. A 6-digit OTP will be sent via SMS.
               </p>
 
-              <label style={lbl}><Smartphone size={10} color="rgba(255,255,255,.38)"/> Mobile Number</label>
+              <label htmlFor="aols-mobile" style={lbl}><Smartphone size={10} color="rgba(255,255,255,.38)"/> Mobile Number</label>
               <input
+                id="aols-mobile"
                 className="ao-inp"
                 type="tel"
                 inputMode="numeric"
@@ -138,11 +141,12 @@ export default function AdminOtpLoginScreen({ onBack, onSuccess }) {
 
               {error && <ErrBox msg={error} />}
 
-              <button className="ao-btn" type="submit" disabled={loading} style={{
+              <button className="ao-btn" type="submit" disabled={!canSubmitStep1} style={{
                 ...btnStyle, marginTop:20,
                 background:'linear-gradient(135deg,#6366f1,#4f46e5)',
                 boxShadow:'0 4px 18px rgba(99,102,241,.4)',
-                opacity: loading ? .7 : 1,
+                cursor: canSubmitStep1 ? 'pointer' : 'not-allowed',
+                opacity: canSubmitStep1 ? 1 : .7,
               }}>
                 {loading ? <><Spin/> Sending OTP…</> : <>Send OTP &nbsp;→</>}
               </button>
@@ -162,8 +166,9 @@ export default function AdminOtpLoginScreen({ onBack, onSuccess }) {
                 OTP sent to <strong style={{ color:'rgba(255,255,255,.7)' }}>+91 {mobile.slice(0,3)}****{mobile.slice(-3)}</strong>. Valid for 10 minutes.
               </p>
 
-              <label style={lbl}>6-Digit OTP</label>
+              <label htmlFor="aols-otp" style={lbl}>6-Digit OTP</label>
               <input
+                id="aols-otp"
                 className="ao-inp ao-otp"
                 type="text"
                 inputMode="numeric"
@@ -178,11 +183,12 @@ export default function AdminOtpLoginScreen({ onBack, onSuccess }) {
               {error    && <ErrBox msg={error} />}
               {resendMsg && <p style={{ fontSize:12, color:'#818cf8', marginBottom:10 }}>{resendMsg}</p>}
 
-              <button className="ao-btn" type="submit" disabled={loading} style={{
+              <button className="ao-btn" type="submit" disabled={!canSubmitStep2} style={{
                 ...btnStyle, marginTop:16,
                 background:'linear-gradient(135deg,#6366f1,#4f46e5)',
                 boxShadow:'0 4px 18px rgba(99,102,241,.4)',
-                opacity: loading ? .7 : 1,
+                cursor: canSubmitStep2 ? 'pointer' : 'not-allowed',
+                opacity: canSubmitStep2 ? 1 : .7,
               }}>
                 {loading ? <><Spin/> Verifying…</> : <><ShieldCheck size={14}/> Verify & Login</>}
               </button>

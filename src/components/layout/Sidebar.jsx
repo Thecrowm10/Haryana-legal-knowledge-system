@@ -123,6 +123,7 @@ export default function Sidebar({ user, activePage, onNavigate, collapsed, mobil
           <img
             src={haryanaLogo}
             alt="Haryana Government"
+            loading="lazy"
             style={{ width: 42, height: 42, objectFit: 'contain' }}
           />
         </div>

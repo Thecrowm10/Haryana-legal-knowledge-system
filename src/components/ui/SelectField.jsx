@@ -46,7 +46,7 @@ const PANEL = {
   animation: 'dropdownIn .15s cubic-bezier(.2,.8,.3,1)',
 };
 
-export default function SelectField({ value, onChange, required, placeholder, children, style = {} }) {
+export default function SelectField({ id, value, onChange, required, placeholder, children, style = {} }) {
   const [open, setOpen]   = useState(false);
   const ref               = useRef(null);
   const options           = parseOptions(children);
@@ -69,6 +69,7 @@ export default function SelectField({ value, onChange, required, placeholder, ch
 
       {/* Trigger button */}
       <button
+        id={id}
         type="button"
         onClick={() => setOpen(o => !o)}
         style={{

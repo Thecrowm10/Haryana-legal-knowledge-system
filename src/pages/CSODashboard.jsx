@@ -884,6 +884,7 @@ function GraphTab({ documents, relationships }) {
                   onChange={e => { setSearch(e.target.value); setShowDrop(true); }}
                   onFocus={() => setShowDrop(true)}
                   placeholder={t('graph.searchPlaceholder')}
+                  aria-label={t('graph.searchPlaceholder')}
                   style={{ width: '100%', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 8, color: 'var(--text-color)', fontFamily: 'var(--font)', fontSize: 12.5, padding: '8px 12px 8px 30px', outline: 'none', transition: 'border-color .2s', boxSizing: 'border-box' }}
                   onBlur={() => setTimeout(() => setShowDrop(false), 150)}
                 />
@@ -923,7 +924,9 @@ function GraphTab({ documents, relationships }) {
               const otherId = l.source === focusId ? l.target : l.source;
               const other   = allNodes.find(n => n.id === otherId);
               return (
-                <div key={i} onClick={() => select(otherId)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 20, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', cursor: 'pointer', fontSize: 11.5, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', transition: 'all .15s' }}
+                <div key={i} role="button" tabIndex={0} onClick={() => select(otherId)}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(otherId); } }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 12px', borderRadius: 20, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', cursor: 'pointer', fontSize: 11.5, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', transition: 'all .15s' }}
                   onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.color = 'var(--primary)'; }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--surface-border)'; e.currentTarget.style.color = 'var(--text-color-secondary)'; }}>
                   <span style={{ width: 7, height: 7, borderRadius: '50%', background: NODE_COLORS[other?.type] }} />
@@ -1105,6 +1108,7 @@ export default function CSODashboard({ activePage, auditLog, documents = [], rel
         <div style={{ position: 'relative' }}>
           <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-color-secondary)' }} />
           <input value={auditSearch} onChange={e => setAuditSearch(e.target.value)} placeholder={t('audit.searchPlaceholder')}
+            aria-label={t('audit.searchPlaceholder')}
             style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 8, color: 'var(--text-color)', fontFamily: 'var(--font)', fontSize: 12.5, padding: '7px 14px 7px 32px', outline: 'none', width: 210, transition: 'border-color .2s' }}
             onFocus={e => e.target.style.borderColor = 'var(--primary)'}
             onBlur={e => e.target.style.borderColor = 'var(--surface-border)'} />

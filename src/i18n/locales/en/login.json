@@ -36,6 +36,8 @@
   "usernamePlaceholder": "Enter your username",
   "password": "Password",
   "passwordPlaceholder": "Enter your password",
+  "showPassword": "Show password",
+  "hidePassword": "Hide password",
   "signingIn": "Signing in…",
   "loginButton": "Login",
   "forgotPassword": "Forgot Password?",

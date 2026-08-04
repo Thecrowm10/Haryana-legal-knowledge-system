@@ -94,7 +94,7 @@ export default function Footer() {
             {/* State Emblem on a dark background must render white per DBIM 5.3 —
                 the source SVG is solid black, so it's flipped via filter rather
                 than maintaining a second white-fill copy of the asset. */}
-            <img src={ashokEmblem} alt={t('footer.emblemAlt')} style={{ height: 34, width: 'auto', objectFit: 'contain', flexShrink: 0, filter: 'brightness(0) invert(1)' }} />
+            <img src={ashokEmblem} alt={t('footer.emblemAlt')} loading="lazy" style={{ height: 34, width: 'auto', objectFit: 'contain', flexShrink: 0, filter: 'brightness(0) invert(1)' }} />
             <div>
               <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: '#fff', lineHeight: 1.2 }}>
                 {t('footer.orgName')}
@@ -160,7 +160,7 @@ export default function Footer() {
           onMouseEnter={e => e.currentTarget.style.opacity = 1}
           onMouseLeave={e => e.currentTarget.style.opacity = 0.9}
         >
-          <img src={digitalIndiaLogo} alt={t('footer.digitalIndiaAlt')} style={{ height: 28, width: 'auto' }} />
+          <img src={digitalIndiaLogo} alt={t('footer.digitalIndiaAlt')} loading="lazy" style={{ height: 28, width: 'auto' }} />
         </a>
       </div>
 

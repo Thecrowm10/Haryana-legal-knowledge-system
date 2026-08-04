@@ -152,7 +152,10 @@ function PwField({ value, show, onToggle, onChange }) {
         autoComplete="new-password"
         style={{ ...INPUT_BASE, paddingRight: 38 }}
       />
-      <div onClick={onToggle} style={{ position: 'absolute', right: 11, top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex' }}>
+      <div role="button" tabIndex={0} onClick={onToggle}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } }}
+        aria-label={show ? 'Hide password' : 'Show password'}
+        style={{ position: 'absolute', right: 11, top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex' }}>
         {show ? <EyeOff size={14} /> : <Eye size={14} />}
       </div>
     </div>

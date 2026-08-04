@@ -11,7 +11,8 @@ export default function ChangePasswordScreen({ user, onPasswordChanged, onLogout
   const [loading, setLoading] = useState(false);
   const [captchaStatus, setCaptchaStatus] = useState({ touched: false, valid: false });
   const captchaRef            = useRef(null);
-  const canSubmit             = !loading && captchaStatus.valid;
+  const canSubmit             = !loading && captchaStatus.valid
+    && form.current !== '' && form.next.length >= 8 && form.next === form.confirm && form.next !== form.current;
 
   function toggle(field) { setShow(s => ({ ...s, [field]: !s[field] })); }
   function set(field, val) { setForm(f => ({ ...f, [field]: val })); setError(''); }
@@ -95,7 +96,7 @@ export default function ChangePasswordScreen({ user, onPasswordChanged, onLogout
         }}>
           {/* Brand */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid rgba(255,255,255,.1)' }}>
-            <img src={haryanaLogo} alt="Haryana Government" style={{ width: 40, height: 40, objectFit: 'contain' }} />
+            <img src={haryanaLogo} alt="Haryana Government" loading="lazy" style={{ width: 40, height: 40, objectFit: 'contain' }} />
             <div>
               <div style={{ fontSize: 13.5, fontWeight: 700, color: '#fff' }}>Haryana Government</div>
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)' }}>Digital Repository</div>
@@ -114,12 +115,12 @@ export default function ChangePasswordScreen({ user, onPasswordChanged, onLogout
             </p>
 
             {/* Current password */}
-            <label style={labelStyle}>Current Password</label>
-            <PwField value={form.current} show={show.current} onToggle={() => toggle('current')} onChange={v => set('current', v)} style={{ marginBottom: 16 }} />
+            <label htmlFor="cps-current" style={labelStyle}>Current Password</label>
+            <PwField id="cps-current" value={form.current} show={show.current} onToggle={() => toggle('current')} onChange={v => set('current', v)} style={{ marginBottom: 16 }} />
 
             {/* New password */}
-            <label style={labelStyle}>New Password</label>
-            <PwField value={form.next} show={show.next} onToggle={() => toggle('next')} onChange={v => set('next', v)} style={{ marginBottom: strength ? 4 : 16 }} />
+            <label htmlFor="cps-next" style={labelStyle}>New Password</label>
+            <PwField id="cps-next" value={form.next} show={show.next} onToggle={() => toggle('next')} onChange={v => set('next', v)} style={{ marginBottom: strength ? 4 : 16 }} />
 
             {strength && (
               <div style={{ marginBottom: 16 }}>
@@ -131,14 +132,14 @@ export default function ChangePasswordScreen({ user, onPasswordChanged, onLogout
             )}
 
             {/* Confirm password */}
-            <label style={labelStyle}>Confirm New Password</label>
-            <PwField value={form.confirm} show={show.confirm} onToggle={() => toggle('confirm')} onChange={v => set('confirm', v)} style={{ marginBottom: 16 }} />
+            <label htmlFor="cps-confirm" style={labelStyle}>Confirm New Password</label>
+            <PwField id="cps-confirm" value={form.confirm} show={show.confirm} onToggle={() => toggle('confirm')} onChange={v => set('confirm', v)} style={{ marginBottom: 16 }} />
 
             <Captcha ref={captchaRef} onStatusChange={setCaptchaStatus} style={{ marginBottom: 16 }} />
 
             {error && <ErrorBox msg={error} />}
 
-            <button className="fp-btn" type="submit" disabled={loading} style={{
+            <button className="fp-btn" type="submit" disabled={!canSubmit} style={{
               width: '100%', padding: '12px',
               background: canSubmit ? 'linear-gradient(135deg,#198754,#16a34a)' : 'rgba(255,255,255,.04)',
               borderRadius: 11, color: canSubmit ? '#fff' : 'rgba(255,255,255,.32)', fontSize: 14, fontWeight: 700,
@@ -172,10 +173,11 @@ const labelStyle = {
   marginBottom: 7, letterSpacing: '.08em', textTransform: 'uppercase',
 };
 
-function PwField({ value, show, onToggle, onChange, style }) {
+function PwField({ id, value, show, onToggle, onChange, style }) {
   return (
     <div style={{ position: 'relative', ...style }}>
       <input
+        id={id}
         className="fp-inp"
         type={show ? 'text' : 'password'}
         value={value}
@@ -188,7 +190,10 @@ function PwField({ value, show, onToggle, onChange, style }) {
           borderRadius: 11, fontSize: 13.5, color: '#fff',
         }}
       />
-      <div onClick={onToggle} style={{ position: 'absolute', right: 11, top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: 'rgba(255,255,255,.3)', display: 'flex' }}>
+      <div role="button" tabIndex={0} onClick={onToggle}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } }}
+        aria-label={show ? 'Hide password' : 'Show password'}
+        style={{ position: 'absolute', right: 11, top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: 'rgba(255,255,255,.3)', display: 'flex' }}>
         {show ? <EyeOff size={14} /> : <Eye size={14} />}
       </div>
     </div>

@@ -21,7 +21,9 @@ export default function ForgotPasswordScreen({ onBack }) {
 
   const isEmail   = identifier.includes('@');
   const InputIcon = isEmail ? Mail : Phone;
-  const canSubmitStep2 = !loading && captchaStatus.valid;
+  const canSubmitStep1 = !loading && identifier.trim() !== '';
+  const canSubmitStep2 = !loading && captchaStatus.valid
+    && otp.length === 6 && newPass.length >= 8 && newPass === confirm;
 
   // ── Step 1: request OTP ───────────────────────────────────
   async function handleRequestOtp(e) {
@@ -135,7 +137,7 @@ export default function ForgotPasswordScreen({ onBack }) {
         }}>
           {/* Brand */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid rgba(255,255,255,.1)' }}>
-            <img src={haryanaLogo} alt="Haryana Government" style={{ width: 40, height: 40, objectFit: 'contain' }} />
+            <img src={haryanaLogo} alt="Haryana Government" loading="lazy" style={{ width: 40, height: 40, objectFit: 'contain' }} />
             <div>
               <div style={{ fontSize: 13.5, fontWeight: 700, color: '#fff' }}>Haryana Government</div>
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)' }}>Digital Repository</div>
@@ -172,11 +174,12 @@ export default function ForgotPasswordScreen({ onBack }) {
                 Enter your registered email or mobile number. We'll send you a 6-digit OTP.
               </p>
 
-              <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10.5, fontWeight: 700, color: 'rgba(255,255,255,.5)', marginBottom: 7, letterSpacing: '.08em', textTransform: 'uppercase' }}>
+              <label htmlFor="fp-identifier" style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10.5, fontWeight: 700, color: 'rgba(255,255,255,.5)', marginBottom: 7, letterSpacing: '.08em', textTransform: 'uppercase' }}>
                 <InputIcon size={10} color="rgba(255,255,255,.4)" />
                 {isEmail ? 'Email Address' : 'Mobile Number'}
               </label>
               <input
+                id="fp-identifier"
                 className="fp-inp"
                 type="text"
                 value={identifier}
@@ -196,13 +199,14 @@ export default function ForgotPasswordScreen({ onBack }) {
 
               {error && <ErrorBox msg={error} />}
 
-              <button className="fp-btn" type="submit" disabled={loading} style={{
+              <button className="fp-btn" type="submit" disabled={!canSubmitStep1} style={{
                 width: '100%', padding: '12px', marginTop: 4,
-                background: 'linear-gradient(135deg,#198754,#16a34a)',
-                borderRadius: 11, color: '#fff', fontSize: 14, fontWeight: 700,
+                background: canSubmitStep1 ? 'linear-gradient(135deg,#198754,#16a34a)' : 'rgba(255,255,255,.04)',
+                borderRadius: 11, color: canSubmitStep1 ? '#fff' : 'rgba(255,255,255,.32)', fontSize: 14, fontWeight: 700,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                boxShadow: '0 4px 18px rgba(25, 135, 84,.35)',
-                opacity: loading ? .7 : 1,
+                border: canSubmitStep1 ? 'none' : '1.5px dashed rgba(255,255,255,.2)',
+                boxShadow: canSubmitStep1 ? '0 4px 18px rgba(25, 135, 84,.35)' : 'none',
+                cursor: canSubmitStep1 ? 'pointer' : 'not-allowed',
               }}>
                 {loading ? <><Spin /> Sending OTP…</> : <>Send OTP &nbsp;→</>}
               </button>
@@ -222,8 +226,9 @@ export default function ForgotPasswordScreen({ onBack }) {
               </p>
 
               {/* OTP */}
-              <label style={labelStyle}>OTP (6 digits)</label>
+              <label htmlFor="fp-otp" style={labelStyle}>OTP (6 digits)</label>
               <input
+                id="fp-otp"
                 className="fp-inp fp-otp-inp"
                 type="text"
                 inputMode="numeric"
@@ -240,9 +245,10 @@ export default function ForgotPasswordScreen({ onBack }) {
               />
 
               {/* New password */}
-              <label style={labelStyle}>New Password</label>
+              <label htmlFor="fp-newpass" style={labelStyle}>New Password</label>
               <div style={{ position: 'relative', marginBottom: 4 }}>
                 <input
+                  id="fp-newpass"
                   className="fp-inp"
                   type={showPass ? 'text' : 'password'}
                   value={newPass}
@@ -256,7 +262,10 @@ export default function ForgotPasswordScreen({ onBack }) {
                     borderRadius: 11, fontSize: 13.5, color: '#fff',
                   }}
                 />
-                <div onClick={() => setShowPass(s => !s)} style={{ position: 'absolute', right: 11, top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: 'rgba(255,255,255,.3)', display: 'flex' }}>
+                <div role="button" tabIndex={0} onClick={() => setShowPass(s => !s)}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowPass(s => !s); } }}
+                  aria-label={showPass ? 'Hide password' : 'Show password'}
+                  style={{ position: 'absolute', right: 11, top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: 'rgba(255,255,255,.3)', display: 'flex' }}>
                   {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
                 </div>
               </div>
@@ -271,8 +280,9 @@ export default function ForgotPasswordScreen({ onBack }) {
               )}
 
               {/* Confirm password */}
-              <label style={labelStyle}>Confirm New Password</label>
+              <label htmlFor="fp-confirm" style={labelStyle}>Confirm New Password</label>
               <input
+                id="fp-confirm"
                 className="fp-inp"
                 type="password"
                 value={confirm}
@@ -292,7 +302,7 @@ export default function ForgotPasswordScreen({ onBack }) {
               {error    && <ErrorBox msg={error} />}
               {resendMsg && <div style={{ fontSize: 12, color: '#4ade80', marginBottom: 10 }}>{resendMsg}</div>}
 
-              <button className="fp-btn" type="submit" disabled={loading} style={{
+              <button className="fp-btn" type="submit" disabled={!canSubmitStep2} style={{
                 width: '100%', padding: '12px',
                 background: canSubmitStep2 ? 'linear-gradient(135deg,#198754,#16a34a)' : 'rgba(255,255,255,.04)',
                 borderRadius: 11, color: canSubmitStep2 ? '#fff' : 'rgba(255,255,255,.32)', fontSize: 14, fontWeight: 700,

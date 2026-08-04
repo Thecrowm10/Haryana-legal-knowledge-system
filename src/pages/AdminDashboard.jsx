@@ -725,16 +725,16 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 {/* Username + Email */}
                 <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
-                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.username')}</label>
-                    <input style={{ ...INP_STYLE, borderColor: addError.toLowerCase().includes('username') ? 'rgba(220, 53, 69,.6)' : undefined }}
+                    <label htmlFor="adm-add-username" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.username')} <span style={{ color: '#dc3545' }}>*</span></label>
+                    <input id="adm-add-username" style={{ ...INP_STYLE, borderColor: addError.toLowerCase().includes('username') ? 'rgba(220, 53, 69,.6)' : undefined }}
                       placeholder={t('users.addDrawer.usernamePlaceholder')}
                       autoComplete="off"
                       value={addForm.username}
                       onChange={e => { setAddForm(f => ({ ...f, username: e.target.value })); setAddError(''); }} />
                   </div>
                   <div>
-                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.email')}</label>
-                    <input style={{ ...INP_STYLE, borderColor: addError.toLowerCase().includes('email') ? 'rgba(220, 53, 69,.6)' : undefined }}
+                    <label htmlFor="adm-add-email" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.email')} <span style={{ color: '#dc3545' }}>*</span></label>
+                    <input id="adm-add-email" style={{ ...INP_STYLE, borderColor: addError.toLowerCase().includes('email') ? 'rgba(220, 53, 69,.6)' : undefined }}
                       type="email" placeholder={t('users.addDrawer.emailPlaceholder')}
                       autoComplete="off"
                       value={addForm.email}
@@ -744,9 +744,10 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
 
                 {/* Password */}
                 <div>
-                  <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.password')}</label>
+                  <label htmlFor="adm-add-password" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.password')} <span style={{ color: '#dc3545' }}>*</span></label>
                   <div style={{ position: 'relative' }}>
                     <input
+                      id="adm-add-password"
                       style={{ ...INP_STYLE, paddingRight: 38, borderColor: addError.toLowerCase().includes('password') ? 'rgba(220, 53, 69,.6)' : undefined }}
                       type={showAddPass ? 'text' : 'password'}
                       placeholder={t('users.addDrawer.passwordPlaceholder')}
@@ -763,14 +764,14 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 {/* First + Last name */}
                 <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
-                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.firstName')}</label>
-                    <input style={INP_STYLE} placeholder={t('users.addDrawer.firstNamePlaceholder')}
+                    <label htmlFor="adm-add-firstname" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.firstName')}</label>
+                    <input id="adm-add-firstname" style={INP_STYLE} placeholder={t('users.addDrawer.firstNamePlaceholder')}
                       value={addForm.first_name}
                       onChange={e => setAddForm(f => ({ ...f, first_name: e.target.value }))} />
                   </div>
                   <div>
-                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.lastName')}</label>
-                    <input style={INP_STYLE} placeholder={t('users.addDrawer.lastNamePlaceholder')}
+                    <label htmlFor="adm-add-lastname" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.lastName')}</label>
+                    <input id="adm-add-lastname" style={INP_STYLE} placeholder={t('users.addDrawer.lastNamePlaceholder')}
                       value={addForm.last_name}
                       onChange={e => setAddForm(f => ({ ...f, last_name: e.target.value }))} />
                   </div>
@@ -778,8 +779,8 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
 
                 {/* Mobile Number */}
                 <div>
-                  <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.mobileNumber')}</label>
-                  <input style={INP_STYLE}
+                  <label htmlFor="adm-add-mobile" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.mobileNumber')}</label>
+                  <input id="adm-add-mobile" style={INP_STYLE}
                     type="tel"
                     inputMode="numeric"
                     maxLength={10}
@@ -795,8 +796,9 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                     <>
                       <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: isNodal ? '1fr' : '1fr 1fr', gap: 12 }}>
                         <div>
-                          <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.role')}</label>
+                          <label htmlFor="adm-add-role" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.role')}</label>
                           <SelectField
+                            id="adm-add-role"
                             value={addForm.role_id}
                             onChange={e => setAddForm(f => ({ ...f, role_id: e.target.value, department_id: '', dept_ids: [] }))}
                             placeholder={t('users.addDrawer.roleSelectPlaceholder')}
@@ -808,8 +810,8 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                         </div>
                         {!isNodal && (
                           <div>
-                            <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.department')}</label>
-                            <SelectField value={addForm.department_id} onChange={e => setAddForm(f => ({ ...f, department_id: e.target.value }))} placeholder={t('users.addDrawer.departmentSelectPlaceholder')}>
+                            <label htmlFor="adm-add-department" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.department')}</label>
+                            <SelectField id="adm-add-department" value={addForm.department_id} onChange={e => setAddForm(f => ({ ...f, department_id: e.target.value }))} placeholder={t('users.addDrawer.departmentSelectPlaceholder')}>
                               {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                             </SelectField>
                           </div>
@@ -819,8 +821,9 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                       {/* Managed Departments — nodal officer only */}
                       {isNodal && (
                         <div>
-                          <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.department')}</label>
+                          <label htmlFor="adm-add-dept-multi" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.department')}</label>
                           <MultiSelectField
+                            id="adm-add-dept-multi"
                             value={addForm.dept_ids}
                             onChange={ids => setAddForm(f => ({ ...f, dept_ids: ids }))}
                             options={depts}
@@ -845,13 +848,19 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                   style={{ padding: '9px 18px', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'var(--text-color)', fontFamily: 'var(--font)' }}>
                   {t('users.addDrawer.cancel')}
                 </button>
-                <button onClick={handleAddUser} disabled={addSaving}
-                  style={{ padding: '9px 20px', background: addSaving ? 'var(--surface-border)' : 'var(--primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: addSaving ? 'not-allowed' : 'pointer', color: addSaving ? 'var(--text-color-secondary)' : 'white', fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 7 }}>
-                  {addSaving
-                    ? <><div style={{ width: 12, height: 12, border: '2px solid rgba(0,0,0,.2)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin .7s linear infinite' }} /> {t('users.addDrawer.creating')}</>
-                    : <><Plus size={13} /> {t('users.addDrawer.createUser')}</>
-                  }
-                </button>
+                {(() => {
+                  const addFormInvalid = !addForm.username.trim() || !addForm.email.trim() || !addForm.password;
+                  const addBtnDisabled = addSaving || addFormInvalid;
+                  return (
+                    <button onClick={handleAddUser} disabled={addBtnDisabled}
+                      style={{ padding: '9px 20px', background: addBtnDisabled ? 'var(--surface-border)' : 'var(--primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: addBtnDisabled ? 'not-allowed' : 'pointer', color: addBtnDisabled ? 'var(--text-color-secondary)' : 'white', fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 7 }}>
+                      {addSaving
+                        ? <><div style={{ width: 12, height: 12, border: '2px solid rgba(0,0,0,.2)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin .7s linear infinite' }} /> {t('users.addDrawer.creating')}</>
+                        : <><Plus size={13} /> {t('users.addDrawer.createUser')}</>
+                      }
+                    </button>
+                  );
+                })()}
               </div>
             </div>
           </>
@@ -887,20 +896,20 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
 
                 <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
-                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.firstName')}</label>
-                    <input style={INP_STYLE} value={editForm.first_name}
+                    <label htmlFor="adm-edit-firstname" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.firstName')}</label>
+                    <input id="adm-edit-firstname" style={INP_STYLE} value={editForm.first_name}
                       onChange={e => setEditForm(f => ({ ...f, first_name: e.target.value }))} />
                   </div>
                   <div>
-                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.lastName')}</label>
-                    <input style={INP_STYLE} value={editForm.last_name}
+                    <label htmlFor="adm-edit-lastname" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.lastName')}</label>
+                    <input id="adm-edit-lastname" style={INP_STYLE} value={editForm.last_name}
                       onChange={e => setEditForm(f => ({ ...f, last_name: e.target.value }))} />
                   </div>
                 </div>
 
                 <div>
-                  <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.email')}</label>
-                  <input style={INP_STYLE} type="email" value={editForm.email}
+                  <label htmlFor="adm-edit-email" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.email')}</label>
+                  <input id="adm-edit-email" style={INP_STYLE} type="email" value={editForm.email}
                     onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} />
                 </div>
 
@@ -910,8 +919,9 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                     <>
                       <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: isNodal ? '1fr' : '1fr 1fr', gap: 12 }}>
                         <div>
-                          <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.role')}</label>
+                          <label htmlFor="adm-edit-role" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.role')}</label>
                           <SelectField
+                            id="adm-edit-role"
                             value={editForm.role_id ?? ''}
                             onChange={e => setEditForm(f => ({ ...f, role_id: e.target.value ? Number(e.target.value) : null, department_id: '', dept_ids: [] }))}
                             placeholder={t('users.editModal.selectRole')}
@@ -923,8 +933,8 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                         </div>
                         {!isNodal && (
                           <div>
-                            <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.department')}</label>
-                            <SelectField value={editForm.department_id ?? ''} onChange={e => setEditForm(f => ({ ...f, department_id: e.target.value || null }))} placeholder={t('users.editModal.selectDepartment')}>
+                            <label htmlFor="adm-edit-department" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.department')}</label>
+                            <SelectField id="adm-edit-department" value={editForm.department_id ?? ''} onChange={e => setEditForm(f => ({ ...f, department_id: e.target.value || null }))} placeholder={t('users.editModal.selectDepartment')}>
                               {depts.map(d => (
                                 <option key={d.id} value={d.id}>{d.name}</option>
                               ))}
@@ -934,8 +944,9 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                       </div>
                       {isNodal && (
                         <div>
-                          <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.department')}</label>
+                          <label htmlFor="adm-edit-dept-multi" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.department')}</label>
                           <MultiSelectField
+                            id="adm-edit-dept-multi"
                             value={editForm.dept_ids}
                             onChange={ids => setEditForm(f => ({ ...f, dept_ids: ids }))}
                             options={depts}
@@ -975,13 +986,18 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                   style={{ padding: '9px 18px', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'var(--text-color)', fontFamily: 'var(--font)' }}>
                   {t('users.editModal.cancel')}
                 </button>
-                <button onClick={handleEditSave} disabled={editSaving}
-                  style={{ padding: '9px 20px', background: editSaving ? 'var(--surface-border)' : 'var(--primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: editSaving ? 'not-allowed' : 'pointer', color: editSaving ? 'var(--text-color-secondary)' : 'white', fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 7 }}>
-                  {editSaving
-                    ? <><div style={{ width: 12, height: 12, border: '2px solid rgba(0,0,0,.2)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin .7s linear infinite' }} /> {t('users.editModal.saving')}</>
-                    : t('users.editModal.saveChanges')
-                  }
-                </button>
+                {(() => {
+                  const editBtnDisabled = editSaving || !(editForm.email || '').trim();
+                  return (
+                    <button onClick={handleEditSave} disabled={editBtnDisabled}
+                      style={{ padding: '9px 20px', background: editBtnDisabled ? 'var(--surface-border)' : 'var(--primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: editBtnDisabled ? 'not-allowed' : 'pointer', color: editBtnDisabled ? 'var(--text-color-secondary)' : 'white', fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 7 }}>
+                      {editSaving
+                        ? <><div style={{ width: 12, height: 12, border: '2px solid rgba(0,0,0,.2)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin .7s linear infinite' }} /> {t('users.editModal.saving')}</>
+                        : t('users.editModal.saveChanges')
+                      }
+                    </button>
+                  );
+                })()}
               </div>
             </div>
           </div>
@@ -1162,8 +1178,9 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
 
             <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
-                <label style={{ ...LABEL, display: 'block', marginBottom: 7 }}>{t('taxonomy.addDepartment.name')}</label>
+                <label htmlFor="adm-add-dept-name" style={{ ...LABEL, display: 'block', marginBottom: 7 }}>{t('taxonomy.addDepartment.name')} <span style={{ color: '#dc3545' }}>*</span></label>
                 <input
+                  id="adm-add-dept-name"
                   autoFocus
                   style={{
                     width: '100%', padding: '10px 13px', background: 'var(--surface-ground)',
@@ -1177,8 +1194,9 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
               </div>
 
               <div>
-                <label style={{ ...LABEL, display: 'block', marginBottom: 7 }}>{t('taxonomy.addDepartment.description')}</label>
+                <label htmlFor="adm-add-dept-desc" style={{ ...LABEL, display: 'block', marginBottom: 7 }}>{t('taxonomy.addDepartment.description')}</label>
                 <textarea
+                  id="adm-add-dept-desc"
                   rows={5}
                   style={{
                     width: '100%', padding: '10px 13px', background: 'var(--surface-ground)',
@@ -1204,24 +1222,29 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 style={{ padding: '9px 20px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                 {t('taxonomy.addDepartment.cancel')}
               </button>
-              <button
-                type="button"
-                disabled={creating}
-                onClick={handleCreateDept}
-                style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
-                  background: creating ? 'var(--surface-border)' : 'var(--primary)',
-                  color: creating ? 'var(--text-color-secondary)' : 'white',
-                  border: 'none', borderRadius: 8, padding: '9px 20px',
-                  fontSize: 13, fontWeight: 700, cursor: creating ? 'not-allowed' : 'pointer',
-                  fontFamily: 'var(--font)',
-                }}
-              >
-                {creating
-                  ? <><div style={{ width: 13, height: 13, border: '2px solid rgba(0,0,0,.2)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin .7s linear infinite' }}/> {t('taxonomy.addDepartment.creating')}</>
-                  : <><Plus size={14} /> {t('taxonomy.addDepartment.addDepartment')}</>
-                }
-              </button>
+              {(() => {
+                const deptBtnDisabled = creating || !newDept.name.trim();
+                return (
+                  <button
+                    type="button"
+                    disabled={deptBtnDisabled}
+                    onClick={handleCreateDept}
+                    style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                      background: deptBtnDisabled ? 'var(--surface-border)' : 'var(--primary)',
+                      color: deptBtnDisabled ? 'var(--text-color-secondary)' : 'white',
+                      border: 'none', borderRadius: 8, padding: '9px 20px',
+                      fontSize: 13, fontWeight: 700, cursor: deptBtnDisabled ? 'not-allowed' : 'pointer',
+                      fontFamily: 'var(--font)',
+                    }}
+                  >
+                    {creating
+                      ? <><div style={{ width: 13, height: 13, border: '2px solid rgba(0,0,0,.2)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin .7s linear infinite' }}/> {t('taxonomy.addDepartment.creating')}</>
+                      : <><Plus size={14} /> {t('taxonomy.addDepartment.addDepartment')}</>
+                    }
+                  </button>
+                );
+              })()}
             </div>
           </div>
         </>
@@ -1528,7 +1551,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
             { label: t('uploads.stats.pending'),       value: pendingDocs,  color: '#b45309',        bg: 'rgba(255, 193, 7,.12)', icon: Clock,       key: 'pending'  },
             { label: t('uploads.stats.rejected'),      value: rejectedDocs, color: '#dc3545',        bg: 'rgba(220, 53, 69,.12)',  icon: XCircle,     key: 'rejected' },
           ].map(s => {
-            const isActive = uploadsFilterStatus === s.key && s.key !== '';
+            const isActive = uploadsFilterStatus === s.key;
             return (
               <Card key={s.label}
                 onClick={() => setUploadsFilterStatus(f => f === s.key ? '' : s.key)}
@@ -1787,7 +1810,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
             { label: t('linkedDocs.stats.pending'),     value: totals.pending,   color: '#b45309',       bg: 'rgba(255, 193, 7,.12)', icon: Clock,       key: 'pending'  },
             { label: t('linkedDocs.stats.rejected'),    value: totals.rejected,  color: '#dc3545',       bg: 'rgba(220, 53, 69,.12)',  icon: XCircle,     key: 'rejected' },
           ].map(s => {
-            const isActive = linksFilterStatus === s.key && s.key !== '';
+            const isActive = linksFilterStatus === s.key;
             return (
               <Card key={s.label}
                 onClick={() => setLinksFilterStatus(f => f === s.key ? '' : s.key)}
@@ -1983,7 +2006,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   return null;
 }
 
-function MultiSelectField({ value = [], onChange, options = [], placeholder = 'Select...' }) {
+function MultiSelectField({ id, value = [], onChange, options = [], placeholder = 'Select...' }) {
   const { t } = useTranslation('admin');
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -2004,7 +2027,7 @@ function MultiSelectField({ value = [], onChange, options = [], placeholder = 'S
   return (
     <div ref={ref} style={{ position: 'relative' }}>
       {/* Trigger */}
-      <button type="button" onClick={() => setOpen(o => !o)} style={{
+      <button id={id} type="button" onClick={() => setOpen(o => !o)} style={{
         width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
         padding: '10px 12px 10px 14px', fontFamily: 'var(--font)', fontSize: 13,
         borderRadius: 8, background: 'var(--surface-ground)',

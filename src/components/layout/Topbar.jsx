@@ -138,7 +138,7 @@ export default function Topbar({ user, activePage, onNavigate, onLogout, onToggl
         /* No sidebar for this role, so the org branding lives here instead */
         <>
           <div className="tb-brand" style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0, minWidth: 240 }}>
-            <img className="tb-brand-logo" src={haryanaLogo} alt="Haryana Government" style={{ width: 42, height: 42, objectFit: 'contain', flexShrink: 0 }} />
+            <img className="tb-brand-logo" src={haryanaLogo} alt="Haryana Government" loading="lazy" style={{ width: 42, height: 42, objectFit: 'contain', flexShrink: 0 }} />
             <div className="tb-brand-text" style={{ overflow: 'hidden' }}>
               <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', lineHeight: 1.3, whiteSpace: 'nowrap' }}>{t('sidebar.orgName')}</div>
               <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', lineHeight: 1.3, whiteSpace: 'nowrap' }}>{t('sidebar.orgTagline')}</div>
@@ -208,14 +208,16 @@ export default function Topbar({ user, activePage, onNavigate, onLogout, onToggl
               <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{headerPrimaryText}</div>
               <div style={{ fontSize: 11, color: rm.color, fontWeight: 600, marginTop: 2 }}>{t(rm.label)}</div>
             </div>
-            <div onClick={() => { setProfileOpen(false); setProfileModalOpen(true); }}
+            <div role="button" tabIndex={0} onClick={() => { setProfileOpen(false); setProfileModalOpen(true); }}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setProfileOpen(false); setProfileModalOpen(true); } }}
               style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer', fontSize: 13, color: 'var(--text-color)', transition: 'background .15s' }}
               onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
               <User size={14} color="var(--text-color-secondary)" />{t('topbar.profile')}
             </div>
             <div style={{ height: 1, background: 'var(--surface-border)', margin: '4px 0' }} />
-            <div onClick={() => { setProfileOpen(false); onLogout(); }}
+            <div role="button" tabIndex={0} onClick={() => { setProfileOpen(false); onLogout(); }}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setProfileOpen(false); onLogout(); } }}
               style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer', fontSize: 13, color: 'var(--red)', transition: 'background .15s' }}
               onMouseEnter={e => e.currentTarget.style.background = 'rgba(220, 53, 69,.07)'}
               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>

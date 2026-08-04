@@ -41,7 +41,7 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
   }, [authError]);
 
   const error = formError || authError;
-  const canSubmit = !loading && captchaStatus.valid;
+  const canSubmit = !loading && captchaStatus.valid && username.trim() !== '' && password !== '';
 
   const handleLogin = () => {
     setFormError('');
@@ -92,7 +92,7 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
           {/* Header */}
           <div className="lk-left" style={{ textAlign:'center', position: 'relative' }}>
             <div style={{ display:'inline-flex', alignItems:'center', gap:10, marginBottom:20 }}>
-              <img src={haryanaLogo} alt="Haryana" style={{ width:52, height:52, objectFit:'contain' }} />
+              <img src={haryanaLogo} alt="Haryana" loading="lazy" style={{ width:52, height:52, objectFit:'contain' }} />
               <div style={{ textAlign:'left' }}>
                 <div style={{ fontSize:16, fontWeight:700, color:'#fff' }}>{t('orgNamePortal')}</div>
                 <div style={{ fontSize:11.5, color:'rgba(255,255,255,.7)' }}>{t('tagline')}</div>
@@ -110,7 +110,9 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
           <div style={{ display:'flex', gap:24, flexWrap:'wrap', justifyContent:'center' }}>
 
             {/* Public Access */}
-            <div className="lk-portal-card" onClick={() => onLogin({ role: 'citizen' })} style={{
+            <div className="lk-portal-card" role="button" tabIndex={0} onClick={() => onLogin({ role: 'citizen' })}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onLogin({ role: 'citizen' }); } }}
+              aria-label={t('publicAccessTitle')} style={{
               width: 280, padding:'32px 28px', borderRadius:20, cursor:'pointer',
               background:'rgba(255,255,255,.05)', backdropFilter:'blur(32px) saturate(160%)', WebkitBackdropFilter:'blur(32px) saturate(160%)',
               border:'1px solid rgba(255,255,255,.14)', borderTop:'1px solid rgba(255,255,255,.28)',
@@ -134,7 +136,9 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
             </div>
 
             {/* Official Access */}
-            <div className="lk-portal-card" onClick={() => setScreen('login')} style={{
+            <div className="lk-portal-card" role="button" tabIndex={0} onClick={() => setScreen('login')}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setScreen('login'); } }}
+              aria-label={t('officialAccessTitle')} style={{
               width: 280, padding:'32px 28px', borderRadius:20, cursor:'pointer',
               background:'rgba(255,255,255,.05)', backdropFilter:'blur(32px) saturate(160%)', WebkitBackdropFilter:'blur(32px) saturate(160%)',
               border:'1px solid rgba(255,255,255,.14)', borderTop:'1px solid rgba(255,255,255,.28)',
@@ -158,7 +162,9 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
             </div>
 
             {/* Admin Access */}
-            <div className="lk-portal-card" onClick={() => setScreen('admin-otp')} style={{
+            <div className="lk-portal-card" role="button" tabIndex={0} onClick={() => setScreen('admin-otp')}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setScreen('admin-otp'); } }}
+              aria-label={t('adminAccessTitle')} style={{
               width: 280, padding:'32px 28px', borderRadius:20, cursor:'pointer',
               background:'rgba(255,255,255,.05)', backdropFilter:'blur(32px) saturate(160%)', WebkitBackdropFilter:'blur(32px) saturate(160%)',
               border:'1px solid rgba(255,255,255,.14)', borderTop:'1px solid rgba(255,255,255,.28)',
@@ -313,6 +319,7 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
                 <img
                   src={haryanaLogo}
                   alt="Haryana Government"
+                  loading="lazy"
                   style={{ width: 60, height: 60, objectFit: 'contain', borderRadius: 13 }}
                 />
               </div>
@@ -341,10 +348,11 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
 
             {/* Username */}
             <div style={{ marginBottom:14 }}>
-              <label style={{ display:'flex', alignItems:'center', gap:5, fontSize:10.5, fontWeight:700, color:'rgba(255,255,255,.5)', marginBottom:7, letterSpacing:'.08em', textTransform:'uppercase' }}>
+              <label htmlFor="login-username" style={{ display:'flex', alignItems:'center', gap:5, fontSize:10.5, fontWeight:700, color:'rgba(255,255,255,.5)', marginBottom:7, letterSpacing:'.08em', textTransform:'uppercase' }}>
                 <User size={10} color='rgba(255,255,255,.4)'/> {t('username')}
               </label>
               <input
+                id="login-username"
                 className="lk-inp"
                 type="text"
                 value={username}
@@ -363,11 +371,12 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
 
             {/* Password */}
             <div style={{ marginBottom:16 }}>
-              <label style={{ display:'flex', alignItems:'center', gap:5, fontSize:10.5, fontWeight:700, color:'rgba(255,255,255,.5)', marginBottom:7, letterSpacing:'.08em', textTransform:'uppercase' }}>
+              <label htmlFor="login-password" style={{ display:'flex', alignItems:'center', gap:5, fontSize:10.5, fontWeight:700, color:'rgba(255,255,255,.5)', marginBottom:7, letterSpacing:'.08em', textTransform:'uppercase' }}>
                 <Lock size={10} color='rgba(255,255,255,.4)'/> {t('password')}
               </label>
               <div style={{ position:'relative' }}>
                 <input
+                  id="login-password"
                   className="lk-inp"
                   type={showPass?'text':'password'}
                   value={password}
@@ -381,7 +390,10 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
                     borderRadius:11, fontSize:13.5, color:'#fff',
                   }}
                 />
-                <div onClick={()=>setShowPass(s=>!s)} style={{ position:'absolute', right:11, top:'50%', transform:'translateY(-50%)', cursor:'pointer', color:'rgba(255,255,255,.28)', display:'flex' }}>
+                <div role="button" tabIndex={0} onClick={()=>setShowPass(s=>!s)}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowPass(s=>!s); } }}
+                  aria-label={showPass ? t('hidePassword') : t('showPassword')}
+                  style={{ position:'absolute', right:11, top:'50%', transform:'translateY(-50%)', cursor:'pointer', color:'rgba(255,255,255,.28)', display:'flex' }}>
                   {showPass?<EyeOff size={14}/>:<Eye size={14}/>}
                 </div>
               </div>
@@ -398,7 +410,7 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
             )}
 
             {/* Button */}
-            <button className="lk-btn" onClick={handleLogin} disabled={loading}
+            <button className="lk-btn" onClick={handleLogin} disabled={!canSubmit}
               style={{
                 width:'100%', padding:'12px', marginBottom:12,
                 background: canSubmit ? 'linear-gradient(135deg,#198754,#16a34a)' : 'rgba(255,255,255,.04)',

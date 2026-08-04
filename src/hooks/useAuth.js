@@ -4,6 +4,8 @@ import { changePassword as changePasswordApi } from '../services/pdf';
 import { encryptLoginPayload } from '../services/crypto';
 
 const CITIZEN_PROFILE = { username: 'citizen', role: 'citizen', name: 'Guest', dept: '', mustChangePassword: false };
+const IDLE_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes of inactivity — standard govt-portal idle timeout
+const IDLE_EVENTS = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
 // const DEV_UPLOADER  = { username: 'dept.uploader', role: 'uploader', name: 'Dev Uploader (Mock)', dept: 'Urban Local Bodies', mustChangePassword: false };
 // const DEV_APPROVER  = { username: 'dept.approver', role: 'approver', name: 'Dev Approver (Mock)', dept: 'Urban Local Bodies', mustChangePassword: false };
 
@@ -55,6 +57,27 @@ export function useAuth() {
     window.addEventListener('hlks:session-expired', handler);
     return () => window.removeEventListener('hlks:session-expired', handler);
   }, []);
+
+  // Idle/inactivity timeout — separate from the reactive 401 handler above.
+  // Only applies to real authenticated (token-based) sessions, not the
+  // citizen guest role, which has no backend session to protect.
+  useEffect(() => {
+    if (!user || user.role === 'citizen') return;
+
+    let timer;
+    const resetTimer = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => logout(), IDLE_TIMEOUT_MS);
+    };
+
+    IDLE_EVENTS.forEach(evt => window.addEventListener(evt, resetTimer));
+    resetTimer();
+
+    return () => {
+      clearTimeout(timer);
+      IDLE_EVENTS.forEach(evt => window.removeEventListener(evt, resetTimer));
+    };
+  }, [user]);
 
   async function loginAsRole({ username, password, role, token } = {}) {
     if (role === 'citizen') { setUser(CITIZEN_PROFILE); return; }

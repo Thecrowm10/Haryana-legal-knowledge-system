@@ -14,7 +14,8 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
   const [resendMsg, setResendMsg] = useState('');
   const [captchaStatus, setCaptchaStatus] = useState({ touched: false, valid: false });
   const captchaRef                = useRef(null);
-  const canSubmitStep2            = !loading && captchaStatus.valid;
+  const canSubmitStep1            = !loading && mobile.replace(/\D/g, '').length === 10;
+  const canSubmitStep2            = !loading && captchaStatus.valid && otp.length === 6;
 
   // ── Step 1: request OTP ───────────────────────────────────
   async function handleSendOtp(e) {
@@ -111,7 +112,7 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
         }}>
           {/* Brand */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 11, marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid rgba(255,255,255,.1)' }}>
-            <img src={haryanaLogo} alt="Haryana Government" style={{ width: 40, height: 40, objectFit: 'contain' }} />
+            <img src={haryanaLogo} alt="Haryana Government" loading="lazy" style={{ width: 40, height: 40, objectFit: 'contain' }} />
             <div>
               <div style={{ fontSize: 14.5, fontWeight: 700, color: '#fff' }}>Haryana Government</div>
               <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,.42)', marginTop: 2 }}>Digital Repository</div>
@@ -134,10 +135,11 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
                 Enter your registered mobile number. A 6-digit OTP will be sent via SMS.
               </p>
 
-              <label style={labelStyle}>
+              <label htmlFor="aol-mobile" style={labelStyle}>
                 <Phone size={10} color="rgba(255,255,255,.4)" /> Mobile Number
               </label>
               <input
+                id="aol-mobile"
                 className="aol-inp"
                 type="text"
                 inputMode="numeric"
@@ -156,13 +158,14 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
 
               {error && <ErrorBox msg={error} />}
 
-              <button className="aol-btn" type="submit" disabled={loading} style={{
+              <button className="aol-btn" type="submit" disabled={!canSubmitStep1} style={{
                 width: '100%', padding: '12px',
-                background: 'linear-gradient(135deg,#198754,#16a34a)',
-                borderRadius: 11, color: '#fff', fontSize: 14, fontWeight: 700,
+                background: canSubmitStep1 ? 'linear-gradient(135deg,#198754,#16a34a)' : 'rgba(255,255,255,.04)',
+                borderRadius: 11, color: canSubmitStep1 ? '#fff' : 'rgba(255,255,255,.32)', fontSize: 14, fontWeight: 700,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                boxShadow: '0 4px 18px rgba(25, 135, 84,.38)',
-                opacity: loading ? .7 : 1,
+                border: canSubmitStep1 ? 'none' : '1.5px dashed rgba(255,255,255,.2)',
+                boxShadow: canSubmitStep1 ? '0 4px 18px rgba(25, 135, 84,.38)' : 'none',
+                cursor: canSubmitStep1 ? 'pointer' : 'not-allowed',
               }}>
                 {loading ? <><Spin /> Sending OTP…</> : <>Send OTP &nbsp;→</>}
               </button>
@@ -181,8 +184,9 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
                 OTP sent to <strong style={{ color: 'rgba(255,255,255,.7)' }}>+91 {mobile.slice(0,3)}****{mobile.slice(-3)}</strong>. Valid for 10 minutes.
               </p>
 
-              <label style={labelStyle}>6-Digit OTP</label>
+              <label htmlFor="aol-otp" style={labelStyle}>6-Digit OTP</label>
               <input
+                id="aol-otp"
                 className="aol-inp aol-otp-inp"
                 type="text"
                 inputMode="numeric"
@@ -204,7 +208,7 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
               {error     && <ErrorBox msg={error} />}
               {resendMsg && <div style={{ fontSize: 12, color: '#4ade80', marginBottom: 10 }}>{resendMsg}</div>}
 
-              <button className="aol-btn" type="submit" disabled={loading} style={{
+              <button className="aol-btn" type="submit" disabled={!canSubmitStep2} style={{
                 width: '100%', padding: '12px',
                 background: canSubmitStep2 ? 'linear-gradient(135deg,#198754,#16a34a)' : 'rgba(255,255,255,.04)',
                 borderRadius: 11, color: canSubmitStep2 ? '#fff' : 'rgba(255,255,255,.32)', fontSize: 14, fontWeight: 700,

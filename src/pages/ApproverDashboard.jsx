@@ -405,9 +405,7 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Toolbar — horizontally scrollable below the point where Rotate/Zoom/Highlight
-          all stop fitting, so the Highlight button scrolls into view instead of being
-          clipped off the edge of the panel on phones/tablets. */}
+      
       <div className="table-scroll-wrap" style={{ padding: '10px 14px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surface-50)', flexShrink: 0 }}>
         <Eye size={13} color="var(--primary)" style={{ flexShrink: 0 }} />
         <span style={{ fontSize: 'var(--font-size-small)', fontWeight: 700, color: 'var(--text-heading)', flex: '1 1 auto', minWidth: 40, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{docxHtml ? t('pdfViewer.documentPreview') : t('pdfViewer.originalPdf')}</span>
@@ -546,13 +544,14 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
             zIndex: 1101, width: 300, background: 'var(--surface-card)', border: '1px solid var(--surface-border)',
             borderRadius: 12, padding: '14px 16px', boxShadow: '0 12px 40px rgba(0,0,0,.25)',
             display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ fontSize: 10.5, fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', letterSpacing: '.07em' }}>
+            <label htmlFor="app-annotation-comment" style={{ fontSize: 10.5, fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', letterSpacing: '.07em' }}>
               {pendingDocxText
                 ? t('pdfViewer.highlightPreview', { text: `${pendingDocxText.slice(0, 35)}${pendingDocxText.length > 35 ? '…' : ''}` })
                 : t('pdfViewer.addCommentPage', { page: pendingRect?.page })}
-            </div>
+            </label>
             <div style={{ width: '100%', height: 10, borderRadius: 4, background: selectedColor, border: '1px solid rgba(0,0,0,.15)' }} />
             <textarea
+              id="app-annotation-comment"
               autoFocus
               value={popupComment}
               onChange={e => setPopupComment(e.target.value)}
@@ -865,7 +864,8 @@ function DocumentDetailsPanel({ doc, reviewAnnotations = [], onScrollToAnnotatio
             <div style={{ ...LABEL, marginBottom: 8 }}>{t('documentDetails.highlights', { count: reviewAnnotations.length })}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {reviewAnnotations.map(ann => (
-                <div key={ann.id} onClick={() => onScrollToAnnotation?.(ann)}
+                <div key={ann.id} role="button" tabIndex={0} onClick={() => onScrollToAnnotation?.(ann)}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onScrollToAnnotation?.(ann); } }}
                   style={{ display: 'flex', gap: 10, padding: '9px 12px', borderRadius: 8, background: ann.color, border: '1px solid rgba(0,0,0,.1)', alignItems: 'flex-start', cursor: 'pointer', transition: 'filter .15s' }}
                   onMouseEnter={e => e.currentTarget.style.filter = 'brightness(.92)'}
                   onMouseLeave={e => e.currentTarget.style.filter = 'none'}>
@@ -917,6 +917,7 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, deciding })
     const texts = lines.map(l => l.replace(/^Remark \d+:\s*/, ''));
     return texts.length > 0 ? texts : [''];
   });
+  const hasRemarks = remarkLines.some(l => l.trim());
 
   function updateRemark(idx, val) {
     const updated = remarkLines.map((r, i) => i === idx ? val : r);
@@ -1008,9 +1009,10 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, deciding })
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {remarkLines.map((remark, idx) => (
               <div key={idx}>
-                <div style={{ ...LABEL, marginBottom: 5 }}>{t('common.remarkNumber', { num: idx + 1 })}</div>
+                <label htmlFor={`app-remark-${idx}`} style={{ ...LABEL, display: 'block', marginBottom: 5 }}>{t('common.remarkNumber', { num: idx + 1 })}</label>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <input
+                    id={`app-remark-${idx}`}
                     value={remark}
                     onChange={e => updateRemark(idx, e.target.value)}
                     placeholder={t('common.enterRemarkPlaceholder', { num: idx + 1 })}
@@ -1053,9 +1055,10 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, deciding })
               <Plus size={13} /> {t('common.addRemark')}
             </button>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={() => setConfirmDecision('rejected')} disabled={!!deciding}
-                style={{ background: 'rgba(220, 53, 69,.08)', border: '1px solid rgba(220, 53, 69,.3)', color: '#b91c1c', padding: '9px 18px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 600, cursor: deciding ? 'not-allowed' : 'pointer', opacity: deciding && deciding !== 'rejected' ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
-                onMouseEnter={e => { if (!deciding) e.currentTarget.style.background = 'rgba(220, 53, 69,.15)'; }}
+              <button onClick={() => setConfirmDecision('rejected')} disabled={!!deciding || !hasRemarks}
+                title={!hasRemarks ? t('common.enterRemarkBeforeRejecting') : undefined}
+                style={{ background: 'rgba(220, 53, 69,.08)', border: '1px solid rgba(220, 53, 69,.3)', color: '#b91c1c', padding: '9px 18px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 600, cursor: (deciding || !hasRemarks) ? 'not-allowed' : 'pointer', opacity: (deciding && deciding !== 'rejected') || !hasRemarks ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
+                onMouseEnter={e => { if (!deciding && hasRemarks) e.currentTarget.style.background = 'rgba(220, 53, 69,.15)'; }}
                 onMouseLeave={e => { if (!deciding) e.currentTarget.style.background = 'rgba(220, 53, 69,.08)'; }}>
                 <X size={14} /> {deciding === 'rejected' ? t('common.rejecting') : t('common.reject')}
               </button>
@@ -1491,9 +1494,10 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {remarkLines.map((remark, idx) => (
               <div key={idx}>
-                <div style={{ ...LABEL, marginBottom: 5 }}>{t('common.remarkNumber', { num: idx + 1 })}</div>
+                <label htmlFor={`app-remark-${idx}`} style={{ ...LABEL, display: 'block', marginBottom: 5 }}>{t('common.remarkNumber', { num: idx + 1 })}</label>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <input
+                    id={`app-remark-${idx}`}
                     value={remark}
                     onChange={e => updateRemark(idx, e.target.value)}
                     placeholder={t('common.enterRemarkPlaceholder', { num: idx + 1 })}
@@ -2077,6 +2081,7 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
           <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '6px 12px', flex: 1, maxWidth: 300 }}>
             <Search size={13} color="var(--text-color-secondary)" />
             <input value={searchQ} onChange={e => setSearchQ(e.target.value)} placeholder={t('dashboard.searchPlaceholder')}
+              aria-label={t('dashboard.searchPlaceholder')}
               style={{ background: 'transparent', border: 'none', outline: 'none', fontSize: 12.5, color: 'var(--text-color)', width: '100%' }} />
             {searchQ && <button onClick={() => setSearchQ('')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', padding: 0 }}><X size={12} /></button>}
           </div>
@@ -2194,7 +2199,8 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
             <Card style={{ padding: 0, borderColor: isOpen ? 'rgba(33, 74, 171,.3)' : 'var(--surface-border)', transition: 'border-color .2s', overflow: 'hidden' }}>
 
               {/* Header row — click to expand */}
-              <div className="ap-doc-row" onClick={() => setExpanded(isOpen ? null : doc.id)}
+              <div className="ap-doc-row" role="button" tabIndex={0} onClick={() => setExpanded(isOpen ? null : doc.id)}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(isOpen ? null : doc.id); } }}
                 style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '16px 20px', cursor: 'pointer' }}>
                 <div style={{ width: 38, height: 44, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, flexShrink: 0 }}>
                   <FileText size={14} color="var(--primary)" />
@@ -2570,10 +2576,10 @@ function ApproverActPartsModal({ item, partsData, onClose, readOnly = false, onA
           </div>
         ) : (
           <div style={{ padding: '16px 24px', borderTop: '1px solid var(--surface-border)', flexShrink: 0 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-color-secondary)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.06em' }}>
+            <label htmlFor="app-actparts-comment" style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-color-secondary)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '.06em' }}>
               {t('actParts.detail.comments')} {confirming === 'rejected' && <span style={{ color: '#dc3545' }}>*</span>}
-            </div>
-            <textarea value={comment} onChange={e => setComment(e.target.value)} rows={2}
+            </label>
+            <textarea id="app-actparts-comment" value={comment} onChange={e => setComment(e.target.value)} rows={2}
               placeholder={confirming === 'rejected' ? t('actParts.detail.reasonForRejection') : t('actParts.detail.optionalComments')}
               style={{ width: '100%', borderRadius: 8, border: '1px solid var(--surface-border)', padding: '8px 12px', fontSize: 13, fontFamily: 'var(--font)', resize: 'none', boxSizing: 'border-box', background: 'var(--surface-ground)', color: 'var(--text-color)' }} />
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 10 }}>

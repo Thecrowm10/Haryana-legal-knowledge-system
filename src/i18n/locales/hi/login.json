@@ -36,6 +36,8 @@
   "usernamePlaceholder": "अपना उपयोगकर्ता नाम दर्ज करें",
   "password": "पासवर्ड",
   "passwordPlaceholder": "अपना पासवर्ड दर्ज करें",
+  "showPassword": "पासवर्ड दिखाएं",
+  "hidePassword": "पासवर्ड छिपाएं",
   "signingIn": "साइन इन हो रहा है…",
   "loginButton": "लॉगिन",
   "forgotPassword": "पासवर्ड भूल गए?",

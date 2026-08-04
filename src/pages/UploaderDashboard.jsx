@@ -3277,10 +3277,15 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                   style={{ padding: '9px 18px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'transparent', color: 'var(--text-color-secondary)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                   {t('common.cancel')}
                 </button>
-                <button type="button" onClick={saveEditDoc} disabled={editSaving}
-                  style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 20px', borderRadius: 8, border: 'none', background: editSaving ? 'rgba(33, 74, 171,.5)' : 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: editSaving ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)' }}>
-                  <Save size={14} /> {editSaving ? t('editDocument.saving') : t('editDocument.saveChanges')}
-                </button>
+                {(() => {
+                  const editDocBtnDisabled = editSaving || !(editForm?.document_name || '').trim();
+                  return (
+                    <button type="button" onClick={saveEditDoc} disabled={editDocBtnDisabled}
+                      style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 20px', borderRadius: 8, border: 'none', background: editDocBtnDisabled ? 'rgba(33, 74, 171,.5)' : 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: editDocBtnDisabled ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)' }}>
+                      <Save size={14} /> {editSaving ? t('editDocument.saving') : t('editDocument.saveChanges')}
+                    </button>
+                  );
+                })()}
               </div>
             </div>
           </div>

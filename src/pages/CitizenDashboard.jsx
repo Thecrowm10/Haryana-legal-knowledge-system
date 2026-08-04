@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import DocViewModal from '../components/DocViewModal';
+import ActContentsView from '../components/ActContentsView';
 import AccessibilityMenu from '../components/AccessibilityMenu';
 import LanguageToggle from '../components/LanguageToggle';
 import Footer from '../components/layout/Footer';
@@ -14,17 +15,7 @@ import haryanaLogo from '../assets/haryana-logo.png';
 import bannerBg from '../assets/banner-1-768x217.png';
 import { publicSearchDocuments, publicSemanticSearch } from '../services/pdf';
 import { getDocumentTypes } from '../services/departments';
-
-// Document types matching backend VALID_DOCUMENT_TYPES
-const DOC_TYPE_META = {
-  'Act':                 { color: '#214aab', bg: 'rgba(33, 74, 171,.1)',   border: 'rgba(33, 74, 171,.25)' },
-  'Amendment':           { color: '#d97706', bg: 'rgba(217,119,6,.1)',   border: 'rgba(217,119,6,.25)' },
-  'Notification':        { color: '#7c3aed', bg: 'rgba(124,58,237,.1)',  border: 'rgba(124,58,237,.25)' },
-  'Circular':            { color: '#0f766e', bg: 'rgba(20,184,166,.1)',  border: 'rgba(20,184,166,.25)' },
-  'Policy':              { color: '#16a34a', bg: 'rgba(25, 135, 84,.1)',   border: 'rgba(25, 135, 84,.25)' },
-  'Rules & Regulations': { color: '#dc2626', bg: 'rgba(220,38,38,.1)',  border: 'rgba(220,38,38,.25)' },
-  'Order/Gazette':       { color: '#a16207', bg: 'rgba(234,179,8,.1)',   border: 'rgba(234,179,8,.25)' },
-};
+import { DOC_TYPE_META } from '../constants/docTypeMeta';
 
 const QUICK_SEARCHES = [
   'right to information', 'land revenue', 'municipal corporation',
@@ -240,6 +231,7 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
   const [searched, setSearched]     = useState(false);
   const [error, setError]           = useState(null);
   const [viewDoc, setViewDoc]       = useState(null);
+  const [viewActLanding, setViewActLanding] = useState(null);
   const [bookmarks, setBookmarks]   = useState(loadBookmarks);
   const [showSugg, setShowSugg]     = useState(false);
   const [liveSuggestions, setLiveSuggestions] = useState([]); // documents from /pdf/public/search, live as you type
@@ -359,8 +351,15 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
       mapped._initialPage = doc._bestPage || doc._pages[0];
       mapped._searchQuery = query;
       mapped._searchPages = doc._pages;
+      setViewDoc(mapped);
+    } else if (mapped.type === 'Act') {
+      // A direct browse click (not "show me where my search term matched")
+      // on an Act lands on the reading view first, not the raw PDF — the PDF
+      // stays one click away via that view's "View Original PDF" action.
+      setViewActLanding(mapped);
+    } else {
+      setViewDoc(mapped);
     }
-    setViewDoc(mapped);
     onAuditLog?.(`Viewed: ${doc.document_name || doc.original_filename}`);
   }
 
@@ -396,6 +395,10 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
       `}</style>
 
       {viewDoc && <DocViewModal doc={viewDoc} onClose={() => setViewDoc(null)} initialPage={viewDoc._initialPage || 1} searchQuery={viewDoc._searchQuery || null} searchPages={viewDoc._searchPages || null} />}
+      {viewActLanding && (
+        <ActContentsView doc={viewActLanding} onClose={() => setViewActLanding(null)}
+          onViewPdf={() => { setViewDoc(viewActLanding); setViewActLanding(null); }} />
+      )}
 
       {/* Top bar — transparent/blended into the hero image at rest, solidifies on scroll.
           The search box itself (below, in the hero) docks fixed underneath this bar once
@@ -416,7 +419,7 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
           opacity: scrolled ? 1 : 0, transform: scrolled ? 'translateY(0)' : 'translateY(-8px)',
           transition: `opacity ${TOP_BAR_EASE}, transform ${TOP_BAR_EASE}`,
         }}>
-          <img src={haryanaLogo} alt="Haryana Government" style={{ width: 26, height: 26, objectFit: 'contain' }} />
+          <img src={haryanaLogo} alt="Haryana Government" loading="lazy" style={{ width: 26, height: 26, objectFit: 'contain' }} />
           <div className="cd-brand-text" style={{ textAlign: 'left' }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-heading)', lineHeight: 1.15 }}>{t('brandSubtitle')}</div>
             <div style={{ fontSize: 10, color: 'var(--text-color-secondary)', lineHeight: 1.15 }}>{t('brandTitle')}</div>
@@ -489,7 +492,7 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
 
         <div style={{ position: 'relative', zIndex: 2 }}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-            <img src={haryanaLogo} alt="Haryana Government" style={{ width: 'clamp(52px, 12vw, 76px)', height: 'clamp(52px, 12vw, 76px)', objectFit: 'contain' }} />
+            <img src={haryanaLogo} alt="Haryana Government" loading="lazy" style={{ width: 'clamp(52px, 12vw, 76px)', height: 'clamp(52px, 12vw, 76px)', objectFit: 'contain' }} />
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: 'clamp(22px, 6vw, 32px)', fontWeight: 800, color: '#fff', letterSpacing: '-.01em', lineHeight: 1.2 }}>
                 {t('brandTitle')}

@@ -619,16 +619,16 @@ export default function NodalOfficerDashboard({ activePage }) {
                 {/* Username + Email */}
                 <div className="nod-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
-                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.username')}</label>
-                    <input style={{ ...INP_STYLE, borderColor: addError.toLowerCase().includes('username') ? 'rgba(220, 53, 69,.6)' : undefined }}
+                    <label htmlFor="nod-add-username" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.username')} <span style={{ color: '#dc3545' }}>*</span></label>
+                    <input id="nod-add-username" style={{ ...INP_STYLE, borderColor: addError.toLowerCase().includes('username') ? 'rgba(220, 53, 69,.6)' : undefined }}
                       placeholder={t('users.addDrawer.usernamePlaceholder')}
                       autoComplete="off"
                       value={addForm.username}
                       onChange={e => { setAddForm(f => ({ ...f, username: e.target.value })); setAddError(''); }} />
                   </div>
                   <div>
-                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.email')}</label>
-                    <input style={{ ...INP_STYLE, borderColor: addError.toLowerCase().includes('email') ? 'rgba(220, 53, 69,.6)' : undefined }}
+                    <label htmlFor="nod-add-email" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.email')} <span style={{ color: '#dc3545' }}>*</span></label>
+                    <input id="nod-add-email" style={{ ...INP_STYLE, borderColor: addError.toLowerCase().includes('email') ? 'rgba(220, 53, 69,.6)' : undefined }}
                       type="email" placeholder={t('users.addDrawer.emailPlaceholder')}
                       autoComplete="off"
                       value={addForm.email}
@@ -638,9 +638,10 @@ export default function NodalOfficerDashboard({ activePage }) {
 
                 {/* Password */}
                 <div>
-                  <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.password')}</label>
+                  <label htmlFor="nod-add-password" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.password')} <span style={{ color: '#dc3545' }}>*</span></label>
                   <div style={{ position: 'relative' }}>
                     <input
+                      id="nod-add-password"
                       style={{ ...INP_STYLE, paddingRight: 38, borderColor: addError.toLowerCase().includes('password') ? 'rgba(220, 53, 69,.6)' : undefined }}
                       type={showAddPass ? 'text' : 'password'}
                       placeholder={t('users.addDrawer.passwordPlaceholder')}
@@ -657,14 +658,14 @@ export default function NodalOfficerDashboard({ activePage }) {
                 {/* First + Last name */}
                 <div className="nod-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
-                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.firstName')}</label>
-                    <input style={INP_STYLE} placeholder={t('users.addDrawer.firstNamePlaceholder')}
+                    <label htmlFor="nod-add-firstname" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.firstName')}</label>
+                    <input id="nod-add-firstname" style={INP_STYLE} placeholder={t('users.addDrawer.firstNamePlaceholder')}
                       value={addForm.first_name}
                       onChange={e => setAddForm(f => ({ ...f, first_name: e.target.value }))} />
                   </div>
                   <div>
-                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.lastName')}</label>
-                    <input style={INP_STYLE} placeholder={t('users.addDrawer.lastNamePlaceholder')}
+                    <label htmlFor="nod-add-lastname" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.lastName')}</label>
+                    <input id="nod-add-lastname" style={INP_STYLE} placeholder={t('users.addDrawer.lastNamePlaceholder')}
                       value={addForm.last_name}
                       onChange={e => setAddForm(f => ({ ...f, last_name: e.target.value }))} />
                   </div>
@@ -672,8 +673,8 @@ export default function NodalOfficerDashboard({ activePage }) {
 
                 {/* Mobile Number */}
                 <div>
-                  <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.mobileNumber')}</label>
-                  <input style={INP_STYLE}
+                  <label htmlFor="nod-add-mobile" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.mobileNumber')}</label>
+                  <input id="nod-add-mobile" style={INP_STYLE}
                     type="tel"
                     inputMode="numeric"
                     maxLength={10}
@@ -685,16 +686,16 @@ export default function NodalOfficerDashboard({ activePage }) {
                 {/* Role + Department */}
                 <div className="nod-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
-                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.role')}</label>
-                    <SelectField value={addForm.role_id} onChange={e => setAddForm(f => ({ ...f, role_id: e.target.value }))} placeholder={t('users.addDrawer.roleSelectPlaceholder')}>
+                    <label htmlFor="nod-add-role" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.role')}</label>
+                    <SelectField id="nod-add-role" value={addForm.role_id} onChange={e => setAddForm(f => ({ ...f, role_id: e.target.value }))} placeholder={t('users.addDrawer.roleSelectPlaceholder')}>
                       {assignableRoles(roles).map(r => (
                         <option key={r.id} value={r.id}>{r.name.charAt(0).toUpperCase() + r.name.slice(1)}</option>
                       ))}
                     </SelectField>
                   </div>
                   <div>
-                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.department')}</label>
-                    <SelectField value={addForm.department_id} onChange={e => setAddForm(f => ({ ...f, department_id: e.target.value }))} placeholder={t('users.addDrawer.departmentSelectPlaceholder')}>
+                    <label htmlFor="nod-add-department" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.department')} <span style={{ color: '#dc3545' }}>*</span></label>
+                    <SelectField id="nod-add-department" value={addForm.department_id} onChange={e => setAddForm(f => ({ ...f, department_id: e.target.value }))} placeholder={t('users.addDrawer.departmentSelectPlaceholder')}>
                       {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                     </SelectField>
                   </div>
@@ -713,13 +714,19 @@ export default function NodalOfficerDashboard({ activePage }) {
                   style={{ padding: '9px 18px', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'var(--text-color)', fontFamily: 'var(--font)' }}>
                   {t('users.addDrawer.cancel')}
                 </button>
-                <button onClick={handleAddUser} disabled={addSaving}
-                  style={{ padding: '9px 20px', background: addSaving ? 'var(--surface-border)' : 'var(--primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: addSaving ? 'not-allowed' : 'pointer', color: addSaving ? 'var(--text-color-secondary)' : 'white', fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 7 }}>
-                  {addSaving
-                    ? <><div style={{ width: 12, height: 12, border: '2px solid rgba(0,0,0,.2)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin .7s linear infinite' }} /> {t('users.addDrawer.creating')}</>
-                    : <><Plus size={13} /> {t('users.addDrawer.createUser')}</>
-                  }
-                </button>
+                {(() => {
+                  const addFormInvalid = !addForm.username.trim() || !addForm.email.trim() || !addForm.password || !addForm.department_id;
+                  const addBtnDisabled = addSaving || addFormInvalid;
+                  return (
+                    <button onClick={handleAddUser} disabled={addBtnDisabled}
+                      style={{ padding: '9px 20px', background: addBtnDisabled ? 'var(--surface-border)' : 'var(--primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: addBtnDisabled ? 'not-allowed' : 'pointer', color: addBtnDisabled ? 'var(--text-color-secondary)' : 'white', fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 7 }}>
+                      {addSaving
+                        ? <><div style={{ width: 12, height: 12, border: '2px solid rgba(0,0,0,.2)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin .7s linear infinite' }} /> {t('users.addDrawer.creating')}</>
+                        : <><Plus size={13} /> {t('users.addDrawer.createUser')}</>
+                      }
+                    </button>
+                  );
+                })()}
               </div>
             </div>
           </>
@@ -755,20 +762,20 @@ export default function NodalOfficerDashboard({ activePage }) {
 
                 <div className="nod-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
-                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.firstName')}</label>
-                    <input style={INP_STYLE} value={editForm.first_name}
+                    <label htmlFor="nod-edit-firstname" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.firstName')}</label>
+                    <input id="nod-edit-firstname" style={INP_STYLE} value={editForm.first_name}
                       onChange={e => setEditForm(f => ({ ...f, first_name: e.target.value }))} />
                   </div>
                   <div>
-                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.lastName')}</label>
-                    <input style={INP_STYLE} value={editForm.last_name}
+                    <label htmlFor="nod-edit-lastname" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.lastName')}</label>
+                    <input id="nod-edit-lastname" style={INP_STYLE} value={editForm.last_name}
                       onChange={e => setEditForm(f => ({ ...f, last_name: e.target.value }))} />
                   </div>
                 </div>
 
                 <div>
-                  <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.email')}</label>
-                  <input style={INP_STYLE} type="email" value={editForm.email}
+                  <label htmlFor="nod-edit-email" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.email')}</label>
+                  <input id="nod-edit-email" style={INP_STYLE} type="email" value={editForm.email}
                     onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} />
                 </div>
 
@@ -780,8 +787,8 @@ export default function NodalOfficerDashboard({ activePage }) {
                     </div>
                   </div>
                   <div>
-                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.department')}</label>
-                    <SelectField value={editForm.department_id ?? ''} onChange={e => setEditForm(f => ({ ...f, department_id: e.target.value || null }))} placeholder={t('users.editModal.selectDepartment')}>
+                    <label htmlFor="nod-edit-department" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.department')}</label>
+                    <SelectField id="nod-edit-department" value={editForm.department_id ?? ''} onChange={e => setEditForm(f => ({ ...f, department_id: e.target.value || null }))} placeholder={t('users.editModal.selectDepartment')}>
                       {depts.map(d => (
                         <option key={d.id} value={d.id}>{d.name}</option>
                       ))}
@@ -817,13 +824,18 @@ export default function NodalOfficerDashboard({ activePage }) {
                   style={{ padding: '9px 18px', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'var(--text-color)', fontFamily: 'var(--font)' }}>
                   {t('users.editModal.cancel')}
                 </button>
-                <button onClick={handleEditSave} disabled={editSaving}
-                  style={{ padding: '9px 20px', background: editSaving ? 'var(--surface-border)' : 'var(--primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: editSaving ? 'not-allowed' : 'pointer', color: editSaving ? 'var(--text-color-secondary)' : 'white', fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 7 }}>
-                  {editSaving
-                    ? <><div style={{ width: 12, height: 12, border: '2px solid rgba(0,0,0,.2)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin .7s linear infinite' }} /> {t('users.editModal.saving')}</>
-                    : t('users.editModal.saveChanges')
-                  }
-                </button>
+                {(() => {
+                  const editBtnDisabled = editSaving || !(editForm.email || '').trim();
+                  return (
+                    <button onClick={handleEditSave} disabled={editBtnDisabled}
+                      style={{ padding: '9px 20px', background: editBtnDisabled ? 'var(--surface-border)' : 'var(--primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: editBtnDisabled ? 'not-allowed' : 'pointer', color: editBtnDisabled ? 'var(--text-color-secondary)' : 'white', fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 7 }}>
+                      {editSaving
+                        ? <><div style={{ width: 12, height: 12, border: '2px solid rgba(0,0,0,.2)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin .7s linear infinite' }} /> {t('users.editModal.saving')}</>
+                        : t('users.editModal.saveChanges')
+                      }
+                    </button>
+                  );
+                })()}
               </div>
             </div>
           </div>
