@@ -24,9 +24,11 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
     if (cleaned.length < 10) { setError('Enter a valid 10-digit mobile number.'); return; }
     setLoading(true); setError(''); setResendMsg('');
     try {
-      await requestAdminOtp(cleaned);
+      const res = await requestAdminOtp(cleaned);
       setMobile(cleaned);
       setStep(2);
+      // TODO: remove autofill once real SMS delivery is wired up; backend currently echoes the OTP in the response for dev/testing.
+      if (res.data?.otp) setOtp(res.data.otp);
     } catch (err) {
       const detail = err.response?.data?.detail;
       setError(typeof detail === 'string' ? detail : 'Could not send OTP. Please try again.');
@@ -57,8 +59,9 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
   async function handleResend() {
     setOtp(''); setError(''); setResendMsg(''); setLoading(true);
     try {
-      await requestAdminOtp(mobile);
+      const res = await requestAdminOtp(mobile);
       setResendMsg('A new OTP has been sent.');
+      if (res.data?.otp) setOtp(res.data.otp);
     } catch {
       setError('Could not resend OTP. Please try again.');
     } finally {
