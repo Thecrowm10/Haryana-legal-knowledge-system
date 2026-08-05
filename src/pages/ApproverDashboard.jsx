@@ -108,6 +108,16 @@ function ConfirmDialog({ decision, docTitle, onConfirm, onCancel }) {
   );
 }
 
+// crypto.randomUUID() only exists in secure contexts (https, or localhost) — this portal
+// is often opened over plain http on a LAN/intranet address during demos, where it's
+// undefined and throws. Annotation ids only need to be locally unique, not cryptographic.
+function genId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 function parseDisplayRemarks(str) {
   if (!str) return [];
   const lines = str.split('\n').filter(l => l.trim());
@@ -367,7 +377,7 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
   function confirmDocxAnnotation() {
     if (!pendingDocxText) return;
     onAnnotationsChange?.([...annotations, {
-      id: crypto.randomUUID(),
+      id: genId(),
       text: pendingDocxText,
       comment: popupComment.trim(),
       color: selectedColor,
@@ -391,7 +401,7 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
   function confirmAnnotation() {
     if (!pendingRect) return;
     const newAnnot = {
-      id: crypto.randomUUID(),
+      id: genId(),
       ...pendingRect,
       color: selectedColor,
       comment: popupComment.trim(),
