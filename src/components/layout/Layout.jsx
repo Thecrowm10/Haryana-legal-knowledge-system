@@ -63,7 +63,7 @@ export default function Layout({ user, activePage, onNavigate, onLogout, onChang
             <div style={{ flex: '1 0 auto', padding: user.role === 'citizen' ? 0 : '24px 28px 32px' }}>
               {children}
             </div>
-            {user.role !== 'citizen' && <Footer />}
+            {user.role !== 'citizen' && <Footer role={user.role} />}
           </main>
         </div>
       </div>
