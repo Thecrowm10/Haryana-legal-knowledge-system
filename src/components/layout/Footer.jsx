@@ -5,7 +5,27 @@ import ScreenReaderAccessModal from './ScreenReaderAccessModal';
 import ashokEmblem from '../../assets/ashok-emblem.svg';
 import digitalIndiaLogo from '../../assets/digital-india-logo.svg';
 
-function footerLinks(t) {
+// Each role's manual is a separate PDF (no combined/admin manual exists yet) —
+// link only shows for roles that actually have one in public/docs/manuals.
+const ROLE_MANUAL_FILE = {
+  uploader:      'Uploader-User-Manual.pdf',
+  approver:      'Approver-User-Manual.pdf',
+  nodal_officer: 'Nodal-Officer-User-Manual.pdf',
+};
+
+function footerLinks(t, role) {
+  const helpLinks = [
+    { label: t('footer.links.faqs'),               pageKey: 'faqs'            },
+    { label: t('footer.links.screenReaderAccess'), pageKey: 'screen-reader'   },
+    { label: t('footer.links.rti'),                pageKey: 'rti'             },
+    { label: t('footer.links.feedback'),           pageKey: 'feedback'        },
+    { label: t('footer.links.contactUs'),          pageKey: 'contact-us'      },
+  ];
+  const manualFile = ROLE_MANUAL_FILE[role];
+  if (manualFile) {
+    helpLinks.push({ label: t('footer.links.userManual'), href: `/docs/manuals/${manualFile}` });
+  }
+
   return [
     {
       heading: t('footer.sections.websitePolicies'),
@@ -18,13 +38,7 @@ function footerLinks(t) {
     },
     {
       heading: t('footer.sections.helpSupport'),
-      links: [
-        { label: t('footer.links.faqs'),               pageKey: 'faqs'            },
-        { label: t('footer.links.screenReaderAccess'), pageKey: 'screen-reader'   },
-        { label: t('footer.links.rti'),                pageKey: 'rti'             },
-        { label: t('footer.links.feedback'),           pageKey: 'feedback'        },
-        { label: t('footer.links.contactUs'),          pageKey: 'contact-us'      },
-      ],
+      links: helpLinks,
     },
     {
       heading: t('footer.sections.navigation'),
@@ -45,9 +59,9 @@ const LAST_UPDATED = new Date(__BUILD_DATE__).toLocaleDateString('en-GB', {
   day: 'numeric', month: 'long', year: 'numeric',
 });
 
-export default function Footer() {
+export default function Footer({ role }) {
   const { t } = useTranslation('common');
-  const FOOTER_LINKS = footerLinks(t);
+  const FOOTER_LINKS = footerLinks(t, role);
   const [openPage, setOpenPage] = useState(null); // pageKey | null
   const [showScreenReader, setShowScreenReader] = useState(false);
 
@@ -121,26 +135,34 @@ export default function Footer() {
               {section.heading}
             </h3>
             <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
-              {section.links.map(link => (
-                <li key={link.label}>
-                  <button
-                    type="button"
-                    onClick={() => openLink(link.pageKey)}
-                    style={{
-                      fontSize: 11.5, color: 'rgba(255,255,255,0.7)',
-                      textDecoration: 'none', transition: 'color .15s',
-                      background: 'transparent', border: 'none', padding: 0, cursor: 'pointer',
-                      fontFamily: 'inherit', textAlign: 'left', lineHeight: 1.35,
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.color = '#fff'}
-                    onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.7)'}
-                    onFocus={e => e.currentTarget.style.color = '#fff'}
-                    onBlur={e => e.currentTarget.style.color = 'rgba(255,255,255,0.7)'}
-                  >
-                    {link.label}
-                  </button>
-                </li>
-              ))}
+              {section.links.map(link => {
+                const linkStyle = {
+                  fontSize: 11.5, color: 'rgba(255,255,255,0.7)',
+                  textDecoration: 'none', transition: 'color .15s',
+                  background: 'transparent', border: 'none', padding: 0, cursor: 'pointer',
+                  fontFamily: 'inherit', textAlign: 'left', lineHeight: 1.35,
+                };
+                const hoverHandlers = {
+                  onMouseEnter: e => e.currentTarget.style.color = '#fff',
+                  onMouseLeave: e => e.currentTarget.style.color = 'rgba(255,255,255,0.7)',
+                  onFocus: e => e.currentTarget.style.color = '#fff',
+                  onBlur: e => e.currentTarget.style.color = 'rgba(255,255,255,0.7)',
+                };
+                return (
+                  <li key={link.label}>
+                    {link.href ? (
+                      <a href={link.href} target="_blank" rel="noopener noreferrer"
+                        style={{ ...linkStyle, display: 'inline-block' }} {...hoverHandlers}>
+                        {link.label}
+                      </a>
+                    ) : (
+                      <button type="button" onClick={() => openLink(link.pageKey)} style={linkStyle} {...hoverHandlers}>
+                        {link.label}
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           </div>
         ))}
