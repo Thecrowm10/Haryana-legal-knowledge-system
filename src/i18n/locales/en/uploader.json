@@ -296,8 +296,7 @@
         "noOfStatutes": "No. of Statutes",
         "noOfOrdinances": "No. of Ordinances",
         "noOfOrder": "No. of Order",
-        "keywords": "Keywords",
-        "repealCheckbox": "Check if you want to repeal the Act. This Act will not show anywhere."
+        "keywords": "Keywords"
       },
       "amendment": {
         "nameLabel": "Amendment Name",

@@ -97,7 +97,7 @@ export default function SelectField({ id, value, onChange, required, placeholder
       {/* Dropdown panel */}
       {open && (
         <div style={PANEL}>
-          {options.map((opt, i) => {
+          {options.map((opt) => {
             const isActive = opt.value === String(value ?? '');
             return (
               <div

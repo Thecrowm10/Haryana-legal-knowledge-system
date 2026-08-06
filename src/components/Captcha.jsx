@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useId, forwardRef, useImperativeHandle } from 'react';
+import { useCallback, useEffect, useRef, useState, useId, forwardRef, useImperativeHandle } from 'react';
 import { RefreshCw, Volume2 } from 'lucide-react';
 
 // No confusing look-alike characters (0/O, 1/I/L).
@@ -115,20 +115,20 @@ const Captcha = forwardRef(function Captcha({ label = 'Security Check', style, o
   const [shake, setShake] = useState(false);
   const inputId = useId();
 
-  const notify = (val) => {
+  const notify = useCallback((val) => {
     const touched = val.length > 0;
     const valid = touched && val.trim().toUpperCase() === codeRef.current;
     onStatusChange?.({ touched, valid });
-  };
+  }, [onStatusChange]);
 
-  const refresh = () => {
+  const refresh = useCallback(() => {
     codeRef.current = generateCode();
     setInput('');
     draw(canvasRef.current, codeRef.current);
     notify('');
-  };
+  }, [notify]);
 
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => { refresh(); }, [refresh]);
   useEffect(() => () => { if (speechSupported) window.speechSynthesis.cancel(); }, []);
 
   useImperativeHandle(ref, () => ({

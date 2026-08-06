@@ -33,18 +33,18 @@
     "addDrawer": {
       "title": "नया उपयोगकर्ता जोड़ें",
       "subtitle": "एक नया सिस्टम खाता बनाएं",
-      "username": "उपयोगकर्ता नाम *",
+      "username": "उपयोगकर्ता नाम",
       "usernamePlaceholder": "जैसे firstname.lastname",
-      "email": "ईमेल *",
+      "email": "ईमेल",
       "emailPlaceholder": "user@example.com",
-      "password": "पासवर्ड *",
+      "password": "पासवर्ड",
       "passwordPlaceholder": "एक पासवर्ड सेट करें",
       "firstName": "पहला नाम",
       "firstNamePlaceholder": "पहला नाम",
       "lastName": "अंतिम नाम",
       "lastNamePlaceholder": "अंतिम नाम",
       "mobileNumber": "मोबाइल नंबर",
-      "mobilePlaceholder": "10 अंकों का मोबाइल नंबर (वैकल्पिक)",
+      "mobilePlaceholder": "10 अंकों का मोबाइल नंबर",
       "role": "भूमिका",
       "roleSelectPlaceholder": "भूमिका चुनें",
       "department": "विभाग",
@@ -73,6 +73,11 @@
       "usernameRequired": "उपयोगकर्ता नाम आवश्यक है।",
       "emailRequired": "ईमेल आवश्यक है।",
       "passwordRequired": "पासवर्ड आवश्यक है।",
+      "mobileRequired": "एक मान्य 10-अंकों का मोबाइल नंबर आवश्यक है।",
+      "firstNameRequired": "पहला नाम आवश्यक है।",
+      "lastNameRequired": "अंतिम नाम आवश्यक है।",
+      "roleRequired": "भूमिका आवश्यक है।",
+      "departmentRequired": "विभाग आवश्यक है।",
       "createFailed": "उपयोगकर्ता बनाने में विफल।",
       "saveFailed": "परिवर्तन सहेजने में विफल।"
     }
@@ -93,7 +98,7 @@
     "addDepartment": {
       "title": "विभाग जोड़ें",
       "subtitle": "एक नया विभाग रिकॉर्ड बनाएं।",
-      "name": "विभाग का नाम *",
+      "name": "विभाग का नाम",
       "namePlaceholder": "जैसे राजस्व विभाग",
       "description": "विवरण",
       "descriptionPlaceholder": "विभाग के कार्य का संक्षिप्त विवरण…",
@@ -198,7 +203,15 @@
     "approvedLabel": "स्वीकृत",
     "rejectedLabel": "अस्वीकृत",
     "reviewedLabel": "समीक्षित",
-    "view": "देखें"
+    "view": "देखें",
+    "report": {
+      "button": "रिपोर्ट डाउनलोड करें",
+      "panelTitle": "एक्सेल रिपोर्ट डाउनलोड करें",
+      "panelDesc": "एक या अधिक विभाग चुनें — सभी शामिल करने के लिए खाली छोड़ें। रिपोर्ट में कुल, अपलोडर-वार गणना और लंबित दस्तावेज़ों का विभागवार विवरण होगा।",
+      "allDepartmentsPlaceholder": "सभी विभाग",
+      "downloadButton": "एक्सेल डाउनलोड करें",
+      "generating": "बन रहा है…"
+    }
   },
   "linkedDocs": {
     "failedToLoad": "लिंक किए गए दस्तावेज़ लोड करने में विफल।",

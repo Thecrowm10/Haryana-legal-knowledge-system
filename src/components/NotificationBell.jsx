@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Bell, CheckCheck, FileText, CheckCircle, XCircle } from 'lucide-react';
 import { getNotifications, getUnreadCount, markRead, markAllRead } from '../services/notifications';
 
@@ -24,16 +24,16 @@ export default function NotificationBell({ role }) {
   const [unread, setUnread]     = useState(0);
   const ref                     = useRef(null);
 
-  function refresh() {
+  const refresh = useCallback(() => {
     setNotifs(getNotifications(role));
     setUnread(getUnreadCount(role));
-  }
+  }, [role]);
 
   useEffect(() => {
     refresh();
     const interval = setInterval(refresh, 15000);
     return () => clearInterval(interval);
-  }, [role]);
+  }, [refresh]);
 
   useEffect(() => {
     function handleClick(e) {

@@ -36,21 +36,21 @@
     "addDrawer": {
       "title": "नया उपयोगकर्ता जोड़ें",
       "subtitle": "एक नया सिस्टम खाता बनाएं",
-      "username": "उपयोगकर्ता नाम *",
+      "username": "उपयोगकर्ता नाम",
       "usernamePlaceholder": "जैसे firstname.lastname",
-      "email": "ईमेल *",
+      "email": "ईमेल",
       "emailPlaceholder": "user@example.com",
-      "password": "पासवर्ड *",
+      "password": "पासवर्ड",
       "passwordPlaceholder": "एक पासवर्ड सेट करें",
       "firstName": "पहला नाम",
       "firstNamePlaceholder": "पहला नाम",
       "lastName": "अंतिम नाम",
       "lastNamePlaceholder": "अंतिम नाम",
       "mobileNumber": "मोबाइल नंबर",
-      "mobilePlaceholder": "10 अंकों का मोबाइल नंबर (वैकल्पिक)",
+      "mobilePlaceholder": "10 अंकों का मोबाइल नंबर",
       "role": "भूमिका",
       "roleSelectPlaceholder": "भूमिका चुनें",
-      "department": "विभाग *",
+      "department": "विभाग",
       "departmentSelectPlaceholder": "विभाग चुनें",
       "cancel": "रद्द करें",
       "createUser": "उपयोगकर्ता बनाएं",
@@ -85,6 +85,7 @@
       "usernameRequired": "उपयोगकर्ता नाम आवश्यक है।",
       "emailRequired": "ईमेल आवश्यक है।",
       "passwordRequired": "पासवर्ड आवश्यक है।",
+      "mobileRequired": "एक मान्य 10-अंकों का मोबाइल नंबर आवश्यक है।",
       "departmentRequired": "विभाग आवश्यक है।",
       "createFailed": "उपयोगकर्ता बनाने में विफल।",
       "saveFailed": "परिवर्तन सहेजने में विफल।"
@@ -122,7 +123,19 @@
     "approvedLabel": "स्वीकृत",
     "rejectedLabel": "अस्वीकृत",
     "reviewedLabel": "समीक्षित",
-    "view": "देखें"
+    "view": "देखें",
+    "report": {
+      "button": "रिपोर्ट डाउनलोड करें",
+      "panelTitle": "एक्सेल रिपोर्ट डाउनलोड करें",
+      "panelDesc": "एक या अधिक विभाग चुनें — अपने सभी अधिकृत विभागों को शामिल करने के लिए खाली छोड़ें। रिपोर्ट में कुल, अपलोडर-वार गणना और लंबित दस्तावेज़ों का विभागवार विवरण होगा।",
+      "allDepartmentsPlaceholder": "सभी विभाग",
+      "downloadButton": "एक्सेल डाउनलोड करें",
+      "generating": "बन रहा है…"
+    }
+  },
+  "multiSelect": {
+    "selectDepartments": "विभाग चुनें…",
+    "departmentsSelected": "{{count}} विभाग चयनित"
   },
   "audit": {
     "failedToLoad": "ऑडिट लॉग लोड करने में विफल। कृपया पुनः प्रयास करें।",

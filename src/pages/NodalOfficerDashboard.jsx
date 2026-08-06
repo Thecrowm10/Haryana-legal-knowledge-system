@@ -1,9 +1,10 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
-import { Users, CheckCircle, XCircle, Plus, Edit2, X, Eye, EyeOff, Download, Layers, FileText, Clock, Search, Link2, Activity } from 'lucide-react';
+import { Users, CheckCircle, XCircle, Plus, Edit2, X, Eye, EyeOff, Download, FileSpreadsheet, Layers, FileText, Clock, Search, Link2, Activity } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import SelectField from '../components/ui/SelectField';
+import MultiSelectField from '../components/ui/MultiSelectField';
 import DocViewModal from '../components/DocViewModal';
 import { getUsers, getRoles, updateUser, registerUser } from '../services/users';
 import { getMyDepartments } from '../services/departments';
@@ -11,6 +12,7 @@ import { getAllDocumentsAdmin, getAllDepartmentLinks } from '../services/pdf';
 import { getAuditLogs } from '../services/audit';
 import { getAllActPartSubmissions, getAllActParts } from '../services/act_parts';
 import { useMediaQuery } from '../hooks/useMediaQuery';
+import { downloadUploadsExcelReport } from '../utils/uploadsExcelReport';
 
 
 const LABEL = { fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)' };
@@ -112,7 +114,7 @@ export default function NodalOfficerDashboard({ activePage }) {
       })
       .catch(() => setUsersError(t('users.failedToLoadUsers')))
       .finally(() => setUsersLoading(false));
-  }, [activePage]);
+  }, [activePage, t]);
 
   // Nodal officer's authorised departments — drives both the user management selectors and the uploads dept filter.
   const [depts, setDepts] = useState([]);
@@ -134,6 +136,17 @@ export default function NodalOfficerDashboard({ activePage }) {
   const [uploadsFilterUploader, setUploadsFilterUploader] = useState('');
   const [uploadsFilterApprover, setUploadsFilterApprover] = useState('');
   const [viewDoc, setViewDoc]                             = useState(null);
+  const [showReportPanel, setShowReportPanel] = useState(false);
+  const [reportDeptIds, setReportDeptIds]     = useState([]);
+  const [reportGenerating, setReportGenerating] = useState(false);
+  const reportPanelRef = useRef(null);
+
+  useEffect(() => {
+    if (!showReportPanel) return;
+    const close = e => { if (!reportPanelRef.current?.contains(e.target)) setShowReportPanel(false); };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [showReportPanel]);
 
   useEffect(() => {
     if (activePage !== 'nodaluploads') return;
@@ -146,7 +159,7 @@ export default function NodalOfficerDashboard({ activePage }) {
       })
       .catch(() => setAllDocsError(t('uploads.failedToLoad')))
       .finally(() => setAllDocsLoading(false));
-  }, [activePage]);
+  }, [activePage, t]);
 
   // Add User drawer state
   const EMPTY_ADD_FORM = { username: '', email: '', mobile_number: '', password: '', first_name: '', last_name: '', role_id: '', department_id: '' };
@@ -161,12 +174,13 @@ export default function NodalOfficerDashboard({ activePage }) {
     if (!addForm.email.trim())       { setAddError(t('users.errors.emailRequired')); return; }
     if (!addForm.password)           { setAddError(t('users.errors.passwordRequired')); return; }
     if (!addForm.department_id)      { setAddError(t('users.errors.departmentRequired')); return; }
+    if (addForm.mobile_number.trim().length !== 10) { setAddError(t('users.errors.mobileRequired')); return; }
     setAddSaving(true);
     setAddError('');
     registerUser({
       username:      addForm.username.trim(),
       email:         addForm.email.trim(),
-      mobile_number: addForm.mobile_number.trim() || undefined,
+      mobile_number: addForm.mobile_number.trim(),
       password:      addForm.password,
       first_name:    addForm.first_name.trim(),
       last_name:     addForm.last_name.trim(),
@@ -299,7 +313,6 @@ export default function NodalOfficerDashboard({ activePage }) {
         ...(d.no_of_ordinances      ? { noOfOrdinances:     d.no_of_ordinances }      : {}),
         ...(d.no_of_orders          ? { noOfOrders:         d.no_of_orders }          : {}),
         ...(d.keywords              ? { keywords:           d.keywords }              : {}),
-        ...(d.is_repealed           ? { repealed:           'Yes' }                   : {}),
       },
       // Amend / replace / issued-under links to other documents
       docRelations: (d.relationships || [])
@@ -379,7 +392,7 @@ export default function NodalOfficerDashboard({ activePage }) {
       })
       .catch(() => setAuditError(t('audit.failedToLoad')))
       .finally(() => setAuditLoading(false));
-  }, [activePage, auditPage, auditFilterEntity, auditFilterAction, auditFilterStatus, auditFromDate, auditToDate]);
+  }, [activePage, auditPage, auditFilterEntity, auditFilterAction, auditFilterStatus, auditFromDate, auditToDate, t]);
 
   useEffect(() => {
     if (activePage !== 'nodallinkedocs') return;
@@ -389,7 +402,7 @@ export default function NodalOfficerDashboard({ activePage }) {
       .then(res => setNodalLinks(Array.isArray(res.data) ? res.data : []))
       .catch(() => setNodalLinksError(t('linkedDocs.failedToLoad')))
       .finally(() => setNodalLinksLoading(false));
-  }, [activePage]);
+  }, [activePage, t]);
 
   const [deptFilter, setDeptFilter] = useState('');
   const [usersStatusFilter, setUsersStatusFilter] = useState('');
@@ -410,7 +423,7 @@ export default function NodalOfficerDashboard({ activePage }) {
       .then(res => setActPartsItems(Array.isArray(res.data) ? res.data : []))
       .catch(() => setActPartsError(t('actParts.failedToLoad')))
       .finally(() => setActPartsLoading(false));
-  }, [activePage]);
+  }, [activePage, t]);
 
   async function openActPartsDetail(item) {
     setActPartsDetailLoading(true);
@@ -673,7 +686,7 @@ export default function NodalOfficerDashboard({ activePage }) {
 
                 {/* Mobile Number */}
                 <div>
-                  <label htmlFor="nod-add-mobile" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.mobileNumber')}</label>
+                  <label htmlFor="nod-add-mobile" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.mobileNumber')} <span style={{ color: '#dc3545' }}>*</span></label>
                   <input id="nod-add-mobile" style={INP_STYLE}
                     type="tel"
                     inputMode="numeric"
@@ -715,7 +728,7 @@ export default function NodalOfficerDashboard({ activePage }) {
                   {t('users.addDrawer.cancel')}
                 </button>
                 {(() => {
-                  const addFormInvalid = !addForm.username.trim() || !addForm.email.trim() || !addForm.password || !addForm.department_id;
+                  const addFormInvalid = !addForm.username.trim() || !addForm.email.trim() || !addForm.password || !addForm.department_id || addForm.mobile_number.trim().length !== 10;
                   const addBtnDisabled = addSaving || addFormInvalid;
                   return (
                     <button onClick={handleAddUser} disabled={addBtnDisabled}
@@ -943,6 +956,18 @@ export default function NodalOfficerDashboard({ activePage }) {
     const cols = '4px 1fr 175px 155px 155px 90px';
     const anyFilter = uploadsSearch || uploadsFilterStatus || uploadsFilterDept || uploadsFilterUploader || uploadsFilterApprover;
 
+    async function handleDownloadReport() {
+      setReportGenerating(true);
+      try {
+        const selectedNames = depts.filter(d => reportDeptIds.includes(d.id)).map(d => d.name);
+        await downloadUploadsExcelReport({ docs: deptScopedDocs, departments: selectedNames, fileLabel: 'Nodal' });
+        setShowReportPanel(false);
+        setReportDeptIds([]);
+      } finally {
+        setReportGenerating(false);
+      }
+    }
+
     return (
       <>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
@@ -1024,6 +1049,41 @@ export default function NodalOfficerDashboard({ activePage }) {
             )}
             <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
               {t('uploads.countOf', { shown: filteredDocs.length, total: totalDocs })}
+            </div>
+
+            <div ref={reportPanelRef} style={{ position: 'relative' }}>
+              <button onClick={() => setShowReportPanel(o => !o)}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--surface-ground)', color: 'var(--text-color)', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '7px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                <FileSpreadsheet size={13} /> {t('uploads.report.button')}
+              </button>
+
+              {showReportPanel && (
+                <div style={{
+                  position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 620, width: 300,
+                  background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 12,
+                  boxShadow: '0 12px 32px rgba(0,0,0,.14)', padding: 16, animation: 'dropdownIn .15s cubic-bezier(.2,.8,.3,1)',
+                }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 4 }}>{t('uploads.report.panelTitle')}</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginBottom: 12, lineHeight: 1.5 }}>{t('uploads.report.panelDesc')}</div>
+                  <MultiSelectField
+                    id="nod-report-dept-multi"
+                    value={reportDeptIds}
+                    onChange={setReportDeptIds}
+                    options={depts}
+                    placeholder={t('uploads.report.allDepartmentsPlaceholder')}
+                    selectedLabel={count => t('multiSelect.departmentsSelected', { count })}
+                  />
+                  <button onClick={handleDownloadReport} disabled={reportGenerating}
+                    style={{
+                      width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: 14,
+                      background: reportGenerating ? 'var(--surface-ground)' : 'var(--primary)', color: reportGenerating ? 'var(--text-color-secondary)' : '#fff',
+                      border: 'none', borderRadius: 8, padding: '9px 12px', fontSize: 12.5, fontWeight: 700,
+                      cursor: reportGenerating ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)',
+                    }}>
+                    <Download size={13} /> {reportGenerating ? t('uploads.report.generating') : t('uploads.report.downloadButton')}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1858,16 +1918,6 @@ function ActPartsDetailModal({ item, partsData, onClose, readOnly = false, onApp
         )}
       </div>
     ));
-  }
-
-  async function handleDecide(action) {
-    if (action === 'rejected' && !comment.trim()) return;
-    setSubmitting(true);
-    try {
-      await onReject?.({ action, comment: comment.trim() || null });
-    } finally {
-      setSubmitting(false);
-    }
   }
 
   return (

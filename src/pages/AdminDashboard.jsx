@@ -1,15 +1,17 @@
 ﻿import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Users, ShieldCheck, Settings, Activity, ClipboardList, Trash2, Edit2, Plus, CheckCircle, XCircle, Building2, X, Eye, EyeOff, ChevronDown, Check, Download, Layers, FileText, Clock, Search, Filter, Link2 } from 'lucide-react';
+import { Users, Trash2, Edit2, Plus, CheckCircle, XCircle, Building2, X, Eye, EyeOff, Check, Download, FileSpreadsheet, Layers, FileText, Clock, Search, Link2 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import SelectField from '../components/ui/SelectField';
+import MultiSelectField from '../components/ui/MultiSelectField';
 import DocViewModal from '../components/DocViewModal';
 import { getUsers, getRoles, updateUser, registerUser } from '../services/users';
 import { getDepartments, createDepartment, toggleDepartment, getDocumentTypes, createDocumentType, toggleDocumentType } from '../services/departments';
 import { getAllDocumentsAdmin, getAllDepartmentLinks } from '../services/pdf';
 import { getAuditLogs } from '../services/audit';
 import { useMediaQuery } from '../hooks/useMediaQuery';
+import { downloadUploadsExcelReport } from '../utils/uploadsExcelReport';
 
 const LABEL = { fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)' };
 
@@ -112,7 +114,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       })
       .catch(() => setUsersError(t('users.failedToLoadUsers')))
       .finally(() => setUsersLoading(false));
-  }, [activePage]);
+  }, [activePage, t]);
 
   // Departments state — full list for add/edit selectors
   const [depts, setDepts]               = useState([]);
@@ -131,7 +133,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       .then(res => setDepts(res.data))
       .catch(() => setDeptsError(t('taxonomy.errors.departmentsLoadFailed')))
       .finally(() => setDeptsLoading(false));
-  }, [activePage]);
+  }, [activePage, t]);
 
   // Document Types state
   const [docTypes, setDocTypes]               = useState([]);
@@ -151,7 +153,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       .then(res => setDocTypes(res.data))
       .catch(() => setDocTypesError(t('taxonomy.errors.docTypesLoadFailed')))
       .finally(() => setDocTypesLoading(false));
-  }, [activePage]);
+  }, [activePage, t]);
 
   // All Uploads state
   const [allDocs, setAllDocs]           = useState([]);
@@ -163,6 +165,17 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   const [uploadsFilterUploader, setUploadsFilterUploader] = useState('');
   const [uploadsFilterApprover, setUploadsFilterApprover] = useState('');
   const [viewDoc, setViewDoc]                             = useState(null);
+  const [showReportPanel, setShowReportPanel] = useState(false);
+  const [reportDeptIds, setReportDeptIds]     = useState([]);
+  const [reportGenerating, setReportGenerating] = useState(false);
+  const reportPanelRef = useRef(null);
+
+  useEffect(() => {
+    if (!showReportPanel) return;
+    const close = e => { if (!reportPanelRef.current?.contains(e.target)) setShowReportPanel(false); };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [showReportPanel]);
 
   useEffect(() => {
     if (activePage !== 'alluploads') return;
@@ -178,7 +191,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       })
       .catch(() => setAllDocsError(t('uploads.failedToLoad')))
       .finally(() => setAllDocsLoading(false));
-  }, [activePage]);
+  }, [activePage, t]);
 
   // Audit Log state
   const [auditLogs, setAuditLogs]               = useState([]);
@@ -187,7 +200,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   const [auditError, setAuditError]             = useState('');
   const [auditPage, setAuditPage]               = useState(0);
   const [auditFilterEntity, setAuditFilterEntity] = useState('');
-  const [auditFilterAction, setAuditFilterAction] = useState('');
+  const [auditFilterAction] = useState('');
   const [auditFilterStatus, setAuditFilterStatus] = useState('');
   const [auditFromDate, setAuditFromDate]       = useState('');
   const [auditToDate, setAuditToDate]           = useState('');
@@ -206,7 +219,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       .then(res => { setAuditLogs(res.data.logs || []); setAuditTotal(res.data.total || 0); })
       .catch(() => setAuditError(t('audit.failedToLoad')))
       .finally(() => setAuditLoading(false));
-  }, [activePage, auditPage, auditFilterEntity, auditFilterAction, auditFilterStatus, auditFromDate, auditToDate]);
+  }, [activePage, auditPage, auditFilterEntity, auditFilterAction, auditFilterStatus, auditFromDate, auditToDate, t]);
 
   // Linked Documents state (admin view)
   const [allLinks, setAllLinks]           = useState([]);
@@ -264,7 +277,6 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
         ...(d.no_of_ordinances      ? { noOfOrdinances:     d.no_of_ordinances }      : {}),
         ...(d.no_of_orders          ? { noOfOrders:         d.no_of_orders }          : {}),
         ...(d.keywords              ? { keywords:           d.keywords }              : {}),
-        ...(d.is_repealed           ? { repealed:           'Yes' }                   : {}),
       },
       // Amend / replace / issued-under links to other documents
       docRelations: (d.relationships || [])
@@ -319,7 +331,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       })
       .catch(() => setAllLinksError(t('linkedDocs.failedToLoad')))
       .finally(() => setAllLinksLoading(false));
-  }, [activePage]);
+  }, [activePage, t]);
 
   function handleCreateDept(e) {
     e.preventDefault();
@@ -426,17 +438,22 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   const [showAddPass, setShowAddPass] = useState(false);
 
   async function handleAddUser() {
+    const isNodal = roles.find(r => String(r.id) === String(addForm.role_id))?.name === 'nodal Officer';
+    if (!addForm.role_id)         { setAddError(t('users.errors.roleRequired')); return; }
+    if (isNodal ? addForm.dept_ids.length === 0 : !addForm.department_id) { setAddError(t('users.errors.departmentRequired')); return; }
     if (!addForm.username.trim()) { setAddError(t('users.errors.usernameRequired')); return; }
     if (!addForm.email.trim())    { setAddError(t('users.errors.emailRequired')); return; }
     if (!addForm.password)        { setAddError(t('users.errors.passwordRequired')); return; }
+    if (!addForm.first_name.trim()) { setAddError(t('users.errors.firstNameRequired')); return; }
+    if (!addForm.last_name.trim())  { setAddError(t('users.errors.lastNameRequired')); return; }
+    if (addForm.mobile_number.trim().length !== 10) { setAddError(t('users.errors.mobileRequired')); return; }
     setAddSaving(true);
     setAddError('');
     try {
-      const isNodal = roles.find(r => String(r.id) === String(addForm.role_id))?.name === 'nodal Officer';
       const res = await registerUser({
         username:      addForm.username.trim(),
         email:         addForm.email.trim(),
-        mobile_number: addForm.mobile_number.trim() || undefined,
+        mobile_number: addForm.mobile_number.trim(),
         password:      addForm.password,
         first_name:    addForm.first_name.trim(),
         last_name:     addForm.last_name.trim(),
@@ -722,6 +739,54 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
               {/* Body */}
               <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
 
+                {/* Role + Department */}
+                {(() => {
+                  const isNodal = roles.find(r => String(r.id) === String(addForm.role_id))?.name === 'nodal Officer';
+                  return (
+                    <>
+                      <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: isNodal ? '1fr' : '1fr 1fr', gap: 12 }}>
+                        <div>
+                          <label htmlFor="adm-add-role" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.role')} <span style={{ color: '#dc3545' }}>*</span></label>
+                          <SelectField
+                            id="adm-add-role"
+                            required
+                            value={addForm.role_id}
+                            onChange={e => setAddForm(f => ({ ...f, role_id: e.target.value, department_id: '', dept_ids: [] }))}
+                            placeholder={t('users.addDrawer.roleSelectPlaceholder')}
+                          >
+                            {assignableRoles(roles).map(r => (
+                              <option key={r.id} value={r.id}>{r.name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</option>
+                            ))}
+                          </SelectField>
+                        </div>
+                        {!isNodal && (
+                          <div>
+                            <label htmlFor="adm-add-department" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.department')} <span style={{ color: '#dc3545' }}>*</span></label>
+                            <SelectField id="adm-add-department" required value={addForm.department_id} onChange={e => setAddForm(f => ({ ...f, department_id: e.target.value }))} placeholder={t('users.addDrawer.departmentSelectPlaceholder')}>
+                              {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                            </SelectField>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Managed Departments — nodal officer only */}
+                      {isNodal && (
+                        <div>
+                          <label htmlFor="adm-add-dept-multi" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.department')} <span style={{ color: '#dc3545' }}>*</span></label>
+                          <MultiSelectField
+                            id="adm-add-dept-multi"
+                            value={addForm.dept_ids}
+                            onChange={ids => setAddForm(f => ({ ...f, dept_ids: ids }))}
+                            options={depts}
+                            placeholder={t('multiSelect.selectDepartments')}
+                            selectedLabel={count => t('multiSelect.departmentsSelected', { count })}
+                          />
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+
                 {/* Username + Email */}
                 <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
@@ -764,13 +829,13 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 {/* First + Last name */}
                 <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
-                    <label htmlFor="adm-add-firstname" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.firstName')}</label>
+                    <label htmlFor="adm-add-firstname" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.firstName')} <span style={{ color: '#dc3545' }}>*</span></label>
                     <input id="adm-add-firstname" style={INP_STYLE} placeholder={t('users.addDrawer.firstNamePlaceholder')}
                       value={addForm.first_name}
                       onChange={e => setAddForm(f => ({ ...f, first_name: e.target.value }))} />
                   </div>
                   <div>
-                    <label htmlFor="adm-add-lastname" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.lastName')}</label>
+                    <label htmlFor="adm-add-lastname" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.lastName')} <span style={{ color: '#dc3545' }}>*</span></label>
                     <input id="adm-add-lastname" style={INP_STYLE} placeholder={t('users.addDrawer.lastNamePlaceholder')}
                       value={addForm.last_name}
                       onChange={e => setAddForm(f => ({ ...f, last_name: e.target.value }))} />
@@ -779,7 +844,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
 
                 {/* Mobile Number */}
                 <div>
-                  <label htmlFor="adm-add-mobile" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.mobileNumber')}</label>
+                  <label htmlFor="adm-add-mobile" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.mobileNumber')} <span style={{ color: '#dc3545' }}>*</span></label>
                   <input id="adm-add-mobile" style={INP_STYLE}
                     type="tel"
                     inputMode="numeric"
@@ -788,52 +853,6 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                     value={addForm.mobile_number}
                     onChange={e => setAddForm(f => ({ ...f, mobile_number: e.target.value.replace(/\D/g, '') }))} />
                 </div>
-
-                {/* Role + Department */}
-                {(() => {
-                  const isNodal = roles.find(r => String(r.id) === String(addForm.role_id))?.name === 'nodal Officer';
-                  return (
-                    <>
-                      <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: isNodal ? '1fr' : '1fr 1fr', gap: 12 }}>
-                        <div>
-                          <label htmlFor="adm-add-role" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.role')}</label>
-                          <SelectField
-                            id="adm-add-role"
-                            value={addForm.role_id}
-                            onChange={e => setAddForm(f => ({ ...f, role_id: e.target.value, department_id: '', dept_ids: [] }))}
-                            placeholder={t('users.addDrawer.roleSelectPlaceholder')}
-                          >
-                            {assignableRoles(roles).map(r => (
-                              <option key={r.id} value={r.id}>{r.name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</option>
-                            ))}
-                          </SelectField>
-                        </div>
-                        {!isNodal && (
-                          <div>
-                            <label htmlFor="adm-add-department" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.department')}</label>
-                            <SelectField id="adm-add-department" value={addForm.department_id} onChange={e => setAddForm(f => ({ ...f, department_id: e.target.value }))} placeholder={t('users.addDrawer.departmentSelectPlaceholder')}>
-                              {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                            </SelectField>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Managed Departments — nodal officer only */}
-                      {isNodal && (
-                        <div>
-                          <label htmlFor="adm-add-dept-multi" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.department')}</label>
-                          <MultiSelectField
-                            id="adm-add-dept-multi"
-                            value={addForm.dept_ids}
-                            onChange={ids => setAddForm(f => ({ ...f, dept_ids: ids }))}
-                            options={depts}
-                            placeholder={t('multiSelect.selectDepartments')}
-                          />
-                        </div>
-                      )}
-                    </>
-                  );
-                })()}
 
                 {addError && (
                   <div style={{ padding: '9px 12px', background: 'rgba(220, 53, 69,.08)', border: '1px solid rgba(220, 53, 69,.25)', borderRadius: 8, fontSize: 12.5, color: '#dc3545', display: 'flex', gap: 7, alignItems: 'center' }}>
@@ -849,7 +868,12 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                   {t('users.addDrawer.cancel')}
                 </button>
                 {(() => {
-                  const addFormInvalid = !addForm.username.trim() || !addForm.email.trim() || !addForm.password;
+                  const isNodal = roles.find(r => String(r.id) === String(addForm.role_id))?.name === 'nodal Officer';
+                  const addFormInvalid = !addForm.role_id
+                    || (isNodal ? addForm.dept_ids.length === 0 : !addForm.department_id)
+                    || !addForm.username.trim() || !addForm.email.trim() || !addForm.password
+                    || !addForm.first_name.trim() || !addForm.last_name.trim()
+                    || addForm.mobile_number.trim().length !== 10;
                   const addBtnDisabled = addSaving || addFormInvalid;
                   return (
                     <button onClick={handleAddUser} disabled={addBtnDisabled}
@@ -951,6 +975,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                             onChange={ids => setEditForm(f => ({ ...f, dept_ids: ids }))}
                             options={depts}
                             placeholder={t('multiSelect.selectDepartments')}
+                            selectedLabel={count => t('multiSelect.departmentsSelected', { count })}
                           />
                         </div>
                       )}
@@ -1029,6 +1054,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
           const canCreateApi = cat.category === 'Document Types' || cat.category === 'Departments';
           const apiItems     = cat.category === 'Departments' ? depts : cat.category === 'Document Types' ? docTypes : [];
           const apiLoading   = cat.category === 'Departments' ? deptsLoading : docTypesLoading;
+          const apiError     = cat.category === 'Departments' ? deptsError : cat.category === 'Document Types' ? docTypesError : '';
           const displayItems = isApiDriven ? apiItems : cat.items;
           const addCreating  = cat.category === 'Document Types' ? docTypeCreating : cat.category === 'Departments' ? deptMdmCreating : false;
           const addError     = cat.category === 'Document Types' ? docTypeCreateError : cat.category === 'Departments' ? deptMdmCreateError : '';
@@ -1039,9 +1065,9 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, paddingBottom: 12, borderBottom: '1px solid var(--surface-border)' }}>
               <div>
                 <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>{cat.category}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 2 }}>
+                <div style={{ fontSize: 11, color: apiError ? '#dc3545' : 'var(--text-color-secondary)', marginTop: 2 }}>
                   {isApiDriven
-                    ? (apiLoading ? t('taxonomy.loading') : t('taxonomy.activeOfTotal', { active: activeCount, total: apiItems.length }))
+                    ? (apiLoading ? t('taxonomy.loading') : apiError || t('taxonomy.activeOfTotal', { active: activeCount, total: apiItems.length }))
                     : t('taxonomy.itemsCount', { count: cat.items.length })
                   }
                 </div>
@@ -1539,6 +1565,18 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     const cols = '4px 1fr 175px 155px 155px 90px';
     const anyFilter = uploadsSearch || uploadsFilterStatus || uploadsFilterDept || uploadsFilterUploader || uploadsFilterApprover;
 
+    async function handleDownloadReport() {
+      setReportGenerating(true);
+      try {
+        const selectedNames = depts.filter(d => reportDeptIds.includes(d.id)).map(d => d.name);
+        await downloadUploadsExcelReport({ docs: allDocs, departments: selectedNames, fileLabel: 'Admin' });
+        setShowReportPanel(false);
+        setReportDeptIds([]);
+      } finally {
+        setReportGenerating(false);
+      }
+    }
+
     return (
       <>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
@@ -1610,6 +1648,41 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
             )}
             <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
               {t('uploads.countOf', { shown: filteredDocs.length, total: totalDocs })}
+            </div>
+
+            <div ref={reportPanelRef} style={{ position: 'relative' }}>
+              <button onClick={() => setShowReportPanel(o => !o)}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--surface-ground)', color: 'var(--text-color)', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '7px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                <FileSpreadsheet size={13} /> {t('uploads.report.button')}
+              </button>
+
+              {showReportPanel && (
+                <div style={{
+                  position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 620, width: 300,
+                  background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 12,
+                  boxShadow: '0 12px 32px rgba(0,0,0,.14)', padding: 16, animation: 'dropdownIn .15s cubic-bezier(.2,.8,.3,1)',
+                }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 4 }}>{t('uploads.report.panelTitle')}</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginBottom: 12, lineHeight: 1.5 }}>{t('uploads.report.panelDesc')}</div>
+                  <MultiSelectField
+                    id="adm-report-dept-multi"
+                    value={reportDeptIds}
+                    onChange={setReportDeptIds}
+                    options={depts}
+                    placeholder={t('uploads.report.allDepartmentsPlaceholder')}
+                    selectedLabel={count => t('multiSelect.departmentsSelected', { count })}
+                  />
+                  <button onClick={handleDownloadReport} disabled={reportGenerating}
+                    style={{
+                      width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: 14,
+                      background: reportGenerating ? 'var(--surface-ground)' : 'var(--primary)', color: reportGenerating ? 'var(--text-color-secondary)' : '#fff',
+                      border: 'none', borderRadius: 8, padding: '9px 12px', fontSize: 12.5, fontWeight: 700,
+                      cursor: reportGenerating ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)',
+                    }}>
+                    <Download size={13} /> {reportGenerating ? t('uploads.report.generating') : t('uploads.report.downloadButton')}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -2006,109 +2079,3 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   return null;
 }
 
-function MultiSelectField({ id, value = [], onChange, options = [], placeholder = 'Select...' }) {
-  const { t } = useTranslation('admin');
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const close = e => { if (!ref.current?.contains(e.target)) setOpen(false); };
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
-  }, [open]);
-
-  function toggle(id) {
-    onChange(value.includes(id) ? value.filter(v => v !== id) : [...value, id]);
-  }
-
-  const selectedOptions = options.filter(o => value.includes(o.id));
-
-  return (
-    <div ref={ref} style={{ position: 'relative' }}>
-      {/* Trigger */}
-      <button id={id} type="button" onClick={() => setOpen(o => !o)} style={{
-        width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-        padding: '10px 12px 10px 14px', fontFamily: 'var(--font)', fontSize: 13,
-        borderRadius: 8, background: 'var(--surface-ground)',
-        border: `1px solid ${open ? 'var(--primary)' : 'var(--surface-border)'}`,
-        boxShadow: open ? '0 0 0 3px rgba(33, 74, 171,.1)' : 'none',
-        cursor: 'pointer', outline: 'none', textAlign: 'left',
-        color: selectedOptions.length ? 'var(--text-color)' : 'var(--text-color-secondary)',
-        transition: 'border-color .2s, box-shadow .2s',
-      }}>
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {selectedOptions.length === 0
-            ? placeholder
-            : selectedOptions.length === 1
-            ? selectedOptions[0].name
-            : t('multiSelect.departmentsSelected', { count: selectedOptions.length })}
-        </span>
-        <ChevronDown size={15} strokeWidth={2} style={{
-          flexShrink: 0, color: 'var(--text-color-secondary)',
-          transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .2s',
-        }} />
-      </button>
-
-      {/* Dropdown panel */}
-      {open && (
-        <div style={{
-          position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 600,
-          background: 'rgba(255,255,255,.75)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-          border: '1.5px solid rgba(255,255,255,.8)', borderRadius: 12,
-          boxShadow: '0 8px 32px rgba(0,0,0,.1), 0 2px 8px rgba(0,0,0,.06), inset 0 1px 0 rgba(255,255,255,.95)',
-          maxHeight: 200, overflowY: 'auto', animation: 'dropdownIn .15s cubic-bezier(.2,.8,.3,1)',
-        }}>
-          {options.map(opt => {
-            const isChecked = value.includes(opt.id);
-            return (
-              <div key={opt.id} onMouseDown={() => toggle(opt.id)} style={{
-                display: 'flex', alignItems: 'center', gap: 9,
-                padding: '10px 14px', fontSize: 13, fontFamily: 'var(--font)',
-                color: isChecked ? 'var(--primary)' : 'var(--text-color)',
-                fontWeight: isChecked ? 600 : 400, cursor: 'pointer',
-                transition: 'background .12s', background: 'transparent',
-              }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(33, 74, 171,.08)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-              >
-                <div style={{
-                  width: 15, height: 15, borderRadius: 4, flexShrink: 0,
-                  border: `2px solid ${isChecked ? 'var(--primary)' : 'var(--surface-border)'}`,
-                  background: isChecked ? 'var(--primary)' : 'transparent',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  transition: 'background .15s, border-color .15s',
-                }}>
-                  {isChecked && <Check size={9} color="white" strokeWidth={3} />}
-                </div>
-                {opt.name}
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Selected tags */}
-      {selectedOptions.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 8 }}>
-          {selectedOptions.map(o => (
-            <span key={o.id} style={{
-              display: 'inline-flex', alignItems: 'center', gap: 4,
-              padding: '3px 6px 3px 10px', borderRadius: 20,
-              background: 'rgba(33, 74, 171,.1)', border: '1px solid rgba(33, 74, 171,.2)',
-              fontSize: 11.5, color: 'var(--primary)', fontWeight: 600,
-            }}>
-              {o.name}
-              <button type="button" onMouseDown={e => { e.stopPropagation(); toggle(o.id); }} style={{
-                background: 'none', border: 'none', cursor: 'pointer',
-                color: 'var(--primary)', display: 'flex', padding: '1px',
-              }}>
-                <X size={10} />
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}

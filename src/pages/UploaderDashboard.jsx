@@ -5,14 +5,13 @@ import {
   RotateCcw, AlertCircle, Eye, GitBranch, Plus, FolderPlus,
   Layers, ChevronRight, AlertTriangle, CheckSquare, Square,
   Edit3, Tag, Search, MessageSquare, MessageCircle, ZoomIn, ZoomOut, RotateCw, ExternalLink,
-  Save, ArrowRight, Paperclip, Send,
+  Save, ArrowRight, Paperclip,
 } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 import mammoth from 'mammoth';
 import Card from '../components/ui/Card';
-import Badge from '../components/ui/Badge';
 import SelectField from '../components/ui/SelectField';
 import { useAuth } from '../hooks/useAuth';
 import { getDepartments, getDocumentTypes } from '../services/departments';
@@ -31,7 +30,6 @@ const DEFAULT_DEPTS = [
   'Panchayati Raj','General Administration',
 ];
 const DEFAULT_TYPES = ['Act','Amendment','Notification','Circular','Policy','Rules & Regulations','Order/Gazette','Bye Laws','Miscellaneous'];
-const LANGS  = ['English','Hindi','Bilingual'];
 const REL_TYPES = [
   'Replaces', 'Replaced by', 'Amends', 'Amended by',
   'In Continuation of', 'Continued by', 'Issued Under',
@@ -64,8 +62,6 @@ const REL_TARGET_TYPES = {
 };
 
 const AMEND_CHANGE_TYPES = ['Amended', 'Substituted', 'Inserted', 'Deleted', 'Expanded'];
-const AMEND_CHANGE_COLORS = { Amended: '#ffc107', Substituted: '#0d6efd', Inserted: '#198754', Deleted: '#dc3545', Expanded: '#8b5cf6' };
-const EMPTY_PROVISION = () => ({ section: '', chapter: '', subsection: '', page: '', changeType: 'Substituted', before: '', after: '' });
 
 // Display-only lookup maps: map the internal English enum values (used in comparisons,
 // object keys, and API payloads — never changed) to safe i18n key suffixes used purely
@@ -464,21 +460,6 @@ function VersionConflictModal({ existingDoc, newVersion, onUploadAsNew, onCancel
     </div>
   );
 }
-function WorkflowBadge({ status }) {
-  const { t } = useTranslation('uploader');
-  const config = {
-    [WORKFLOW_STATUS.DRAFT]:     { label: t('workflowBadge.draft'),          bg: 'rgba(148,163,184,.12)', color: '#64748b' },
-    [WORKFLOW_STATUS.PENDING]:   { label: t('workflowBadge.pendingReview'), bg: 'rgba(255, 193, 7,.12)', color: '#d97706' },
-    [WORKFLOW_STATUS.PUBLISHED]: { label: t('workflowBadge.published'),       bg: 'rgba(25, 135, 84,.12)',  color: '#16a34a' },
-  };
-  const c = config[status] || config[WORKFLOW_STATUS.DRAFT];
-  return (
-    <span style={{ fontSize: 10.5, fontWeight: 700, fontFamily: 'var(--mono)', padding: '3px 9px', borderRadius: 20, background: c.bg, color: c.color }}>
-      {c.label}
-    </span>
-  );
-}
-
 function Toast({ toast, onClose }) {
   if (!toast) return null;
   const isError = toast.type === 'error';
@@ -512,10 +493,11 @@ function DocViewModal({ doc, onClose }) {
   const suppressRef   = useRef(false);
   const svgRefs       = useRef([]);
   const docxViewRef   = useRef(null);
-  const annotations  = useMemo(() => {
-    try { return doc.approval?.annotations_json ? JSON.parse(doc.approval.annotations_json) : []; }
+  const annotationsJson = doc.approval?.annotations_json;
+  const annotations = useMemo(() => {
+    try { return annotationsJson ? JSON.parse(annotationsJson) : []; }
     catch { return []; }
-  }, [doc.approval?.annotations_json]);
+  }, [annotationsJson]);
 
   useEffect(() => {
     const h = e => { if (e.key === 'Escape') onClose(); };
@@ -524,8 +506,10 @@ function DocViewModal({ doc, onClose }) {
   }, [onClose]);
 
   useEffect(() => {
+    // doc.id never actually changes on an already-mounted instance — every call site
+    // gates this component behind `cond && <DocViewModal .../>`, so a new document
+    // always means a fresh mount and these useState initial values already apply.
     let url = null;
-    setBlobUrl(null); setPdfDoc(null); setCurrentPage(1); setDocxHtml(null);
     getPdfFile(doc.id)
       .then(res => {
         const ct = (res.headers['content-type'] || '').toLowerCase();
@@ -1086,7 +1070,7 @@ function DocViewModal({ doc, onClose }) {
 }
 
 // Main component
-export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, documents = [], onAddDocument, taxonomy = [] }) {
+export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, documents = [], onAddDocument }) {
   const { user } = useAuth();
   const { t } = useTranslation('uploader');
   const isMobile = useIsMobile();
@@ -1115,14 +1099,15 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const [myDocsError,   setMyDocsError]   = useState('');
   const [remarksModal,  setRemarksModal]  = useState(null);
   const [viewDoc,       setViewDoc]       = useState(null);
+  const [linkedDocs, setLinkedDocs] = useState([]);
 
-  function mapApiDoc(d) {
+  const mapApiDoc = useCallback((d) => {
     // Amendment provisions ride along inside description as a hidden __PROVISIONS__ JSON
     // suffix (see the upload flow below) — strip it back out before displaying the description.
     const rawDesc = d.description || '';
     const provisionsMatch = rawDesc.match(/\n?__PROVISIONS__:(.+)$/s);
     let amendmentProvisions = [];
-    if (provisionsMatch) { try { amendmentProvisions = JSON.parse(provisionsMatch[1]); } catch {} }
+    if (provisionsMatch) { try { amendmentProvisions = JSON.parse(provisionsMatch[1]); } catch { /* malformed JSON in remarks — keep default */ } }
 
     return {
       id:              d.id,
@@ -1187,11 +1172,10 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         ...(d.no_of_ordinances       ? { noOfOrdinances:      d.no_of_ordinances }       : {}),
         ...(d.no_of_orders           ? { noOfOrders:          d.no_of_orders }           : {}),
         ...(d.keywords               ? { keywords:            d.keywords }               : {}),
-        ...(d.is_repealed            ? { repealed:            'Yes' }                    : {}),
       },
       approval:        d.latest_approval || null,
     };
-  }
+  }, [t]);
 
   useEffect(() => {
     if (activePage !== 'dashboard') return;
@@ -1208,7 +1192,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         setMyDocsError(typeof detail === 'string' ? detail : t('toasts.failedToLoadDocuments'));
       })
       .finally(() => setMyDocsLoading(false));
-  }, [activePage]);
+  }, [activePage, mapApiDoc, t]);
 
   // Edit Document page: pick a type → table of that type's docs → edit form for one doc
   const [editType, setEditType]             = useState(null);
@@ -1223,7 +1207,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
 
   // Loads (or reloads) the current type's document table from the API.
   // Shared by the effect below and by saveEditDoc so the table reflects an edit immediately.
-  function refreshEditList() {
+  const refreshEditList = useCallback(() => {
     if (!editType) return;
     const typeId = typesData.find(d => d.name === editType)?.id;
     if (!typeId) { setEditList([]); return () => {}; }
@@ -1244,14 +1228,14 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       })
       .finally(() => { if (!cancelled) setEditListLoading(false); });
     return () => { cancelled = true; };
-  }
+  }, [editType, typesData, mapApiDoc, t]);
 
   // Fetch the documents of the chosen type in the uploader's department once a type is picked
   useEffect(() => {
     if (activePage !== 'editdocument' || !editType) return;
     if (!localStorage.getItem('token')) return;
     return refreshEditList();
-  }, [activePage, editType, typesData]);
+  }, [activePage, editType, refreshEditList]);
 
   function openEditDoc(doc) {
     setEditingDoc(doc);
@@ -1314,7 +1298,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       no_of_ordinances:        tf.noOfOrdinances ? parseInt(tf.noOfOrdinances, 10) || null : null,
       no_of_orders:            tf.noOfOrders ? parseInt(tf.noOfOrders, 10) || null : null,
       keywords:                tf.keywords || '',
-      is_repealed:             !!tf.repealed,
       tag_ids:                 [],
     };
     try {
@@ -1358,7 +1341,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const [subDocActsLoading, setSubDocActsLoading] = useState(false);
   // approvals[partType] = { status, submitted_at, reviewed_at, comments, ... } | undefined
   const [subDocApprovals, setSubDocApprovals] = useState({});
-  const [subDocSubmitting, setSubDocSubmitting] = useState(false);
   const [secHasChapters, setSecHasChapters] = useState(null); // null = not answered yet
   const [secChapters, setSecChapters]       = useState([]); // [{ name, sections: [{name,description},...] }]
   const [activeChapterIdx, setActiveChapterIdx] = useState(-1); // -1 = all collapsed (overview); set to index to expand
@@ -1378,7 +1360,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const [sectionsBaseline, setSectionsBaseline] = useState(() => sectionsSignature(null, [], []));
   const [entriesBaseline, setEntriesBaseline] = useState({}); // { [tab]: signature string }; a missing key falls back to entriesSignature([])
   const [form, setForm]             = useState({ act: '', dept: user?.dept || '', type: '', version: '1.0', desc: '', enactmentDate: '', parentAct: '', changeTypes: [] });
-  const [amendmentProvisions, setAmendmentProvisions] = useState([]);
   const [typeFields, setTypeFields]  = useState({});
   const [hierarchy, setHierarchy]   = useState({ act: '', actId: null, chapter: '', section: '', subsection: '' });
   const [rejected, setRejected]     = useState([]);
@@ -1386,14 +1367,9 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const [versionModal, setVersionModal] = useState(null);
   const [conflictModal, setConflictModal] = useState(null); // { existingDoc, pendingDocs, pendingRelations }
   const [duplicateModal, setDuplicateModal] = useState(null); // { matches: DuplicateCheckItem[] }
-  const [linkedDocs, setLinkedDocs] = useState([]);
   const [linkingId, setLinkingId] = useState(null); // pdf_id being linked (loading state)
   const [viewingLinkedDoc, setViewingLinkedDoc] = useState(null); // linked doc open in DocViewModal
   const [viewingActChildDoc, setViewingActChildDoc] = useState(null); // existing-under-this-Act doc open in DocViewModal
-
-  // Correction request state
-  const [correctionModal, setCorrectionModal] = useState(null); // { doc }
-  const [correctionReason, setCorrectionReason] = useState('');
 
   // Relationship state
   const [relations, setRelations]     = useState([]);
@@ -1418,8 +1394,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const [relDocSuggestions, setRelDocSuggestions] = useState([]); // real API results for "Link to Document", keyed by whichever Target Document Type is selected
   const [relDocSearching,   setRelDocSearching]   = useState(false);
   const relDocSearchTimer = useRef(null);
-  const [parentActSearch, setParentActSearch] = useState('');
-  const [showParentActDrop, setShowParentActDrop] = useState(false);
   const [drawerType,      setDrawerType]      = useState(null); // null | 'hierarchy' | 'relationship'
   const [drawerHierarchy, setDrawerHierarchy] = useState({ act: '', actId: null, chapter: '', section: '', subsection: '' });
 
@@ -1560,13 +1534,28 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const [sortCol,     setSortCol]     = useState('uploadedAt');
   const [sortDir,     setSortDir]     = useState('desc');
 
-  // The Upload and Edit flows reset to their starting state on every fresh visit —
-  // navigating there from the dashboard never resumes wherever it was left mid-session.
-  useEffect(() => {
-    if (activePage === 'upload') resetUploadForm();
-  }, [activePage]);
+  // Full reset of the upload wizard back to its starting (no type chosen) state.
+  function resetUploadForm() {
+    setForm({ act: '', dept: user?.dept || '', type: '', version: '1.0', desc: '', enactmentDate: '', parentAct: '', changeTypes: [] });
+    setFiles([]); setFileRefs([]); setFileMeta({});
+    setRelations([]);
+    setHierarchy({ act: '', chapter: '', section: '', subsection: '' });
+    setLegalAuthorities([{ act: '', sections: [''] }]);
+    setRelNote('');
+    setTypeFields({});
+    setUploadStep(null);
+    setUploadError('');
+  }
 
-  useEffect(() => {
+  // The Upload, Dashboard and Edit tabs reset to their starting state on every fresh
+  // visit — navigating there never resumes wherever it was left mid-session. Adjusted
+  // during render (React's "you might not need an effect" pattern, also used in
+  // Layout.jsx/App.jsx) rather than in an effect, since these are plain resets with
+  // no I/O or subscriptions.
+  const [prevActivePage, setPrevActivePage] = useState(activePage);
+  if (activePage !== prevActivePage) {
+    setPrevActivePage(activePage);
+    if (activePage === 'upload') resetUploadForm();
     if (activePage === 'dashboard') {
       setTableSearch('');
       setFilterType('');
@@ -1578,11 +1567,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       setBulkEditOpen(false);
       setBulkFields({ dept: '', type: '', year: '' });
     }
-  }, [activePage]);
-
-  useEffect(() => {
     if (activePage === 'editdocument') setEditType(null);
-  }, [activePage]);
+  }
 
   const inputRef     = useRef();
   const uploadsTableRef = useRef();
@@ -1661,11 +1647,14 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   }, [activePage, subDocTab, subDocAct]);
 
   // Switching tabs (schedule → annexure, etc.) shouldn't leave an entry from the previous
-  // tab's list expanded — start each tab's entries collapsed.
-  useEffect(() => {
+  // tab's list expanded — start each tab's entries collapsed. Adjusted during render
+  // rather than in an effect, since it's a plain reset with no I/O.
+  const [prevSubDocTab, setPrevSubDocTab] = useState(subDocTab);
+  if (subDocTab !== prevSubDocTab) {
+    setPrevSubDocTab(subDocTab);
     setActiveEntryIdx(-1);
     setEntryPreviewIdx(null);
-  }, [subDocTab]);
+  }
 
   // Load existing entries from DB when act or tab changes.
   // Skips if this (actId, tab) pair was already loaded — preserves unsaved additions across tab switches.
@@ -1686,13 +1675,17 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   }
 
   // Switching (or adding) a chapter should default to its own last section being the open one,
-  // not whatever section index was active in the previously-open chapter.
-  useEffect(() => {
+  // not whatever section index was active in the previously-open chapter. Adjusted during
+  // render rather than in an effect — intentionally keyed on activePage/activeChapterIdx only,
+  // not secChapters, so editing chapter content doesn't reset which section is open.
+  const chapterKey = `${activePage}:${activeChapterIdx}`;
+  const [prevChapterKey, setPrevChapterKey] = useState(chapterKey);
+  if (chapterKey !== prevChapterKey) {
+    setPrevChapterKey(chapterKey);
     if (activePage === 'adddocuments') {
       setActiveSectionIdx(Math.max(0, (secChapters[activeChapterIdx]?.sections.length || 1) - 1));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activePage, activeChapterIdx]);
+  }
 
   useEffect(() => {
     if (activePage === 'adddocuments' && secHasChapters === true) scrollAddDocumentsToEnd();
@@ -1752,10 +1745,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
 
     return [...found].sort();
   }
-  const parentActFiltered = approvedDocs
-    .filter(d => d.title.toLowerCase().includes(parentActSearch.toLowerCase()))
-    .slice(0, 8);
-
   async function addFiles(fileList) {
     const arr = Array.from(fileList);
     setRejected(arr.filter(f => !isAccepted(f)).map(f => f.name));
@@ -1849,7 +1838,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     setForm({ act:'',dept:user?.dept||'',type:'',version:'1.0',desc:'',enactmentDate:'',parentAct:'',changeTypes:[] });
     setHierarchy({ act:'', actId: null, chapter:'',section:'',subsection:'' });
     setLegalAuthorities([{ act: '', sections: [''] }]);
-    setAmendmentProvisions([]); setParentActSearch(''); setTypeFields({});
+    setTypeFields({});
 
     // Move newly uploaded docs from DRAFT to PENDING (queued for approver review)
     setTimeout(() => {
@@ -1859,21 +1848,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     }, 1800);
 
     onAuditLog?.(`Uploaded ${docsWithWorkflow.length} document(s): ${docsWithWorkflow.map(d => d.title).join(', ')}`);
-  }
-
-  // Full reset of the upload wizard back to its starting (no type chosen) state.
-  function resetUploadForm() {
-    setForm({ act: '', dept: user?.dept || '', type: '', version: '1.0', desc: '', enactmentDate: '', parentAct: '', changeTypes: [] });
-    setFiles([]); setFileRefs([]); setFileMeta({});
-    setRelations([]);
-    setHierarchy({ act: '', chapter: '', section: '', subsection: '' });
-    setLegalAuthorities([{ act: '', sections: [''] }]);
-    setAmendmentProvisions([]);
-    setParentActSearch('');
-    setRelNote('');
-    setTypeFields({});
-    setUploadStep(null);
-    setUploadError('');
   }
 
   // Runs the OCR eligibility check (POST /pdf/upload-file) for any files not yet checked.
@@ -2059,7 +2033,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             no_of_ordinances:      typeFields.noOfOrdinances ? parseInt(typeFields.noOfOrdinances, 10) || null : null,
             no_of_orders:          typeFields.noOfOrder ? parseInt(typeFields.noOfOrder, 10) || null : null,
             keywords:              typeFields.keywords || '',
-            is_repealed:           !!typeFields.repealed,
             tag_ids:               [],
             relationships:         relationshipsPayload,
             description:           (() => {
@@ -2177,7 +2150,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       const res = await checkDuplicateDocument(docName, typeObj.id);
       const matches = Array.isArray(res.data) ? res.data : [];
       if (matches.length > 0) setDuplicateModal({ matches });
-    } catch (_) { /* silent — duplicate check is advisory */ }
+    } catch { /* silent — duplicate check is advisory */ }
   }
 
   // Called when user clicks "Link to My Department" in the duplicate modal
@@ -2188,7 +2161,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       setDuplicateModal(null);
       // Refresh linked docs
       getLinkedDocuments().then(r => setLinkedDocs(Array.isArray(r.data) ? r.data : [])).catch(() => {});
-    } catch (_) {}
+    } catch { /* link failed — surfaced via linkingId clearing without a success state */ }
     setLinkingId(null);
   }
 
@@ -2245,7 +2218,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     const approved  = uploads.filter(d => d.status === 'approved').length;
     const pending   = uploads.filter(d => d.status === 'pending').length;
     const rejected  = uploads.filter(d => d.status === 'rejected').length;
-    const published = uploads.filter(d => d.workflowStatus === WORKFLOW_STATUS.PUBLISHED).length;
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
@@ -2518,16 +2490,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
             else { setSortCol(col); setSortDir('asc'); }
           }
-
-          const SortBtn = ({ col, label }) => {
-            const active = sortCol === col;
-            return (
-              <button onClick={() => toggleSort(col)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3, padding: 0, fontFamily: 'var(--mono)', fontSize: 10.5, fontWeight: 700, letterSpacing: '.07em', textTransform: 'uppercase', color: active ? 'var(--primary)' : 'var(--text-color-secondary)' }}>
-                {label}
-                <span style={{ fontSize: 9, lineHeight: 1, opacity: active ? 1 : 0.4 }}>{active ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}</span>
-              </button>
-            );
-          };
 
           return (
         <div ref={uploadsTableRef} style={{ scrollMarginTop: 16 }}>
@@ -3314,7 +3276,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
 
     function addChapter() {
       setSecChapters(prev => {
-        const nextIdx = prev.filter(c => !c.isDeleted).length + prev.filter(c => c.isDeleted).length; // = prev.length
         setActiveChapterIdx(prev.length);
         return [...prev, { id: null, name: '', isDeleted: false, sections: [] }];
       });
@@ -5014,13 +4975,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                   placeholder={t('wizard.placeholders.act.keywords')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
 
-              <div style={{ gridColumn: '1 / -1' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 12.5, color: 'var(--text-color-secondary)' }}>
-                  <input type="checkbox" checked={!!typeFields.repealed} onChange={e => setTypeFields(f => ({ ...f, repealed: e.target.checked }))}
-                    style={{ width: 15, height: 15, cursor: 'pointer', accentColor: 'var(--primary)' }} />
-                  {t('wizard.fields.act.repealCheckbox')}
-                </label>
-              </div>
             </>)}
 
             {/* ── Amendment: unified inline fields ── */}

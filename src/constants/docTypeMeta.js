@@ -9,4 +9,6 @@ export const DOC_TYPE_META = {
   'Policy':              { color: '#16a34a', bg: 'rgba(25, 135, 84,.1)',   border: 'rgba(25, 135, 84,.25)' },
   'Rules & Regulations': { color: '#dc2626', bg: 'rgba(220,38,38,.1)',  border: 'rgba(220,38,38,.25)' },
   'Order/Gazette':       { color: '#a16207', bg: 'rgba(234,179,8,.1)',   border: 'rgba(234,179,8,.25)' },
+  'Bye Laws':            { color: '#0369a1', bg: 'rgba(14,165,233,.1)',  border: 'rgba(14,165,233,.25)' },
+  'Miscellaneous':       { color: '#475569', bg: 'rgba(100,116,139,.1)', border: 'rgba(100,116,139,.25)' },
 };

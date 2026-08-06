@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Cookie, X, ShieldCheck } from 'lucide-react';
 
 const STORAGE_KEY = 'hlks-cookie-consent';
@@ -54,14 +54,9 @@ function ToggleSwitch({ checked, disabled, onChange, label }) {
 }
 
 export default function CookieBanner() {
-  const [visible, setVisible]     = useState(false);
+  const [visible, setVisible]     = useState(() => !localStorage.getItem(STORAGE_KEY));
   const [expanded, setExpanded]   = useState(false);
   const [prefs, setPrefs]         = useState({ essential: true, analytics: false, functional: false });
-
-  useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) setVisible(true);
-  }, []);
 
   function save(choice) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ choice, prefs, timestamp: Date.now() }));

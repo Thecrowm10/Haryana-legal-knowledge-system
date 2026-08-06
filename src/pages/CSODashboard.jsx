@@ -5,13 +5,12 @@ import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell, Legend,
 } from 'recharts';
-import { ANALYTICS_STATS, AUDIT_LOGS, GRAPH_NODES, GRAPH_LINKS } from '../data/mockData';
-import { FileText, CheckCircle, Clock, XCircle, Search, TrendingUp, GitBranch } from 'lucide-react';
+import { ANALYTICS_STATS, AUDIT_LOGS } from '../data/mockData';
+import { FileText, CheckCircle, Clock, XCircle, Search, TrendingUp } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 
 /* ─── helpers ─── */
-const CHART_COLORS = ['#214aab', '#0d6efd', '#ffc107', '#198754', '#8b5cf6', '#dc3545'];
 const label = { fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)' };
 
 const TOOLTIP_STYLE = { background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 8, boxShadow: 'var(--card-shadow)', fontSize: 12 };
@@ -464,6 +463,10 @@ function KnowledgeGraph({ focusId, allNodes = KG_NODES, allLinks = KG_LINKS, onN
     });
 
     return () => sim.stop();
+    // allNodes/allLinks are new array literals every render (spread copies built in the
+    // parent) — the D3 simulation is imperative and must only be torn down/reseeded when
+    // focusId actually changes, not on every parent re-render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusId]);
 
   return (
@@ -831,7 +834,7 @@ function GraphTab({ documents, relationships }) {
     if (selectedNode && detailRef.current) {
       setTimeout(() => detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
     }
-  }, [selectedNode?.id]);
+  }, [selectedNode]);
 
   // Build live nodes from uploaded documents that have relationships
   const connectedIds = new Set(relationships.flatMap(r => [r.sourceId, r.targetId]));

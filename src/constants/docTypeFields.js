@@ -21,7 +21,6 @@ export const TYPE_SPECIFIC_FIELD_KEYS = {
     { key: 'noOfOrdinances', inputType: 'number' },
     { key: 'noOfOrders', inputType: 'number' },
     { key: 'keywords', inputType: 'text' },
-    { key: 'repealed', inputType: 'checkbox' },
   ],
   'Amendment': [],
   'Circular': [{ key: 'validity', inputType: 'date' }],

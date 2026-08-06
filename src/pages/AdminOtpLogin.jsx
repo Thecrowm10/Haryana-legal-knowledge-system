@@ -1,11 +1,23 @@
 import { useState, useRef } from 'react';
+import { useTranslation, Trans } from 'react-i18next';
 import { Phone, ArrowLeft, ShieldCheck, RotateCcw, ShieldAlert, Lock } from 'lucide-react';
 import haryanaLogo from '../assets/haryana-logo.png';
 import bannerBg from '../assets/banner-1-768x217.png';
 import { requestAdminOtp, verifyAdminOtp } from '../services/pdf';
 import Captcha from '../components/Captcha';
+import LanguageToggle from '../components/LanguageToggle';
+import AccessibilityMenu from '../components/AccessibilityMenu';
+
+const otpIconStyle = {
+  display: 'flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, borderRadius: '50%',
+  background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.18)', color: 'rgba(255,255,255,.85)',
+  cursor: 'pointer',
+};
 
 export default function AdminOtpLogin({ onBack, onLogin }) {
+  const { t, i18n } = useTranslation('login');
+  const orgNameHi = i18n.getFixedT('hi', 'login')('orgNamePortal');
+  const orgNameEn = i18n.getFixedT('en', 'login')('orgNamePortal');
   const [step, setStep]           = useState(1);
   const [mobile, setMobile]       = useState('');
   const [otp, setOtp]             = useState('');
@@ -21,7 +33,7 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
   async function handleSendOtp(e) {
     e?.preventDefault();
     const cleaned = mobile.replace(/\D/g, '');
-    if (cleaned.length < 10) { setError('Enter a valid 10-digit mobile number.'); return; }
+    if (cleaned.length < 10) { setError(t('adminOtpScreen.errorMobileInvalid')); return; }
     setLoading(true); setError(''); setResendMsg('');
     try {
       const res = await requestAdminOtp(cleaned);
@@ -31,7 +43,7 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
       if (res.data?.otp) setOtp(res.data.otp);
     } catch (err) {
       const detail = err.response?.data?.detail;
-      setError(typeof detail === 'string' ? detail : 'Could not send OTP. Please try again.');
+      setError(typeof detail === 'string' ? detail : t('adminOtpScreen.errorSendFailed'));
     } finally {
       setLoading(false);
     }
@@ -40,16 +52,16 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
   // ── Step 2: verify OTP ────────────────────────────────────
   async function handleVerify(e) {
     e?.preventDefault();
-    if (otp.length !== 6) { setError('Enter the 6-digit OTP.'); return; }
-    if (!captchaStatus.touched)          { setError('Please fill the captcha.'); return; }
-    if (!captchaRef.current?.validate()) { setError('Please enter the correct captcha.'); return; }
+    if (otp.length !== 6) { setError(t('adminOtpScreen.errorOtp6Digits')); return; }
+    if (!captchaStatus.touched)          { setError(t('errorFillCaptcha')); return; }
+    if (!captchaRef.current?.validate()) { setError(t('errorCorrectCaptcha')); return; }
     setLoading(true); setError('');
     try {
       const res = await verifyAdminOtp(mobile, otp);
       onLogin({ token: res.data.access_token });
     } catch (err) {
       const detail = err.response?.data?.detail;
-      setError(typeof detail === 'string' ? detail : 'Invalid or expired OTP.');
+      setError(typeof detail === 'string' ? detail : t('adminOtpScreen.errorInvalidOtp'));
       captchaRef.current?.reset();
     } finally {
       setLoading(false);
@@ -60,10 +72,10 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
     setOtp(''); setError(''); setResendMsg(''); setLoading(true);
     try {
       const res = await requestAdminOtp(mobile);
-      setResendMsg('A new OTP has been sent.');
+      setResendMsg(t('adminOtpScreen.resendMsg'));
       if (res.data?.otp) setOtp(res.data.otp);
     } catch {
-      setError('Could not resend OTP. Please try again.');
+      setError(t('adminOtpScreen.errorResendFailed'));
     } finally {
       setLoading(false);
     }
@@ -100,6 +112,19 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
         />
         <div className="fixed-bg-img" style={{ zIndex: 1, background: 'linear-gradient(110deg, rgba(2,10,5,.82) 0%, rgba(2,10,5,.62) 45%, rgba(2,10,5,.42) 100%)' }}/>
 
+        {/* Masthead — same position as the portal-selection and credentials-login screens */}
+        <div style={{ position: 'absolute', top: 14, left: 32, zIndex: 10, display: 'flex', alignItems: 'center', gap: 14 }}>
+          <img src={haryanaLogo} alt="Haryana" loading="lazy" style={{ width: 100, height: 100, objectFit: 'contain' }} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 1, whiteSpace: 'nowrap', transform: 'translateY(12px)' }}>
+            <span style={{ fontSize: 13, fontWeight: 500, color: 'rgba(255,255,255,.62)', letterSpacing: '.01em' }}>{orgNameHi}</span>
+            <span style={{ fontSize: 18, fontWeight: 700, color: 'rgba(255,255,255,.9)', letterSpacing: '.01em' }}>{orgNameEn}</span>
+          </div>
+        </div>
+        <div style={{ position: 'absolute', top: 42, right: 32, zIndex: 10, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <LanguageToggle variant="dark" iconOnly buttonStyle={otpIconStyle} />
+          <AccessibilityMenu iconButtonStyle={otpIconStyle} />
+        </div>
+
         <div className="aol-card" style={{
           position: 'relative', zIndex: 2,
           width: 'clamp(300px,27vw,385px)',
@@ -113,33 +138,26 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
           boxShadow: '0 24px 64px rgba(0,0,0,.32), inset 0 1px 0 rgba(255,255,255,.14)',
           padding: '26px 24px 22px',
         }}>
-          {/* Brand */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 11, marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid rgba(255,255,255,.1)' }}>
-            <img src={haryanaLogo} alt="Haryana Government" loading="lazy" style={{ width: 40, height: 40, objectFit: 'contain' }} />
-            <div>
-              <div style={{ fontSize: 14.5, fontWeight: 700, color: '#fff' }}>Haryana Government</div>
-              <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,.42)', marginTop: 2 }}>Digital Repository</div>
-            </div>
-            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 20, background: 'rgba(74,222,128,.12)', border: '1px solid rgba(74,222,128,.3)' }}>
-              <ShieldAlert size={11} color="#4ade80" />
-              <span style={{ fontSize: 10, color: '#4ade80', fontWeight: 700 }}>ADMIN</span>
-            </div>
-          </div>
-
           {/* ── Step 1: enter mobile ── */}
           {step === 1 && (
             <form onSubmit={handleSendOtp}>
               <button type="button" onClick={onBack}
                 style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.4)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, marginBottom: 14, padding: 0, fontFamily: 'inherit', letterSpacing: '.04em' }}>
-                <ArrowLeft size={12} /> Back to Portal Selection
+                <ArrowLeft size={12} /> {t('adminOtpScreen.backToPortal')}
               </button>
-              <h2 style={{ fontSize: 21, fontWeight: 800, color: '#fff', letterSpacing: '-.02em', marginBottom: 4 }}>Admin Access</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                <h2 style={{ fontSize: 21, fontWeight: 800, color: '#fff', letterSpacing: '-.02em' }}>{t('adminOtpScreen.title')}</h2>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 20, background: 'rgba(74,222,128,.12)', border: '1px solid rgba(74,222,128,.3)' }}>
+                  <ShieldAlert size={11} color="#4ade80" />
+                  <span style={{ fontSize: 10, color: '#4ade80', fontWeight: 700 }}>{t('adminOtpScreen.badge')}</span>
+                </div>
+              </div>
               <p style={{ fontSize: 12.5, color: 'rgba(255,255,255,.42)', marginBottom: 20 }}>
-                Enter your registered mobile number. A 6-digit OTP will be sent via SMS.
+                {t('adminOtpScreen.subtitle')}
               </p>
 
               <label htmlFor="aol-mobile" style={labelStyle}>
-                <Phone size={10} color="rgba(255,255,255,.4)" /> Mobile Number
+                <Phone size={10} color="rgba(255,255,255,.4)" /> {t('adminOtpScreen.mobileNumber')}
               </label>
               <input
                 id="aol-mobile"
@@ -149,7 +167,7 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
                 maxLength={10}
                 value={mobile}
                 onChange={e => { setMobile(e.target.value.replace(/\D/g, '')); setError(''); }}
-                placeholder="10-digit mobile number"
+                placeholder={t('adminOtpScreen.mobilePlaceholder')}
                 autoComplete="tel"
                 style={{
                   width: '100%', padding: '11px 13px',
@@ -170,7 +188,7 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
                 boxShadow: canSubmitStep1 ? '0 4px 18px rgba(25, 135, 84,.38)' : 'none',
                 cursor: canSubmitStep1 ? 'pointer' : 'not-allowed',
               }}>
-                {loading ? <><Spin /> Sending OTP…</> : <>Send OTP &nbsp;→</>}
+                {loading ? <><Spin /> {t('adminOtpScreen.sendingOtp')}</> : <>{t('adminOtpScreen.sendOtp')} &nbsp;→</>}
               </button>
             </form>
           )}
@@ -180,14 +198,14 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
             <form onSubmit={handleVerify}>
               <button type="button" onClick={() => { setStep(1); setError(''); setOtp(''); setResendMsg(''); }}
                 style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.4)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, marginBottom: 14, padding: 0, fontFamily: 'inherit', letterSpacing: '.04em' }}>
-                <ArrowLeft size={12} /> Back
+                <ArrowLeft size={12} /> {t('adminOtpScreen.back')}
               </button>
-              <h2 style={{ fontSize: 21, fontWeight: 800, color: '#fff', letterSpacing: '-.02em', marginBottom: 4 }}>Enter OTP</h2>
+              <h2 style={{ fontSize: 21, fontWeight: 800, color: '#fff', letterSpacing: '-.02em', marginBottom: 4 }}>{t('adminOtpScreen.enterOtpTitle')}</h2>
               <p style={{ fontSize: 12.5, color: 'rgba(255,255,255,.42)', marginBottom: 20 }}>
-                OTP sent to <strong style={{ color: 'rgba(255,255,255,.7)' }}>+91 {mobile.slice(0,3)}****{mobile.slice(-3)}</strong>. Valid for 10 minutes.
+                <Trans t={t} i18nKey="adminOtpScreen.otpSentTo" values={{ masked: `${mobile.slice(0,3)}****${mobile.slice(-3)}` }} components={[<strong key="s" style={{ color: 'rgba(255,255,255,.7)' }} />]} />
               </p>
 
-              <label htmlFor="aol-otp" style={labelStyle}>6-Digit OTP</label>
+              <label htmlFor="aol-otp" style={labelStyle}>{t('adminOtpScreen.otpLabel')}</label>
               <input
                 id="aol-otp"
                 className="aol-inp aol-otp-inp"
@@ -221,19 +239,19 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
                 cursor: canSubmitStep2 ? 'pointer' : 'not-allowed',
                 marginBottom: 12,
               }}>
-                {loading ? <><Spin /> Verifying…</> : canSubmitStep2 ? <><ShieldCheck size={14} /> Verify & Login</> : <><Lock size={13} /> Verify & Login</>}
+                {loading ? <><Spin /> {t('adminOtpScreen.verifying')}</> : canSubmitStep2 ? <><ShieldCheck size={14} /> {t('adminOtpScreen.verifyLogin')}</> : <><Lock size={13} /> {t('adminOtpScreen.verifyLogin')}</>}
               </button>
 
               <button type="button" onClick={handleResend} disabled={loading}
                 style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.35)', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'inherit', margin: '0 auto' }}>
-                <RotateCcw size={11} /> Resend OTP
+                <RotateCcw size={11} /> {t('adminOtpScreen.resendOtp')}
               </button>
             </form>
           )}
         </div>
 
         <p style={{ position: 'absolute', bottom: 14, zIndex: 2, color: 'rgba(255,255,255,.16)', fontSize: 11 }}>
-          © 2026 Government of Haryana · HARTRON
+          {t('footerCopyright')}
         </p>
       </div>
     </>
