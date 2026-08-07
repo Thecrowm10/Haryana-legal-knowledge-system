@@ -1,16 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Eye, EyeOff, ShieldCheck, Lock, Smartphone, Mail, CheckCircle2 } from 'lucide-react';
 import haryanaLogo from '../assets/haryana-logo.png';
 import bannerBg from '../assets/banner-1-768x217.png';
 import {
+  getFirstLoginStatus,
   sendFirstLoginMobileOtp,
   verifyFirstLoginMobileOtp,
   firstLoginResetPassword,
 } from '../services/authService';
 
-// step: 'initial' | 'otp_sent' | 'verified'
+// step: 'loading' | 'initial' | 'otp_sent' | 'verified'
 export default function FirstLoginScreen({ user, onTokenReceived, onLogout }) {
-  const [step, setStep]               = useState(user?.mobileVerified ? 'verified' : 'initial');
+  const [step, setStep]               = useState('loading');
   const [maskedMobile, setMaskedMobile] = useState('');
   const [otp, setOtp]                 = useState('');
   const [otpError, setOtpError]       = useState('');
@@ -23,6 +24,14 @@ export default function FirstLoginScreen({ user, onTokenReceived, onLogout }) {
   const [showConfirm, setShowConfirm]   = useState(false);
   const [pwError, setPwError]           = useState('');
   const [resetting, setResetting]       = useState(false);
+
+  // Check actual DB value on mount — JWT at login may not have mobile_verified
+  // if the login stored procedure doesn't return that column.
+  useEffect(() => {
+    getFirstLoginStatus()
+      .then(res => setStep(res.data.mobile_verified ? 'verified' : 'initial'))
+      .catch(() => setStep('initial'));
+  }, []);
 
   async function handleSendOtp() {
     setSendingOtp(true);
@@ -143,32 +152,41 @@ export default function FirstLoginScreen({ user, onTokenReceived, onLogout }) {
             Verify your mobile number to set a new password.
           </p>
 
+          {/* Loading state */}
+          {step === 'loading' && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 0', gap: 10, color: 'rgba(255,255,255,.45)', fontSize: 13 }}>
+              <Spin /> Checking verification status…
+            </div>
+          )}
+
           {/* Step indicators */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
-            {['Verify Mobile', 'Set Password'].map((label, i) => {
-              const done = (i === 0 && step === 'verified') || (i === 1 && false);
-              const active = (i === 0 && step !== 'verified') || (i === 1 && step === 'verified');
-              return (
-                <div key={label} style={{
-                  flex: 1, padding: '6px 10px', borderRadius: 8,
-                  background: done ? 'rgba(25,135,84,.25)' : active ? 'rgba(255,255,255,.12)' : 'rgba(255,255,255,.04)',
-                  border: `1px solid ${done ? 'rgba(25,135,84,.5)' : active ? 'rgba(255,255,255,.2)' : 'rgba(255,255,255,.08)'}`,
-                  display: 'flex', alignItems: 'center', gap: 6,
-                }}>
-                  {done
-                    ? <CheckCircle2 size={13} color="#4ade80" />
-                    : <div style={{ width: 13, height: 13, borderRadius: '50%', background: active ? '#4ade80' : 'rgba(255,255,255,.2)', flexShrink: 0 }} />
-                  }
-                  <span style={{ fontSize: 11, fontWeight: 600, color: done ? '#4ade80' : active ? '#fff' : 'rgba(255,255,255,.35)' }}>
-                    {label}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
+          {step !== 'loading' && (
+            <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+              {['Verify Mobile', 'Set Password'].map((label, i) => {
+                const done = (i === 0 && step === 'verified') || (i === 1 && false);
+                const active = (i === 0 && step !== 'verified') || (i === 1 && step === 'verified');
+                return (
+                  <div key={label} style={{
+                    flex: 1, padding: '6px 10px', borderRadius: 8,
+                    background: done ? 'rgba(25,135,84,.25)' : active ? 'rgba(255,255,255,.12)' : 'rgba(255,255,255,.04)',
+                    border: `1px solid ${done ? 'rgba(25,135,84,.5)' : active ? 'rgba(255,255,255,.2)' : 'rgba(255,255,255,.08)'}`,
+                    display: 'flex', alignItems: 'center', gap: 6,
+                  }}>
+                    {done
+                      ? <CheckCircle2 size={13} color="#4ade80" />
+                      : <div style={{ width: 13, height: 13, borderRadius: '50%', background: active ? '#4ade80' : 'rgba(255,255,255,.2)', flexShrink: 0 }} />
+                    }
+                    <span style={{ fontSize: 11, fontWeight: 600, color: done ? '#4ade80' : active ? '#fff' : 'rgba(255,255,255,.35)' }}>
+                      {label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           {/* ── STEP: initial + otp_sent ── */}
-          {step !== 'verified' && (
+          {step !== 'loading' && step !== 'verified' && (
             <div>
               {/* Verification buttons */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: otpError ? 12 : 20 }}>
@@ -294,7 +312,7 @@ export default function FirstLoginScreen({ user, onTokenReceived, onLogout }) {
           )}
 
           {/* ── STEP: verified — set new password ── */}
-          {step === 'verified' && (
+          {step !== 'loading' && step === 'verified' && (
             <form onSubmit={handleResetPassword}>
               <div style={{
                 padding: '10px 14px', marginBottom: 18,

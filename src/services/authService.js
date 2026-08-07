@@ -1,5 +1,8 @@
 import api from './api';
 
+export const getFirstLoginStatus   = () =>
+  api.get('/auth/first-login/status');
+
 export const sendFirstLoginMobileOtp = () =>
   api.post('/auth/first-login/send-mobile-otp');
 
