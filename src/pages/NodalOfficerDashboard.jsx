@@ -645,6 +645,50 @@ export default function NodalOfficerDashboard({ activePage }) {
               {/* Body */}
               <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
 
+                {/* Role + Department */}
+                <div className="nod-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label htmlFor="nod-add-role" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.role')}</label>
+                    <SelectField id="nod-add-role" value={addForm.role_id} onChange={e => setAddForm(f => ({ ...f, role_id: e.target.value, approver_id: '' }))} placeholder={t('users.addDrawer.roleSelectPlaceholder')}>
+                      {assignableRoles(roles).map(r => (
+                        <option key={r.id} value={r.id}>{r.name.charAt(0).toUpperCase() + r.name.slice(1)}</option>
+                      ))}
+                    </SelectField>
+                  </div>
+                  <div>
+                    <label htmlFor="nod-add-department" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.department')} <span style={{ color: '#dc3545' }}>*</span></label>
+                    <SelectField id="nod-add-department" value={addForm.department_id} onChange={e => setAddForm(f => ({ ...f, department_id: e.target.value, approver_id: '' }))} placeholder={t('users.addDrawer.departmentSelectPlaceholder')}>
+                      {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </SelectField>
+                  </div>
+                </div>
+
+                {/* Approver mapping — shown only when Uploader role is selected and a department is chosen */}
+                {isUploader && addForm.department_id && (
+                  <div>
+                    <label htmlFor="nod-add-approver" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>
+                      {t('users.addDrawer.approver')} <span style={{ color: '#dc3545' }}>*</span>
+                    </label>
+                    <SelectField
+                      id="nod-add-approver"
+                      value={addForm.approver_id}
+                      onChange={e => setAddForm(f => ({ ...f, approver_id: e.target.value }))}
+                      placeholder={approversLoading ? t('users.addDrawer.loadingApprovers') : t('users.addDrawer.approverSelectPlaceholder')}
+                      disabled={approversLoading}>
+                      {approvers.map(a => (
+                        <option key={a.id} value={a.id}>
+                          {a.first_name || a.last_name ? `${a.first_name || ''} ${a.last_name || ''}`.trim() : a.username}
+                        </option>
+                      ))}
+                    </SelectField>
+                    {!approversLoading && approvers.length === 0 && (
+                      <div style={{ fontSize: 11.5, color: '#d97706', marginTop: 5 }}>
+                        {t('users.addDrawer.noApproversInDept')}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Username + Email */}
                 <div className="nod-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
@@ -711,50 +755,6 @@ export default function NodalOfficerDashboard({ activePage }) {
                     value={addForm.mobile_number}
                     onChange={e => setAddForm(f => ({ ...f, mobile_number: e.target.value.replace(/\D/g, '') }))} />
                 </div>
-
-                {/* Role + Department */}
-                <div className="nod-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div>
-                    <label htmlFor="nod-add-role" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.role')}</label>
-                    <SelectField id="nod-add-role" value={addForm.role_id} onChange={e => setAddForm(f => ({ ...f, role_id: e.target.value, approver_id: '' }))} placeholder={t('users.addDrawer.roleSelectPlaceholder')}>
-                      {assignableRoles(roles).map(r => (
-                        <option key={r.id} value={r.id}>{r.name.charAt(0).toUpperCase() + r.name.slice(1)}</option>
-                      ))}
-                    </SelectField>
-                  </div>
-                  <div>
-                    <label htmlFor="nod-add-department" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.department')} <span style={{ color: '#dc3545' }}>*</span></label>
-                    <SelectField id="nod-add-department" value={addForm.department_id} onChange={e => setAddForm(f => ({ ...f, department_id: e.target.value, approver_id: '' }))} placeholder={t('users.addDrawer.departmentSelectPlaceholder')}>
-                      {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                    </SelectField>
-                  </div>
-                </div>
-
-                {/* Approver mapping — shown only when Uploader role is selected and a department is chosen */}
-                {isUploader && addForm.department_id && (
-                  <div>
-                    <label htmlFor="nod-add-approver" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>
-                      {t('users.addDrawer.approver')} <span style={{ color: '#dc3545' }}>*</span>
-                    </label>
-                    <SelectField
-                      id="nod-add-approver"
-                      value={addForm.approver_id}
-                      onChange={e => setAddForm(f => ({ ...f, approver_id: e.target.value }))}
-                      placeholder={approversLoading ? t('users.addDrawer.loadingApprovers') : t('users.addDrawer.approverSelectPlaceholder')}
-                      disabled={approversLoading}>
-                      {approvers.map(a => (
-                        <option key={a.id} value={a.id}>
-                          {a.first_name || a.last_name ? `${a.first_name || ''} ${a.last_name || ''}`.trim() : a.username}
-                        </option>
-                      ))}
-                    </SelectField>
-                    {!approversLoading && approvers.length === 0 && (
-                      <div style={{ fontSize: 11.5, color: '#d97706', marginTop: 5 }}>
-                        {t('users.addDrawer.noApproversInDept')}
-                      </div>
-                    )}
-                  </div>
-                )}
 
                 {addError && (
                   <div style={{ padding: '9px 12px', background: 'rgba(220, 53, 69,.08)', border: '1px solid rgba(220, 53, 69,.25)', borderRadius: 8, fontSize: 12.5, color: '#dc3545', display: 'flex', gap: 7, alignItems: 'center' }}>
