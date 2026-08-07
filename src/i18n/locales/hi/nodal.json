@@ -86,6 +86,8 @@
       "activate": "सक्रिय करें"
     },
     "errors": {
+      "roleRequired": "भूमिका आवश्यक है।",
+      "firstNameRequired": "पहला नाम आवश्यक है।",
       "usernameRequired": "उपयोगकर्ता नाम आवश्यक है।",
       "emailRequired": "ईमेल आवश्यक है।",
       "passwordRequired": "पासवर्ड आवश्यक है।",
