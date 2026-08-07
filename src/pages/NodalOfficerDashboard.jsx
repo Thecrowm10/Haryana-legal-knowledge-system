@@ -132,7 +132,6 @@ export default function NodalOfficerDashboard({ activePage }) {
   const [allDocsError, setAllDocsError]                   = useState('');
   const [uploadsSearch, setUploadsSearch]                 = useState('');
   const [uploadsFilterStatus, setUploadsFilterStatus]     = useState('');
-  const [uploadsFilterDept, setUploadsFilterDept]         = useState('');
   const [uploadsFilterUploader, setUploadsFilterUploader] = useState('');
   const [uploadsFilterApprover, setUploadsFilterApprover] = useState('');
   const [viewDoc, setViewDoc]                             = useState(null);
@@ -427,7 +426,7 @@ export default function NodalOfficerDashboard({ activePage }) {
       .finally(() => setNodalLinksLoading(false));
   }, [activePage, t]);
 
-  const [deptFilter, setDeptFilter] = useState('');
+  const [roleFilter, setRoleFilter] = useState('');
   const [usersStatusFilter, setUsersStatusFilter] = useState('');
 
   // ── Act Parts (view-only) state ─────────────────────────────────────────
@@ -466,7 +465,7 @@ export default function NodalOfficerDashboard({ activePage }) {
     const inactive = users.filter(u => u.status === 'inactive').length;
 
     const filteredUsers = users
-      .filter(u => !deptFilter || u.deptIds.map(String).includes(String(deptFilter)))
+      .filter(u => !roleFilter || String(u.roleId) === String(roleFilter))
       .filter(u => !usersStatusFilter || u.status === usersStatusFilter);
 
     const INP_STYLE = {
@@ -510,9 +509,9 @@ export default function NodalOfficerDashboard({ activePage }) {
           <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
             <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>{t('users.systemUsers')}</div>
             <div className="nod-users-actions" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <SelectField value={deptFilter} onChange={e => setDeptFilter(e.target.value)} placeholder={t('users.allDepartments')} style={{ width: 200, maxWidth: '100%' }}>
-                <option value="">{t('users.allDepartments')}</option>
-                {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+              <SelectField value={roleFilter} onChange={e => setRoleFilter(e.target.value)} placeholder={t('users.allRoles')} style={{ width: 200, maxWidth: '100%' }}>
+                <option value="">{t('users.allRoles')}</option>
+                {assignableRoles(roles).map(r => <option key={r.id} value={r.id}>{r.name.toUpperCase()}</option>)}
               </SelectField>
               <button
                 onClick={() => { setAddingUser(true); setAddError(''); setAddForm({ ...EMPTY_ADD_FORM, department_id: depts[0]?.id ? String(depts[0].id) : '' }); setShowAddPass(false); }}
@@ -984,7 +983,6 @@ export default function NodalOfficerDashboard({ activePage }) {
 
     const filteredDocs = deptScopedDocs.filter(d => {
       if (uploadsFilterStatus && d.status !== uploadsFilterStatus) return false;
-      if (uploadsFilterDept && d.department_name !== uploadsFilterDept) return false;
       if (uploadsFilterUploader && d.uploader_username !== uploadsFilterUploader) return false;
       if (uploadsFilterApprover && d.latest_approval?.approver_username !== uploadsFilterApprover) return false;
       if (uploadsSearch) {
@@ -1003,7 +1001,7 @@ export default function NodalOfficerDashboard({ activePage }) {
       rejected: { color: '#dc3545', bg: 'rgba(220, 53, 69,.1)',  label: t('uploads.stats.rejected') },
     };
     const cols = '4px 1fr 175px 155px 155px 90px';
-    const anyFilter = uploadsSearch || uploadsFilterStatus || uploadsFilterDept || uploadsFilterUploader || uploadsFilterApprover;
+    const anyFilter = uploadsSearch || uploadsFilterStatus || uploadsFilterUploader || uploadsFilterApprover;
 
     async function handleDownloadReport() {
       setReportGenerating(true);
@@ -1079,11 +1077,6 @@ export default function NodalOfficerDashboard({ activePage }) {
               <option value="">{t('uploads.allApprovers')}</option>
               {approverOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </SelectField>
-            {/* Department filter is limited to the nodal officer's authorised departments */}
-            <SelectField value={uploadsFilterDept} onChange={e => setUploadsFilterDept(e.target.value)} style={{ flex: '0 0 155px' }}>
-              <option value="">{t('uploads.allDepartments')}</option>
-              {depts.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
-            </SelectField>
             <SelectField value={uploadsFilterStatus} onChange={e => setUploadsFilterStatus(e.target.value)} style={{ flex: '0 0 130px' }}>
               <option value="">{t('uploads.allStatuses')}</option>
               <option value="pending">{t('uploads.statusPending')}</option>
@@ -1091,7 +1084,7 @@ export default function NodalOfficerDashboard({ activePage }) {
               <option value="rejected">{t('uploads.statusRejected')}</option>
             </SelectField>
             {anyFilter && (
-              <button onClick={() => { setUploadsSearch(''); setUploadsFilterStatus(''); setUploadsFilterDept(''); setUploadsFilterUploader(''); setUploadsFilterApprover(''); }}
+              <button onClick={() => { setUploadsSearch(''); setUploadsFilterStatus(''); setUploadsFilterUploader(''); setUploadsFilterApprover(''); }}
                 style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'transparent', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '7px 12px', fontSize: 12, cursor: 'pointer', color: 'var(--text-color-secondary)', whiteSpace: 'nowrap' }}>
                 <X size={11} /> {t('uploads.clear')}
               </button>

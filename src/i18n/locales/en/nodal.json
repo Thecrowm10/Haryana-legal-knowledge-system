@@ -17,6 +17,7 @@
     },
     "systemUsers": "System Users",
     "allDepartments": "All Departments",
+    "allRoles": "All Roles",
     "addUser": "Add User",
     "loadingUsers": "Loading users…",
     "failedToLoadUsers": "Failed to load users. Please try again.",
