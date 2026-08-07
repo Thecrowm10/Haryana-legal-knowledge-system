@@ -35,7 +35,8 @@
       "auditLog": "Audit Log",
       "queryHistory": "Query History",
       "complianceReport": "Compliance Report",
-      "actPartsReview": "Act Parts Review"
+      "actPartsReview": "Act Parts Review",
+      "roleCaps": "Role User Caps"
     }
   },
   "topbar": {

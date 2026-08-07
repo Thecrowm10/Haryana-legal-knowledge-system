@@ -248,5 +248,37 @@
   "multiSelect": {
     "selectDepartments": "Select departments…",
     "departmentsSelected": "{{count}} departments selected"
+  },
+  "roleCaps": {
+    "title": "Role User Caps",
+    "subtitle": "Set the maximum number of active users allowed per role in each department. If no custom limit is set, the system default of {{default}} applies.",
+    "addTitle": "Add / Update Limit",
+    "department": "Department",
+    "role": "Role",
+    "maxUsers": "Max Users",
+    "selectDepartment": "Select department",
+    "selectRole": "Select role",
+    "save": "Save",
+    "saving": "Saving…",
+    "delete": "Remove",
+    "edit": "Edit",
+    "cancel": "Cancel",
+    "noLimits": "No custom limits set. All departments use the system default of {{default}} users per role.",
+    "defaultBadge": "Default: {{n}}",
+    "headers": {
+      "department": "Department",
+      "role": "Role",
+      "maxUsers": "Max Users",
+      "actions": "Actions"
+    },
+    "errors": {
+      "loadFailed": "Failed to load role caps. Please try again.",
+      "saveFailed": "Failed to save limit.",
+      "deleteFailed": "Failed to remove limit.",
+      "deptRequired": "Please select a department.",
+      "roleRequired": "Please select a role.",
+      "maxRequired": "Max users must be 0 or more."
+    },
+    "deleteConfirm": "Remove the custom limit for {{role}} in {{dept}}? The system default of {{default}} will apply."
   }
 }
