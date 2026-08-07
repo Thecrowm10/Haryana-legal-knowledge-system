@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Eye, EyeOff, ShieldCheck, Lock, Smartphone, Mail, CheckCircle2 } from 'lucide-react';
+import { useTranslation, Trans } from 'react-i18next';
+import { Eye, EyeOff, ShieldCheck, Lock, Smartphone, Mail, CheckCircle2, ArrowLeft } from 'lucide-react';
 import haryanaLogo from '../assets/haryana-logo.png';
 import bannerBg from '../assets/banner-1-768x217.png';
 import {
@@ -8,9 +9,20 @@ import {
   verifyFirstLoginMobileOtp,
   firstLoginResetPassword,
 } from '../services/authService';
+import LanguageToggle from '../components/LanguageToggle';
+import AccessibilityMenu from '../components/AccessibilityMenu';
+
+const flIconStyle = {
+  display: 'flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, borderRadius: '50%',
+  background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.18)', color: 'rgba(255,255,255,.85)',
+  cursor: 'pointer',
+};
 
 // step: 'loading' | 'initial' | 'otp_sent' | 'verified'
 export default function FirstLoginScreen({ user, onTokenReceived, onLogout }) {
+  const { t, i18n } = useTranslation('login');
+  const orgNameHi = i18n.getFixedT('hi', 'login')('orgNamePortal');
+  const orgNameEn = i18n.getFixedT('en', 'login')('orgNamePortal');
   const [step, setStep]               = useState('loading');
   const [maskedMobile, setMaskedMobile] = useState('');
   const [otp, setOtp]                 = useState('');
@@ -42,14 +54,14 @@ export default function FirstLoginScreen({ user, onTokenReceived, onLogout }) {
       setStep('otp_sent');
     } catch (err) {
       const detail = err.response?.data?.detail;
-      setOtpError(typeof detail === 'string' ? detail : 'Failed to send OTP. Please try again.');
+      setOtpError(typeof detail === 'string' ? detail : t('firstLoginScreen.errorOtpSendFailed'));
     } finally {
       setSendingOtp(false);
     }
   }
 
   async function handleVerifyOtp() {
-    if (otp.trim().length !== 6) { setOtpError('Please enter the 6-digit OTP.'); return; }
+    if (otp.trim().length !== 6) { setOtpError(t('firstLoginScreen.errorOtp6Digits')); return; }
     setVerifyingOtp(true);
     setOtpError('');
     try {
@@ -58,7 +70,7 @@ export default function FirstLoginScreen({ user, onTokenReceived, onLogout }) {
       setStep('verified');
     } catch (err) {
       const detail = err.response?.data?.detail;
-      setOtpError(typeof detail === 'string' ? detail : 'Invalid or expired OTP.');
+      setOtpError(typeof detail === 'string' ? detail : t('firstLoginScreen.errorOtpInvalid'));
     } finally {
       setVerifyingOtp(false);
     }
@@ -66,8 +78,8 @@ export default function FirstLoginScreen({ user, onTokenReceived, onLogout }) {
 
   async function handleResetPassword(e) {
     e.preventDefault();
-    if (newPassword.length < 8) { setPwError('Password must be at least 8 characters.'); return; }
-    if (newPassword !== confirmPw) { setPwError('Passwords do not match.'); return; }
+    if (newPassword.length < 8) { setPwError(t('firstLoginScreen.errorPasswordMin8')); return; }
+    if (newPassword !== confirmPw) { setPwError(t('firstLoginScreen.errorPasswordsNoMatch')); return; }
     setResetting(true);
     setPwError('');
     try {
@@ -75,7 +87,7 @@ export default function FirstLoginScreen({ user, onTokenReceived, onLogout }) {
       onTokenReceived(res.data.access_token);
     } catch (err) {
       const detail = err.response?.data?.detail;
-      setPwError(typeof detail === 'string' ? detail : 'Failed to reset password. Please try again.');
+      setPwError(typeof detail === 'string' ? detail : t('firstLoginScreen.errorResetFailed'));
     } finally {
       setResetting(false);
     }
@@ -90,10 +102,10 @@ export default function FirstLoginScreen({ user, onTokenReceived, onLogout }) {
     if (/[A-Z]/.test(p)) score++;
     if (/[0-9]/.test(p)) score++;
     if (/[^A-Za-z0-9]/.test(p)) score++;
-    if (score <= 1) return { label: 'Weak',   color: '#dc3545', w: '25%' };
-    if (score <= 2) return { label: 'Fair',   color: '#b45309', w: '50%' };
-    if (score <= 3) return { label: 'Good',   color: '#0d6efd', w: '75%' };
-    return              { label: 'Strong', color: '#198754', w: '100%' };
+    if (score <= 1) return { label: t('forgotPasswordScreen.strengthWeak'),   color: '#dc3545', w: '25%' };
+    if (score <= 2) return { label: t('forgotPasswordScreen.strengthFair'),   color: '#b45309', w: '50%' };
+    if (score <= 3) return { label: t('forgotPasswordScreen.strengthGood'),   color: '#0d6efd', w: '75%' };
+    return              { label: t('forgotPasswordScreen.strengthStrong'), color: '#198754', w: '100%' };
   })();
 
   const canReset = !resetting && newPassword.length >= 8 && newPassword === confirmPw;
@@ -112,6 +124,19 @@ export default function FirstLoginScreen({ user, onTokenReceived, onLogout }) {
         .fl-btn:hover:not(:disabled) { filter:brightness(1.1); transform:translateY(-1px); }
         .fl-btn:active:not(:disabled) { transform:translateY(0); }
         .fl-otp { letter-spacing:.25em; font-size:22px; text-align:center; }
+
+        @media (max-width:640px) {
+          .fl-masthead { top:10px !important; left:14px !important; gap:8px !important; }
+          .fl-masthead-logo { width:44px !important; height:44px !important; }
+          .fl-masthead-text { transform:none !important; }
+          .fl-masthead-hi { display:none !important; }
+          .fl-masthead-en { font-size:13px !important; white-space:normal !important; max-width:150px; line-height:1.2 !important; }
+          .fl-topright { top:10px !important; right:14px !important; gap:8px !important; }
+        }
+        @media (max-width:380px) {
+          .fl-masthead-logo { width:36px !important; height:36px !important; }
+          .fl-masthead-en { font-size:11.5px !important; max-width:120px; }
+        }
       `}</style>
 
       <div className="fl full-vh-min" style={{
@@ -122,6 +147,19 @@ export default function FirstLoginScreen({ user, onTokenReceived, onLogout }) {
         <img src={bannerBg} alt="" className="fixed-bg-img"
           style={{ objectFit: 'cover', zIndex: 0, filter: 'blur(2px)', transform: 'scale(1.02)' }} />
         <div className="fixed-bg-img" style={{ zIndex: 1, background: 'linear-gradient(110deg, rgba(2,10,5,.82) 0%, rgba(2,10,5,.62) 45%, rgba(2,10,5,.42) 100%)' }} />
+
+        {/* Masthead — same position/size as the other login screens */}
+        <div className="fl-masthead" style={{ position: 'absolute', top: 14, left: 32, zIndex: 10, display: 'flex', alignItems: 'center', gap: 14, maxWidth: 'calc(100vw - 64px)' }}>
+          <img src={haryanaLogo} alt="Haryana" loading="lazy" className="fl-masthead-logo" style={{ width: 100, height: 100, objectFit: 'contain', flexShrink: 0 }} />
+          <div className="fl-masthead-text" style={{ display: 'flex', flexDirection: 'column', gap: 1, whiteSpace: 'nowrap', transform: 'translateY(12px)', minWidth: 0 }}>
+            <span className="fl-masthead-hi" style={{ fontSize: 13, fontWeight: 500, color: 'rgba(255,255,255,.62)', letterSpacing: '.01em' }}>{orgNameHi}</span>
+            <span className="fl-masthead-en" style={{ fontSize: 18, fontWeight: 700, color: 'rgba(255,255,255,.9)', letterSpacing: '.01em' }}>{orgNameEn}</span>
+          </div>
+        </div>
+        <div className="fl-topright" style={{ position: 'absolute', top: 42, right: 32, zIndex: 10, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <LanguageToggle variant="dark" iconOnly buttonStyle={flIconStyle} />
+          <AccessibilityMenu iconButtonStyle={flIconStyle} />
+        </div>
 
         <div className="fl-card" style={{
           position: 'relative', zIndex: 2,
@@ -135,34 +173,31 @@ export default function FirstLoginScreen({ user, onTokenReceived, onLogout }) {
           boxShadow: '0 24px 64px rgba(0,0,0,.4)',
           padding: '28px 26px 24px',
         }}>
-          {/* Brand */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid rgba(255,255,255,.1)' }}>
-            <img src={haryanaLogo} alt="Haryana Government" loading="lazy" style={{ width: 40, height: 40, objectFit: 'contain' }} />
-            <div>
-              <div style={{ fontSize: 13.5, fontWeight: 700, color: '#fff' }}>Haryana Government</div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)' }}>Digital Repository</div>
-            </div>
+          <div style={{ marginBottom: 14, paddingBottom: 14, borderBottom: '1px solid rgba(255,255,255,.1)' }}>
+            <button type="button" onClick={onLogout}
+              style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,.4)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, padding: 0, fontFamily: 'inherit', letterSpacing: '.04em' }}>
+              <ArrowLeft size={12} /> {t('firstLoginScreen.signOut')}
+            </button>
           </div>
 
           <h2 style={{ fontSize: 20, fontWeight: 800, color: '#fff', letterSpacing: '-.02em', marginBottom: 4 }}>
-            First Login Setup
+            {t('firstLoginScreen.title')}
           </h2>
           <p style={{ fontSize: 12.5, color: 'rgba(255,255,255,.42)', marginBottom: 20 }}>
-            Welcome, <strong style={{ color: 'rgba(255,255,255,.7)' }}>{user?.name || user?.username}</strong>.
-            Verify your mobile number to set a new password.
+            <Trans t={t} i18nKey="firstLoginScreen.welcome" values={{ name: user?.name || user?.username }} components={[<strong key="n" style={{ color: 'rgba(255,255,255,.7)' }} />]} />
           </p>
 
           {/* Loading state */}
           {step === 'loading' && (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 0', gap: 10, color: 'rgba(255,255,255,.45)', fontSize: 13 }}>
-              <Spin /> Checking verification status…
+              <Spin /> {t('firstLoginScreen.checkingStatus')}
             </div>
           )}
 
           {/* Step indicators */}
           {step !== 'loading' && (
             <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
-              {['Verify Mobile', 'Set Password'].map((label, i) => {
+              {[t('firstLoginScreen.stepVerifyMobile'), t('firstLoginScreen.stepSetPassword')].map((label, i) => {
                 const done = (i === 0 && step === 'verified') || (i === 1 && false);
                 const active = (i === 0 && step !== 'verified') || (i === 1 && step === 'verified');
                 return (
@@ -211,10 +246,10 @@ export default function FirstLoginScreen({ user, onTokenReceived, onLogout }) {
                   }}
                 >
                   {sendingOtp
-                    ? <><Spin /> Sending OTP…</>
+                    ? <><Spin /> {t('firstLoginScreen.sendingOtp')}</>
                     : step === 'otp_sent'
-                      ? <><CheckCircle2 size={14} /> OTP Sent to Mobile</>
-                      : <><Smartphone size={14} /> Send OTP to Mobile <span style={{ fontSize: 11, opacity: .7 }}>(Required)</span></>
+                      ? <><CheckCircle2 size={14} /> {t('firstLoginScreen.otpSentBadge')}</>
+                      : <><Smartphone size={14} /> {t('firstLoginScreen.sendOtpToMobile')} <span style={{ fontSize: 11, opacity: .7 }}>{t('firstLoginScreen.required')}</span></>
                   }
                 </button>
 
@@ -232,7 +267,7 @@ export default function FirstLoginScreen({ user, onTokenReceived, onLogout }) {
                     cursor: 'not-allowed',
                   }}
                 >
-                  <Mail size={14} /> Verify Email <span style={{ fontSize: 11 }}>(Optional)</span>
+                  <Mail size={14} /> {t('firstLoginScreen.verifyEmail')} <span style={{ fontSize: 11 }}>{t('firstLoginScreen.optional')}</span>
                 </button>
               </div>
 
@@ -247,10 +282,10 @@ export default function FirstLoginScreen({ user, onTokenReceived, onLogout }) {
                     display: 'flex', alignItems: 'center', gap: 8,
                   }}>
                     <Smartphone size={13} style={{ flexShrink: 0, color: '#60a5fa' }} />
-                    OTP sent to <strong style={{ color: '#93c5fd' }}>{maskedMobile}</strong>. Enter the 6-digit code below.
+                    <Trans t={t} i18nKey="firstLoginScreen.otpSentTo" values={{ masked: maskedMobile }} components={[<strong key="m" style={{ color: '#93c5fd' }} />]} />
                   </div>
 
-                  <label style={labelStyle}>Enter OTP</label>
+                  <label style={labelStyle}>{t('firstLoginScreen.enterOtp')}</label>
                   <input
                     className="fl-inp fl-otp"
                     type="text"
@@ -287,7 +322,7 @@ export default function FirstLoginScreen({ user, onTokenReceived, onLogout }) {
                       marginBottom: 8,
                     }}
                   >
-                    {verifyingOtp ? <><Spin /> Verifying…</> : <><ShieldCheck size={14} /> Verify OTP</>}
+                    {verifyingOtp ? <><Spin /> {t('firstLoginScreen.verifying')}</> : <><ShieldCheck size={14} /> {t('firstLoginScreen.verifyOtp')}</>}
                   </button>
 
                   <button
@@ -302,7 +337,7 @@ export default function FirstLoginScreen({ user, onTokenReceived, onLogout }) {
                       fontFamily: 'inherit', display: 'block', margin: '0 auto',
                     }}
                   >
-                    {sendingOtp ? 'Resending…' : 'Resend OTP'}
+                    {sendingOtp ? t('firstLoginScreen.resending') : t('firstLoginScreen.resendOtp')}
                   </button>
                 </div>
               )}
@@ -322,16 +357,17 @@ export default function FirstLoginScreen({ user, onTokenReceived, onLogout }) {
                 display: 'flex', alignItems: 'center', gap: 8,
               }}>
                 <CheckCircle2 size={14} style={{ flexShrink: 0 }} />
-                Mobile number verified. Now set your new password.
+                {t('firstLoginScreen.mobileVerifiedNotice')}
               </div>
 
-              <label htmlFor="fl-new-pw" style={labelStyle}>New Password</label>
+              <label htmlFor="fl-new-pw" style={labelStyle}>{t('firstLoginScreen.newPasswordLabel')}</label>
               <PwField
                 id="fl-new-pw"
                 value={newPassword}
                 show={showPw}
                 onToggle={() => setShowPw(s => !s)}
                 onChange={v => { setNewPassword(v); setPwError(''); }}
+                showLabel={showPw ? t('hidePassword') : t('showPassword')}
                 style={{ marginBottom: strength ? 4 : 16 }}
               />
 
@@ -344,13 +380,14 @@ export default function FirstLoginScreen({ user, onTokenReceived, onLogout }) {
                 </div>
               )}
 
-              <label htmlFor="fl-confirm-pw" style={labelStyle}>Confirm New Password</label>
+              <label htmlFor="fl-confirm-pw" style={labelStyle}>{t('firstLoginScreen.confirmPasswordLabel')}</label>
               <PwField
                 id="fl-confirm-pw"
                 value={confirmPw}
                 show={showConfirm}
                 onToggle={() => setShowConfirm(s => !s)}
                 onChange={v => { setConfirmPw(v); setPwError(''); }}
+                showLabel={showConfirm ? t('hidePassword') : t('showPassword')}
                 style={{ marginBottom: 16 }}
               />
 
@@ -370,30 +407,16 @@ export default function FirstLoginScreen({ user, onTokenReceived, onLogout }) {
                   border: canReset ? 'none' : '1.5px dashed rgba(255,255,255,.2)',
                   cursor: canReset ? 'pointer' : 'not-allowed',
                   boxShadow: canReset ? '0 4px 18px rgba(25,135,84,.35)' : 'none',
-                  marginBottom: 14,
                 }}
               >
-                {resetting ? <><Spin /> Setting Password…</> : canReset ? <><ShieldCheck size={14} /> Set New Password</> : <><Lock size={13} /> Set New Password</>}
+                {resetting ? <><Spin /> {t('firstLoginScreen.settingPassword')}</> : canReset ? <><ShieldCheck size={14} /> {t('firstLoginScreen.setNewPassword')}</> : <><Lock size={13} /> {t('firstLoginScreen.setNewPassword')}</>}
               </button>
             </form>
           )}
-
-          <button
-            type="button"
-            onClick={onLogout}
-            style={{
-              background: 'none', border: 'none',
-              color: 'rgba(255,255,255,.3)', fontSize: 12,
-              cursor: 'pointer', textDecoration: 'underline',
-              fontFamily: 'inherit', display: 'block', margin: '8px auto 0',
-            }}
-          >
-            Sign out and log in as a different user
-          </button>
         </div>
 
         <p style={{ position: 'absolute', bottom: 14, zIndex: 2, color: 'rgba(255,255,255,.16)', fontSize: 11 }}>
-          © 2026 Government of Haryana · HARTRON
+          {t('footerCopyright')}
         </p>
       </div>
     </>
@@ -406,7 +429,7 @@ const labelStyle = {
   marginBottom: 7, letterSpacing: '.08em', textTransform: 'uppercase',
 };
 
-function PwField({ id, value, show, onToggle, onChange, style }) {
+function PwField({ id, value, show, onToggle, onChange, showLabel, style }) {
   return (
     <div style={{ position: 'relative', ...style }}>
       <input
@@ -427,7 +450,7 @@ function PwField({ id, value, show, onToggle, onChange, style }) {
         role="button" tabIndex={0}
         onClick={onToggle}
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } }}
-        aria-label={show ? 'Hide password' : 'Show password'}
+        aria-label={showLabel}
         style={{ position: 'absolute', right: 11, top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: 'rgba(255,255,255,.3)', display: 'flex' }}
       >
         {show ? <EyeOff size={14} /> : <Eye size={14} />}

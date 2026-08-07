@@ -875,7 +875,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                           <div>
                             <label htmlFor="adm-add-department" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.department')} <span style={{ color: '#dc3545' }}>*</span></label>
                             <SelectField id="adm-add-department" required value={addForm.department_id} onChange={e => setAddForm(f => ({ ...f, department_id: e.target.value, approver_id: '' }))} placeholder={t('users.addDrawer.departmentSelectPlaceholder')}>
-                              {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                              {depts.filter(d => d.is_active !== false).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                             </SelectField>
                           </div>
                         )}
@@ -1081,29 +1081,51 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                     onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} />
                 </div>
 
-                <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div>
-                    <label htmlFor="adm-edit-role" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.role')}</label>
-                    <SelectField
-                      id="adm-edit-role"
-                      value={editForm.role_id ?? ''}
-                      onChange={e => setEditForm(f => ({ ...f, role_id: e.target.value ? Number(e.target.value) : null, department_id: '' }))}
-                      placeholder={t('users.editModal.selectRole')}
-                    >
-                      {assignableRoles(roles).map(r => (
-                        <option key={r.id} value={r.id}>{r.name.charAt(0).toUpperCase() + r.name.slice(1)}</option>
-                      ))}
-                    </SelectField>
-                  </div>
-                  <div>
-                    <label htmlFor="adm-edit-department" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.department')}</label>
-                    <SelectField id="adm-edit-department" value={editForm.department_id ?? ''} onChange={e => setEditForm(f => ({ ...f, department_id: e.target.value || null }))} placeholder={t('users.editModal.selectDepartment')}>
-                      {depts.filter(d => d.is_active !== false).map(d => (
-                        <option key={d.id} value={d.id}>{d.name}</option>
-                      ))}
-                    </SelectField>
-                  </div>
-                </div>
+                {(() => {
+                  const isNodal = roles.find(r => String(r.id) === String(editForm.role_id))?.name === 'nodal Officer';
+                  return (
+                    <>
+                      <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: isNodal ? '1fr' : '1fr 1fr', gap: 12 }}>
+                        <div>
+                          <label htmlFor="adm-edit-role" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.role')}</label>
+                          <SelectField
+                            id="adm-edit-role"
+                            value={editForm.role_id ?? ''}
+                            onChange={e => setEditForm(f => ({ ...f, role_id: e.target.value ? Number(e.target.value) : null, department_id: '', dept_ids: [] }))}
+                            placeholder={t('users.editModal.selectRole')}
+                          >
+                            {assignableRoles(roles).map(r => (
+                              <option key={r.id} value={r.id}>{r.name.charAt(0).toUpperCase() + r.name.slice(1)}</option>
+                            ))}
+                          </SelectField>
+                        </div>
+                        {!isNodal && (
+                          <div>
+                            <label htmlFor="adm-edit-department" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.department')}</label>
+                            <SelectField id="adm-edit-department" value={editForm.department_id ?? ''} onChange={e => setEditForm(f => ({ ...f, department_id: e.target.value || null }))} placeholder={t('users.editModal.selectDepartment')}>
+                              {depts.filter(d => d.is_active !== false).map(d => (
+                                <option key={d.id} value={d.id}>{d.name}</option>
+                              ))}
+                            </SelectField>
+                          </div>
+                        )}
+                      </div>
+                      {isNodal && (
+                        <div>
+                          <label htmlFor="adm-edit-dept-multi" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.department')}</label>
+                          <MultiSelectField
+                            id="adm-edit-dept-multi"
+                            value={editForm.dept_ids}
+                            onChange={ids => setEditForm(f => ({ ...f, dept_ids: ids }))}
+                            options={depts}
+                            placeholder={t('multiSelect.selectDepartments')}
+                            selectedLabel={count => t('multiSelect.departmentsSelected', { count })}
+                          />
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
 
                 {/* Active status toggle */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: 'var(--surface-ground)', borderRadius: 10, border: '1px solid var(--surface-border)' }}>

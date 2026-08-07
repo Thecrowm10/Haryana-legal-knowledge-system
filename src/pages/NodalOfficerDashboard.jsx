@@ -778,7 +778,7 @@ export default function NodalOfficerDashboard({ activePage }) {
                   {t('users.addDrawer.cancel')}
                 </button>
                 {(() => {
-                  const addFormInvalid = !addForm.role_id || !addForm.username.trim() || !addForm.email.trim() || !addForm.password || !addForm.department_id || !addForm.first_name.trim() || addForm.mobile_number.trim().length !== 10 || (isUploader && !addForm.approver_id);
+                  const addFormInvalid = !addForm.role_id || !addForm.username.trim() || !addForm.email.trim() || !addForm.password || !addForm.department_id || !addForm.first_name.trim() || !addForm.last_name.trim() || addForm.mobile_number.trim().length !== 10 || (isUploader && !addForm.approver_id);
                   const addBtnDisabled = addSaving || addFormInvalid;
                   return (
                     <button
