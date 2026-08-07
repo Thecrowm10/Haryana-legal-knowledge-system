@@ -1207,10 +1207,14 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const [editListLoading, setEditListLoading] = useState(false);
   const [editListError, setEditListError]   = useState('');
   const [viewingEditDoc, setViewingEditDoc] = useState(null); // doc open in DocViewModal (read-only "View")
-  const [editingDoc, setEditingDoc]   = useState(null);
-  const [editForm, setEditForm]       = useState(null);
-  const [editSaving, setEditSaving]   = useState(false);
-  const [editError, setEditError]     = useState('');
+  const [editingDoc, setEditingDoc]     = useState(null);
+  const [editForm, setEditForm]         = useState(null);
+  const [editSaving, setEditSaving]     = useState(false);
+  const [editError, setEditError]       = useState('');
+  const [editFileSelected, setEditFileSelected]   = useState(null);
+  const [editFileUploading, setEditFileUploading] = useState(false);
+  const [editFileResubmit, setEditFileResubmit]   = useState(false);
+  const editFileInputRef = useRef(null);
 
   // Loads (or reloads) the current type's document table from the API.
   // Shared by the effect below and by saveEditDoc so the table reflects an edit immediately.
@@ -1259,12 +1263,16 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       typeFields:        { ...(doc.typeFields || {}) },
     });
     setEditError('');
+    setEditFileSelected(null);
+    setEditFileResubmit(false);
   }
 
   function closeEditDoc() {
     setEditingDoc(null);
     setEditForm(null);
     setEditError('');
+    setEditFileSelected(null);
+    setEditFileResubmit(false);
   }
 
   async function saveEditDoc() {
@@ -1272,44 +1280,68 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     setEditSaving(true);
     setEditError('');
     const tf = editForm.typeFields || {};
-    // Prefer the id the document already carries from the API (reliable); only fall back to
-    // matching on the display name if that's somehow missing (e.g. an older cached row).
     const typeId = editingDoc.docTypeId ?? typesData.find(d => d.name === editingDoc.type)?.id ?? null;
-    const payload = {
-      document_type_id:      typeId,
-      document_name:         editForm.document_name,
-      reference_number:      editForm.reference_number,
-      issue_date:             editForm.issue_date || null,
-      effective_from:         editForm.effective_from || null,
-      gazette_reference:      editForm.gazette_reference,
-      legal_authority:        editForm.legal_authority,
-      short_title:            editForm.short_title,
-      version_no:             editForm.version_no || '1.0',
-      description:            editForm.description,
-      valid_until:            tf.validity || null,
-      sector_domain:          tf.sector || '',
-      implementing_agency:    tf.implementingAgency || '',
-      next_review_date:       tf.reviewDate || null,
-      rule_making_authority:  tf.ruleAuthority || '',
-      act_year:               tf.actYear ? parseInt(tf.actYear, 10) || null : null,
-      long_title:             tf.longTitle || '',
-      regional_title:         tf.regionalTitle || '',
-      notification_no:        tf.notificationNo || '',
-      act_code:                tf.actCode || '',
-      so_reason:               tf.soReason || '',
-      no_of_rules:             tf.noOfRules ? parseInt(tf.noOfRules, 10) || null : null,
-      no_of_notifications:     tf.noOfNotifications ? parseInt(tf.noOfNotifications, 10) || null : null,
-      no_of_regulations:       tf.noOfRegulations ? parseInt(tf.noOfRegulations, 10) || null : null,
-      no_of_circulars:         tf.noOfCirculars ? parseInt(tf.noOfCirculars, 10) || null : null,
-      no_of_statutes:          tf.noOfStatutes ? parseInt(tf.noOfStatutes, 10) || null : null,
-      no_of_ordinances:        tf.noOfOrdinances ? parseInt(tf.noOfOrdinances, 10) || null : null,
-      no_of_orders:            tf.noOfOrders ? parseInt(tf.noOfOrders, 10) || null : null,
-      keywords:                tf.keywords || '',
-      tag_ids:                 [],
-    };
+    let description = editForm.description;
     try {
+      // 1. If a new file was chosen — upload it, replace the stored file, get fresh summary
+      if (editFileSelected) {
+        setEditFileUploading(true);
+        const fd = new FormData();
+        fd.append('file', editFileSelected);
+        const uploadRes = await uploadPdfFile(fd);
+        const { file_ref, summary } = uploadRes.data;
+        setEditFileUploading(false);
+        if (summary) {
+          description = summary;
+          setEditForm(f => ({ ...f, description: summary }));
+        }
+        // Rejected docs are always resubmitted when file is replaced
+        const resubmit = editingDoc.status === 'rejected';
+        const replaceRes = await replaceDocumentFile(editingDoc.id, file_ref, resubmit);
+        const updatedDoc = mapApiDoc(replaceRes.data);
+        setUploads(prev => prev.map(d => d.id === updatedDoc.id ? updatedDoc : d));
+      }
+
+      // 2. Save metadata (always, even if only file changed — keeps description in sync)
+      const payload = {
+        document_type_id:      typeId,
+        document_name:         editForm.document_name,
+        reference_number:      editForm.reference_number,
+        issue_date:             editForm.issue_date || null,
+        effective_from:         editForm.effective_from || null,
+        gazette_reference:      editForm.gazette_reference,
+        legal_authority:        editForm.legal_authority,
+        short_title:            editForm.short_title,
+        version_no:             editForm.version_no || '1.0',
+        description,
+        valid_until:            tf.validity || null,
+        sector_domain:          tf.sector || '',
+        implementing_agency:    tf.implementingAgency || '',
+        next_review_date:       tf.reviewDate || null,
+        rule_making_authority:  tf.ruleAuthority || '',
+        act_year:               tf.actYear ? parseInt(tf.actYear, 10) || null : null,
+        long_title:             tf.longTitle || '',
+        regional_title:         tf.regionalTitle || '',
+        notification_no:        tf.notificationNo || '',
+        act_code:               tf.actCode || '',
+        so_reason:              tf.soReason || '',
+        no_of_rules:            tf.noOfRules ? parseInt(tf.noOfRules, 10) || null : null,
+        no_of_notifications:    tf.noOfNotifications ? parseInt(tf.noOfNotifications, 10) || null : null,
+        no_of_regulations:      tf.noOfRegulations ? parseInt(tf.noOfRegulations, 10) || null : null,
+        no_of_circulars:        tf.noOfCirculars ? parseInt(tf.noOfCirculars, 10) || null : null,
+        no_of_statutes:         tf.noOfStatutes ? parseInt(tf.noOfStatutes, 10) || null : null,
+        no_of_ordinances:       tf.noOfOrdinances ? parseInt(tf.noOfOrdinances, 10) || null : null,
+        no_of_orders:           tf.noOfOrders ? parseInt(tf.noOfOrders, 10) || null : null,
+        keywords:               tf.keywords || '',
+        tag_ids:                [],
+      };
       await updatePdfMetadata(editingDoc.id, payload);
-      showToast('success', t('editDocument.updateSuccess', { name: editForm.document_name }));
+      const successMsg = editFileSelected && editingDoc.status === 'rejected'
+        ? t('toasts.fileReplacedAndResubmitted')
+        : editFileSelected
+          ? t('toasts.fileReplaced')
+          : t('editDocument.updateSuccess', { name: editForm.document_name });
+      showToast('success', successMsg);
       closeEditDoc();
       refreshEditList();
       setMyDocsLoading(true);
@@ -1318,14 +1350,11 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         .catch(() => {})
         .finally(() => setMyDocsLoading(false));
     } catch (err) {
+      setEditFileUploading(false);
       const detail = err.response?.data?.detail;
       let message = t('editDocument.updateFailed');
-      if (typeof detail === 'string') {
-        message = detail;
-      } else if (Array.isArray(detail)) {
-        // FastAPI validation errors: [{ loc: ['body','field'], msg: '...' }, ...]
-        message = detail.map(e => `${(e.loc || []).slice(1).join('.')}: ${e.msg}`).join('; ') || message;
-      }
+      if (typeof detail === 'string') message = detail;
+      else if (Array.isArray(detail)) message = detail.map(e => `${(e.loc || []).slice(1).join('.')}: ${e.msg}`).join('; ') || message;
       setEditError(message);
     } finally {
       setEditSaving(false);
@@ -2392,110 +2421,162 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         {/* Full-screen document viewer */}
         {viewDoc && <DocViewModal doc={viewDoc} onClose={() => setViewDoc(null)} />}
 
-        {/* Replace File modal */}
-        {replaceFileModal && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            onClick={() => { if (!replaceFileSaving) { setReplaceFileModal(null); setReplaceFileSelected(null); setReplaceFileResubmit(false); setReplaceFileError(''); } }}>
-            <div style={{ background: 'var(--surface-card)', borderRadius: 14, padding: 28, width: 'min(520px, calc(100vw - 32px))', boxShadow: '0 24px 80px rgba(0,0,0,.3)' }}
-              onClick={e => e.stopPropagation()}>
+        {/* Edit drawer (also handles file replacement for pending/rejected docs) */}
+        {editingDoc && editForm && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 1500, display: 'flex', justifyContent: 'flex-end' }} onClick={closeEditDoc}>
+            <div style={{ width: 520, maxWidth: '100%', height: '100%', background: 'var(--surface-card)', boxShadow: '-8px 0 32px rgba(0,0,0,.18)', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+              <div style={{ padding: '18px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t('editDocument.editHeading')}</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{editingDoc.title}</div>
+                </div>
+                <button type="button" onClick={closeEditDoc}
+                  style={{ width: 30, height: 30, borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-color-secondary)', flexShrink: 0 }}>
+                  <X size={14} />
+                </button>
+              </div>
 
-              {/* Header */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18, paddingBottom: 14, borderBottom: '1px solid var(--surface-border)' }}>
-                <div>
-                  <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)', marginBottom: 4 }}>
-                    {t('replaceFileModal.title')}
+              <div className="ud-drawer-body" style={{ flex: 1, overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {/* Rejection reason banner */}
+                {editingDoc.status === 'rejected' && editingDoc.approval?.comments && (
+                  <div style={{ display: 'flex', gap: 10, padding: '10px 14px', borderRadius: 8, background: 'rgba(220,53,69,.06)', border: '1px solid rgba(220,53,69,.2)' }}>
+                    <XCircle size={14} color="#dc3545" style={{ flexShrink: 0, marginTop: 2 }} />
+                    <div>
+                      <div style={{ fontSize: 11.5, fontWeight: 700, color: '#dc3545', marginBottom: 3 }}>{t('replaceFileModal.rejectionReason')}</div>
+                      <div style={{ fontSize: 12.5, color: 'var(--text-color)', lineHeight: 1.5 }}>{editingDoc.approval.comments}</div>
+                    </div>
                   </div>
-                  <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 360 }}>
-                    {replaceFileModal.title}
+                )}
+
+                {editError && (
+                  <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(220, 53, 69,.08)', border: '1px solid rgba(220, 53, 69,.2)', color: '#dc2626', fontSize: 12.5 }}>
+                    {editError}
+                  </div>
+                )}
+
+                <div>
+                  <div style={{ ...LABEL, marginBottom: 6 }}>{t('editDocument.documentName')} <span style={{ color: '#dc3545' }}>*</span></div>
+                  <input value={editForm.document_name} onChange={e => setEditForm(f => ({ ...f, document_name: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                </div>
+                <div>
+                  <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.referenceNo')}</div>
+                  <input value={editForm.reference_number} onChange={e => setEditForm(f => ({ ...f, reference_number: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                </div>
+                <div className="ud-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')}</div>
+                    <input type="date" value={editForm.issue_date || ''} onChange={e => setEditForm(f => ({ ...f, issue_date: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  </div>
+                  <div>
+                    <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.effectiveFrom')}</div>
+                    <input type="date" value={editForm.effective_from || ''} onChange={e => setEditForm(f => ({ ...f, effective_from: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
                   </div>
                 </div>
-                {!replaceFileSaving && (
-                  <button onClick={() => { setReplaceFileModal(null); setReplaceFileSelected(null); setReplaceFileResubmit(false); setReplaceFileError(''); }}
-                    style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '5px 8px', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', flexShrink: 0 }}>
-                    <X size={14} />
-                  </button>
+                <div>
+                  <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.gazetteReference')}</div>
+                  <input value={editForm.gazette_reference} onChange={e => setEditForm(f => ({ ...f, gazette_reference: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                </div>
+                <div>
+                  <div style={{ ...LABEL, marginBottom: 6 }}>{t('docViewModal.legalAuthority')}</div>
+                  <input value={editForm.legal_authority} onChange={e => setEditForm(f => ({ ...f, legal_authority: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                </div>
+                <div className="ud-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <div style={{ ...LABEL, marginBottom: 6 }}>{t('editDocument.shortTitle')}</div>
+                    <input value={editForm.short_title} onChange={e => setEditForm(f => ({ ...f, short_title: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  </div>
+                  <div>
+                    <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.version')}</div>
+                    <input value={editForm.version_no} onChange={e => setEditForm(f => ({ ...f, version_no: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  </div>
+                </div>
+                <div>
+                  <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.description')}</div>
+                  <textarea value={editForm.description} rows={4}
+                    onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+                    style={{ ...INPUT_BASE, resize: 'vertical', fontFamily: 'var(--font)' }} onFocus={focusStyle} onBlur={blurStyle} />
+                  {editFileUploading && (
+                    <div style={{ fontSize: 11.5, color: 'var(--primary)', marginTop: 4 }}>Extracting description from new file…</div>
+                  )}
+                </div>
+
+                {(EDIT_TYPE_FIELD_KEYS[editingDoc.type] || []).length > 0 && (
+                  <div>
+                    <div style={{ ...LABEL, marginBottom: 10 }}>{t('editDocument.typeSpecificFields')}</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      {EDIT_TYPE_FIELD_KEYS[editingDoc.type].map(({ key, inputType }) => (
+                        <div key={key}>
+                          {inputType === 'checkbox' ? (
+                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--text-color)', cursor: 'pointer' }}>
+                              <input type="checkbox" checked={!!editForm.typeFields[key]}
+                                onChange={e => setEditForm(f => ({ ...f, typeFields: { ...f.typeFields, [key]: e.target.checked } }))} />
+                              {fieldLabel(key)}
+                            </label>
+                          ) : (
+                            <>
+                              <div style={{ ...LABEL, marginBottom: 6 }}>{fieldLabel(key)}</div>
+                              <input type={inputType} value={editForm.typeFields[key] || ''}
+                                onChange={e => setEditForm(f => ({ ...f, typeFields: { ...f.typeFields, [key]: e.target.value } }))}
+                                style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Replace File section — shown for pending and rejected docs */}
+                {(editingDoc.status === 'pending' || editingDoc.status === 'rejected') && (
+                  <div style={{ borderTop: '1px solid var(--surface-border)', paddingTop: 16 }}>
+                    <div style={{ ...LABEL, marginBottom: 8 }}>
+                      {t('replaceFileModal.title')} <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-color-secondary)', textTransform: 'none', letterSpacing: 0 }}>({t('common.optional', 'optional')})</span>
+                    </div>
+                    <input ref={editFileInputRef} type="file" accept=".pdf,.docx" style={{ display: 'none' }}
+                      onChange={e => { const f = e.target.files?.[0]; if (f) setEditFileSelected(f); e.target.value = ''; }} />
+                    {editFileSelected ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(33,74,171,.3)', background: 'rgba(33,74,171,.05)' }}>
+                        <FileText size={14} color="var(--primary)" style={{ flexShrink: 0 }} />
+                        <span style={{ flex: 1, fontSize: 12.5, color: 'var(--text-color)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{editFileSelected.name}</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', whiteSpace: 'nowrap' }}>({(editFileSelected.size / 1024).toFixed(0)} KB)</span>
+                        <button type="button" onClick={() => setEditFileSelected(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', padding: 0 }}><X size={13} /></button>
+                      </div>
+                    ) : (
+                      <div
+                        style={{ border: '2px dashed var(--surface-border)', borderRadius: 8, padding: '16px', textAlign: 'center', cursor: 'pointer', background: 'var(--surface-ground)', transition: 'all .15s' }}
+                        onClick={() => editFileInputRef.current?.click()}
+                        onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.background = 'rgba(33,74,171,.04)'; }}
+                        onDragLeave={e => { e.currentTarget.style.borderColor = ''; e.currentTarget.style.background = 'var(--surface-ground)'; }}
+                        onDrop={e => { e.preventDefault(); e.currentTarget.style.borderColor = ''; e.currentTarget.style.background = 'var(--surface-ground)'; const f = e.dataTransfer.files[0]; if (f) setEditFileSelected(f); }}>
+                        <Upload size={18} color="var(--text-color-secondary)" style={{ marginBottom: 4 }} />
+                        <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)' }}>{t('replaceFileModal.dropzone')}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 3, opacity: .7 }}>PDF or Word (.docx)</div>
+                      </div>
+                    )}
+                    {editingDoc.status === 'rejected' && editFileSelected && (
+                      <div style={{ marginTop: 10, padding: '8px 14px', borderRadius: 8, background: 'rgba(33,74,171,.06)', border: '1px solid rgba(33,74,171,.25)', fontSize: 12.5, color: 'var(--primary)' }}>
+                        {t('replaceFileModal.resubmitDesc')}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
 
-              {/* Rejection reason banner */}
-              {replaceFileModal.approval?.comments && replaceFileModal.status === 'rejected' && (
-                <div style={{ display: 'flex', gap: 10, padding: '10px 14px', borderRadius: 8, background: 'rgba(220, 53, 69,.06)', border: '1px solid rgba(220, 53, 69,.2)', marginBottom: 16 }}>
-                  <XCircle size={14} color="#dc3545" style={{ flexShrink: 0, marginTop: 2 }} />
-                  <div>
-                    <div style={{ fontSize: 11.5, fontWeight: 700, color: '#dc3545', marginBottom: 3 }}>{t('replaceFileModal.rejectionReason')}</div>
-                    <div style={{ fontSize: 12.5, color: 'var(--text-color)', lineHeight: 1.5 }}>{replaceFileModal.approval.comments}</div>
-                  </div>
-                </div>
-              )}
-
-              {/* File picker */}
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-color-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.05em' }}>
-                  {t('replaceFileModal.newFileLabel')}
-                </div>
-                <div
-                  style={{ border: `2px dashed ${replaceFileSelected ? 'var(--primary)' : 'var(--surface-border)'}`, borderRadius: 10, padding: '20px 16px', textAlign: 'center', cursor: 'pointer', background: replaceFileSelected ? 'rgba(33, 74, 171,.04)' : 'var(--surface-ground)', transition: 'all .15s' }}
-                  onClick={() => replaceFileInputRef.current?.click()}
-                  onDragOver={e => { e.preventDefault(); e.currentTarget.style.background = 'rgba(33, 74, 171,.08)'; }}
-                  onDragLeave={e => { e.currentTarget.style.background = replaceFileSelected ? 'rgba(33, 74, 171,.04)' : 'var(--surface-ground)'; }}
-                  onDrop={e => {
-                    e.preventDefault();
-                    e.currentTarget.style.background = 'rgba(33, 74, 171,.04)';
-                    const f = e.dataTransfer.files[0];
-                    if (f) { setReplaceFileSelected(f); setReplaceFileError(''); }
-                  }}>
-                  <input ref={replaceFileInputRef} type="file" accept=".pdf,.docx" style={{ display: 'none' }}
-                    onChange={e => { const f = e.target.files?.[0]; if (f) { setReplaceFileSelected(f); setReplaceFileError(''); } }} />
-                  {replaceFileSelected ? (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                      <FileText size={16} color="var(--primary)" />
-                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--primary)' }}>{replaceFileSelected.name}</span>
-                      <span style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>({(replaceFileSelected.size / 1024).toFixed(0)} KB)</span>
-                    </div>
-                  ) : (
-                    <div>
-                      <Upload size={22} color="var(--text-color-secondary)" style={{ marginBottom: 6 }} />
-                      <div style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>{t('replaceFileModal.dropzone')}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 4, opacity: .7 }}>PDF or Word (.docx)</div>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Resubmit checkbox — only for rejected docs */}
-              {replaceFileModal.status === 'rejected' && (
-                <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 14px', borderRadius: 8, background: replaceFileResubmit ? 'rgba(33, 74, 171,.06)' : 'var(--surface-ground)', border: `1px solid ${replaceFileResubmit ? 'rgba(33, 74, 171,.25)' : 'var(--surface-border)'}`, cursor: 'pointer', marginBottom: 16, transition: 'all .15s', userSelect: 'none' }}>
-                  <input type="checkbox" checked={replaceFileResubmit} onChange={e => setReplaceFileResubmit(e.target.checked)} style={{ marginTop: 2, accentColor: 'var(--primary)', width: 14, height: 14, cursor: 'pointer', flexShrink: 0 }} />
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: replaceFileResubmit ? 'var(--primary)' : 'var(--text-heading)' }}>
-                      {t('replaceFileModal.resubmitLabel')}
-                    </div>
-                    <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 3, lineHeight: 1.5 }}>
-                      {t('replaceFileModal.resubmitDesc')}
-                    </div>
-                  </div>
-                </label>
-              )}
-
-              {/* Error */}
-              {replaceFileError && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px', borderRadius: 8, background: 'rgba(220, 53, 69,.06)', border: '1px solid rgba(220, 53, 69,.2)', color: '#dc2626', fontSize: 12.5, marginBottom: 14 }}>
-                  <AlertCircle size={13} style={{ flexShrink: 0 }} />
-                  {replaceFileError}
-                </div>
-              )}
-
-              {/* Actions */}
-              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                <button disabled={replaceFileSaving} onClick={() => { setReplaceFileModal(null); setReplaceFileSelected(null); setReplaceFileResubmit(false); setReplaceFileError(''); }}
-                  style={{ padding: '9px 20px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 13, cursor: replaceFileSaving ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: replaceFileSaving ? .5 : 1 }}>
+              <div style={{ padding: '16px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end', gap: 10, flexShrink: 0 }}>
+                <button type="button" onClick={closeEditDoc} disabled={editSaving}
+                  style={{ padding: '9px 18px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'transparent', color: 'var(--text-color-secondary)', fontSize: 13, fontWeight: 600, cursor: editSaving ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: editSaving ? .5 : 1 }}>
                   {t('common.cancel')}
                 </button>
-                <button disabled={!replaceFileSelected || replaceFileSaving} onClick={handleReplaceFileSubmit}
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 22px', borderRadius: 8, border: 'none', background: replaceFileResubmit ? 'var(--primary)' : '#475569', color: 'white', fontSize: 13, fontWeight: 700, cursor: (!replaceFileSelected || replaceFileSaving) ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: (!replaceFileSelected || replaceFileSaving) ? .5 : 1, transition: 'background .15s' }}>
-                  {replaceFileSaving ? <RotateCcw size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Upload size={13} />}
-                  {replaceFileSaving ? '…' : replaceFileResubmit ? t('replaceFileModal.replaceAndResubmitButton') : t('replaceFileModal.replaceButton')}
-                </button>
+                {(() => {
+                  const disabled = editSaving || !(editForm?.document_name || '').trim();
+                  return (
+                    <button type="button" onClick={saveEditDoc} disabled={disabled}
+                      style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 20px', borderRadius: 8, border: 'none', background: disabled ? 'rgba(33,74,171,.5)' : 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: disabled ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)' }}>
+                      {editFileUploading ? <RotateCcw size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={14} />}
+                      {editSaving ? t('editDocument.saving') : t('editDocument.saveChanges')}
+                    </button>
+                  );
+                })()}
               </div>
             </div>
           </div>
@@ -2868,9 +2949,9 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                             <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)' }}>{doc.uploadedAt}</span>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                               {(doc.status === 'pending' || doc.status === 'rejected') && (
-                                <button onClick={() => { setReplaceFileModal(doc); setReplaceFileSelected(null); setReplaceFileResubmit(false); setReplaceFileError(''); }}
+                                <button onClick={() => openEditDoc(doc)}
                                   style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 10px', borderRadius: 7, border: '1px solid rgba(100,116,139,.3)', background: 'rgba(100,116,139,.07)', color: '#475569', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                                  <RotateCcw size={12} /> {t('table.replaceFileButton')}
+                                  <Edit3 size={12} /> {t('editDocument.editButton')}
                                 </button>
                               )}
                               {doc.approval?.comments && (
@@ -2965,11 +3046,11 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                             <Eye size={13} /> {t('common.view')}
                           </button>
                           {(doc.status === 'pending' || doc.status === 'rejected') && (
-                            <button onClick={() => { setReplaceFileModal(doc); setReplaceFileSelected(null); setReplaceFileResubmit(false); setReplaceFileError(''); }}
+                            <button onClick={() => openEditDoc(doc)}
                               style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 7, border: '1px solid rgba(100,116,139,.3)', background: 'rgba(100,116,139,.07)', color: '#475569', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', whiteSpace: 'nowrap', transition: 'background .15s' }}
                               onMouseEnter={e => e.currentTarget.style.background = 'rgba(100,116,139,.14)'}
                               onMouseLeave={e => e.currentTarget.style.background = 'rgba(100,116,139,.07)'}>
-                              <RotateCcw size={13} /> {t('table.replaceFileButton')}
+                              <Edit3 size={13} /> {t('editDocument.editButton')}
                             </button>
                           )}
                           {doc.approval?.comments && (
@@ -3429,19 +3510,55 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                     </div>
                   </div>
                 )}
+
+                {/* Replace File section — shown for pending and rejected docs */}
+                {(editingDoc.status === 'pending' || editingDoc.status === 'rejected') && (
+                  <div style={{ borderTop: '1px solid var(--surface-border)', paddingTop: 16 }}>
+                    <div style={{ ...LABEL, marginBottom: 8 }}>
+                      {t('replaceFileModal.title')} <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-color-secondary)', textTransform: 'none', letterSpacing: 0 }}>({t('common.optional', 'optional')})</span>
+                    </div>
+                    <input ref={editFileInputRef} type="file" accept=".pdf,.docx" style={{ display: 'none' }}
+                      onChange={e => { const f = e.target.files?.[0]; if (f) setEditFileSelected(f); e.target.value = ''; }} />
+                    {editFileSelected ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(33,74,171,.3)', background: 'rgba(33,74,171,.05)' }}>
+                        <FileText size={14} color="var(--primary)" style={{ flexShrink: 0 }} />
+                        <span style={{ flex: 1, fontSize: 12.5, color: 'var(--text-color)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{editFileSelected.name}</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', whiteSpace: 'nowrap' }}>({(editFileSelected.size / 1024).toFixed(0)} KB)</span>
+                        <button type="button" onClick={() => setEditFileSelected(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', padding: 0 }}><X size={13} /></button>
+                      </div>
+                    ) : (
+                      <div
+                        style={{ border: '2px dashed var(--surface-border)', borderRadius: 8, padding: '16px', textAlign: 'center', cursor: 'pointer', background: 'var(--surface-ground)', transition: 'all .15s' }}
+                        onClick={() => editFileInputRef.current?.click()}
+                        onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.background = 'rgba(33,74,171,.04)'; }}
+                        onDragLeave={e => { e.currentTarget.style.borderColor = ''; e.currentTarget.style.background = 'var(--surface-ground)'; }}
+                        onDrop={e => { e.preventDefault(); e.currentTarget.style.borderColor = ''; e.currentTarget.style.background = 'var(--surface-ground)'; const f = e.dataTransfer.files[0]; if (f) setEditFileSelected(f); }}>
+                        <Upload size={18} color="var(--text-color-secondary)" style={{ marginBottom: 4 }} />
+                        <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)' }}>{t('replaceFileModal.dropzone')}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 3, opacity: .7 }}>PDF or Word (.docx)</div>
+                      </div>
+                    )}
+                    {editingDoc.status === 'rejected' && editFileSelected && (
+                      <div style={{ marginTop: 10, padding: '8px 14px', borderRadius: 8, background: 'rgba(33,74,171,.06)', border: '1px solid rgba(33,74,171,.25)', fontSize: 12.5, color: 'var(--primary)' }}>
+                        {t('replaceFileModal.resubmitDesc')}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div style={{ padding: '16px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end', gap: 10, flexShrink: 0 }}>
-                <button type="button" onClick={closeEditDoc}
-                  style={{ padding: '9px 18px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'transparent', color: 'var(--text-color-secondary)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                <button type="button" onClick={closeEditDoc} disabled={editSaving}
+                  style={{ padding: '9px 18px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'transparent', color: 'var(--text-color-secondary)', fontSize: 13, fontWeight: 600, cursor: editSaving ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: editSaving ? .5 : 1 }}>
                   {t('common.cancel')}
                 </button>
                 {(() => {
-                  const editDocBtnDisabled = editSaving || !(editForm?.document_name || '').trim();
+                  const disabled = editSaving || !(editForm?.document_name || '').trim();
                   return (
-                    <button type="button" onClick={saveEditDoc} disabled={editDocBtnDisabled}
-                      style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 20px', borderRadius: 8, border: 'none', background: editDocBtnDisabled ? 'rgba(33, 74, 171,.5)' : 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: editDocBtnDisabled ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)' }}>
-                      <Save size={14} /> {editSaving ? t('editDocument.saving') : t('editDocument.saveChanges')}
+                    <button type="button" onClick={saveEditDoc} disabled={disabled}
+                      style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 20px', borderRadius: 8, border: 'none', background: disabled ? 'rgba(33,74,171,.5)' : 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: disabled ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)' }}>
+                      {editFileUploading ? <RotateCcw size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={14} />}
+                      {editSaving ? t('editDocument.saving') : t('editDocument.saveChanges')}
                     </button>
                   );
                 })()}
