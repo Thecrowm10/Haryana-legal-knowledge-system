@@ -6,7 +6,7 @@ import Badge from '../components/ui/Badge';
 import SelectField from '../components/ui/SelectField';
 import MultiSelectField from '../components/ui/MultiSelectField';
 import DocViewModal from '../components/DocViewModal';
-import { getUsers, getRoles, updateUser, registerUser } from '../services/users';
+import { getUsers, getRoles, updateUser, registerUser, getApproversByDepartment } from '../services/users';
 import { getDepartments, createDepartment, toggleDepartment, getDocumentTypes, createDocumentType, toggleDocumentType } from '../services/departments';
 import { getAllDocumentsAdmin, getAllDepartmentLinks } from '../services/pdf';
 import { getAuditLogs } from '../services/audit';
@@ -430,17 +430,35 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   }
 
   // Add User modal state
-  const EMPTY_ADD_FORM = { username: '', email: '', mobile_number: '', password: '', first_name: '', last_name: '', role_id: '', department_id: '', dept_ids: [] };
+  const EMPTY_ADD_FORM = { username: '', email: '', mobile_number: '', password: '', first_name: '', last_name: '', role_id: '', department_id: '', dept_ids: [], approver_id: '' };
   const [addingUser, setAddingUser]   = useState(false);
   const [addForm, setAddForm]         = useState(EMPTY_ADD_FORM);
   const [addSaving, setAddSaving]     = useState(false);
   const [addError, setAddError]       = useState('');
   const [showAddPass, setShowAddPass] = useState(false);
+  const [approvers, setApprovers]     = useState([]);
+  const [approversLoading, setApproversLoading] = useState(false);
+
+  const _addFormRoleName = roles.find(r => String(r.id) === String(addForm.role_id))?.name;
+  useEffect(() => {
+    if (_addFormRoleName !== 'uploader' || !addForm.department_id) {
+      setApprovers([]);
+      return;
+    }
+    setApproversLoading(true);
+    getApproversByDepartment(addForm.department_id)
+      .then(res => setApprovers(res.data || []))
+      .catch(() => setApprovers([]))
+      .finally(() => setApproversLoading(false));
+  }, [_addFormRoleName, addForm.department_id]);
 
   async function handleAddUser() {
-    const isNodal = roles.find(r => String(r.id) === String(addForm.role_id))?.name === 'nodal Officer';
+    const selectedRole = roles.find(r => String(r.id) === String(addForm.role_id));
+    const isNodal    = selectedRole?.name === 'nodal Officer';
+    const isUploader = selectedRole?.name === 'uploader';
     if (!addForm.role_id)         { setAddError(t('users.errors.roleRequired')); return; }
     if (isNodal ? addForm.dept_ids.length === 0 : !addForm.department_id) { setAddError(t('users.errors.departmentRequired')); return; }
+    if (isUploader && !addForm.approver_id) { setAddError('Please select an approver for this uploader.'); return; }
     if (!addForm.username.trim()) { setAddError(t('users.errors.usernameRequired')); return; }
     if (!addForm.email.trim())    { setAddError(t('users.errors.emailRequired')); return; }
     if (!addForm.password)        { setAddError(t('users.errors.passwordRequired')); return; }
@@ -461,6 +479,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
         department_id: isNodal
           ? (addForm.dept_ids.length > 0 ? addForm.dept_ids.join(',') : undefined)
           : (addForm.department_id || undefined),
+        approver_id:   isUploader && addForm.approver_id ? Number(addForm.approver_id) : undefined,
       });
       setUsers(prev => [normalizeUser(res.data), ...prev]);
       setAddingUser(false);
@@ -751,7 +770,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                             id="adm-add-role"
                             required
                             value={addForm.role_id}
-                            onChange={e => setAddForm(f => ({ ...f, role_id: e.target.value, department_id: '', dept_ids: [] }))}
+                            onChange={e => setAddForm(f => ({ ...f, role_id: e.target.value, department_id: '', dept_ids: [], approver_id: '' }))}
                             placeholder={t('users.addDrawer.roleSelectPlaceholder')}
                           >
                             {assignableRoles(roles).map(r => (
@@ -762,12 +781,39 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                         {!isNodal && (
                           <div>
                             <label htmlFor="adm-add-department" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.department')} <span style={{ color: '#dc3545' }}>*</span></label>
-                            <SelectField id="adm-add-department" required value={addForm.department_id} onChange={e => setAddForm(f => ({ ...f, department_id: e.target.value }))} placeholder={t('users.addDrawer.departmentSelectPlaceholder')}>
+                            <SelectField id="adm-add-department" required value={addForm.department_id} onChange={e => setAddForm(f => ({ ...f, department_id: e.target.value, approver_id: '' }))} placeholder={t('users.addDrawer.departmentSelectPlaceholder')}>
                               {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                             </SelectField>
                           </div>
                         )}
                       </div>
+
+                      {/* Approver assignment — uploader role only */}
+                      {!isNodal && roles.find(r => String(r.id) === String(addForm.role_id))?.name === 'uploader' && addForm.department_id && (
+                        <div>
+                          <label htmlFor="adm-add-approver" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>
+                            Assign Approver <span style={{ color: '#dc3545' }}>*</span>
+                          </label>
+                          <SelectField
+                            id="adm-add-approver"
+                            required
+                            value={addForm.approver_id}
+                            onChange={e => setAddForm(f => ({ ...f, approver_id: e.target.value }))}
+                            placeholder={approversLoading ? 'Loading approvers…' : approvers.length === 0 ? 'No approvers in this department' : 'Select approver'}
+                          >
+                            {approvers.map(a => (
+                              <option key={a.id} value={a.id}>
+                                {a.first_name} {a.last_name} ({a.username})
+                              </option>
+                            ))}
+                          </SelectField>
+                          {approvers.length === 0 && !approversLoading && (
+                            <div style={{ fontSize: 11.5, color: '#e67e22', marginTop: 5 }}>
+                              ⚠ No active approvers found for this department. Create an approver first.
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       {/* Managed Departments — nodal officer only */}
                       {isNodal && (
@@ -868,9 +914,12 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                   {t('users.addDrawer.cancel')}
                 </button>
                 {(() => {
-                  const isNodal = roles.find(r => String(r.id) === String(addForm.role_id))?.name === 'nodal Officer';
+                  const _footerRole = roles.find(r => String(r.id) === String(addForm.role_id));
+                  const isNodal    = _footerRole?.name === 'nodal Officer';
+                  const isUploader = _footerRole?.name === 'uploader';
                   const addFormInvalid = !addForm.role_id
                     || (isNodal ? addForm.dept_ids.length === 0 : !addForm.department_id)
+                    || (isUploader && !addForm.approver_id)
                     || !addForm.username.trim() || !addForm.email.trim() || !addForm.password
                     || !addForm.first_name.trim() || !addForm.last_name.trim()
                     || addForm.mobile_number.trim().length !== 10;
