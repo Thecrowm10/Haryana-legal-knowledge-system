@@ -10,7 +10,7 @@ import {
 
 // step: 'initial' | 'otp_sent' | 'verified'
 export default function FirstLoginScreen({ user, onTokenReceived, onLogout }) {
-  const [step, setStep]               = useState('initial');
+  const [step, setStep]               = useState(user?.mobileVerified ? 'verified' : 'initial');
   const [maskedMobile, setMaskedMobile] = useState('');
   const [otp, setOtp]                 = useState('');
   const [otpError, setOtpError]       = useState('');
