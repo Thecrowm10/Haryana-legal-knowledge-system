@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from './hooks/useAuth';
 import Login from './pages/Login';
 import ChangePasswordScreen from './pages/ChangePasswordScreen';
+import FirstLoginScreen from './pages/FirstLoginScreen';
 import Layout from './components/layout/Layout';
 import CookieBanner from './components/CookieBanner';
 import CitizenDashboard from './pages/CitizenDashboard';
@@ -37,7 +38,7 @@ const INITIAL_TAXONOMY = [
 ];
 
 export default function App() {
-  const { user, loading, error: authError, loginAsRole, changePass, logout } = useAuth();
+  const { user, loading, error: authError, loginAsRole, loginWithToken, changePass, logout } = useAuth();
   const [activePage, setActivePage]       = useState(null);
   const [auditLog, setAuditLog]           = useState([]);
   const [documents, setDocuments]         = useState(
@@ -109,7 +110,12 @@ export default function App() {
   }
 
   if (!user) return <><Login onLogin={loginAsRole} loading={loading} authError={authError} /><CookieBanner /></>;
-  if (user.mustChangePassword) return <><ChangePasswordScreen user={user} onPasswordChanged={changePass} onLogout={logout} reason={user.passwordExpired ? 'expired' : 'first_login'} /><CookieBanner /></>;
+  if (user.mustChangePassword) {
+    if (user.passwordExpired) {
+      return <><ChangePasswordScreen user={user} onPasswordChanged={changePass} onLogout={logout} reason="expired" /><CookieBanner /></>;
+    }
+    return <><FirstLoginScreen user={user} onTokenReceived={loginWithToken} onLogout={logout} /><CookieBanner /></>;
+  }
   if (activePage === null) return <CookieBanner />;
 
   function renderDashboard() {

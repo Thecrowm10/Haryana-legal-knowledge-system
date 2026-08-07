@@ -32,6 +32,7 @@ function userFromPayload(payload) {
     isActive:           payload.is_active,
     mustChangePassword: payload.must_change_password ?? false,
     passwordExpired:    payload.password_expired ?? false,
+    mobileVerified:     payload.mobile_verified ?? false,
   };
 }
 
