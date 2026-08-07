@@ -87,6 +87,7 @@
     },
     "errors": {
       "roleRequired": "Role is required.",
+      "firstNameRequired": "First name is required.",
       "usernameRequired": "Username is required.",
       "emailRequired": "Email is required.",
       "passwordRequired": "Password is required.",

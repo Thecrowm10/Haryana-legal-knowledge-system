@@ -194,6 +194,7 @@ export default function NodalOfficerDashboard({ activePage }) {
     if (!addForm.email.trim())       { setAddError(t('users.errors.emailRequired')); return; }
     if (!addForm.password)           { setAddError(t('users.errors.passwordRequired')); return; }
     if (!addForm.department_id)      { setAddError(t('users.errors.departmentRequired')); return; }
+    if (!addForm.first_name.trim())  { setAddError(t('users.errors.firstNameRequired')); return; }
     if (addForm.mobile_number.trim().length !== 10) { setAddError(t('users.errors.mobileRequired')); return; }
     if (isUploader && !addForm.approver_id) { setAddError(t('users.errors.approverRequired')); return; }
     setAddSaving(true);
@@ -737,7 +738,7 @@ export default function NodalOfficerDashboard({ activePage }) {
                 {/* First + Last name */}
                 <div className="nod-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
-                    <label htmlFor="nod-add-firstname" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.firstName')}</label>
+                    <label htmlFor="nod-add-firstname" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.firstName')} <span style={{ color: '#dc3545' }}>*</span></label>
                     <input id="nod-add-firstname" style={INP_STYLE} placeholder={t('users.addDrawer.firstNamePlaceholder')}
                       value={addForm.first_name}
                       onChange={e => setAddForm(f => ({ ...f, first_name: e.target.value }))} />
@@ -776,7 +777,7 @@ export default function NodalOfficerDashboard({ activePage }) {
                   {t('users.addDrawer.cancel')}
                 </button>
                 {(() => {
-                  const addFormInvalid = !addForm.role_id || !addForm.username.trim() || !addForm.email.trim() || !addForm.password || !addForm.department_id || addForm.mobile_number.trim().length !== 10 || (isUploader && !addForm.approver_id);
+                  const addFormInvalid = !addForm.role_id || !addForm.username.trim() || !addForm.email.trim() || !addForm.password || !addForm.department_id || !addForm.first_name.trim() || addForm.mobile_number.trim().length !== 10 || (isUploader && !addForm.approver_id);
                   const addBtnDisabled = addSaving || addFormInvalid;
                   return (
                     <button onClick={handleAddUser} disabled={addBtnDisabled}
