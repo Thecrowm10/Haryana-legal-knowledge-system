@@ -129,7 +129,18 @@
     "colActions": "कार्रवाई",
     "noDocumentsFound": "कोई दस्तावेज़ नहीं मिला।",
     "remarksButton": "टिप्पणियाँ",
+    "replaceFileButton": "फ़ाइल बदलें",
     "allTypes": "सभी प्रकार"
+  },
+  "replaceFileModal": {
+    "title": "दस्तावेज़ फ़ाइल बदलें",
+    "newFileLabel": "नई फ़ाइल चुनें",
+    "dropzone": "फ़ाइल बदलने के लिए यहाँ क्लिक करें या खींचें",
+    "rejectionReason": "अस्वीकृति का कारण",
+    "resubmitLabel": "समीक्षा के लिए पुनः सबमिट करें",
+    "resubmitDesc": "फ़ाइल बदलने के बाद, दस्तावेज़ की स्थिति पुनः लंबित करें ताकि अनुमोदक इसे दोबारा देख सके।",
+    "replaceButton": "फ़ाइल बदलें",
+    "replaceAndResubmitButton": "बदलें और पुनः सबमिट करें"
   },
   "linkedDocs": {
     "title": "लिंक किए गए दस्तावेज़",
@@ -467,7 +478,10 @@
     "submitSuccessSingle": "\"{{title}}\" सफलतापूर्वक सबमिट किया गया — अनुमोदन लंबित है।",
     "submitSuccessMulti": "{{count}} दस्तावेज़ सफलतापूर्वक सबमिट किए गए — अनुमोदन लंबित है।",
     "documentFallback": "दस्तावेज़",
-    "failedToLoadDocuments": "आपके दस्तावेज़ लोड करने में विफल"
+    "failedToLoadDocuments": "आपके दस्तावेज़ लोड करने में विफल",
+    "fileReplaced": "फ़ाइल सफलतापूर्वक बदली गई।",
+    "fileReplacedAndResubmitted": "फ़ाइल बदली गई और अनुमोदन के लिए पुनः सबमिट की गई।",
+    "replaceFileFailed": "फ़ाइल बदलने में विफल। कृपया पुनः प्रयास करें।"
   },
   "addDocuments": {
     "heading": "दस्तावेज़ जोड़ें",

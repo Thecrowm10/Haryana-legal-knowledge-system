@@ -36,3 +36,4 @@ export const getActChildren            = (pdf_id)                       => api.g
 export const getPdfFull                = (act_id)                       => publicApi.get(`/pdf/${act_id}/full`);
 export const getMyDepartmentActs       = (status, skip = 0, limit = 20)  => api.get('/pdf/my-department/acts', { params: { skip, limit, ...(status ? { status } : {}) } });
 export const getMyDepartmentDocsByType = (doc_type_id, status, skip = 0, limit = 20) => api.get('/pdf/my-department/by-type', { params: { doc_type_id, skip, limit, ...(status ? { status } : {}) } });
+export const replaceDocumentFile = (docId, file_ref, resubmit = false) => api.post(`/pdf/${docId}/replace-file`, { file_ref, resubmit });

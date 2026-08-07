@@ -15,7 +15,7 @@ import Card from '../components/ui/Card';
 import SelectField from '../components/ui/SelectField';
 import { useAuth } from '../hooks/useAuth';
 import { getDepartments, getDocumentTypes } from '../services/departments';
-import { uploadPdfFile, uploadPdfMetadata, updatePdfMetadata, getMyDocuments, searchDocuments, getPdfFile, checkDuplicateDocument, linkDocumentToDepartment, getLinkedDocuments, getActChildren, getMyDepartmentActs, getMyDepartmentDocsByType } from '../services/pdf';
+import { uploadPdfFile, uploadPdfMetadata, updatePdfMetadata, getMyDocuments, searchDocuments, getPdfFile, checkDuplicateDocument, linkDocumentToDepartment, getLinkedDocuments, getActChildren, getMyDepartmentActs, getMyDepartmentDocsByType, replaceDocumentFile } from '../services/pdf';
 import { uploadActPartFile, saveActPartSections, saveActPartEntries, getActPartSections, getActPartEntries, getActPartFile, getActPartApprovals, submitActPartForApproval } from '../services/act_parts';
 import { createNotification } from '../services/notifications';
 import HindiKeyboardInput from '../components/HindiKeyboardInput';
@@ -1100,6 +1100,13 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const [remarksModal,  setRemarksModal]  = useState(null);
   const [viewDoc,       setViewDoc]       = useState(null);
   const [linkedDocs, setLinkedDocs] = useState([]);
+  // Replace-file modal: { doc } | null
+  const [replaceFileModal,    setReplaceFileModal]    = useState(null);
+  const [replaceFileSaving,   setReplaceFileSaving]   = useState(false);
+  const [replaceFileResubmit, setReplaceFileResubmit] = useState(false);
+  const [replaceFileError,    setReplaceFileError]    = useState('');
+  const [replaceFileSelected, setReplaceFileSelected] = useState(null); // File object
+  const replaceFileInputRef = useRef(null);
 
   const mapApiDoc = useCallback((d) => {
     // Amendment provisions ride along inside description as a hidden __PROVISIONS__ JSON
@@ -2204,6 +2211,30 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     onAuditLog?.(`Bulk edited ${selectedIds.size} documents`);
   }
 
+  async function handleReplaceFileSubmit() {
+    if (!replaceFileModal || !replaceFileSelected) return;
+    setReplaceFileSaving(true);
+    setReplaceFileError('');
+    try {
+      const formData = new FormData();
+      formData.append('file', replaceFileSelected);
+      const uploadRes = await uploadPdfFile(formData);
+      const { file_ref } = uploadRes.data;
+      const updateRes = await replaceDocumentFile(replaceFileModal.id, file_ref, replaceFileResubmit);
+      const updated = mapApiDoc(updateRes.data);
+      setUploads(prev => prev.map(d => d.id === updated.id ? updated : d));
+      setToast({ type: 'success', message: replaceFileResubmit ? t('toasts.fileReplacedAndResubmitted') : t('toasts.fileReplaced') });
+      setReplaceFileModal(null);
+      setReplaceFileSelected(null);
+      setReplaceFileResubmit(false);
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      setReplaceFileError(typeof detail === 'string' ? detail : t('toasts.replaceFileFailed'));
+    } finally {
+      setReplaceFileSaving(false);
+    }
+  }
+
   function downloadAuditTrail() {
     const rows = [['Document Title','Type','Department','Year','Status','Workflow Status','Uploaded On','Version','OCR Status']];
     uploads.forEach(d => rows.push([d.title,d.type,d.dept,d.year,d.status,d.workflowStatus||'draft',d.uploadedAt,d.version||'1.0',d.ocrStatus||'completed']));
@@ -2359,6 +2390,115 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
 
         {/* Full-screen document viewer */}
         {viewDoc && <DocViewModal doc={viewDoc} onClose={() => setViewDoc(null)} />}
+
+        {/* Replace File modal */}
+        {replaceFileModal && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            onClick={() => { if (!replaceFileSaving) { setReplaceFileModal(null); setReplaceFileSelected(null); setReplaceFileResubmit(false); setReplaceFileError(''); } }}>
+            <div style={{ background: 'var(--surface-card)', borderRadius: 14, padding: 28, width: 'min(520px, calc(100vw - 32px))', boxShadow: '0 24px 80px rgba(0,0,0,.3)' }}
+              onClick={e => e.stopPropagation()}>
+
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18, paddingBottom: 14, borderBottom: '1px solid var(--surface-border)' }}>
+                <div>
+                  <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)', marginBottom: 4 }}>
+                    {t('replaceFileModal.title')}
+                  </div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 360 }}>
+                    {replaceFileModal.title}
+                  </div>
+                </div>
+                {!replaceFileSaving && (
+                  <button onClick={() => { setReplaceFileModal(null); setReplaceFileSelected(null); setReplaceFileResubmit(false); setReplaceFileError(''); }}
+                    style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '5px 8px', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', flexShrink: 0 }}>
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+
+              {/* Rejection reason banner */}
+              {replaceFileModal.approval?.comments && replaceFileModal.status === 'rejected' && (
+                <div style={{ display: 'flex', gap: 10, padding: '10px 14px', borderRadius: 8, background: 'rgba(220, 53, 69,.06)', border: '1px solid rgba(220, 53, 69,.2)', marginBottom: 16 }}>
+                  <XCircle size={14} color="#dc3545" style={{ flexShrink: 0, marginTop: 2 }} />
+                  <div>
+                    <div style={{ fontSize: 11.5, fontWeight: 700, color: '#dc3545', marginBottom: 3 }}>{t('replaceFileModal.rejectionReason')}</div>
+                    <div style={{ fontSize: 12.5, color: 'var(--text-color)', lineHeight: 1.5 }}>{replaceFileModal.approval.comments}</div>
+                  </div>
+                </div>
+              )}
+
+              {/* File picker */}
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-color-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.05em' }}>
+                  {t('replaceFileModal.newFileLabel')}
+                </div>
+                <div
+                  style={{ border: `2px dashed ${replaceFileSelected ? 'var(--primary)' : 'var(--surface-border)'}`, borderRadius: 10, padding: '20px 16px', textAlign: 'center', cursor: 'pointer', background: replaceFileSelected ? 'rgba(33, 74, 171,.04)' : 'var(--surface-ground)', transition: 'all .15s' }}
+                  onClick={() => replaceFileInputRef.current?.click()}
+                  onDragOver={e => { e.preventDefault(); e.currentTarget.style.background = 'rgba(33, 74, 171,.08)'; }}
+                  onDragLeave={e => { e.currentTarget.style.background = replaceFileSelected ? 'rgba(33, 74, 171,.04)' : 'var(--surface-ground)'; }}
+                  onDrop={e => {
+                    e.preventDefault();
+                    e.currentTarget.style.background = 'rgba(33, 74, 171,.04)';
+                    const f = e.dataTransfer.files[0];
+                    if (f) { setReplaceFileSelected(f); setReplaceFileError(''); }
+                  }}>
+                  <input ref={replaceFileInputRef} type="file" accept=".pdf,.docx" style={{ display: 'none' }}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) { setReplaceFileSelected(f); setReplaceFileError(''); } }} />
+                  {replaceFileSelected ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                      <FileText size={16} color="var(--primary)" />
+                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--primary)' }}>{replaceFileSelected.name}</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>({(replaceFileSelected.size / 1024).toFixed(0)} KB)</span>
+                    </div>
+                  ) : (
+                    <div>
+                      <Upload size={22} color="var(--text-color-secondary)" style={{ marginBottom: 6 }} />
+                      <div style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>{t('replaceFileModal.dropzone')}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 4, opacity: .7 }}>PDF or Word (.docx)</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Resubmit checkbox — only for rejected docs */}
+              {replaceFileModal.status === 'rejected' && (
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 14px', borderRadius: 8, background: replaceFileResubmit ? 'rgba(33, 74, 171,.06)' : 'var(--surface-ground)', border: `1px solid ${replaceFileResubmit ? 'rgba(33, 74, 171,.25)' : 'var(--surface-border)'}`, cursor: 'pointer', marginBottom: 16, transition: 'all .15s', userSelect: 'none' }}>
+                  <input type="checkbox" checked={replaceFileResubmit} onChange={e => setReplaceFileResubmit(e.target.checked)} style={{ marginTop: 2, accentColor: 'var(--primary)', width: 14, height: 14, cursor: 'pointer', flexShrink: 0 }} />
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: replaceFileResubmit ? 'var(--primary)' : 'var(--text-heading)' }}>
+                      {t('replaceFileModal.resubmitLabel')}
+                    </div>
+                    <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 3, lineHeight: 1.5 }}>
+                      {t('replaceFileModal.resubmitDesc')}
+                    </div>
+                  </div>
+                </label>
+              )}
+
+              {/* Error */}
+              {replaceFileError && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px', borderRadius: 8, background: 'rgba(220, 53, 69,.06)', border: '1px solid rgba(220, 53, 69,.2)', color: '#dc2626', fontSize: 12.5, marginBottom: 14 }}>
+                  <AlertCircle size={13} style={{ flexShrink: 0 }} />
+                  {replaceFileError}
+                </div>
+              )}
+
+              {/* Actions */}
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <button disabled={replaceFileSaving} onClick={() => { setReplaceFileModal(null); setReplaceFileSelected(null); setReplaceFileResubmit(false); setReplaceFileError(''); }}
+                  style={{ padding: '9px 20px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 13, cursor: replaceFileSaving ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: replaceFileSaving ? .5 : 1 }}>
+                  {t('common.cancel')}
+                </button>
+                <button disabled={!replaceFileSelected || replaceFileSaving} onClick={handleReplaceFileSubmit}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 22px', borderRadius: 8, border: 'none', background: replaceFileResubmit ? 'var(--primary)' : '#475569', color: 'white', fontSize: 13, fontWeight: 700, cursor: (!replaceFileSelected || replaceFileSaving) ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: (!replaceFileSelected || replaceFileSaving) ? .5 : 1, transition: 'background .15s' }}>
+                  {replaceFileSaving ? <RotateCcw size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Upload size={13} />}
+                  {replaceFileSaving ? '…' : replaceFileResubmit ? t('replaceFileModal.replaceAndResubmitButton') : t('replaceFileModal.replaceButton')}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* API error */}
         {myDocsError && (
@@ -2683,7 +2823,13 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                           {/* Row 3: date + actions */}
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
                             <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)' }}>{doc.uploadedAt}</span>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                              {(doc.status === 'pending' || doc.status === 'rejected') && (
+                                <button onClick={() => { setReplaceFileModal(doc); setReplaceFileSelected(null); setReplaceFileResubmit(false); setReplaceFileError(''); }}
+                                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 10px', borderRadius: 7, border: '1px solid rgba(100,116,139,.3)', background: 'rgba(100,116,139,.07)', color: '#475569', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                                  <RotateCcw size={12} /> {t('table.replaceFileButton')}
+                                </button>
+                              )}
                               {doc.approval?.comments && (
                                 <button onClick={() => setRemarksModal(doc)}
                                   style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 10px', borderRadius: 7, border: `1px solid ${statusBorder}`, background: statusBg, color: statusAccent, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
@@ -2768,13 +2914,21 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                         </div>
 
                         {/* Actions */}
-                        <div style={{ padding: '14px 16px', borderLeft: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 7 }}>
+                        <div style={{ padding: '14px 16px', borderLeft: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
                           <button onClick={() => setViewDoc(doc)}
                             style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 7, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', whiteSpace: 'nowrap', transition: 'background .15s' }}
                             onMouseEnter={e => e.currentTarget.style.background = 'rgba(33, 74, 171,.14)'}
                             onMouseLeave={e => e.currentTarget.style.background = 'rgba(33, 74, 171,.07)'}>
                             <Eye size={13} /> {t('common.view')}
                           </button>
+                          {(doc.status === 'pending' || doc.status === 'rejected') && (
+                            <button onClick={() => { setReplaceFileModal(doc); setReplaceFileSelected(null); setReplaceFileResubmit(false); setReplaceFileError(''); }}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 7, border: '1px solid rgba(100,116,139,.3)', background: 'rgba(100,116,139,.07)', color: '#475569', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', whiteSpace: 'nowrap', transition: 'background .15s' }}
+                              onMouseEnter={e => e.currentTarget.style.background = 'rgba(100,116,139,.14)'}
+                              onMouseLeave={e => e.currentTarget.style.background = 'rgba(100,116,139,.07)'}>
+                              <RotateCcw size={13} /> {t('table.replaceFileButton')}
+                            </button>
+                          )}
                           {doc.approval?.comments && (
                             <button onClick={() => setRemarksModal(doc)}
                               style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 7, border: `1px solid ${statusBorder}`, background: statusBg, color: statusAccent, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', whiteSpace: 'nowrap', transition: 'opacity .15s' }}>
