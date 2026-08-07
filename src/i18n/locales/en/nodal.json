@@ -86,6 +86,7 @@
       "activate": "Activate"
     },
     "errors": {
+      "roleRequired": "Role is required.",
       "usernameRequired": "Username is required.",
       "emailRequired": "Email is required.",
       "passwordRequired": "Password is required.",
