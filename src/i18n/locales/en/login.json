@@ -106,5 +106,22 @@
     "errorOtp6Digits": "Enter the 6-digit OTP.",
     "errorInvalidOtp": "Invalid or expired OTP.",
     "errorResendFailed": "Could not resend OTP. Please try again."
+  },
+  "changePasswordScreen": {
+    "signOut": "Sign out and log in as a different user",
+    "titleExpired": "Password Expired",
+    "titleRequired": "Password Change Required",
+    "welcomeExpired": "Your password has expired (6-month policy). Please set a new password to continue, <0>{{name}}</0>.",
+    "welcomeRequired": "Welcome, <0>{{name}}</0>. You must set a new password before you can continue.",
+    "currentPasswordLabel": "Current Password",
+    "newPasswordLabel": "New Password",
+    "confirmPasswordLabel": "Confirm New Password",
+    "setNewPassword": "Set New Password",
+    "changingPassword": "Changing Password…",
+    "errorCurrentRequired": "Please enter your current password.",
+    "errorNewMin8": "New password must be at least 8 characters.",
+    "errorPasswordsNoMatch": "New passwords do not match.",
+    "errorSameAsCurrent": "New password must differ from the current password.",
+    "errorChangeFailed": "Failed to change password. Please try again."
   }
 }

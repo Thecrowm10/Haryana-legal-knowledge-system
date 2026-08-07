@@ -97,6 +97,19 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
         input::placeholder { color:rgba(255,255,255,.3); font-size:13px; }
         .aol-otp-inp { letter-spacing:12px; font-size:24px; font-weight:700; text-align:center; }
         .aol-otp-inp::placeholder { letter-spacing:normal; font-size:14px; font-weight:400; }
+
+        @media (max-width:640px) {
+          .aol-masthead { top:10px !important; left:14px !important; gap:8px !important; }
+          .aol-masthead-logo { width:44px !important; height:44px !important; }
+          .aol-masthead-text { transform:none !important; }
+          .aol-masthead-hi { display:none !important; }
+          .aol-masthead-en { font-size:13px !important; white-space:normal !important; max-width:150px; line-height:1.2 !important; }
+          .aol-topright { top:10px !important; right:14px !important; gap:8px !important; }
+        }
+        @media (max-width:380px) {
+          .aol-masthead-logo { width:36px !important; height:36px !important; }
+          .aol-masthead-en { font-size:11.5px !important; max-width:120px; }
+        }
       `}</style>
 
       <div className="aol full-vh-min" style={{
@@ -113,14 +126,14 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
         <div className="fixed-bg-img" style={{ zIndex: 1, background: 'linear-gradient(110deg, rgba(2,10,5,.82) 0%, rgba(2,10,5,.62) 45%, rgba(2,10,5,.42) 100%)' }}/>
 
         {/* Masthead — same position as the portal-selection and credentials-login screens */}
-        <div style={{ position: 'absolute', top: 14, left: 32, zIndex: 10, display: 'flex', alignItems: 'center', gap: 14 }}>
-          <img src={haryanaLogo} alt="Haryana" loading="lazy" style={{ width: 100, height: 100, objectFit: 'contain' }} />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 1, whiteSpace: 'nowrap', transform: 'translateY(12px)' }}>
-            <span style={{ fontSize: 13, fontWeight: 500, color: 'rgba(255,255,255,.62)', letterSpacing: '.01em' }}>{orgNameHi}</span>
-            <span style={{ fontSize: 18, fontWeight: 700, color: 'rgba(255,255,255,.9)', letterSpacing: '.01em' }}>{orgNameEn}</span>
+        <div className="aol-masthead" style={{ position: 'absolute', top: 14, left: 32, zIndex: 10, display: 'flex', alignItems: 'center', gap: 14, maxWidth: 'calc(100vw - 64px)' }}>
+          <img src={haryanaLogo} alt="Haryana" loading="lazy" className="aol-masthead-logo" style={{ width: 100, height: 100, objectFit: 'contain', flexShrink: 0 }} />
+          <div className="aol-masthead-text" style={{ display: 'flex', flexDirection: 'column', gap: 1, whiteSpace: 'nowrap', transform: 'translateY(12px)', minWidth: 0 }}>
+            <span className="aol-masthead-hi" style={{ fontSize: 13, fontWeight: 500, color: 'rgba(255,255,255,.62)', letterSpacing: '.01em' }}>{orgNameHi}</span>
+            <span className="aol-masthead-en" style={{ fontSize: 18, fontWeight: 700, color: 'rgba(255,255,255,.9)', letterSpacing: '.01em' }}>{orgNameEn}</span>
           </div>
         </div>
-        <div style={{ position: 'absolute', top: 42, right: 32, zIndex: 10, display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div className="aol-topright" style={{ position: 'absolute', top: 42, right: 32, zIndex: 10, display: 'flex', alignItems: 'center', gap: 12 }}>
           <LanguageToggle variant="dark" iconOnly buttonStyle={otpIconStyle} />
           <AccessibilityMenu iconButtonStyle={otpIconStyle} />
         </div>
@@ -141,10 +154,12 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
           {/* ── Step 1: enter mobile ── */}
           {step === 1 && (
             <form onSubmit={handleSendOtp}>
-              <button type="button" onClick={onBack}
-                style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.4)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, marginBottom: 14, padding: 0, fontFamily: 'inherit', letterSpacing: '.04em' }}>
-                <ArrowLeft size={12} /> {t('adminOtpScreen.backToPortal')}
-              </button>
+              <div style={{ marginBottom: 14, paddingBottom: 14, borderBottom: '1px solid rgba(255,255,255,.1)' }}>
+                <button type="button" onClick={onBack}
+                  style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.4)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, padding: 0, fontFamily: 'inherit', letterSpacing: '.04em' }}>
+                  <ArrowLeft size={12} /> {t('adminOtpScreen.backToPortal')}
+                </button>
+              </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
                 <h2 style={{ fontSize: 21, fontWeight: 800, color: '#fff', letterSpacing: '-.02em' }}>{t('adminOtpScreen.title')}</h2>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 20, background: 'rgba(74,222,128,.12)', border: '1px solid rgba(74,222,128,.3)' }}>
@@ -196,10 +211,12 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
           {/* ── Step 2: verify OTP ── */}
           {step === 2 && (
             <form onSubmit={handleVerify}>
-              <button type="button" onClick={() => { setStep(1); setError(''); setOtp(''); setResendMsg(''); }}
-                style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.4)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, marginBottom: 14, padding: 0, fontFamily: 'inherit', letterSpacing: '.04em' }}>
-                <ArrowLeft size={12} /> {t('adminOtpScreen.back')}
-              </button>
+              <div style={{ marginBottom: 14, paddingBottom: 14, borderBottom: '1px solid rgba(255,255,255,.1)' }}>
+                <button type="button" onClick={() => { setStep(1); setError(''); setOtp(''); setResendMsg(''); }}
+                  style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.4)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, padding: 0, fontFamily: 'inherit', letterSpacing: '.04em' }}>
+                  <ArrowLeft size={12} /> {t('adminOtpScreen.back')}
+                </button>
+              </div>
               <h2 style={{ fontSize: 21, fontWeight: 800, color: '#fff', letterSpacing: '-.02em', marginBottom: 4 }}>{t('adminOtpScreen.enterOtpTitle')}</h2>
               <p style={{ fontSize: 12.5, color: 'rgba(255,255,255,.42)', marginBottom: 20 }}>
                 <Trans t={t} i18nKey="adminOtpScreen.otpSentTo" values={{ masked: `${mobile.slice(0,3)}****${mobile.slice(-3)}` }} components={[<strong key="s" style={{ color: 'rgba(255,255,255,.7)' }} />]} />

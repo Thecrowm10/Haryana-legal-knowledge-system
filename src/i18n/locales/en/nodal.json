@@ -96,7 +96,8 @@
       "departmentRequired": "Department is required.",
       "approverRequired": "Please select an approver for this uploader.",
       "createFailed": "Failed to create user.",
-      "saveFailed": "Failed to save changes."
+      "saveFailed": "Failed to save changes.",
+      "fillMandatory": "Please fill all mandatory fields before continuing."
     }
   },
   "uploads": {

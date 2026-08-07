@@ -69,6 +69,16 @@
       "saveChanges": "परिवर्तन सहेजें",
       "saving": "सहेजा जा रहा है…"
     },
+    "confirmToggle": {
+      "deactivateTitle": "उपयोगकर्ता को निष्क्रिय करें",
+      "activateTitle": "उपयोगकर्ता को सक्रिय करें",
+      "confirmDeactivate": "क्या आप वाकई <strong>{{name}}</strong> को निष्क्रिय करना चाहते हैं?",
+      "confirmActivate": "क्या आप वाकई <strong>{{name}}</strong> को सक्रिय करना चाहते हैं?",
+      "loginBlockedNote": "वे अब लॉग इन नहीं कर पाएंगे।",
+      "cancel": "रद्द करें",
+      "deactivate": "निष्क्रिय करें",
+      "activate": "सक्रिय करें"
+    },
     "errors": {
       "usernameRequired": "उपयोगकर्ता नाम आवश्यक है।",
       "emailRequired": "ईमेल आवश्यक है।",
@@ -79,7 +89,8 @@
       "roleRequired": "भूमिका आवश्यक है।",
       "departmentRequired": "विभाग आवश्यक है।",
       "createFailed": "उपयोगकर्ता बनाने में विफल।",
-      "saveFailed": "परिवर्तन सहेजने में विफल।"
+      "saveFailed": "परिवर्तन सहेजने में विफल।",
+      "fillMandatory": "कृपया आगे बढ़ने से पहले सभी अनिवार्य फ़ील्ड भरें।"
     }
   },
   "taxonomy": {
@@ -95,6 +106,15 @@
     "activate": "सक्रिय करें",
     "edit": "संपादित करें",
     "delete": "हटाएं",
+    "confirmToggle": {
+      "deactivateTitle": "{{category}} निष्क्रिय करें",
+      "activateTitle": "{{category}} सक्रिय करें",
+      "confirmDeactivate": "क्या आप वाकई <strong>{{name}}</strong> को निष्क्रिय करना चाहते हैं?",
+      "confirmActivate": "क्या आप वाकई <strong>{{name}}</strong> को सक्रिय करना चाहते हैं?",
+      "cancel": "रद्द करें",
+      "deactivate": "निष्क्रिय करें",
+      "activate": "सक्रिय करें"
+    },
     "addDepartment": {
       "title": "विभाग जोड़ें",
       "subtitle": "एक नया विभाग रिकॉर्ड बनाएं।",

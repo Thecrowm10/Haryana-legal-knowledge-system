@@ -76,6 +76,16 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
         @media (max-width:640px) {
           .lk-portal-content { padding:88px 5% 28px !important; gap:32px !important; }
           .lk-portal-card { width:100% !important; max-width:340px !important; padding:26px 22px !important; }
+          .lk-masthead { top:10px !important; left:14px !important; gap:8px !important; }
+          .lk-masthead-logo { width:44px !important; height:44px !important; }
+          .lk-masthead-text { transform:none !important; }
+          .lk-masthead-hi { display:none !important; }
+          .lk-masthead-en { font-size:13px !important; white-space:normal !important; max-width:150px; line-height:1.2 !important; }
+          .lk-topright { top:10px !important; right:14px !important; gap:8px !important; }
+        }
+        @media (max-width:380px) {
+          .lk-masthead-logo { width:36px !important; height:36px !important; }
+          .lk-masthead-en { font-size:11.5px !important; max-width:120px; }
         }
       `}</style>
       <div className="lk full-vh-min" style={{ width:'100vw', position:'relative', overflowX:'hidden', display:'flex', alignItems:'center' }}>
@@ -87,15 +97,15 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
           style={{ objectFit:'cover', zIndex:0, filter:'blur(2px)', transform:'scale(1.02)' }} />
         <div className="fixed-bg-img" style={{ zIndex:1, background:'linear-gradient(110deg,rgba(2,10,5,.82) 0%,rgba(2,10,5,.62) 45%,rgba(2,10,5,.42) 100%)' }}/>
 
-        <div style={{ position: 'absolute', top: 14, left: 32, zIndex: 10, display: 'flex', alignItems: 'center', gap: 14 }}>
-          <img src={haryanaLogo} alt="Haryana" loading="lazy" style={{ width:100, height:100, objectFit:'contain' }} />
-          <div style={{ display:'flex', flexDirection:'column', gap:1, whiteSpace:'nowrap', transform:'translateY(12px)' }}>
-            <span style={{ fontSize:13, fontWeight:500, color:'rgba(255,255,255,.62)', letterSpacing:'.01em' }}>{orgNameHi}</span>
-            <span style={{ fontSize:18, fontWeight:700, color:'rgba(255,255,255,.9)', letterSpacing:'.01em' }}>{orgNameEn}</span>
+        <div className="lk-masthead" style={{ position: 'absolute', top: 14, left: 32, zIndex: 10, display: 'flex', alignItems: 'center', gap: 14, maxWidth: 'calc(100vw - 64px)' }}>
+          <img src={haryanaLogo} alt="Haryana" loading="lazy" className="lk-masthead-logo" style={{ width:100, height:100, objectFit:'contain', flexShrink:0 }} />
+          <div className="lk-masthead-text" style={{ display:'flex', flexDirection:'column', gap:1, whiteSpace:'nowrap', transform:'translateY(12px)', minWidth:0 }}>
+            <span className="lk-masthead-hi" style={{ fontSize:13, fontWeight:500, color:'rgba(255,255,255,.62)', letterSpacing:'.01em' }}>{orgNameHi}</span>
+            <span className="lk-masthead-en" style={{ fontSize:18, fontWeight:700, color:'rgba(255,255,255,.9)', letterSpacing:'.01em' }}>{orgNameEn}</span>
           </div>
         </div>
 
-        <div style={{ position: 'absolute', top: 42, right: 32, zIndex: 10, display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div className="lk-topright" style={{ position: 'absolute', top: 42, right: 32, zIndex: 10, display: 'flex', alignItems: 'center', gap: 12 }}>
           <LanguageToggle variant="dark" iconOnly buttonStyle={loginIconStyle} />
           <AccessibilityMenu iconButtonStyle={loginIconStyle} />
         </div>
@@ -253,6 +263,18 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
         }
         @media (max-width:640px) {
           .lk-role-strip { display:none !important; }
+          .lk-hero-desc { display:none !important; }
+          .lk-dept-portal-subtitle { display:none !important; }
+          .lk-masthead { top:10px !important; left:14px !important; gap:8px !important; }
+          .lk-masthead-logo { width:44px !important; height:44px !important; }
+          .lk-masthead-text { transform:none !important; }
+          .lk-masthead-hi { display:none !important; }
+          .lk-masthead-en { font-size:13px !important; white-space:normal !important; max-width:150px; line-height:1.2 !important; }
+          .lk-topright { top:10px !important; right:14px !important; gap:8px !important; }
+        }
+        @media (max-width:380px) {
+          .lk-masthead-logo { width:36px !important; height:36px !important; }
+          .lk-masthead-en { font-size:11.5px !important; max-width:120px; }
         }
       `}</style>
 
@@ -268,16 +290,16 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
         <div className="fixed-bg-img" style={{ zIndex:1, background:'linear-gradient(110deg, rgba(2,10,5,.82) 0%, rgba(2,10,5,.62) 45%, rgba(2,10,5,.42) 100%)' }}/>
 
         {/* Masthead — same logo, size and position as the portal-selection screen */}
-        <div style={{ position: 'absolute', top: 14, left: 32, zIndex: 10, display: 'flex', alignItems: 'center', gap: 14 }}>
-          <img src={haryanaLogo} alt="Haryana" loading="lazy" style={{ width:100, height:100, objectFit:'contain' }} />
-          <div style={{ display:'flex', flexDirection:'column', gap:1, whiteSpace:'nowrap', transform:'translateY(12px)' }}>
-            <span style={{ fontSize:13, fontWeight:500, color:'rgba(255,255,255,.62)', letterSpacing:'.01em' }}>{orgNameHi}</span>
-            <span style={{ fontSize:18, fontWeight:700, color:'rgba(255,255,255,.9)', letterSpacing:'.01em' }}>{orgNameEn}</span>
+        <div className="lk-masthead" style={{ position: 'absolute', top: 14, left: 32, zIndex: 10, display: 'flex', alignItems: 'center', gap: 14, maxWidth: 'calc(100vw - 64px)' }}>
+          <img src={haryanaLogo} alt="Haryana" loading="lazy" className="lk-masthead-logo" style={{ width:100, height:100, objectFit:'contain', flexShrink:0 }} />
+          <div className="lk-masthead-text" style={{ display:'flex', flexDirection:'column', gap:1, whiteSpace:'nowrap', transform:'translateY(12px)', minWidth:0 }}>
+            <span className="lk-masthead-hi" style={{ fontSize:13, fontWeight:500, color:'rgba(255,255,255,.62)', letterSpacing:'.01em' }}>{orgNameHi}</span>
+            <span className="lk-masthead-en" style={{ fontSize:18, fontWeight:700, color:'rgba(255,255,255,.9)', letterSpacing:'.01em' }}>{orgNameEn}</span>
           </div>
         </div>
 
         {/* Language/accessibility toggles — same position as the portal-selection screen */}
-        <div style={{ position: 'absolute', top: 42, right: 32, zIndex: 10, display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div className="lk-topright" style={{ position: 'absolute', top: 42, right: 32, zIndex: 10, display: 'flex', alignItems: 'center', gap: 12 }}>
           <LanguageToggle variant="dark" iconOnly buttonStyle={loginIconStyle} />
           <AccessibilityMenu iconButtonStyle={loginIconStyle} />
         </div>
@@ -333,14 +355,14 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
               animation: shake ? 'shake .4s ease' : undefined,
             }}
           >
-            <div style={{ marginBottom: 14 }}>
+            <div style={{ marginBottom: 14, paddingBottom: 14, borderBottom: '1px solid rgba(255,255,255,.1)' }}>
               <button onClick={() => { setScreen('portal'); setUsername(''); setPassword(''); setFormError(''); }}
                 style={{ background:'transparent', border:'none', color:'rgba(255,255,255,.4)', fontSize:11.5, fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', gap:5, padding:0, fontFamily:'var(--font)', letterSpacing:'.04em' }}>
                 {t('backToPortal')}
               </button>
             </div>
             <h2 style={{ fontSize: 'var(--font-size-h3)', fontWeight:800, color:'#fff', letterSpacing:'-.02em', marginBottom:3 }}>{t('officialLogin')}</h2>
-            <p style={{ fontSize: 'var(--font-size-small)', color:'rgba(255,255,255,.42)', marginBottom:20 }}>{t('departmentPortalSubtitle')}</p>
+            <p className="lk-dept-portal-subtitle" style={{ fontSize: 'var(--font-size-small)', color:'rgba(255,255,255,.42)', marginBottom:20 }}>{t('departmentPortalSubtitle')}</p>
 
             {/* Username */}
             <div style={{ marginBottom:14 }}>

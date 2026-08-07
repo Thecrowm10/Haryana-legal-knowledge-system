@@ -69,6 +69,16 @@
       "saveChanges": "Save Changes",
       "saving": "Saving…"
     },
+    "confirmToggle": {
+      "deactivateTitle": "Deactivate User",
+      "activateTitle": "Activate User",
+      "confirmDeactivate": "Are you sure you want to deactivate <strong>{{name}}</strong>?",
+      "confirmActivate": "Are you sure you want to activate <strong>{{name}}</strong>?",
+      "loginBlockedNote": "They will no longer be able to log in.",
+      "cancel": "Cancel",
+      "deactivate": "Deactivate",
+      "activate": "Activate"
+    },
     "errors": {
       "usernameRequired": "Username is required.",
       "emailRequired": "Email is required.",
@@ -79,7 +89,8 @@
       "roleRequired": "Role is required.",
       "departmentRequired": "Department is required.",
       "createFailed": "Failed to create user.",
-      "saveFailed": "Failed to save changes."
+      "saveFailed": "Failed to save changes.",
+      "fillMandatory": "Please fill all mandatory fields before continuing."
     }
   },
   "taxonomy": {
@@ -95,6 +106,15 @@
     "activate": "Activate",
     "edit": "Edit",
     "delete": "Delete",
+    "confirmToggle": {
+      "deactivateTitle": "Deactivate {{category}}",
+      "activateTitle": "Activate {{category}}",
+      "confirmDeactivate": "Are you sure you want to deactivate <strong>{{name}}</strong>?",
+      "confirmActivate": "Are you sure you want to activate <strong>{{name}}</strong>?",
+      "cancel": "Cancel",
+      "deactivate": "Deactivate",
+      "activate": "Activate"
+    },
     "addDepartment": {
       "title": "Add Department",
       "subtitle": "Create a new department record.",
