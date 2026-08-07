@@ -92,6 +92,9 @@ const NOD_RESPONSIVE_CSS = `
     .nod-export-btn { width: 100% !important; }
     .nod-users-actions { width: 100% !important; }
     .nod-users-actions > * { flex: 1 1 auto !important; min-width: 0 !important; }
+    .nod-filter-bar { flex-direction: column !important; align-items: stretch !important; }
+    .nod-filter-bar > * { width: 100% !important; flex: 1 1 auto !important; margin-left: 0 !important; }
+    .nod-filter-bar button { width: 100% !important; justify-content: center !important; }
   }
 `;
 
@@ -489,7 +492,7 @@ export default function NodalOfficerDashboard({ activePage }) {
             <div className="nod-users-actions" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <SelectField value={deptFilter} onChange={e => setDeptFilter(e.target.value)} placeholder={t('users.allDepartments')} style={{ width: 200, maxWidth: '100%' }}>
                 <option value="">{t('users.allDepartments')}</option>
-                {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                {depts.filter(d => d.is_active !== false).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
               </SelectField>
               <button
                 onClick={() => { setAddingUser(true); setAddError(''); setAddForm({ ...EMPTY_ADD_FORM, department_id: deptFilter }); setShowAddPass(false); }}
@@ -608,14 +611,14 @@ export default function NodalOfficerDashboard({ activePage }) {
           <>
             <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.25)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', zIndex: 300, animation: 'drawerFadeIn .2s ease' }} />
             <div className="nod-drawer" style={{
-              position: 'fixed', right: 0, top: 0, height: '100vh', width: 460,
+              position: 'fixed', right: 0, top: 0, bottom: 0, width: 460,
               background: 'var(--surface-card)', boxShadow: '-4px 0 40px rgba(0,0,0,.18)',
               zIndex: 301, display: 'flex', flexDirection: 'column',
               animation: 'drawerSlideIn .28s cubic-bezier(.22,1,.36,1)',
             }}>
 
               {/* Header */}
-              <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
                 <div>
                   <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)' }}>{t('users.addDrawer.title')}</div>
                   <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-color-secondary)', marginTop: 1 }}>{t('users.addDrawer.subtitle')}</div>
@@ -628,6 +631,30 @@ export default function NodalOfficerDashboard({ activePage }) {
 
               {/* Body */}
               <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+                {/* Role + Department */}
+                <div className="nod-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label htmlFor="nod-add-role" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.role')} <span style={{ color: '#dc3545' }}>*</span></label>
+                    <SelectField
+                      id="nod-add-role"
+                      required
+                      value={addForm.role_id}
+                      onChange={e => setAddForm(f => ({ ...f, role_id: e.target.value, department_id: '' }))}
+                      placeholder={t('users.addDrawer.roleSelectPlaceholder')}
+                    >
+                      {assignableRoles(roles).map(r => (
+                        <option key={r.id} value={r.id}>{r.name.charAt(0).toUpperCase() + r.name.slice(1)}</option>
+                      ))}
+                    </SelectField>
+                  </div>
+                  <div>
+                    <label htmlFor="nod-add-department" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.department')} <span style={{ color: '#dc3545' }}>*</span></label>
+                    <SelectField id="nod-add-department" required value={addForm.department_id} onChange={e => setAddForm(f => ({ ...f, department_id: e.target.value }))} placeholder={t('users.addDrawer.departmentSelectPlaceholder')}>
+                      {depts.filter(d => d.is_active !== false).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </SelectField>
+                  </div>
+                </div>
 
                 {/* Username + Email */}
                 <div className="nod-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -671,13 +698,13 @@ export default function NodalOfficerDashboard({ activePage }) {
                 {/* First + Last name */}
                 <div className="nod-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
-                    <label htmlFor="nod-add-firstname" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.firstName')}</label>
+                    <label htmlFor="nod-add-firstname" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.firstName')} <span style={{ color: '#dc3545' }}>*</span></label>
                     <input id="nod-add-firstname" style={INP_STYLE} placeholder={t('users.addDrawer.firstNamePlaceholder')}
                       value={addForm.first_name}
                       onChange={e => setAddForm(f => ({ ...f, first_name: e.target.value }))} />
                   </div>
                   <div>
-                    <label htmlFor="nod-add-lastname" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.lastName')}</label>
+                    <label htmlFor="nod-add-lastname" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.lastName')} <span style={{ color: '#dc3545' }}>*</span></label>
                     <input id="nod-add-lastname" style={INP_STYLE} placeholder={t('users.addDrawer.lastNamePlaceholder')}
                       value={addForm.last_name}
                       onChange={e => setAddForm(f => ({ ...f, last_name: e.target.value }))} />
@@ -696,24 +723,6 @@ export default function NodalOfficerDashboard({ activePage }) {
                     onChange={e => setAddForm(f => ({ ...f, mobile_number: e.target.value.replace(/\D/g, '') }))} />
                 </div>
 
-                {/* Role + Department */}
-                <div className="nod-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div>
-                    <label htmlFor="nod-add-role" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.role')}</label>
-                    <SelectField id="nod-add-role" value={addForm.role_id} onChange={e => setAddForm(f => ({ ...f, role_id: e.target.value }))} placeholder={t('users.addDrawer.roleSelectPlaceholder')}>
-                      {assignableRoles(roles).map(r => (
-                        <option key={r.id} value={r.id}>{r.name.charAt(0).toUpperCase() + r.name.slice(1)}</option>
-                      ))}
-                    </SelectField>
-                  </div>
-                  <div>
-                    <label htmlFor="nod-add-department" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.department')} <span style={{ color: '#dc3545' }}>*</span></label>
-                    <SelectField id="nod-add-department" value={addForm.department_id} onChange={e => setAddForm(f => ({ ...f, department_id: e.target.value }))} placeholder={t('users.addDrawer.departmentSelectPlaceholder')}>
-                      {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                    </SelectField>
-                  </div>
-                </div>
-
                 {addError && (
                   <div style={{ padding: '9px 12px', background: 'rgba(220, 53, 69,.08)', border: '1px solid rgba(220, 53, 69,.25)', borderRadius: 8, fontSize: 12.5, color: '#dc3545', display: 'flex', gap: 7, alignItems: 'center' }}>
                     <span>⚠</span> {addError}
@@ -722,17 +731,22 @@ export default function NodalOfficerDashboard({ activePage }) {
               </div>
 
               {/* Footer */}
-              <div style={{ padding: '16px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <div style={{ padding: '16px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end', gap: 10, flexShrink: 0 }}>
                 <button onClick={() => setAddingUser(false)}
                   style={{ padding: '9px 18px', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'var(--text-color)', fontFamily: 'var(--font)' }}>
                   {t('users.addDrawer.cancel')}
                 </button>
                 {(() => {
-                  const addFormInvalid = !addForm.username.trim() || !addForm.email.trim() || !addForm.password || !addForm.department_id || addForm.mobile_number.trim().length !== 10;
+                  const addFormInvalid = !addForm.role_id || !addForm.department_id
+                    || !addForm.username.trim() || !addForm.email.trim() || !addForm.password
+                    || !addForm.first_name.trim() || !addForm.last_name.trim()
+                    || addForm.mobile_number.trim().length !== 10;
                   const addBtnDisabled = addSaving || addFormInvalid;
                   return (
-                    <button onClick={handleAddUser} disabled={addBtnDisabled}
-                      style={{ padding: '9px 20px', background: addBtnDisabled ? 'var(--surface-border)' : 'var(--primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: addBtnDisabled ? 'not-allowed' : 'pointer', color: addBtnDisabled ? 'var(--text-color-secondary)' : 'white', fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 7 }}>
+                    <button
+                      onClick={() => { if (addFormInvalid) { setAddError(t('users.errors.fillMandatory')); return; } handleAddUser(); }}
+                      disabled={addSaving}
+                      style={{ padding: '9px 20px', background: addBtnDisabled ? 'var(--surface-border)' : 'var(--primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: addSaving ? 'not-allowed' : 'pointer', color: addBtnDisabled ? 'var(--text-color-secondary)' : 'white', fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 7 }}>
                       {addSaving
                         ? <><div style={{ width: 12, height: 12, border: '2px solid rgba(0,0,0,.2)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin .7s linear infinite' }} /> {t('users.addDrawer.creating')}</>
                         : <><Plus size={13} /> {t('users.addDrawer.createUser')}</>
@@ -802,7 +816,7 @@ export default function NodalOfficerDashboard({ activePage }) {
                   <div>
                     <label htmlFor="nod-edit-department" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.department')}</label>
                     <SelectField id="nod-edit-department" value={editForm.department_id ?? ''} onChange={e => setEditForm(f => ({ ...f, department_id: e.target.value || null }))} placeholder={t('users.editModal.selectDepartment')}>
-                      {depts.map(d => (
+                      {depts.filter(d => d.is_active !== false).map(d => (
                         <option key={d.id} value={d.id}>{d.name}</option>
                       ))}
                     </SelectField>
@@ -910,10 +924,15 @@ export default function NodalOfficerDashboard({ activePage }) {
     const pendingDocs  = deptScopedDocs.filter(d => d.status === 'pending').length;
     const rejectedDocs = deptScopedDocs.filter(d => d.status === 'rejected').length;
 
+    // Uploader/Approver options are further scoped to the selected department (within
+    // the officer's authorised departments) — pick a department first and only that
+    // department's people show up; "All Departments" shows everyone in scope.
+    const deptScopedForOptions = uploadsFilterDept ? deptScopedDocs.filter(d => d.department_name === uploadsFilterDept) : deptScopedDocs;
+
     // Unique uploaders within authorised scope
     const uploaderOptions = [];
     const seenUp = new Set();
-    for (const d of deptScopedDocs) {
+    for (const d of deptScopedForOptions) {
       if (d.uploader_username && !seenUp.has(d.uploader_username)) {
         seenUp.add(d.uploader_username);
         const label = [d.uploader_first_name, d.uploader_last_name].filter(Boolean).join(' ') || d.uploader_username;
@@ -924,7 +943,7 @@ export default function NodalOfficerDashboard({ activePage }) {
     // Unique approvers within authorised scope
     const approverOptions = [];
     const seenAp = new Set();
-    for (const d of deptScopedDocs) {
+    for (const d of deptScopedForOptions) {
       const key = d.latest_approval?.approver_username;
       if (key && !seenAp.has(key)) {
         seenAp.add(key);
@@ -1012,7 +1031,7 @@ export default function NodalOfficerDashboard({ activePage }) {
 
         {/* Filter bar + table */}
         <Card padding="0">
-          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div className="nod-filter-bar" style={{ padding: '14px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <div style={{ position: 'relative', flex: '1 1 200px', minWidth: 180 }}>
               <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-color-secondary)', pointerEvents: 'none' }} />
               <input
@@ -1022,6 +1041,11 @@ export default function NodalOfficerDashboard({ activePage }) {
                 style={{ width: '100%', padding: '7px 12px 7px 30px', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, color: 'var(--text-color)', outline: 'none', boxSizing: 'border-box' }}
               />
             </div>
+            {/* Department filter is limited to the nodal officer's authorised departments */}
+            <SelectField value={uploadsFilterDept} onChange={e => { setUploadsFilterDept(e.target.value); setUploadsFilterUploader(''); setUploadsFilterApprover(''); }} style={{ flex: '0 0 155px' }}>
+              <option value="">{t('uploads.allDepartments')}</option>
+              {depts.filter(d => d.is_active !== false).map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+            </SelectField>
             <SelectField value={uploadsFilterUploader} onChange={e => setUploadsFilterUploader(e.target.value)} style={{ flex: '0 0 155px' }}>
               <option value="">{t('uploads.allUploaders')}</option>
               {uploaderOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -1029,11 +1053,6 @@ export default function NodalOfficerDashboard({ activePage }) {
             <SelectField value={uploadsFilterApprover} onChange={e => setUploadsFilterApprover(e.target.value)} style={{ flex: '0 0 155px' }}>
               <option value="">{t('uploads.allApprovers')}</option>
               {approverOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </SelectField>
-            {/* Department filter is limited to the nodal officer's authorised departments */}
-            <SelectField value={uploadsFilterDept} onChange={e => setUploadsFilterDept(e.target.value)} style={{ flex: '0 0 155px' }}>
-              <option value="">{t('uploads.allDepartments')}</option>
-              {depts.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
             </SelectField>
             <SelectField value={uploadsFilterStatus} onChange={e => setUploadsFilterStatus(e.target.value)} style={{ flex: '0 0 130px' }}>
               <option value="">{t('uploads.allStatuses')}</option>
@@ -1259,7 +1278,7 @@ export default function NodalOfficerDashboard({ activePage }) {
 
         {/* Filter bar */}
         <Card>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div className="nod-filter-bar" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <div style={{ position: 'relative', flex: '1 1 180px', minWidth: 160 }}>
               <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-color-secondary)' }} />
               <input
@@ -1269,21 +1288,18 @@ export default function NodalOfficerDashboard({ activePage }) {
                 style={{ width: '100%', paddingLeft: 30, paddingRight: 10, height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, background: 'var(--surface-ground)', color: 'var(--text-color)', boxSizing: 'border-box', outline: 'none' }}
               />
             </div>
-            <select value={auditFilterEntity} onChange={e => { setAuditFilterEntity(e.target.value); setAuditPage(0); }}
-              style={{ height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, padding: '0 10px', background: 'var(--surface-ground)', color: 'var(--text-color)', cursor: 'pointer' }}>
+            <SelectField value={auditFilterEntity} onChange={e => { setAuditFilterEntity(e.target.value); setAuditPage(0); }} style={{ flex: '0 0 155px' }}>
               {auditEntityOptions(t).map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-            <select value={auditFilterAction} onChange={e => { setAuditFilterAction(e.target.value); setAuditPage(0); }}
-              style={{ height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, padding: '0 10px', background: 'var(--surface-ground)', color: 'var(--text-color)', cursor: 'pointer' }}>
+            </SelectField>
+            <SelectField value={auditFilterAction} onChange={e => { setAuditFilterAction(e.target.value); setAuditPage(0); }} style={{ flex: '0 0 155px' }}>
               <option value="">{t('audit.allActions')}</option>
               {auditActionOptions.map(a => <option key={a} value={a}>{fmtAction(a)}</option>)}
-            </select>
-            <select value={auditFilterStatus} onChange={e => { setAuditFilterStatus(e.target.value); setAuditPage(0); }}
-              style={{ height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, padding: '0 10px', background: 'var(--surface-ground)', color: 'var(--text-color)', cursor: 'pointer' }}>
+            </SelectField>
+            <SelectField value={auditFilterStatus} onChange={e => { setAuditFilterStatus(e.target.value); setAuditPage(0); }} style={{ flex: '0 0 130px' }}>
               <option value="">{t('audit.allStatuses')}</option>
               <option value="success">{t('audit.success')}</option>
               <option value="failure">{t('audit.failure')}</option>
-            </select>
+            </SelectField>
             <input type="date" value={auditFromDate} onChange={e => { setAuditFromDate(e.target.value); setAuditPage(0); }}
               style={{ height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, padding: '0 10px', background: 'var(--surface-ground)', color: 'var(--text-color)' }} />
             <span style={{ fontSize: 11, color: 'var(--text-color-secondary)' }}>{t('audit.to')}</span>
@@ -1509,7 +1525,7 @@ export default function NodalOfficerDashboard({ activePage }) {
 
         {/* Filter + table */}
         <Card padding="0">
-          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div className="nod-filter-bar" style={{ padding: '14px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <div style={{ position: 'relative', flex: '1 1 200px', minWidth: 180 }}>
               <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-color-secondary)', pointerEvents: 'none' }} />
               <input
@@ -1519,13 +1535,12 @@ export default function NodalOfficerDashboard({ activePage }) {
                 style={{ width: '100%', padding: '7px 12px 7px 30px', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, color: 'var(--text-color)', outline: 'none', boxSizing: 'border-box' }}
               />
             </div>
-            <select value={nodalLinksFilterStatus} onChange={e => setNodalLinksFilterStatus(e.target.value)}
-              style={{ height: 36, padding: '0 10px', border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, background: 'var(--surface-ground)', color: 'var(--text-color)', cursor: 'pointer' }}>
+            <SelectField value={nodalLinksFilterStatus} onChange={e => setNodalLinksFilterStatus(e.target.value)} style={{ flex: '0 0 150px' }}>
               <option value="">{t('linkedDocs.allStatuses')}</option>
               <option value="pending">{t('linkedDocs.statusPending')}</option>
               <option value="approved">{t('linkedDocs.statusApproved')}</option>
               <option value="rejected">{t('linkedDocs.statusRejected')}</option>
-            </select>
+            </SelectField>
             {(nodalLinksSearch || nodalLinksFilterStatus) && (
               <button onClick={() => { setNodalLinksSearch(''); setNodalLinksFilterStatus(''); }}
                 style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'transparent', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '7px 12px', fontSize: 12, cursor: 'pointer', color: 'var(--text-color-secondary)' }}>

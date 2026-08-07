@@ -88,7 +88,8 @@
       "mobileRequired": "A valid 10-digit mobile number is required.",
       "departmentRequired": "Department is required.",
       "createFailed": "Failed to create user.",
-      "saveFailed": "Failed to save changes."
+      "saveFailed": "Failed to save changes.",
+      "fillMandatory": "Please fill all mandatory fields before continuing."
     }
   },
   "uploads": {

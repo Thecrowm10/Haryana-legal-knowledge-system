@@ -120,6 +120,19 @@ export default function ForgotPasswordScreen({ onBack }) {
         input::placeholder { color:rgba(255,255,255,.3); font-size:13px; }
         .fp-otp-inp { letter-spacing:12px; font-size:24px; font-weight:700; text-align:center; }
         .fp-otp-inp::placeholder { letter-spacing:normal; font-size:14px; font-weight:400; }
+
+        @media (max-width:640px) {
+          .fp-masthead { top:10px !important; left:14px !important; gap:8px !important; }
+          .fp-masthead-logo { width:44px !important; height:44px !important; }
+          .fp-masthead-text { transform:none !important; }
+          .fp-masthead-hi { display:none !important; }
+          .fp-masthead-en { font-size:13px !important; white-space:normal !important; max-width:150px; line-height:1.2 !important; }
+          .fp-topright { top:10px !important; right:14px !important; gap:8px !important; }
+        }
+        @media (max-width:380px) {
+          .fp-masthead-logo { width:36px !important; height:36px !important; }
+          .fp-masthead-en { font-size:11.5px !important; max-width:120px; }
+        }
       `}</style>
 
       <div className="fp full-vh-min" style={{
@@ -136,14 +149,14 @@ export default function ForgotPasswordScreen({ onBack }) {
         <div className="fixed-bg-img" style={{ zIndex: 1, background: 'linear-gradient(110deg, rgba(2,10,5,.82) 0%, rgba(2,10,5,.62) 45%, rgba(2,10,5,.42) 100%)' }}/>
 
         {/* Masthead — same position/size as the other login screens */}
-        <div style={{ position: 'absolute', top: 14, left: 32, zIndex: 10, display: 'flex', alignItems: 'center', gap: 14 }}>
-          <img src={haryanaLogo} alt="Haryana" loading="lazy" style={{ width: 100, height: 100, objectFit: 'contain' }} />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 1, whiteSpace: 'nowrap', transform: 'translateY(12px)' }}>
-            <span style={{ fontSize: 13, fontWeight: 500, color: 'rgba(255,255,255,.62)', letterSpacing: '.01em' }}>{orgNameHi}</span>
-            <span style={{ fontSize: 18, fontWeight: 700, color: 'rgba(255,255,255,.9)', letterSpacing: '.01em' }}>{orgNameEn}</span>
+        <div className="fp-masthead" style={{ position: 'absolute', top: 14, left: 32, zIndex: 10, display: 'flex', alignItems: 'center', gap: 14, maxWidth: 'calc(100vw - 64px)' }}>
+          <img src={haryanaLogo} alt="Haryana" loading="lazy" className="fp-masthead-logo" style={{ width: 100, height: 100, objectFit: 'contain', flexShrink: 0 }} />
+          <div className="fp-masthead-text" style={{ display: 'flex', flexDirection: 'column', gap: 1, whiteSpace: 'nowrap', transform: 'translateY(12px)', minWidth: 0 }}>
+            <span className="fp-masthead-hi" style={{ fontSize: 13, fontWeight: 500, color: 'rgba(255,255,255,.62)', letterSpacing: '.01em' }}>{orgNameHi}</span>
+            <span className="fp-masthead-en" style={{ fontSize: 18, fontWeight: 700, color: 'rgba(255,255,255,.9)', letterSpacing: '.01em' }}>{orgNameEn}</span>
           </div>
         </div>
-        <div style={{ position: 'absolute', top: 42, right: 32, zIndex: 10, display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div className="fp-topright" style={{ position: 'absolute', top: 42, right: 32, zIndex: 10, display: 'flex', alignItems: 'center', gap: 12 }}>
           <LanguageToggle variant="dark" iconOnly buttonStyle={fpIconStyle} />
           <AccessibilityMenu iconButtonStyle={fpIconStyle} />
         </div>
@@ -181,10 +194,12 @@ export default function ForgotPasswordScreen({ onBack }) {
           {/* ── Step 1 ── */}
           {step === 1 && (
             <form onSubmit={handleRequestOtp}>
-              <button type="button" onClick={onBack}
-                style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.4)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, marginBottom: 14, padding: 0, fontFamily: 'inherit', letterSpacing: '.04em' }}>
-                <ArrowLeft size={12} /> {t('forgotPasswordScreen.backToLogin')}
-              </button>
+              <div style={{ marginBottom: 14, paddingBottom: 14, borderBottom: '1px solid rgba(255,255,255,.1)' }}>
+                <button type="button" onClick={onBack}
+                  style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.4)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, padding: 0, fontFamily: 'inherit', letterSpacing: '.04em' }}>
+                  <ArrowLeft size={12} /> {t('forgotPasswordScreen.backToLogin')}
+                </button>
+              </div>
               <h2 style={{ fontSize: 21, fontWeight: 800, color: '#fff', letterSpacing: '-.02em', marginBottom: 4 }}>{t('forgotPasswordScreen.title')}</h2>
               <p style={{ fontSize: 12.5, color: 'rgba(255,255,255,.42)', marginBottom: 20 }}>
                 {t('forgotPasswordScreen.subtitle')}
@@ -232,10 +247,12 @@ export default function ForgotPasswordScreen({ onBack }) {
           {/* ── Step 2 ── */}
           {step === 2 && (
             <form onSubmit={handleReset}>
-              <button type="button" onClick={() => { setStep(1); setError(''); setOtp(''); }}
-                style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.4)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, marginBottom: 14, padding: 0, fontFamily: 'inherit', letterSpacing: '.04em' }}>
-                <ArrowLeft size={12} /> {t('forgotPasswordScreen.back')}
-              </button>
+              <div style={{ marginBottom: 14, paddingBottom: 14, borderBottom: '1px solid rgba(255,255,255,.1)' }}>
+                <button type="button" onClick={() => { setStep(1); setError(''); setOtp(''); }}
+                  style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.4)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, padding: 0, fontFamily: 'inherit', letterSpacing: '.04em' }}>
+                  <ArrowLeft size={12} /> {t('forgotPasswordScreen.back')}
+                </button>
+              </div>
               <h2 style={{ fontSize: 21, fontWeight: 800, color: '#fff', letterSpacing: '-.02em', marginBottom: 4 }}>{t('forgotPasswordScreen.enterOtpTitle')}</h2>
               <p style={{ fontSize: 12.5, color: 'rgba(255,255,255,.42)', marginBottom: 20 }}>
                 {channel === 'email' ? t('forgotPasswordScreen.otpSentToEmail') : t('forgotPasswordScreen.otpSentToMobile')}

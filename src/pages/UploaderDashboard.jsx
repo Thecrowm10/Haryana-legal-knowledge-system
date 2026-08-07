@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import {
   Upload, FileText, CheckCircle, XCircle, X, TrendingUp, FileType, Download, Clock,
   RotateCcw, AlertCircle, Eye, GitBranch, Plus, FolderPlus,
-  Layers, ChevronRight, AlertTriangle, CheckSquare, Square,
+  Layers, ChevronRight, ChevronDown, AlertTriangle, CheckSquare, Square,
   Edit3, Tag, Search, MessageSquare, MessageCircle, ZoomIn, ZoomOut, RotateCw, ExternalLink,
   Save, ArrowRight, Paperclip,
 } from 'lucide-react';
@@ -1531,6 +1531,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const [tableSearch, setTableSearch] = useState('');
   const [filterType,   setFilterType]   = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
   const [sortCol,     setSortCol]     = useState('uploadedAt');
   const [sortDir,     setSortDir]     = useState('desc');
 
@@ -2558,19 +2559,61 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             </div>
             {/* Type filter: dropdown on mobile (pill row wraps to too many lines to be usable), pills on desktop */}
             {isMobile ? (
-              <select value={filterType} onChange={e => setFilterType(e.target.value)}
-                style={{ ...INPUT_BASE, cursor: 'pointer', appearance: 'none', fontSize: 12.5 }}
-                onFocus={focusStyle} onBlur={blurStyle}>
-                <option value="">{t('table.allTypes')}</option>
-                {TYPES.map(type => {
-                  const count = uploads.filter(d => d.type === type).length;
-                  return (
-                    <option key={type} value={type}>
-                      {(DOC_TYPE_KEY[type] ? t(`docTypes.${DOC_TYPE_KEY[type]}`) : type)} ({count})
-                    </option>
-                  );
-                })}
-              </select>
+              <div style={{ position: 'relative' }}>
+                <button type="button" onClick={() => setTypeDropdownOpen(o => !o)}
+                  style={{
+                    width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                    padding: '10px 14px', borderRadius: 12, cursor: 'pointer', fontFamily: 'var(--font)',
+                    fontSize: 13, fontWeight: 600,
+                    color: filterType ? (TYPE_CARD_COLORS[filterType]?.text || TYPE_CARD_COLORS[filterType]?.accent) : 'var(--text-color)',
+                    background: 'rgba(255,255,255,.5)',
+                    backdropFilter: 'blur(16px) saturate(180%)', WebkitBackdropFilter: 'blur(16px) saturate(180%)',
+                    border: `1px solid ${filterType ? `${TYPE_CARD_COLORS[filterType]?.accent}55` : 'rgba(255,255,255,.7)'}`,
+                    boxShadow: typeDropdownOpen ? '0 4px 18px rgba(0,0,0,.1), inset 0 1px 0 rgba(255,255,255,.6)' : '0 2px 10px rgba(0,0,0,.05), inset 0 1px 0 rgba(255,255,255,.6)',
+                    transition: 'all .15s',
+                  }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {filterType && <span style={{ width: 8, height: 8, borderRadius: '50%', background: TYPE_CARD_COLORS[filterType]?.accent, flexShrink: 0 }} />}
+                    {filterType ? (DOC_TYPE_KEY[filterType] ? t(`docTypes.${DOC_TYPE_KEY[filterType]}`) : filterType) : t('table.allTypes')}
+                  </span>
+                  <ChevronDown size={15} color="var(--text-color-secondary)" style={{ transform: typeDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s', flexShrink: 0 }} />
+                </button>
+                {typeDropdownOpen && (
+                  <>
+                    <div onClick={() => setTypeDropdownOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 150 }} />
+                    <div style={{
+                      position: 'absolute', top: 'calc(100% + 8px)', left: 0, right: 0, zIndex: 160,
+                      background: 'rgba(255,255,255,.7)',
+                      backdropFilter: 'blur(24px) saturate(180%)', WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+                      border: '1px solid rgba(255,255,255,.7)', borderRadius: 14,
+                      boxShadow: '0 20px 56px rgba(0,0,0,.2), inset 0 1px 0 rgba(255,255,255,.7)',
+                      padding: 6, maxHeight: 300, overflowY: 'auto',
+                      animation: 'fadeSlideIn .15s ease',
+                    }}>
+                      <button type="button" onClick={() => { setFilterType(''); setTypeDropdownOpen(false); }}
+                        style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '9px 12px', borderRadius: 9, border: 'none', background: !filterType ? 'rgba(33, 74, 171,.12)' : 'transparent', color: !filterType ? 'var(--primary)' : 'var(--text-color)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                        {t('table.allTypes')}
+                        <span style={{ fontSize: 11, fontFamily: 'var(--mono)', opacity: .6 }}>{uploads.length}</span>
+                      </button>
+                      {TYPES.map(type => {
+                        const count  = uploads.filter(d => d.type === type).length;
+                        const active = filterType === type;
+                        const c = TYPE_CARD_COLORS[type] || { accent: '#94a3b8', bg: 'rgba(148,163,184,.1)', text: '#64748b' };
+                        return (
+                          <button key={type} type="button" onClick={() => { setFilterType(active ? '' : type); setTypeDropdownOpen(false); }}
+                            style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '9px 12px', borderRadius: 9, border: 'none', background: active ? `${c.accent}20` : 'transparent', color: active ? (c.text || c.accent) : 'var(--text-color)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', opacity: count === 0 ? .5 : 1 }}>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span style={{ width: 8, height: 8, borderRadius: '50%', background: c.accent, flexShrink: 0 }} />
+                              {DOC_TYPE_KEY[type] ? t(`docTypes.${DOC_TYPE_KEY[type]}`) : type}
+                            </span>
+                            <span style={{ fontSize: 11, fontFamily: 'var(--mono)', opacity: .6 }}>{count}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
             ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               {TYPES.map(type => {

@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect, useRef } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation, Trans } from 'react-i18next';
 import { Users, Trash2, Edit2, Plus, CheckCircle, XCircle, Building2, X, Eye, EyeOff, Check, Download, FileSpreadsheet, Layers, FileText, Clock, Search, Link2 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
@@ -91,6 +91,14 @@ const ADM_RESPONSIVE_CSS = `
     .adm-users-actions { width: 100% !important; }
     .adm-users-actions > * { flex: 1 1 auto !important; min-width: 0 !important; }
   }
+  .adm-mdm-scroll { scrollbar-width: thin; }
+  .adm-mdm-scroll::-webkit-scrollbar { width: 6px; }
+  .adm-mdm-scroll::-webkit-scrollbar-thumb { background: var(--surface-border); border-radius: 4px; }
+  @media (max-width: 640px) {
+    .adm-filter-bar { flex-direction: column !important; align-items: stretch !important; }
+    .adm-filter-bar > * { width: 100% !important; flex: 1 1 auto !important; margin-left: 0 !important; }
+    .adm-filter-bar button { width: 100% !important; justify-content: center !important; }
+  }
 `;
 
 export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxonomy }) {
@@ -144,6 +152,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   const [deptMdmCreating, setDeptMdmCreating]         = useState(false);
   const [deptMdmCreateError, setDeptMdmCreateError]   = useState('');
   const [mdmToggling, setMdmToggling]                 = useState(null); // { category, id }
+  const [confirmToggleMdm, setConfirmToggleMdm]       = useState(null); // { category, item }
 
   useEffect(() => {
     if (activePage !== 'taxonomy') return;
@@ -415,6 +424,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
 
   function handleMdmToggle(category, item) {
     const id = item.id;
+    setConfirmToggleMdm(null);
     setMdmToggling({ category, id });
     const toggleFn = category === 'Departments' ? toggleDepartment : toggleDocumentType;
     toggleFn(id)
@@ -430,7 +440,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   }
 
   // Add User modal state
-  const EMPTY_ADD_FORM = { username: '', email: '', mobile_number: '', password: '', first_name: '', last_name: '', role_id: '', department_id: '', dept_ids: [] };
+  const EMPTY_ADD_FORM = { username: '', email: '', mobile_number: '', password: '', first_name: '', last_name: '', role_id: '', department_id: '' };
   const [addingUser, setAddingUser]   = useState(false);
   const [addForm, setAddForm]         = useState(EMPTY_ADD_FORM);
   const [addSaving, setAddSaving]     = useState(false);
@@ -438,9 +448,8 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   const [showAddPass, setShowAddPass] = useState(false);
 
   async function handleAddUser() {
-    const isNodal = roles.find(r => String(r.id) === String(addForm.role_id))?.name === 'nodal Officer';
     if (!addForm.role_id)         { setAddError(t('users.errors.roleRequired')); return; }
-    if (isNodal ? addForm.dept_ids.length === 0 : !addForm.department_id) { setAddError(t('users.errors.departmentRequired')); return; }
+    if (!addForm.department_id)   { setAddError(t('users.errors.departmentRequired')); return; }
     if (!addForm.username.trim()) { setAddError(t('users.errors.usernameRequired')); return; }
     if (!addForm.email.trim())    { setAddError(t('users.errors.emailRequired')); return; }
     if (!addForm.password)        { setAddError(t('users.errors.passwordRequired')); return; }
@@ -458,9 +467,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
         first_name:    addForm.first_name.trim(),
         last_name:     addForm.last_name.trim(),
         role_id:       addForm.role_id ? Number(addForm.role_id) : undefined,
-        department_id: isNodal
-          ? (addForm.dept_ids.length > 0 ? addForm.dept_ids.join(',') : undefined)
-          : (addForm.department_id || undefined),
+        department_id: addForm.department_id || undefined,
       });
       setUsers(prev => [normalizeUser(res.data), ...prev]);
       setAddingUser(false);
@@ -480,9 +487,9 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   const [editSaving, setEditSaving]   = useState(false);
   const [editError, setEditError]     = useState('');
   const [togglingId, setTogglingId]   = useState(null);
+  const [confirmToggleUser, setConfirmToggleUser] = useState(null);
 
   function openEdit(u) {
-    const isNodal = u.role === 'nodal Officer';
     setEditingUser(u);
     setEditForm({
       first_name:    u.firstName,
@@ -490,14 +497,12 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       email:         u.email,
       is_active:     u.isActive,
       role_id:       u.roleId,
-      department_id: isNodal ? '' : String(u.deptId ?? ''),
-      dept_ids:      isNodal ? u.deptIds : [],
+      department_id: String(u.deptId ?? ''),
     });
     setEditError('');
   }
 
   function handleEditSave() {
-    const isNodal = roles.find(r => String(r.id) === String(editForm.role_id))?.name === 'nodal Officer';
     setEditSaving(true);
     setEditError('');
     updateUser({
@@ -507,9 +512,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       email:         editForm.email,
       is_active:     editForm.is_active,
       role_id:       editForm.role_id,
-      department_id: isNodal
-        ? (editForm.dept_ids.length > 0 ? editForm.dept_ids.join(',') : undefined)
-        : (editForm.department_id || undefined),
+      department_id: editForm.department_id || undefined,
     })
       .then(res => {
         setUsers(prev => prev.map(u => u.id === editingUser.id ? normalizeUser(res.data) : u));
@@ -523,6 +526,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   }
 
   function handleToggle(u) {
+    setConfirmToggleUser(null);
     setTogglingId(u.id);
     updateUser({
       user_id:       u.id,
@@ -599,7 +603,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
             <div className="adm-users-actions" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <SelectField value={deptFilter} onChange={e => setDeptFilter(e.target.value)} placeholder={t('users.allDepartments')} style={{ width: 200, maxWidth: '100%' }}>
                 <option value="">{t('users.allDepartments')}</option>
-                {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                {depts.filter(d => d.is_active !== false).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
               </SelectField>
               <button
                 onClick={() => { setAddingUser(true); setAddError(''); setAddForm({ ...EMPTY_ADD_FORM, department_id: deptFilter }); setShowAddPass(false); }}
@@ -652,7 +656,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                       <button
                         title={u.isActive ? t('users.deactivate') : t('users.activate')}
                         disabled={togglingId === u.id}
-                        onClick={() => handleToggle(u)}
+                        onClick={() => setConfirmToggleUser(u)}
                         style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: u.isActive ? 'rgba(220, 53, 69,.08)' : 'rgba(25, 135, 84,.08)', border: `1px solid ${u.isActive ? 'rgba(220, 53, 69,.2)' : 'rgba(25, 135, 84,.2)'}`, borderRadius: 7, padding: '7px 10px', cursor: togglingId === u.id ? 'not-allowed' : 'pointer', color: u.isActive ? '#dc3545' : '#198754', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font)', opacity: togglingId === u.id ? 0.5 : 1 }}>
                         {u.isActive ? <XCircle size={12} /> : <CheckCircle size={12} />} {u.isActive ? t('users.deactivate') : t('users.activate')}
                       </button>
@@ -698,7 +702,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                       <button
                         title={u.isActive ? t('users.deactivate') : t('users.activate')}
                         disabled={togglingId === u.id}
-                        onClick={() => handleToggle(u)}
+                        onClick={() => setConfirmToggleUser(u)}
                         style={{ background: u.isActive ? 'rgba(220, 53, 69,.08)' : 'rgba(25, 135, 84,.08)', border: `1px solid ${u.isActive ? 'rgba(220, 53, 69,.2)' : 'rgba(25, 135, 84,.2)'}`, borderRadius: 6, padding: '5px 8px', cursor: togglingId === u.id ? 'not-allowed' : 'pointer', color: u.isActive ? '#dc3545' : '#198754', display: 'flex', opacity: togglingId === u.id ? 0.5 : 1 }}>
                         {u.isActive ? <XCircle size={12} /> : <CheckCircle size={12} />}
                       </button>
@@ -718,14 +722,14 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
           <>
             <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.25)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', zIndex: 300, animation: 'drawerFadeIn .2s ease' }} />
             <div className="adm-drawer" style={{
-              position: 'fixed', right: 0, top: 0, height: '100vh', width: 460,
+              position: 'fixed', right: 0, top: 0, bottom: 0, width: 460,
               background: 'var(--surface-card)', boxShadow: '-4px 0 40px rgba(0,0,0,.18)',
               zIndex: 301, display: 'flex', flexDirection: 'column',
               animation: 'drawerSlideIn .28s cubic-bezier(.22,1,.36,1)',
             }}>
 
               {/* Header */}
-              <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
                 <div>
                   <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)' }}>{t('users.addDrawer.title')}</div>
                   <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-color-secondary)', marginTop: 1 }}>{t('users.addDrawer.subtitle')}</div>
@@ -740,52 +744,28 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
               <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
 
                 {/* Role + Department */}
-                {(() => {
-                  const isNodal = roles.find(r => String(r.id) === String(addForm.role_id))?.name === 'nodal Officer';
-                  return (
-                    <>
-                      <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: isNodal ? '1fr' : '1fr 1fr', gap: 12 }}>
-                        <div>
-                          <label htmlFor="adm-add-role" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.role')} <span style={{ color: '#dc3545' }}>*</span></label>
-                          <SelectField
-                            id="adm-add-role"
-                            required
-                            value={addForm.role_id}
-                            onChange={e => setAddForm(f => ({ ...f, role_id: e.target.value, department_id: '', dept_ids: [] }))}
-                            placeholder={t('users.addDrawer.roleSelectPlaceholder')}
-                          >
-                            {assignableRoles(roles).map(r => (
-                              <option key={r.id} value={r.id}>{r.name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</option>
-                            ))}
-                          </SelectField>
-                        </div>
-                        {!isNodal && (
-                          <div>
-                            <label htmlFor="adm-add-department" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.department')} <span style={{ color: '#dc3545' }}>*</span></label>
-                            <SelectField id="adm-add-department" required value={addForm.department_id} onChange={e => setAddForm(f => ({ ...f, department_id: e.target.value }))} placeholder={t('users.addDrawer.departmentSelectPlaceholder')}>
-                              {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                            </SelectField>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Managed Departments — nodal officer only */}
-                      {isNodal && (
-                        <div>
-                          <label htmlFor="adm-add-dept-multi" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.department')} <span style={{ color: '#dc3545' }}>*</span></label>
-                          <MultiSelectField
-                            id="adm-add-dept-multi"
-                            value={addForm.dept_ids}
-                            onChange={ids => setAddForm(f => ({ ...f, dept_ids: ids }))}
-                            options={depts}
-                            placeholder={t('multiSelect.selectDepartments')}
-                            selectedLabel={count => t('multiSelect.departmentsSelected', { count })}
-                          />
-                        </div>
-                      )}
-                    </>
-                  );
-                })()}
+                <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label htmlFor="adm-add-role" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.role')} <span style={{ color: '#dc3545' }}>*</span></label>
+                    <SelectField
+                      id="adm-add-role"
+                      required
+                      value={addForm.role_id}
+                      onChange={e => setAddForm(f => ({ ...f, role_id: e.target.value, department_id: '' }))}
+                      placeholder={t('users.addDrawer.roleSelectPlaceholder')}
+                    >
+                      {assignableRoles(roles).map(r => (
+                        <option key={r.id} value={r.id}>{r.name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</option>
+                      ))}
+                    </SelectField>
+                  </div>
+                  <div>
+                    <label htmlFor="adm-add-department" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.department')} <span style={{ color: '#dc3545' }}>*</span></label>
+                    <SelectField id="adm-add-department" required value={addForm.department_id} onChange={e => setAddForm(f => ({ ...f, department_id: e.target.value }))} placeholder={t('users.addDrawer.departmentSelectPlaceholder')}>
+                      {depts.filter(d => d.is_active !== false).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                    </SelectField>
+                  </div>
+                </div>
 
                 {/* Username + Email */}
                 <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -862,22 +842,22 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
               </div>
 
               {/* Footer */}
-              <div style={{ padding: '16px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <div style={{ padding: '16px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end', gap: 10, flexShrink: 0 }}>
                 <button onClick={() => setAddingUser(false)}
                   style={{ padding: '9px 18px', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'var(--text-color)', fontFamily: 'var(--font)' }}>
                   {t('users.addDrawer.cancel')}
                 </button>
                 {(() => {
-                  const isNodal = roles.find(r => String(r.id) === String(addForm.role_id))?.name === 'nodal Officer';
-                  const addFormInvalid = !addForm.role_id
-                    || (isNodal ? addForm.dept_ids.length === 0 : !addForm.department_id)
+                  const addFormInvalid = !addForm.role_id || !addForm.department_id
                     || !addForm.username.trim() || !addForm.email.trim() || !addForm.password
                     || !addForm.first_name.trim() || !addForm.last_name.trim()
                     || addForm.mobile_number.trim().length !== 10;
                   const addBtnDisabled = addSaving || addFormInvalid;
                   return (
-                    <button onClick={handleAddUser} disabled={addBtnDisabled}
-                      style={{ padding: '9px 20px', background: addBtnDisabled ? 'var(--surface-border)' : 'var(--primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: addBtnDisabled ? 'not-allowed' : 'pointer', color: addBtnDisabled ? 'var(--text-color-secondary)' : 'white', fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 7 }}>
+                    <button
+                      onClick={() => { if (addFormInvalid) { setAddError(t('users.errors.fillMandatory')); return; } handleAddUser(); }}
+                      disabled={addSaving}
+                      style={{ padding: '9px 20px', background: addBtnDisabled ? 'var(--surface-border)' : 'var(--primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: addSaving ? 'not-allowed' : 'pointer', color: addBtnDisabled ? 'var(--text-color-secondary)' : 'white', fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 7 }}>
                       {addSaving
                         ? <><div style={{ width: 12, height: 12, border: '2px solid rgba(0,0,0,.2)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin .7s linear infinite' }} /> {t('users.addDrawer.creating')}</>
                         : <><Plus size={13} /> {t('users.addDrawer.createUser')}</>
@@ -937,51 +917,29 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                     onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} />
                 </div>
 
-                {(() => {
-                  const isNodal = roles.find(r => String(r.id) === String(editForm.role_id))?.name === 'nodal Officer';
-                  return (
-                    <>
-                      <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: isNodal ? '1fr' : '1fr 1fr', gap: 12 }}>
-                        <div>
-                          <label htmlFor="adm-edit-role" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.role')}</label>
-                          <SelectField
-                            id="adm-edit-role"
-                            value={editForm.role_id ?? ''}
-                            onChange={e => setEditForm(f => ({ ...f, role_id: e.target.value ? Number(e.target.value) : null, department_id: '', dept_ids: [] }))}
-                            placeholder={t('users.editModal.selectRole')}
-                          >
-                            {assignableRoles(roles).map(r => (
-                              <option key={r.id} value={r.id}>{r.name.charAt(0).toUpperCase() + r.name.slice(1)}</option>
-                            ))}
-                          </SelectField>
-                        </div>
-                        {!isNodal && (
-                          <div>
-                            <label htmlFor="adm-edit-department" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.department')}</label>
-                            <SelectField id="adm-edit-department" value={editForm.department_id ?? ''} onChange={e => setEditForm(f => ({ ...f, department_id: e.target.value || null }))} placeholder={t('users.editModal.selectDepartment')}>
-                              {depts.map(d => (
-                                <option key={d.id} value={d.id}>{d.name}</option>
-                              ))}
-                            </SelectField>
-                          </div>
-                        )}
-                      </div>
-                      {isNodal && (
-                        <div>
-                          <label htmlFor="adm-edit-dept-multi" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.department')}</label>
-                          <MultiSelectField
-                            id="adm-edit-dept-multi"
-                            value={editForm.dept_ids}
-                            onChange={ids => setEditForm(f => ({ ...f, dept_ids: ids }))}
-                            options={depts}
-                            placeholder={t('multiSelect.selectDepartments')}
-                            selectedLabel={count => t('multiSelect.departmentsSelected', { count })}
-                          />
-                        </div>
-                      )}
-                    </>
-                  );
-                })()}
+                <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label htmlFor="adm-edit-role" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.role')}</label>
+                    <SelectField
+                      id="adm-edit-role"
+                      value={editForm.role_id ?? ''}
+                      onChange={e => setEditForm(f => ({ ...f, role_id: e.target.value ? Number(e.target.value) : null, department_id: '' }))}
+                      placeholder={t('users.editModal.selectRole')}
+                    >
+                      {assignableRoles(roles).map(r => (
+                        <option key={r.id} value={r.id}>{r.name.charAt(0).toUpperCase() + r.name.slice(1)}</option>
+                      ))}
+                    </SelectField>
+                  </div>
+                  <div>
+                    <label htmlFor="adm-edit-department" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.department')}</label>
+                    <SelectField id="adm-edit-department" value={editForm.department_id ?? ''} onChange={e => setEditForm(f => ({ ...f, department_id: e.target.value || null }))} placeholder={t('users.editModal.selectDepartment')}>
+                      {depts.filter(d => d.is_active !== false).map(d => (
+                        <option key={d.id} value={d.id}>{d.name}</option>
+                      ))}
+                    </SelectField>
+                  </div>
+                </div>
 
                 {/* Active status toggle */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: 'var(--surface-ground)', borderRadius: 10, border: '1px solid var(--surface-border)' }}>
@@ -1023,6 +981,43 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                     </button>
                   );
                 })()}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Activate/Deactivate Confirm Modal */}
+        {confirmToggleUser && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            onClick={e => { if (e.target === e.currentTarget) setConfirmToggleUser(null); }}>
+            <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.45)', backdropFilter: 'blur(4px)' }} />
+            <div style={{
+              position: 'relative', zIndex: 1,
+              background: 'var(--surface-card)',
+              border: '1px solid var(--surface-border)',
+              borderRadius: 16,
+              width: 'clamp(300px, 90vw, 420px)',
+              boxShadow: '0 24px 64px rgba(0,0,0,.25)',
+              padding: '22px',
+            }}>
+              <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)' }}>
+                {confirmToggleUser.isActive ? t('users.confirmToggle.deactivateTitle') : t('users.confirmToggle.activateTitle')}
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--text-color-secondary)', marginTop: 10, lineHeight: 1.5 }}>
+                {confirmToggleUser.isActive
+                  ? <Trans t={t} i18nKey="users.confirmToggle.confirmDeactivate" values={{ name: confirmToggleUser.name }} components={[<strong key="s" style={{ color: 'var(--text-heading)' }} />]} />
+                  : <Trans t={t} i18nKey="users.confirmToggle.confirmActivate" values={{ name: confirmToggleUser.name }} components={[<strong key="s" style={{ color: 'var(--text-heading)' }} />]} />}
+                {confirmToggleUser.isActive && ' ' + t('users.confirmToggle.loginBlockedNote')}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
+                <button onClick={() => setConfirmToggleUser(null)}
+                  style={{ padding: '9px 18px', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'var(--text-color)', fontFamily: 'var(--font)' }}>
+                  {t('users.confirmToggle.cancel')}
+                </button>
+                <button onClick={() => handleToggle(confirmToggleUser)}
+                  style={{ padding: '9px 20px', background: confirmToggleUser.isActive ? '#dc3545' : '#198754', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'white', fontFamily: 'var(--font)' }}>
+                  {confirmToggleUser.isActive ? t('users.confirmToggle.deactivate') : t('users.confirmToggle.activate')}
+                </button>
               </div>
             </div>
           </div>
@@ -1090,6 +1085,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              <div className="adm-mdm-scroll" style={{ display: 'flex', flexDirection: 'column', gap: 5, maxHeight: 340, overflowY: 'auto', overscrollBehavior: 'contain', paddingRight: 4 }}>
               {displayItems.map((item, idx) => {
                 const isApiItem  = isApiDriven;
                 const itemName   = isApiItem ? item.name : item;
@@ -1120,7 +1116,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                         <span style={{ fontSize: 12.5, color: 'var(--text-color)', flex: 1 }}>{itemName}</span>
                         {isApiItem && (
                           <button
-                            onClick={() => handleMdmToggle(cat.category, item)}
+                            onClick={() => setConfirmToggleMdm({ category: cat.category, item })}
                             disabled={isToggling}
                             title={isActive ? t('taxonomy.deactivate') : t('taxonomy.activate')}
                             style={{ background: 'transparent', border: 'none', cursor: isToggling ? 'not-allowed' : 'pointer', color: isActive ? '#dc3545' : '#198754', padding: 2, display: 'flex' }}>
@@ -1145,6 +1141,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                   </div>
                 );
               })}
+              </div>
 
               {(!isApiDriven || canCreateApi) && addState?.category === cat.category && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: 4 }}>
@@ -1275,6 +1272,50 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
           </div>
         </>
       )}
+
+      {/* Activate/Deactivate Confirm Modal (Master Data) */}
+      {confirmToggleMdm && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={e => { if (e.target === e.currentTarget) setConfirmToggleMdm(null); }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.45)', backdropFilter: 'blur(4px)' }} />
+          <div style={{
+            position: 'relative', zIndex: 1,
+            background: 'var(--surface-card)',
+            border: '1px solid var(--surface-border)',
+            borderRadius: 16,
+            width: 'clamp(300px, 90vw, 420px)',
+            boxShadow: '0 24px 64px rgba(0,0,0,.25)',
+            padding: '22px',
+          }}>
+            {(() => {
+              const { category, item } = confirmToggleMdm;
+              const isActive = item.is_active !== false;
+              return (
+                <>
+                  <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)' }}>
+                    {isActive ? t('taxonomy.confirmToggle.deactivateTitle', { category }) : t('taxonomy.confirmToggle.activateTitle', { category })}
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--text-color-secondary)', marginTop: 10, lineHeight: 1.5 }}>
+                    {isActive
+                      ? <Trans t={t} i18nKey="taxonomy.confirmToggle.confirmDeactivate" values={{ name: item.name }} components={[<strong key="s" style={{ color: 'var(--text-heading)' }} />]} />
+                      : <Trans t={t} i18nKey="taxonomy.confirmToggle.confirmActivate" values={{ name: item.name }} components={[<strong key="s" style={{ color: 'var(--text-heading)' }} />]} />}
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
+                    <button onClick={() => setConfirmToggleMdm(null)}
+                      style={{ padding: '9px 18px', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'var(--text-color)', fontFamily: 'var(--font)' }}>
+                      {t('taxonomy.confirmToggle.cancel')}
+                    </button>
+                    <button onClick={() => handleMdmToggle(category, item)}
+                      style={{ padding: '9px 20px', background: isActive ? '#dc3545' : '#198754', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'white', fontFamily: 'var(--font)' }}>
+                      {isActive ? t('taxonomy.confirmToggle.deactivate') : t('taxonomy.confirmToggle.activate')}
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
     </>
     );
   }
@@ -1357,7 +1398,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
 
         {/* Filter bar */}
         <Card>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div className="adm-filter-bar" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             {/* Search */}
             <div style={{ position: 'relative', flex: '1 1 180px', minWidth: 160 }}>
               <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-color-secondary)' }} />
@@ -1370,22 +1411,22 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
             </div>
 
             {/* Entity type */}
-            <select
+            <SelectField
               value={auditFilterEntity}
               onChange={e => { setAuditFilterEntity(e.target.value); setAuditPage(0); }}
-              style={{ height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, padding: '0 10px', background: 'var(--surface-ground)', color: 'var(--text-color)', cursor: 'pointer' }}>
+              style={{ flex: '0 0 155px' }}>
               {auditEntityOptions(t).map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
+            </SelectField>
 
             {/* Status */}
-            <select
+            <SelectField
               value={auditFilterStatus}
               onChange={e => { setAuditFilterStatus(e.target.value); setAuditPage(0); }}
-              style={{ height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, padding: '0 10px', background: 'var(--surface-ground)', color: 'var(--text-color)', cursor: 'pointer' }}>
+              style={{ flex: '0 0 130px' }}>
               <option value="">{t('audit.allStatuses')}</option>
               <option value="success">{t('audit.success')}</option>
               <option value="failure">{t('audit.failure')}</option>
-            </select>
+            </SelectField>
 
             {/* Date from */}
             <input type="date" value={auditFromDate} onChange={e => { setAuditFromDate(e.target.value); setAuditPage(0); }}
@@ -1520,10 +1561,15 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     const pendingDocs  = allDocs.filter(d => d.status === 'pending').length;
     const rejectedDocs = allDocs.filter(d => d.status === 'rejected').length;
 
+    // Uploader/Approver options are scoped to the selected department — pick a
+    // department first and only that department's people show up; "All Departments"
+    // shows everyone system-wide.
+    const deptScopedForOptions = uploadsFilterDept ? allDocs.filter(d => d.department_name === uploadsFilterDept) : allDocs;
+
     // unique uploaders
     const uploaderOptions = [];
     const seenUp = new Set();
-    for (const d of allDocs) {
+    for (const d of deptScopedForOptions) {
       if (d.uploader_username && !seenUp.has(d.uploader_username)) {
         seenUp.add(d.uploader_username);
         const label = [d.uploader_first_name, d.uploader_last_name].filter(Boolean).join(' ') || d.uploader_username;
@@ -1533,7 +1579,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     // unique approvers
     const approverOptions = [];
     const seenAp = new Set();
-    for (const d of allDocs) {
+    for (const d of deptScopedForOptions) {
       const key = d.latest_approval?.approver_username;
       if (key && !seenAp.has(key)) {
         seenAp.add(key);
@@ -1612,7 +1658,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
 
         {/* Filter bar + table */}
         <Card padding="0">
-          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div className="adm-filter-bar" style={{ padding: '14px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <div style={{ position: 'relative', flex: '1 1 200px', minWidth: 180 }}>
               <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-color-secondary)', pointerEvents: 'none' }} />
               <input
@@ -1622,6 +1668,10 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 style={{ width: '100%', padding: '7px 12px 7px 30px', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, color: 'var(--text-color)', outline: 'none', boxSizing: 'border-box' }}
               />
             </div>
+            <SelectField value={uploadsFilterDept} onChange={e => { setUploadsFilterDept(e.target.value); setUploadsFilterUploader(''); setUploadsFilterApprover(''); }} style={{ flex: '0 0 155px' }}>
+              <option value="">{t('uploads.allDepartments')}</option>
+              {depts.filter(d => d.is_active !== false).map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+            </SelectField>
             <SelectField value={uploadsFilterUploader} onChange={e => setUploadsFilterUploader(e.target.value)} style={{ flex: '0 0 155px' }}>
               <option value="">{t('uploads.allUploaders')}</option>
               {uploaderOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -1629,10 +1679,6 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
             <SelectField value={uploadsFilterApprover} onChange={e => setUploadsFilterApprover(e.target.value)} style={{ flex: '0 0 155px' }}>
               <option value="">{t('uploads.allApprovers')}</option>
               {approverOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </SelectField>
-            <SelectField value={uploadsFilterDept} onChange={e => setUploadsFilterDept(e.target.value)} style={{ flex: '0 0 155px' }}>
-              <option value="">{t('uploads.allDepartments')}</option>
-              {depts.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
             </SelectField>
             <SelectField value={uploadsFilterStatus} onChange={e => setUploadsFilterStatus(e.target.value)} style={{ flex: '0 0 130px' }}>
               <option value="">{t('uploads.allStatuses')}</option>
@@ -1906,7 +1952,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
 
         {/* Filter + table */}
         <Card padding="0">
-          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div className="adm-filter-bar" style={{ padding: '14px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <div style={{ position: 'relative', flex: '1 1 200px', minWidth: 180 }}>
               <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-color-secondary)', pointerEvents: 'none' }} />
               <input
