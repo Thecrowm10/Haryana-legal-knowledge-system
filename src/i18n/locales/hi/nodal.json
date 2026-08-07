@@ -52,6 +52,10 @@
       "roleSelectPlaceholder": "भूमिका चुनें",
       "department": "विभाग",
       "departmentSelectPlaceholder": "विभाग चुनें",
+      "approver": "अनुमोदक नियुक्त करें",
+      "approverSelectPlaceholder": "अनुमोदक चुनें",
+      "loadingApprovers": "अनुमोदक लोड हो रहे हैं…",
+      "noApproversInDept": "इस विभाग में कोई अनुमोदक नहीं मिला। पहले एक अनुमोदक खाता बनाएं।",
       "cancel": "रद्द करें",
       "createUser": "उपयोगकर्ता बनाएं",
       "creating": "बनाया जा रहा है…"
@@ -87,6 +91,7 @@
       "passwordRequired": "पासवर्ड आवश्यक है।",
       "mobileRequired": "एक मान्य 10-अंकों का मोबाइल नंबर आवश्यक है।",
       "departmentRequired": "विभाग आवश्यक है।",
+      "approverRequired": "कृपया इस अपलोडर के लिए एक अनुमोदक चुनें।",
       "createFailed": "उपयोगकर्ता बनाने में विफल।",
       "saveFailed": "परिवर्तन सहेजने में विफल।",
       "fillMandatory": "कृपया आगे बढ़ने से पहले सभी अनिवार्य फ़ील्ड भरें।"

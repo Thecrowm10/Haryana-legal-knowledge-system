@@ -52,6 +52,10 @@
       "roleSelectPlaceholder": "Select Role",
       "department": "Department",
       "departmentSelectPlaceholder": "Select Department",
+      "approver": "Assign Approver",
+      "approverSelectPlaceholder": "Select Approver",
+      "loadingApprovers": "Loading approvers…",
+      "noApproversInDept": "No approvers found in this department. Create an approver account first.",
       "cancel": "Cancel",
       "createUser": "Create User",
       "creating": "Creating…"
@@ -87,6 +91,7 @@
       "passwordRequired": "Password is required.",
       "mobileRequired": "A valid 10-digit mobile number is required.",
       "departmentRequired": "Department is required.",
+      "approverRequired": "Please select an approver for this uploader.",
       "createFailed": "Failed to create user.",
       "saveFailed": "Failed to save changes.",
       "fillMandatory": "Please fill all mandatory fields before continuing."
