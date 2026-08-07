@@ -8,7 +8,7 @@ import MultiSelectField from '../components/ui/MultiSelectField';
 import DocViewModal from '../components/DocViewModal';
 import { getUsers, getRoles, updateUser, registerUser, getApproversByDepartment } from '../services/users';
 import { getDepartments, createDepartment, toggleDepartment, getDocumentTypes, createDocumentType, toggleDocumentType } from '../services/departments';
-import { getRoleCaps, upsertRoleCap, deleteRoleCap } from '../services/roleCaps';
+import { getRoleCaps, upsertRoleCap, deleteRoleCap, getActiveUserCount } from '../services/roleCaps';
 import { getAllDocumentsAdmin, getAllDepartmentLinks } from '../services/pdf';
 import { getAuditLogs } from '../services/audit';
 import { useMediaQuery } from '../hooks/useMediaQuery';
@@ -344,15 +344,23 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   const [capSaving, setCapSaving]       = useState(false);
   const [capEditId, setCapEditId]       = useState(null);
   const [capEditVal, setCapEditVal]     = useState('');
-  const [capDeptSearch, setCapDeptSearch] = useState('');
-  const [capDeptOpen, setCapDeptOpen]     = useState(false);
+  const [capDeptSearch, setCapDeptSearch]   = useState('');
+  const [capDeptOpen, setCapDeptOpen]       = useState(false);
+  const [capActiveCount, setCapActiveCount] = useState(null);
 
   useEffect(() => {
-    if (!capForm.department_id || !capForm.role_id) return;
+    if (!capForm.department_id || !capForm.role_id) {
+      setCapActiveCount(null);
+      return;
+    }
     const existing = caps.find(
       c => String(c.department_id) === String(capForm.department_id) && String(c.role_id) === String(capForm.role_id)
     );
     setCapForm(f => ({ ...f, max_users: existing ? String(existing.max_users) : (capsDefaultMax != null ? String(capsDefaultMax) : '') }));
+    setCapActiveCount(null);
+    getActiveUserCount(capForm.department_id, capForm.role_id)
+      .then(res => setCapActiveCount(res.data.active_count))
+      .catch(() => setCapActiveCount(null));
   }, [capForm.department_id, capForm.role_id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -376,10 +384,14 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     if (!capForm.role_id)       { setCapFormError(t('roleCaps.errors.roleRequired')); return; }
     const max = parseInt(capForm.max_users, 10);
     if (isNaN(max) || max < 0) { setCapFormError(t('roleCaps.errors.maxRequired')); return; }
+    if (capActiveCount !== null && max < capActiveCount) {
+      setCapFormError(t('roleCaps.errors.belowActiveCount', { count: capActiveCount, defaultValue: `${capActiveCount} users are already active with this role in this department. Cap must be at least ${capActiveCount}.` }));
+      return;
+    }
     setCapSaving(true);
     setCapFormError('');
     upsertRoleCap({ department_id: Number(capForm.department_id), role_id: Number(capForm.role_id), max_users: max })
-      .then(() => getRoleCaps().then(r => { setCapsDefaultMax(r.data.default_max); setCaps(r.data.limits); setCapForm({ department_id: '', role_id: '', max_users: '' }); setCapDeptSearch(''); }))
+      .then(() => getRoleCaps().then(r => { setCapsDefaultMax(r.data.default_max); setCaps(r.data.limits); setCapForm({ department_id: '', role_id: '', max_users: '' }); setCapDeptSearch(''); setCapActiveCount(null); }))
       .catch(() => setCapFormError(t('roleCaps.errors.saveFailed')))
       .finally(() => setCapSaving(false));
   }
@@ -2299,8 +2311,15 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                   {capSaving ? t('roleCaps.saving') : t('roleCaps.save')}
                 </button>
               </div>
+              {capActiveCount !== null && (
+                <div style={{ marginTop: 6, fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
+                  {capActiveCount === 0
+                    ? t('roleCaps.activeCountZero', 'No active users currently.')
+                    : t('roleCaps.activeCount', { count: capActiveCount, defaultValue: `${capActiveCount} active user${capActiveCount > 1 ? 's' : ''} currently.` })}
+                </div>
+              )}
               {capFormError && (
-                <div style={{ marginTop: 8, fontSize: 12, color: '#dc3545' }}>{capFormError}</div>
+                <div style={{ marginTop: 6, fontSize: 12, color: '#dc3545' }}>{capFormError}</div>
               )}
             </form>
           </Card>
