@@ -1226,6 +1226,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const editContainerRef = useRef(null);
   const editSuppressRef  = useRef(false);
   const editDocxViewRef  = useRef(null);
+  const [editFileRef, setEditFileRef] = useState(null); // file_ref from pre-upload on file select
+  const editManualBlobRef = useRef(null); // blob URL created from a locally selected file (needs manual revoke)
 
   // Loads (or reloads) the current type's document table from the API.
   // Shared by the effect below and by saveEditDoc so the table reflects an edit immediately.
@@ -1283,6 +1285,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     setEditForm(null);
     setEditError('');
     setEditFileSelected(null);
+    setEditFileRef(null);
     setEditFileResubmit(false);
     setEditBlobUrl(null);
     setEditPdfDoc(null);
@@ -1291,6 +1294,10 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     setEditZoom(100);
     setEditRotation(0);
     setEditDocxHtml(null);
+    if (editManualBlobRef.current) {
+      URL.revokeObjectURL(editManualBlobRef.current);
+      editManualBlobRef.current = null;
+    }
   }
 
   async function saveEditDoc() {
@@ -1301,17 +1308,23 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     const typeId = editingDoc.docTypeId ?? typesData.find(d => d.name === editingDoc.type)?.id ?? null;
     let description = editForm.description;
     try {
-      // 1. If a new file was chosen — upload it, replace the stored file, get fresh summary
+      // 1. If a new file was chosen — use the pre-uploaded ref (from handleEditFileSelect),
+      //    or upload now if the pre-upload hasn't finished yet.
       if (editFileSelected) {
-        setEditFileUploading(true);
-        const fd = new FormData();
-        fd.append('file', editFileSelected);
-        const uploadRes = await uploadPdfFile(fd);
-        const { file_ref, summary } = uploadRes.data;
-        setEditFileUploading(false);
-        if (summary) {
-          description = summary;
-          setEditForm(f => ({ ...f, description: summary }));
+        let file_ref = editFileRef;
+        if (!file_ref) {
+          setEditFileUploading(true);
+          const fd = new FormData();
+          fd.append('file', editFileSelected);
+          const uploadRes = await uploadPdfFile(fd);
+          file_ref = uploadRes.data.file_ref;
+          setEditFileUploading(false);
+          if (uploadRes.data.summary) {
+            description = uploadRes.data.summary;
+            setEditForm(f => ({ ...f, description: uploadRes.data.summary }));
+          }
+        } else {
+          description = editForm.description; // already updated by handleEditFileSelect
         }
         // Rejected docs are always resubmitted when file is replaced
         const resubmit = editingDoc.status === 'rejected';
@@ -1452,6 +1465,47 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       if (vis > bestVis) { bestVis = vis; best = i; }
     });
     if (best + 1 !== editCurrentPage) setEditCurrentPage(best + 1);
+  }
+
+  async function handleEditFileSelect(file) {
+    setEditFileSelected(file);
+    setEditFileRef(null);
+
+    // Immediately show the selected file in the left panel
+    if (editManualBlobRef.current) {
+      URL.revokeObjectURL(editManualBlobRef.current);
+      editManualBlobRef.current = null;
+    }
+    setEditPdfDoc(null);
+    setEditCurrentPage(1);
+    setEditTotalPages(1);
+    setEditDocxHtml(null);
+
+    const isDocx = file.type.includes('wordprocessingml') || file.name.toLowerCase().endsWith('.docx');
+    if (isDocx) {
+      try {
+        const buf = await file.arrayBuffer();
+        const { value } = await mammoth.convertToHtml({ arrayBuffer: buf });
+        setEditDocxHtml(value);
+      } catch { /* show nothing on failure */ }
+    } else {
+      const url = URL.createObjectURL(file);
+      editManualBlobRef.current = url;
+      setEditBlobUrl(url);
+    }
+
+    // Pre-upload to get description/summary
+    setEditFileUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await uploadPdfFile(fd);
+      setEditFileRef(res.data.file_ref);
+      if (res.data.summary) {
+        setEditForm(f => ({ ...f, description: res.data.summary }));
+      }
+    } catch { /* non-fatal — save will retry the upload */ }
+    finally { setEditFileUploading(false); }
   }
 
   const [files, setFiles]           = useState([]);
@@ -2741,20 +2795,47 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                           {t('replaceFileModal.title')} <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-color-secondary)', textTransform: 'none', letterSpacing: 0 }}>({t('common.optional', 'optional')})</span>
                         </div>
                         <input ref={editFileInputRef} type="file" accept=".pdf,.docx" style={{ display: 'none' }}
-                          onChange={e => { const f = e.target.files?.[0]; if (f) setEditFileSelected(f); e.target.value = ''; }} />
+                          onChange={e => { const f = e.target.files?.[0]; if (f) handleEditFileSelect(f); e.target.value = ''; }} />
                         {editFileSelected ? (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(33,74,171,.3)', background: 'rgba(33,74,171,.05)' }}>
                             <FileText size={14} color="var(--primary)" style={{ flexShrink: 0 }} />
                             <span style={{ flex: 1, fontSize: 12.5, color: 'var(--text-color)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{editFileSelected.name}</span>
                             <span style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', whiteSpace: 'nowrap' }}>({(editFileSelected.size / 1024).toFixed(0)} KB)</span>
-                            <button type="button" onClick={() => setEditFileSelected(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', padding: 0 }}><X size={13} /></button>
+                            <button type="button" onClick={() => {
+                              setEditFileSelected(null);
+                              setEditFileRef(null);
+                              if (editManualBlobRef.current) {
+                                URL.revokeObjectURL(editManualBlobRef.current);
+                                editManualBlobRef.current = null;
+                              }
+                              // Restore the original document in the viewer
+                              setEditBlobUrl(null);
+                              setEditPdfDoc(null);
+                              setEditDocxHtml(null);
+                              setEditCurrentPage(1);
+                              setEditTotalPages(1);
+                              if (editingDoc) {
+                                let url = null;
+                                getPdfFile(editingDoc.id)
+                                  .then(res => {
+                                    const ct = (res.headers['content-type'] || '').toLowerCase();
+                                    if (ct.includes('wordprocessingml') || ct.includes('officedocument')) {
+                                      return mammoth.convertToHtml({ arrayBuffer: res.data }).then(r => setEditDocxHtml(r.value));
+                                    }
+                                    const blob = new Blob([res.data], { type: 'application/pdf' });
+                                    url = URL.createObjectURL(blob);
+                                    setEditBlobUrl(url);
+                                  })
+                                  .catch(() => {});
+                              }
+                            }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', padding: 0 }}><X size={13} /></button>
                           </div>
                         ) : (
                           <div style={{ border: '2px dashed var(--surface-border)', borderRadius: 8, padding: '16px', textAlign: 'center', cursor: 'pointer', background: 'var(--surface-ground)', transition: 'all .15s' }}
                             onClick={() => editFileInputRef.current?.click()}
                             onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.background = 'rgba(33,74,171,.04)'; }}
                             onDragLeave={e => { e.currentTarget.style.borderColor = ''; e.currentTarget.style.background = 'var(--surface-ground)'; }}
-                            onDrop={e => { e.preventDefault(); e.currentTarget.style.borderColor = ''; e.currentTarget.style.background = 'var(--surface-ground)'; const f = e.dataTransfer.files[0]; if (f) setEditFileSelected(f); }}>
+                            onDrop={e => { e.preventDefault(); e.currentTarget.style.borderColor = ''; e.currentTarget.style.background = 'var(--surface-ground)'; const f = e.dataTransfer.files[0]; if (f) handleEditFileSelect(f); }}>
                             <Upload size={18} color="var(--text-color-secondary)" style={{ marginBottom: 4 }} />
                             <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)' }}>{t('replaceFileModal.dropzone')}</div>
                             <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 3, opacity: .7 }}>PDF or Word (.docx)</div>
@@ -3140,12 +3221,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
                             <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)' }}>{doc.uploadedAt}</span>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                              {(doc.status === 'pending' || doc.status === 'rejected') && (
-                                <button onClick={() => openEditDoc(doc)}
-                                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 10px', borderRadius: 7, border: '1px solid rgba(100,116,139,.3)', background: 'rgba(100,116,139,.07)', color: '#475569', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                                  <Edit3 size={12} /> {t('editDocument.editButton')}
-                                </button>
-                              )}
                               {doc.approval?.comments && (
                                 <button onClick={() => setRemarksModal(doc)}
                                   style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 10px', borderRadius: 7, border: `1px solid ${statusBorder}`, background: statusBg, color: statusAccent, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
@@ -3817,20 +3892,47 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                           {t('replaceFileModal.title')} <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-color-secondary)', textTransform: 'none', letterSpacing: 0 }}>({t('common.optional', 'optional')})</span>
                         </div>
                         <input ref={editFileInputRef} type="file" accept=".pdf,.docx" style={{ display: 'none' }}
-                          onChange={e => { const f = e.target.files?.[0]; if (f) setEditFileSelected(f); e.target.value = ''; }} />
+                          onChange={e => { const f = e.target.files?.[0]; if (f) handleEditFileSelect(f); e.target.value = ''; }} />
                         {editFileSelected ? (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(33,74,171,.3)', background: 'rgba(33,74,171,.05)' }}>
                             <FileText size={14} color="var(--primary)" style={{ flexShrink: 0 }} />
                             <span style={{ flex: 1, fontSize: 12.5, color: 'var(--text-color)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{editFileSelected.name}</span>
                             <span style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', whiteSpace: 'nowrap' }}>({(editFileSelected.size / 1024).toFixed(0)} KB)</span>
-                            <button type="button" onClick={() => setEditFileSelected(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', padding: 0 }}><X size={13} /></button>
+                            <button type="button" onClick={() => {
+                              setEditFileSelected(null);
+                              setEditFileRef(null);
+                              if (editManualBlobRef.current) {
+                                URL.revokeObjectURL(editManualBlobRef.current);
+                                editManualBlobRef.current = null;
+                              }
+                              // Restore the original document in the viewer
+                              setEditBlobUrl(null);
+                              setEditPdfDoc(null);
+                              setEditDocxHtml(null);
+                              setEditCurrentPage(1);
+                              setEditTotalPages(1);
+                              if (editingDoc) {
+                                let url = null;
+                                getPdfFile(editingDoc.id)
+                                  .then(res => {
+                                    const ct = (res.headers['content-type'] || '').toLowerCase();
+                                    if (ct.includes('wordprocessingml') || ct.includes('officedocument')) {
+                                      return mammoth.convertToHtml({ arrayBuffer: res.data }).then(r => setEditDocxHtml(r.value));
+                                    }
+                                    const blob = new Blob([res.data], { type: 'application/pdf' });
+                                    url = URL.createObjectURL(blob);
+                                    setEditBlobUrl(url);
+                                  })
+                                  .catch(() => {});
+                              }
+                            }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', padding: 0 }}><X size={13} /></button>
                           </div>
                         ) : (
                           <div style={{ border: '2px dashed var(--surface-border)', borderRadius: 8, padding: '16px', textAlign: 'center', cursor: 'pointer', background: 'var(--surface-ground)', transition: 'all .15s' }}
                             onClick={() => editFileInputRef.current?.click()}
                             onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.background = 'rgba(33,74,171,.04)'; }}
                             onDragLeave={e => { e.currentTarget.style.borderColor = ''; e.currentTarget.style.background = 'var(--surface-ground)'; }}
-                            onDrop={e => { e.preventDefault(); e.currentTarget.style.borderColor = ''; e.currentTarget.style.background = 'var(--surface-ground)'; const f = e.dataTransfer.files[0]; if (f) setEditFileSelected(f); }}>
+                            onDrop={e => { e.preventDefault(); e.currentTarget.style.borderColor = ''; e.currentTarget.style.background = 'var(--surface-ground)'; const f = e.dataTransfer.files[0]; if (f) handleEditFileSelect(f); }}>
                             <Upload size={18} color="var(--text-color-secondary)" style={{ marginBottom: 4 }} />
                             <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)' }}>{t('replaceFileModal.dropzone')}</div>
                             <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 3, opacity: .7 }}>PDF or Word (.docx)</div>
