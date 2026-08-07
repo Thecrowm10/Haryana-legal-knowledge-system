@@ -6,7 +6,7 @@ import Badge from '../components/ui/Badge';
 import SelectField from '../components/ui/SelectField';
 import MultiSelectField from '../components/ui/MultiSelectField';
 import DocViewModal from '../components/DocViewModal';
-import { getUsers, getRoles, updateUser, registerUser } from '../services/users';
+import { getUsers, getRoles, updateUser, registerUser, getApproversByDepartment } from '../services/users';
 import { getMyDepartments } from '../services/departments';
 import { getAllDocumentsAdmin, getAllDepartmentLinks } from '../services/pdf';
 import { getAuditLogs } from '../services/audit';
@@ -162,12 +162,26 @@ export default function NodalOfficerDashboard({ activePage }) {
   }, [activePage, t]);
 
   // Add User drawer state
-  const EMPTY_ADD_FORM = { username: '', email: '', mobile_number: '', password: '', first_name: '', last_name: '', role_id: '', department_id: '' };
+  const EMPTY_ADD_FORM = { username: '', email: '', mobile_number: '', password: '', first_name: '', last_name: '', role_id: '', department_id: '', approver_id: '' };
   const [addingUser, setAddingUser]   = useState(false);
   const [addForm, setAddForm]         = useState(EMPTY_ADD_FORM);
   const [addSaving, setAddSaving]     = useState(false);
   const [addError, setAddError]       = useState('');
   const [showAddPass, setShowAddPass] = useState(false);
+  const [approvers, setApprovers]         = useState([]);
+  const [approversLoading, setApproversLoading] = useState(false);
+
+  const selectedRoleName = roles.find(r => r.id === Number(addForm.role_id))?.name?.toLowerCase() || '';
+  const isUploader = selectedRoleName === 'uploader';
+
+  useEffect(() => {
+    if (!isUploader || !addForm.department_id) { setApprovers([]); return; }
+    setApproversLoading(true);
+    getApproversByDepartment(addForm.department_id)
+      .then(res => setApprovers(res.data || []))
+      .catch(() => setApprovers([]))
+      .finally(() => setApproversLoading(false));
+  }, [isUploader, addForm.department_id]);
 
   function handleAddUser() {
     if (!addForm.username.trim())    { setAddError(t('users.errors.usernameRequired')); return; }
@@ -175,6 +189,7 @@ export default function NodalOfficerDashboard({ activePage }) {
     if (!addForm.password)           { setAddError(t('users.errors.passwordRequired')); return; }
     if (!addForm.department_id)      { setAddError(t('users.errors.departmentRequired')); return; }
     if (addForm.mobile_number.trim().length !== 10) { setAddError(t('users.errors.mobileRequired')); return; }
+    if (isUploader && !addForm.approver_id) { setAddError(t('users.errors.approverRequired')); return; }
     setAddSaving(true);
     setAddError('');
     registerUser({
@@ -186,6 +201,7 @@ export default function NodalOfficerDashboard({ activePage }) {
       last_name:     addForm.last_name.trim(),
       role_id:       addForm.role_id ? Number(addForm.role_id) : undefined,
       department_id: String(addForm.department_id),
+      ...(isUploader && addForm.approver_id ? { approver_id: Number(addForm.approver_id) } : {}),
     })
       .then(res => {
         setUsers(prev => [normalizeUser(res.data), ...prev]);
@@ -700,7 +716,7 @@ export default function NodalOfficerDashboard({ activePage }) {
                 <div className="nod-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
                     <label htmlFor="nod-add-role" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.role')}</label>
-                    <SelectField id="nod-add-role" value={addForm.role_id} onChange={e => setAddForm(f => ({ ...f, role_id: e.target.value }))} placeholder={t('users.addDrawer.roleSelectPlaceholder')}>
+                    <SelectField id="nod-add-role" value={addForm.role_id} onChange={e => setAddForm(f => ({ ...f, role_id: e.target.value, approver_id: '' }))} placeholder={t('users.addDrawer.roleSelectPlaceholder')}>
                       {assignableRoles(roles).map(r => (
                         <option key={r.id} value={r.id}>{r.name.charAt(0).toUpperCase() + r.name.slice(1)}</option>
                       ))}
@@ -708,11 +724,37 @@ export default function NodalOfficerDashboard({ activePage }) {
                   </div>
                   <div>
                     <label htmlFor="nod-add-department" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.department')} <span style={{ color: '#dc3545' }}>*</span></label>
-                    <SelectField id="nod-add-department" value={addForm.department_id} onChange={e => setAddForm(f => ({ ...f, department_id: e.target.value }))} placeholder={t('users.addDrawer.departmentSelectPlaceholder')}>
+                    <SelectField id="nod-add-department" value={addForm.department_id} onChange={e => setAddForm(f => ({ ...f, department_id: e.target.value, approver_id: '' }))} placeholder={t('users.addDrawer.departmentSelectPlaceholder')}>
                       {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                     </SelectField>
                   </div>
                 </div>
+
+                {/* Approver mapping — shown only when Uploader role is selected and a department is chosen */}
+                {isUploader && addForm.department_id && (
+                  <div>
+                    <label htmlFor="nod-add-approver" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>
+                      {t('users.addDrawer.approver')} <span style={{ color: '#dc3545' }}>*</span>
+                    </label>
+                    <SelectField
+                      id="nod-add-approver"
+                      value={addForm.approver_id}
+                      onChange={e => setAddForm(f => ({ ...f, approver_id: e.target.value }))}
+                      placeholder={approversLoading ? t('users.addDrawer.loadingApprovers') : t('users.addDrawer.approverSelectPlaceholder')}
+                      disabled={approversLoading}>
+                      {approvers.map(a => (
+                        <option key={a.id} value={a.id}>
+                          {a.first_name || a.last_name ? `${a.first_name || ''} ${a.last_name || ''}`.trim() : a.username}
+                        </option>
+                      ))}
+                    </SelectField>
+                    {!approversLoading && approvers.length === 0 && (
+                      <div style={{ fontSize: 11.5, color: '#d97706', marginTop: 5 }}>
+                        {t('users.addDrawer.noApproversInDept')}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {addError && (
                   <div style={{ padding: '9px 12px', background: 'rgba(220, 53, 69,.08)', border: '1px solid rgba(220, 53, 69,.25)', borderRadius: 8, fontSize: 12.5, color: '#dc3545', display: 'flex', gap: 7, alignItems: 'center' }}>
@@ -728,7 +770,7 @@ export default function NodalOfficerDashboard({ activePage }) {
                   {t('users.addDrawer.cancel')}
                 </button>
                 {(() => {
-                  const addFormInvalid = !addForm.username.trim() || !addForm.email.trim() || !addForm.password || !addForm.department_id || addForm.mobile_number.trim().length !== 10;
+                  const addFormInvalid = !addForm.username.trim() || !addForm.email.trim() || !addForm.password || !addForm.department_id || addForm.mobile_number.trim().length !== 10 || (isUploader && !addForm.approver_id);
                   const addBtnDisabled = addSaving || addFormInvalid;
                   return (
                     <button onClick={handleAddUser} disabled={addBtnDisabled}
