@@ -682,11 +682,14 @@ export default function NodalOfficerDashboard({ activePage }) {
                       onChange={e => setAddForm(f => ({ ...f, approver_id: e.target.value }))}
                       placeholder={approversLoading ? t('users.addDrawer.loadingApprovers') : t('users.addDrawer.approverSelectPlaceholder')}
                       disabled={approversLoading}>
-                      {approvers.map(a => (
-                        <option key={a.id} value={a.id}>
-                          {a.first_name || a.last_name ? `${a.first_name || ''} ${a.last_name || ''}`.trim() : a.username}
-                        </option>
-                      ))}
+                      {approvers.map(a => {
+                        const name = `${a.first_name || ''} ${a.last_name || ''}`.trim();
+                        return (
+                          <option key={a.id} value={a.id}>
+                            {name ? `${name}, ${a.username}` : a.username}
+                          </option>
+                        );
+                      })}
                     </SelectField>
                     {!approversLoading && approvers.length === 0 && (
                       <div style={{ fontSize: 11.5, color: '#d97706', marginTop: 5 }}>
