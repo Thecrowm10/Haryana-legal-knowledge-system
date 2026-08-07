@@ -352,7 +352,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     const existing = caps.find(
       c => String(c.department_id) === String(capForm.department_id) && String(c.role_id) === String(capForm.role_id)
     );
-    setCapForm(f => ({ ...f, max_users: existing ? String(existing.max_users) : '' }));
+    setCapForm(f => ({ ...f, max_users: existing ? String(existing.max_users) : (capsDefaultMax != null ? String(capsDefaultMax) : '') }));
   }, [capForm.department_id, capForm.role_id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
