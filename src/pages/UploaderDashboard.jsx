@@ -1335,6 +1335,12 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         const resubmit = editingDoc.status === 'rejected';
         const replaceRes = await replaceDocumentFile(editingDoc.id, file_ref, resubmit);
         const updatedDoc = mapApiDoc(replaceRes.data);
+        // Old annotation positions don't apply to the new file — clear them immediately
+        // in local state so DocViewModal never renders stale highlights, even before
+        // the DB-level patch has had a chance to propagate through getMyDocuments().
+        if (updatedDoc.approval) {
+          updatedDoc.approval = { ...updatedDoc.approval, annotations_json: null };
+        }
         setUploads(prev => prev.map(d => d.id === updatedDoc.id ? updatedDoc : d));
       }
 
