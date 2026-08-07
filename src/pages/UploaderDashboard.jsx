@@ -1229,21 +1229,20 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const [editFileRef, setEditFileRef] = useState(null); // file_ref from pre-upload on file select
   const editManualBlobRef = useRef(null); // blob URL created from a locally selected file (needs manual revoke)
   const [editDescPreview, setEditDescPreview] = useState(false);
+  const [editFormOriginal, setEditFormOriginal] = useState(null);
 
   // Loads (or reloads) the current type's document table from the API.
   // Shared by the effect below and by saveEditDoc so the table reflects an edit immediately.
   const refreshEditList = useCallback(() => {
     if (!editType) return;
-    const typeId = typesData.find(d => d.name === editType)?.id;
-    if (!typeId) { setEditList([]); return () => {}; }
     let cancelled = false;
     setEditListLoading(true);
     setEditListError('');
-    getMyDepartmentDocsByType(typeId, null, 0, 200)
+    getMyDocuments()
       .then(res => {
         if (cancelled) return;
-        const list = res.data?.documents || res.data?.results || (Array.isArray(res.data) ? res.data : []);
-        setEditList(list.map(mapApiDoc));
+        const all = (res.data?.documents || []).map(mapApiDoc);
+        setEditList(all.filter(d => d.type === editType));
       })
       .catch(err => {
         if (cancelled) return;
@@ -1253,7 +1252,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       })
       .finally(() => { if (!cancelled) setEditListLoading(false); });
     return () => { cancelled = true; };
-  }, [editType, typesData, mapApiDoc, t]);
+  }, [editType, mapApiDoc, t]);
 
   // Fetch the documents of the chosen type in the uploader's department once a type is picked
   useEffect(() => {
@@ -1264,7 +1263,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
 
   function openEditDoc(doc) {
     setEditingDoc(doc);
-    setEditForm({
+    const initialForm = {
       document_name:     doc.title || '',
       reference_number:  doc.referenceNumber || '',
       issue_date:        doc.enactmentDate || '',
@@ -1275,7 +1274,9 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       version_no:        doc.version || '1.0',
       description:       doc.desc || '',
       typeFields:        { ...(doc.typeFields || {}) },
-    });
+    };
+    setEditForm(initialForm);
+    setEditFormOriginal(initialForm);
     setEditError('');
     setEditFileSelected(null);
     setEditFileResubmit(false);
@@ -1301,6 +1302,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       editManualBlobRef.current = null;
     }
     setEditDescPreview(false);
+    setEditFormOriginal(null);
   }
 
   async function saveEditDoc() {
@@ -1368,8 +1370,12 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         no_of_orders:           tf.noOfOrders ? parseInt(tf.noOfOrders, 10) || null : null,
         keywords:               tf.keywords || '',
         tag_ids:                [],
+        resubmit:               !editFileSelected && editingDoc.status === 'rejected',
       };
       await updatePdfMetadata(editingDoc.id, payload);
+      if (!editFileSelected && editingDoc.status === 'rejected') {
+        setUploads(prev => prev.map(d => d.id === editingDoc.id ? { ...d, status: 'pending' } : d));
+      }
       const successMsg = editFileSelected && editingDoc.status === 'rejected'
         ? t('toasts.fileReplacedAndResubmitted')
         : editFileSelected
@@ -2577,7 +2583,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
           const estatusAccent = editingDoc.status === 'approved' ? '#16a34a' : editingDoc.status === 'rejected' ? '#dc3545' : '#ffc107';
           const estatusBg = editingDoc.status === 'approved' ? 'rgba(25,135,84,.1)' : editingDoc.status === 'rejected' ? 'rgba(220,53,69,.1)' : 'rgba(255,193,7,.1)';
           const EStatusIcon = editingDoc.status === 'approved' ? CheckCircle : editingDoc.status === 'rejected' ? XCircle : Clock;
-          const saveBtnDisabled = editSaving || editFileUploading || !(editForm?.document_name || '').trim();
+          const hasEditChanges = editFileSelected !== null || JSON.stringify(editForm) !== JSON.stringify(editFormOriginal);
+          const saveBtnDisabled = editSaving || editFileUploading || !(editForm?.document_name || '').trim() || !hasEditChanges;
           const eIconBtn = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.15)', borderRadius: 7, width: 32, height: 32, cursor: 'pointer', color: 'rgba(255,255,255,.85)' };
           return (
             <div style={{ position: 'fixed', inset: 0, zIndex: 1500, display: 'flex', flexDirection: 'column', background: 'var(--surface-card)' }}>
@@ -3703,7 +3710,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
           const estatusAccent = editingDoc.status === 'approved' ? '#16a34a' : editingDoc.status === 'rejected' ? '#dc3545' : '#ffc107';
           const estatusBg = editingDoc.status === 'approved' ? 'rgba(25,135,84,.1)' : editingDoc.status === 'rejected' ? 'rgba(220,53,69,.1)' : 'rgba(255,193,7,.1)';
           const EStatusIcon = editingDoc.status === 'approved' ? CheckCircle : editingDoc.status === 'rejected' ? XCircle : Clock;
-          const saveBtnDisabled = editSaving || editFileUploading || !(editForm?.document_name || '').trim();
+          const hasEditChanges = editFileSelected !== null || JSON.stringify(editForm) !== JSON.stringify(editFormOriginal);
+          const saveBtnDisabled = editSaving || editFileUploading || !(editForm?.document_name || '').trim() || !hasEditChanges;
           const eIconBtn = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.15)', borderRadius: 7, width: 32, height: 32, cursor: 'pointer', color: 'rgba(255,255,255,.85)' };
           return (
             <div style={{ position: 'fixed', inset: 0, zIndex: 1500, display: 'flex', flexDirection: 'column', background: 'var(--surface-card)' }}>
