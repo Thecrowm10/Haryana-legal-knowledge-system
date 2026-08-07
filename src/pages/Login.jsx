@@ -11,13 +11,18 @@ import LanguageToggle from '../components/LanguageToggle';
 import AccessibilityMenu from '../components/AccessibilityMenu';
 
 const loginIconStyle = {
-  display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: '50%',
+  display: 'flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, borderRadius: '50%',
   background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.18)', color: 'rgba(255,255,255,.85)',
   cursor: 'pointer',
 };
 
 export default function Login({ onLogin, loading, authError, initialScreen = 'portal' }) {
-  const { t } = useTranslation('login');
+  const { t, i18n } = useTranslation('login');
+  // Masthead org name is shown bilingually (Hindi + English stacked) regardless of the
+  // active UI language — both translations already exist, so pull them directly instead
+  // of toggling between them.
+  const orgNameHi = i18n.getFixedT('hi', 'login')('orgNamePortal');
+  const orgNameEn = i18n.getFixedT('en', 'login')('orgNamePortal');
   const [screen, setScreen]       = useState(initialScreen); // 'portal' | 'login' | 'forgot' | 'admin-otp'
   const [username, setUsername]   = useState('');
   const [password, setPassword]   = useState('');
@@ -69,7 +74,7 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
         .lk-portal-card:hover { transform:translateY(-5px) scale(1.01) !important; box-shadow:0 24px 56px rgba(0,0,0,.25), 0 0 0 1px rgba(255,255,255,.22) !important; }
 
         @media (max-width:640px) {
-          .lk-portal-content { padding:64px 5% 28px !important; gap:32px !important; }
+          .lk-portal-content { padding:88px 5% 28px !important; gap:32px !important; }
           .lk-portal-card { width:100% !important; max-width:340px !important; padding:26px 22px !important; }
         }
       `}</style>
@@ -82,26 +87,30 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
           style={{ objectFit:'cover', zIndex:0, filter:'blur(2px)', transform:'scale(1.02)' }} />
         <div className="fixed-bg-img" style={{ zIndex:1, background:'linear-gradient(110deg,rgba(2,10,5,.82) 0%,rgba(2,10,5,.62) 45%,rgba(2,10,5,.42) 100%)' }}/>
 
-        <div style={{ position: 'absolute', top: 24, right: 32, zIndex: 10, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ position: 'absolute', top: 14, left: 32, zIndex: 10, display: 'flex', alignItems: 'center', gap: 14 }}>
+          <img src={haryanaLogo} alt="Haryana" loading="lazy" style={{ width:100, height:100, objectFit:'contain' }} />
+          <div style={{ display:'flex', flexDirection:'column', gap:1, whiteSpace:'nowrap', transform:'translateY(12px)' }}>
+            <span style={{ fontSize:13, fontWeight:500, color:'rgba(255,255,255,.62)', letterSpacing:'.01em' }}>{orgNameHi}</span>
+            <span style={{ fontSize:18, fontWeight:700, color:'rgba(255,255,255,.9)', letterSpacing:'.01em' }}>{orgNameEn}</span>
+          </div>
+        </div>
+
+        <div style={{ position: 'absolute', top: 42, right: 32, zIndex: 10, display: 'flex', alignItems: 'center', gap: 12 }}>
           <LanguageToggle variant="dark" iconOnly buttonStyle={loginIconStyle} />
           <AccessibilityMenu iconButtonStyle={loginIconStyle} />
         </div>
 
-        <div className="lk-portal-content" style={{ position:'relative', zIndex:2, width:'100%', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'40px 6%', gap:48 }}>
+        <div className="lk-portal-content" style={{ position:'relative', zIndex:2, width:'100%', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:'24px 6%', gap:28 }}>
 
-          {/* Header */}
-          <div className="lk-left" style={{ textAlign:'center', position: 'relative' }}>
-            <div style={{ display:'inline-flex', alignItems:'center', gap:10, marginBottom:20 }}>
-              <img src={haryanaLogo} alt="Haryana" loading="lazy" style={{ width:52, height:52, objectFit:'contain' }} />
-              <div style={{ textAlign:'left' }}>
-                <div style={{ fontSize:16, fontWeight:700, color:'#fff' }}>{t('orgNamePortal')}</div>
-                <div style={{ fontSize:11.5, color:'rgba(255,255,255,.7)' }}>{t('tagline')}</div>
-              </div>
-            </div>
-            <h1 style={{ fontSize:'clamp(26px,3.5vw,46px)', fontWeight:800, color:'#fff', lineHeight:1.15, letterSpacing:'-.02em', marginBottom:12 }}>
-              {t('heroLine1')}<br/><span style={{ color:'#4ade80' }}>{t('heroLine2')}</span>
+          {/* Header — the actual site name, "Haryana Government Digital
+              Repository", is the primary, centered highlight. The issuing
+              authority (logo + "Government of Haryana") lives in the
+              top-left masthead instead, so this block stays compact. */}
+          <div className="lk-left" style={{ textAlign:'center', position: 'relative', display:'flex', flexDirection:'column', alignItems:'center' }}>
+            <h1 style={{ fontSize:'clamp(24px,3.2vw,40px)', fontWeight:800, color:'#fff', lineHeight:1.18, letterSpacing:'-.02em', marginBottom:12 }}>
+              {t('orgNameBrand')}<br/><span style={{ color:'#4ade80' }}>{t('tagline')}</span>
             </h1>
-            <p style={{ fontSize: 'var(--font-size-p2)', color:'rgba(255,255,255,.72)', maxWidth:440, margin:'0 auto' }}>
+            <p style={{ fontSize: 'var(--font-size-p2)', color:'rgba(255,255,255,.62)', maxWidth:420, margin:'0 auto' }}>
               {t('heroSubtitle')}
             </p>
           </div>
@@ -237,7 +246,7 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
         .lk-roles::-webkit-scrollbar-thumb { background:rgba(255,255,255,.15); border-radius:4px; }
 
         @media (max-width:1024px) {
-          .lk-row { flex-direction:column !important; align-items:stretch !important; justify-content:flex-start !important; padding:64px 6% 32px !important; gap:28px !important; }
+          .lk-row { flex-direction:column !important; align-items:stretch !important; justify-content:flex-start !important; padding:88px 6% 32px !important; gap:28px !important; transform:none !important; }
           .lk-left { max-width:100% !important; text-align:center; }
           .lk-hero-desc, .lk-role-strip { margin-left:auto !important; margin-right:auto !important; }
           .lk-card { width:100% !important; max-width:420px !important; margin:0 auto; }
@@ -258,17 +267,28 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
         />
         <div className="fixed-bg-img" style={{ zIndex:1, background:'linear-gradient(110deg, rgba(2,10,5,.82) 0%, rgba(2,10,5,.62) 45%, rgba(2,10,5,.42) 100%)' }}/>
 
-        {/* Main content */}
-        <div className="lk-row" style={{ position:'relative', zIndex:2, width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 6%', gap:40 }}>
+        {/* Masthead — same logo, size and position as the portal-selection screen */}
+        <div style={{ position: 'absolute', top: 14, left: 32, zIndex: 10, display: 'flex', alignItems: 'center', gap: 14 }}>
+          <img src={haryanaLogo} alt="Haryana" loading="lazy" style={{ width:100, height:100, objectFit:'contain' }} />
+          <div style={{ display:'flex', flexDirection:'column', gap:1, whiteSpace:'nowrap', transform:'translateY(12px)' }}>
+            <span style={{ fontSize:13, fontWeight:500, color:'rgba(255,255,255,.62)', letterSpacing:'.01em' }}>{orgNameHi}</span>
+            <span style={{ fontSize:18, fontWeight:700, color:'rgba(255,255,255,.9)', letterSpacing:'.01em' }}>{orgNameEn}</span>
+          </div>
+        </div>
+
+        {/* Language/accessibility toggles — same position as the portal-selection screen */}
+        <div style={{ position: 'absolute', top: 42, right: 32, zIndex: 10, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <LanguageToggle variant="dark" iconOnly buttonStyle={loginIconStyle} />
+          <AccessibilityMenu iconButtonStyle={loginIconStyle} />
+        </div>
+
+        {/* Main content — nudged down from dead-center so it clears the masthead/icons above with more breathing room */}
+        <div className="lk-row" style={{ position:'relative', zIndex:2, width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 6%', gap:40, transform:'translateY(48px)' }}>
 
           {/* LEFT */}
           <div className="lk-left" style={{ flex:'1 1 0', minWidth:0, maxWidth:500 }}>
-            <div style={{ display:'inline-flex', alignItems:'center', gap:8, background:'rgba(255,255,255,.08)', backdropFilter:'blur(8px)', border:'1px solid rgba(255,255,255,.14)', borderRadius:100, padding:'5px 16px', marginBottom:26 }}>
-              <span style={{ width:7, height:7, borderRadius:'50%', background:'#4ade80', display:'inline-block', animation:'pulse 2s ease-in-out infinite' }}/>
-              <span style={{ fontSize:11, fontWeight:600, color:'rgba(255,255,255,.7)', letterSpacing:'.1em', textTransform:'uppercase' }}>{t('badge')}</span>
-            </div>
             <h1 style={{ fontSize:'clamp(30px,3.8vw,52px)', fontWeight:800, lineHeight:1.1, letterSpacing:'-.025em', color:'#fff', marginBottom:16 }}>
-              {t('brandHaryana')}<br/><span style={{ color:'#4ade80' }}>{t('brandLegal')}</span><br/>{t('brandSystem')}
+              {t('orgNameBrand')}<br/><span style={{ color:'#4ade80' }}>{t('tagline')}</span>
             </h1>
             <p className="lk-hero-desc" style={{ fontSize: 'var(--font-size-p2)', color:'rgba(255,255,255,.42)', lineHeight:1.8, maxWidth:360, marginBottom:0 }}>
               {t('heroDescription')}
@@ -313,35 +333,11 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
               animation: shake ? 'shake .4s ease' : undefined,
             }}
           >
-            {/* Brand row */}
-            <div style={{ display:'flex', alignItems:'center', gap:11, marginBottom:20, paddingBottom:16, borderBottom:'1px solid rgba(255,255,255,.1)' }}>
-              <div style={{ width: 44, height: 44, borderRadius: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <img
-                  src={haryanaLogo}
-                  alt="Haryana Government"
-                  loading="lazy"
-                  style={{ width: 60, height: 60, objectFit: 'contain', borderRadius: 13 }}
-                />
-              </div>
-              <div>
-                <div style={{ fontSize:14.5, fontWeight:700, color:'#fff' }}>{t('orgNameBrand')}</div>
-                <div style={{ fontSize:11.5, color:'rgba(255,255,255,.42)', marginTop:2 }}>{t('tagline')}</div>
-              </div>
-              <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:5 }}>
-                <span style={{ width:6, height:6, borderRadius:'50%', background:'#4ade80', display:'inline-block', animation:'pulse 2s ease-in-out infinite' }}/>
-                <span style={{ fontSize:10, color:'rgba(255,255,255,.35)', fontWeight:600 }}>{t('liveLabel')}</span>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+            <div style={{ marginBottom: 14 }}>
               <button onClick={() => { setScreen('portal'); setUsername(''); setPassword(''); setFormError(''); }}
                 style={{ background:'transparent', border:'none', color:'rgba(255,255,255,.4)', fontSize:11.5, fontWeight:600, cursor:'pointer', display:'flex', alignItems:'center', gap:5, padding:0, fontFamily:'var(--font)', letterSpacing:'.04em' }}>
                 {t('backToPortal')}
               </button>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <LanguageToggle variant="dark" iconOnly buttonStyle={{ ...loginIconStyle, width: 26, height: 26 }} />
-                <AccessibilityMenu iconButtonStyle={{ ...loginIconStyle, width: 26, height: 26 }} />
-              </div>
             </div>
             <h2 style={{ fontSize: 'var(--font-size-h3)', fontWeight:800, color:'#fff', letterSpacing:'-.02em', marginBottom:3 }}>{t('officialLogin')}</h2>
             <p style={{ fontSize: 'var(--font-size-small)', color:'rgba(255,255,255,.42)', marginBottom:20 }}>{t('departmentPortalSubtitle')}</p>

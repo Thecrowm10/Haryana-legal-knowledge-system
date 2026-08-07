@@ -36,22 +36,26 @@
     "addDrawer": {
       "title": "Add New User",
       "subtitle": "Create a new system account",
-      "username": "Username *",
+      "username": "Username",
       "usernamePlaceholder": "e.g. firstname.lastname",
-      "email": "Email *",
+      "email": "Email",
       "emailPlaceholder": "user@example.com",
-      "password": "Password *",
+      "password": "Password",
       "passwordPlaceholder": "Set a password",
       "firstName": "First Name",
       "firstNamePlaceholder": "First name",
       "lastName": "Last Name",
       "lastNamePlaceholder": "Last name",
       "mobileNumber": "Mobile Number",
-      "mobilePlaceholder": "10-digit mobile number (optional)",
+      "mobilePlaceholder": "10-digit mobile number",
       "role": "Role",
       "roleSelectPlaceholder": "Select Role",
-      "department": "Department *",
+      "department": "Department",
       "departmentSelectPlaceholder": "Select Department",
+      "approver": "Assign Approver",
+      "approverSelectPlaceholder": "Select Approver",
+      "loadingApprovers": "Loading approvers…",
+      "noApproversInDept": "No approvers found in this department. Create an approver account first.",
       "cancel": "Cancel",
       "createUser": "Create User",
       "creating": "Creating…"
@@ -82,10 +86,14 @@
       "activate": "Activate"
     },
     "errors": {
+      "roleRequired": "Role is required.",
+      "firstNameRequired": "First name is required.",
       "usernameRequired": "Username is required.",
       "emailRequired": "Email is required.",
       "passwordRequired": "Password is required.",
+      "mobileRequired": "A valid 10-digit mobile number is required.",
       "departmentRequired": "Department is required.",
+      "approverRequired": "Please select an approver for this uploader.",
       "createFailed": "Failed to create user.",
       "saveFailed": "Failed to save changes."
     }
@@ -122,7 +130,19 @@
     "approvedLabel": "Approved",
     "rejectedLabel": "Rejected",
     "reviewedLabel": "Reviewed",
-    "view": "View"
+    "view": "View",
+    "report": {
+      "button": "Download Report",
+      "panelTitle": "Download Excel Report",
+      "panelDesc": "Pick one or more departments — leave blank to include all your authorised departments. The report breaks totals, uploader-wise counts and pending items down per department.",
+      "allDepartmentsPlaceholder": "All departments",
+      "downloadButton": "Download Excel",
+      "generating": "Generating…"
+    }
+  },
+  "multiSelect": {
+    "selectDepartments": "Select departments…",
+    "departmentsSelected": "{{count}} departments selected"
   },
   "audit": {
     "failedToLoad": "Failed to load audit logs. Please try again.",

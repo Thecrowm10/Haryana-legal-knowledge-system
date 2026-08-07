@@ -1,16 +1,18 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
-import { Users, CheckCircle, XCircle, Plus, Edit2, X, Eye, EyeOff, Download, Layers, FileText, Clock, Search, Link2, Activity } from 'lucide-react';
+import { Users, CheckCircle, XCircle, Plus, Edit2, X, Eye, EyeOff, Download, FileSpreadsheet, Layers, FileText, Clock, Search, Link2, Activity } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import SelectField from '../components/ui/SelectField';
+import MultiSelectField from '../components/ui/MultiSelectField';
 import DocViewModal from '../components/DocViewModal';
-import { getUsers, getRoles, updateUser, registerUser } from '../services/users';
+import { getUsers, getRoles, updateUser, registerUser, getApproversByDepartment } from '../services/users';
 import { getMyDepartments } from '../services/departments';
 import { getAllDocumentsAdmin, getAllDepartmentLinks } from '../services/pdf';
 import { getAuditLogs } from '../services/audit';
 import { getAllActPartSubmissions, getAllActParts } from '../services/act_parts';
 import { useMediaQuery } from '../hooks/useMediaQuery';
+import { downloadUploadsExcelReport } from '../utils/uploadsExcelReport';
 
 
 const LABEL = { fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)' };
@@ -112,7 +114,7 @@ export default function NodalOfficerDashboard({ activePage }) {
       })
       .catch(() => setUsersError(t('users.failedToLoadUsers')))
       .finally(() => setUsersLoading(false));
-  }, [activePage]);
+  }, [activePage, t]);
 
   // Nodal officer's authorised departments — drives both the user management selectors and the uploads dept filter.
   const [depts, setDepts] = useState([]);
@@ -134,6 +136,17 @@ export default function NodalOfficerDashboard({ activePage }) {
   const [uploadsFilterUploader, setUploadsFilterUploader] = useState('');
   const [uploadsFilterApprover, setUploadsFilterApprover] = useState('');
   const [viewDoc, setViewDoc]                             = useState(null);
+  const [showReportPanel, setShowReportPanel] = useState(false);
+  const [reportDeptIds, setReportDeptIds]     = useState([]);
+  const [reportGenerating, setReportGenerating] = useState(false);
+  const reportPanelRef = useRef(null);
+
+  useEffect(() => {
+    if (!showReportPanel) return;
+    const close = e => { if (!reportPanelRef.current?.contains(e.target)) setShowReportPanel(false); };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [showReportPanel]);
 
   useEffect(() => {
     if (activePage !== 'nodaluploads') return;
@@ -146,32 +159,56 @@ export default function NodalOfficerDashboard({ activePage }) {
       })
       .catch(() => setAllDocsError(t('uploads.failedToLoad')))
       .finally(() => setAllDocsLoading(false));
-  }, [activePage]);
+  }, [activePage, t]);
 
   // Add User drawer state
-  const EMPTY_ADD_FORM = { username: '', email: '', mobile_number: '', password: '', first_name: '', last_name: '', role_id: '', department_id: '' };
+  const EMPTY_ADD_FORM = { username: '', email: '', mobile_number: '', password: '', first_name: '', last_name: '', role_id: '', department_id: '', approver_id: '' };
   const [addingUser, setAddingUser]   = useState(false);
   const [addForm, setAddForm]         = useState(EMPTY_ADD_FORM);
   const [addSaving, setAddSaving]     = useState(false);
   const [addError, setAddError]       = useState('');
   const [showAddPass, setShowAddPass] = useState(false);
+  const [approvers, setApprovers]         = useState([]);
+  const [approversLoading, setApproversLoading] = useState(false);
+
+  const selectedRoleName = roles.find(r => r.id === Number(addForm.role_id))?.name?.toLowerCase() || '';
+  const isUploader = selectedRoleName === 'uploader';
+
+  useEffect(() => {
+    if (!addingUser || !depts.length) return;
+    setAddForm(f => f.department_id ? f : { ...f, department_id: String(depts[0].id) });
+  }, [addingUser, depts]);
+
+  useEffect(() => {
+    if (!isUploader || !addForm.department_id) { setApprovers([]); return; }
+    setApproversLoading(true);
+    getApproversByDepartment(addForm.department_id)
+      .then(res => setApprovers(res.data || []))
+      .catch(() => setApprovers([]))
+      .finally(() => setApproversLoading(false));
+  }, [isUploader, addForm.department_id]);
 
   function handleAddUser() {
+    if (!addForm.role_id)            { setAddError(t('users.errors.roleRequired')); return; }
     if (!addForm.username.trim())    { setAddError(t('users.errors.usernameRequired')); return; }
     if (!addForm.email.trim())       { setAddError(t('users.errors.emailRequired')); return; }
     if (!addForm.password)           { setAddError(t('users.errors.passwordRequired')); return; }
     if (!addForm.department_id)      { setAddError(t('users.errors.departmentRequired')); return; }
+    if (!addForm.first_name.trim())  { setAddError(t('users.errors.firstNameRequired')); return; }
+    if (addForm.mobile_number.trim().length !== 10) { setAddError(t('users.errors.mobileRequired')); return; }
+    if (isUploader && !addForm.approver_id) { setAddError(t('users.errors.approverRequired')); return; }
     setAddSaving(true);
     setAddError('');
     registerUser({
       username:      addForm.username.trim(),
       email:         addForm.email.trim(),
-      mobile_number: addForm.mobile_number.trim() || undefined,
+      mobile_number: addForm.mobile_number.trim(),
       password:      addForm.password,
       first_name:    addForm.first_name.trim(),
       last_name:     addForm.last_name.trim(),
       role_id:       addForm.role_id ? Number(addForm.role_id) : undefined,
       department_id: String(addForm.department_id),
+      ...(isUploader && addForm.approver_id ? { approver_id: Number(addForm.approver_id) } : {}),
     })
       .then(res => {
         setUsers(prev => [normalizeUser(res.data), ...prev]);
@@ -299,7 +336,6 @@ export default function NodalOfficerDashboard({ activePage }) {
         ...(d.no_of_ordinances      ? { noOfOrdinances:     d.no_of_ordinances }      : {}),
         ...(d.no_of_orders          ? { noOfOrders:         d.no_of_orders }          : {}),
         ...(d.keywords              ? { keywords:           d.keywords }              : {}),
-        ...(d.is_repealed           ? { repealed:           'Yes' }                   : {}),
       },
       // Amend / replace / issued-under links to other documents
       docRelations: (d.relationships || [])
@@ -379,7 +415,7 @@ export default function NodalOfficerDashboard({ activePage }) {
       })
       .catch(() => setAuditError(t('audit.failedToLoad')))
       .finally(() => setAuditLoading(false));
-  }, [activePage, auditPage, auditFilterEntity, auditFilterAction, auditFilterStatus, auditFromDate, auditToDate]);
+  }, [activePage, auditPage, auditFilterEntity, auditFilterAction, auditFilterStatus, auditFromDate, auditToDate, t]);
 
   useEffect(() => {
     if (activePage !== 'nodallinkedocs') return;
@@ -389,7 +425,7 @@ export default function NodalOfficerDashboard({ activePage }) {
       .then(res => setNodalLinks(Array.isArray(res.data) ? res.data : []))
       .catch(() => setNodalLinksError(t('linkedDocs.failedToLoad')))
       .finally(() => setNodalLinksLoading(false));
-  }, [activePage]);
+  }, [activePage, t]);
 
   const [deptFilter, setDeptFilter] = useState('');
   const [usersStatusFilter, setUsersStatusFilter] = useState('');
@@ -410,7 +446,7 @@ export default function NodalOfficerDashboard({ activePage }) {
       .then(res => setActPartsItems(Array.isArray(res.data) ? res.data : []))
       .catch(() => setActPartsError(t('actParts.failedToLoad')))
       .finally(() => setActPartsLoading(false));
-  }, [activePage]);
+  }, [activePage, t]);
 
   async function openActPartsDetail(item) {
     setActPartsDetailLoading(true);
@@ -479,7 +515,7 @@ export default function NodalOfficerDashboard({ activePage }) {
                 {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
               </SelectField>
               <button
-                onClick={() => { setAddingUser(true); setAddError(''); setAddForm({ ...EMPTY_ADD_FORM, department_id: deptFilter }); setShowAddPass(false); }}
+                onClick={() => { setAddingUser(true); setAddError(''); setAddForm({ ...EMPTY_ADD_FORM, department_id: depts[0]?.id ? String(depts[0].id) : '' }); setShowAddPass(false); }}
                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'var(--primary)', color: 'white', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
                 <Plus size={13} /> {t('users.addUser')}
               </button>
@@ -616,6 +652,50 @@ export default function NodalOfficerDashboard({ activePage }) {
               {/* Body */}
               <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
 
+                {/* Role + Department */}
+                <div className="nod-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label htmlFor="nod-add-role" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.role')} <span style={{ color: '#dc3545' }}>*</span></label>
+                    <SelectField id="nod-add-role" value={addForm.role_id} onChange={e => setAddForm(f => ({ ...f, role_id: e.target.value, approver_id: '' }))} placeholder={t('users.addDrawer.roleSelectPlaceholder')}>
+                      {assignableRoles(roles).map(r => (
+                        <option key={r.id} value={r.id}>{r.name.charAt(0).toUpperCase() + r.name.slice(1)}</option>
+                      ))}
+                    </SelectField>
+                  </div>
+                  <div>
+                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.department')} <span style={{ color: '#dc3545' }}>*</span></label>
+                    <div style={{ ...INP_STYLE, background: 'var(--surface-hover)', color: 'var(--text-color-secondary)', cursor: 'not-allowed', userSelect: 'none' }}>
+                      {depts.find(d => String(d.id) === String(addForm.department_id))?.name || '—'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Approver mapping — shown only when Uploader role is selected and a department is chosen */}
+                {isUploader && addForm.department_id && (
+                  <div>
+                    <label htmlFor="nod-add-approver" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>
+                      {t('users.addDrawer.approver')} <span style={{ color: '#dc3545' }}>*</span>
+                    </label>
+                    <SelectField
+                      id="nod-add-approver"
+                      value={addForm.approver_id}
+                      onChange={e => setAddForm(f => ({ ...f, approver_id: e.target.value }))}
+                      placeholder={approversLoading ? t('users.addDrawer.loadingApprovers') : t('users.addDrawer.approverSelectPlaceholder')}
+                      disabled={approversLoading}>
+                      {approvers.map(a => (
+                        <option key={a.id} value={a.id}>
+                          {a.first_name || a.last_name ? `${a.first_name || ''} ${a.last_name || ''}`.trim() : a.username}
+                        </option>
+                      ))}
+                    </SelectField>
+                    {!approversLoading && approvers.length === 0 && (
+                      <div style={{ fontSize: 11.5, color: '#d97706', marginTop: 5 }}>
+                        {t('users.addDrawer.noApproversInDept')}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Username + Email */}
                 <div className="nod-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
@@ -658,7 +738,7 @@ export default function NodalOfficerDashboard({ activePage }) {
                 {/* First + Last name */}
                 <div className="nod-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
-                    <label htmlFor="nod-add-firstname" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.firstName')}</label>
+                    <label htmlFor="nod-add-firstname" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.firstName')} <span style={{ color: '#dc3545' }}>*</span></label>
                     <input id="nod-add-firstname" style={INP_STYLE} placeholder={t('users.addDrawer.firstNamePlaceholder')}
                       value={addForm.first_name}
                       onChange={e => setAddForm(f => ({ ...f, first_name: e.target.value }))} />
@@ -673,7 +753,7 @@ export default function NodalOfficerDashboard({ activePage }) {
 
                 {/* Mobile Number */}
                 <div>
-                  <label htmlFor="nod-add-mobile" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.mobileNumber')}</label>
+                  <label htmlFor="nod-add-mobile" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.mobileNumber')} <span style={{ color: '#dc3545' }}>*</span></label>
                   <input id="nod-add-mobile" style={INP_STYLE}
                     type="tel"
                     inputMode="numeric"
@@ -681,24 +761,6 @@ export default function NodalOfficerDashboard({ activePage }) {
                     placeholder={t('users.addDrawer.mobilePlaceholder')}
                     value={addForm.mobile_number}
                     onChange={e => setAddForm(f => ({ ...f, mobile_number: e.target.value.replace(/\D/g, '') }))} />
-                </div>
-
-                {/* Role + Department */}
-                <div className="nod-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div>
-                    <label htmlFor="nod-add-role" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.role')}</label>
-                    <SelectField id="nod-add-role" value={addForm.role_id} onChange={e => setAddForm(f => ({ ...f, role_id: e.target.value }))} placeholder={t('users.addDrawer.roleSelectPlaceholder')}>
-                      {assignableRoles(roles).map(r => (
-                        <option key={r.id} value={r.id}>{r.name.charAt(0).toUpperCase() + r.name.slice(1)}</option>
-                      ))}
-                    </SelectField>
-                  </div>
-                  <div>
-                    <label htmlFor="nod-add-department" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.department')} <span style={{ color: '#dc3545' }}>*</span></label>
-                    <SelectField id="nod-add-department" value={addForm.department_id} onChange={e => setAddForm(f => ({ ...f, department_id: e.target.value }))} placeholder={t('users.addDrawer.departmentSelectPlaceholder')}>
-                      {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                    </SelectField>
-                  </div>
                 </div>
 
                 {addError && (
@@ -715,7 +777,7 @@ export default function NodalOfficerDashboard({ activePage }) {
                   {t('users.addDrawer.cancel')}
                 </button>
                 {(() => {
-                  const addFormInvalid = !addForm.username.trim() || !addForm.email.trim() || !addForm.password || !addForm.department_id;
+                  const addFormInvalid = !addForm.role_id || !addForm.username.trim() || !addForm.email.trim() || !addForm.password || !addForm.department_id || !addForm.first_name.trim() || addForm.mobile_number.trim().length !== 10 || (isUploader && !addForm.approver_id);
                   const addBtnDisabled = addSaving || addFormInvalid;
                   return (
                     <button onClick={handleAddUser} disabled={addBtnDisabled}
@@ -943,6 +1005,18 @@ export default function NodalOfficerDashboard({ activePage }) {
     const cols = '4px 1fr 175px 155px 155px 90px';
     const anyFilter = uploadsSearch || uploadsFilterStatus || uploadsFilterDept || uploadsFilterUploader || uploadsFilterApprover;
 
+    async function handleDownloadReport() {
+      setReportGenerating(true);
+      try {
+        const selectedNames = depts.filter(d => reportDeptIds.includes(d.id)).map(d => d.name);
+        await downloadUploadsExcelReport({ docs: deptScopedDocs, departments: selectedNames, fileLabel: 'Nodal' });
+        setShowReportPanel(false);
+        setReportDeptIds([]);
+      } finally {
+        setReportGenerating(false);
+      }
+    }
+
     return (
       <>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
@@ -1024,6 +1098,41 @@ export default function NodalOfficerDashboard({ activePage }) {
             )}
             <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
               {t('uploads.countOf', { shown: filteredDocs.length, total: totalDocs })}
+            </div>
+
+            <div ref={reportPanelRef} style={{ position: 'relative' }}>
+              <button onClick={() => setShowReportPanel(o => !o)}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--surface-ground)', color: 'var(--text-color)', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '7px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                <FileSpreadsheet size={13} /> {t('uploads.report.button')}
+              </button>
+
+              {showReportPanel && (
+                <div style={{
+                  position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 620, width: 300,
+                  background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 12,
+                  boxShadow: '0 12px 32px rgba(0,0,0,.14)', padding: 16, animation: 'dropdownIn .15s cubic-bezier(.2,.8,.3,1)',
+                }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 4 }}>{t('uploads.report.panelTitle')}</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginBottom: 12, lineHeight: 1.5 }}>{t('uploads.report.panelDesc')}</div>
+                  <MultiSelectField
+                    id="nod-report-dept-multi"
+                    value={reportDeptIds}
+                    onChange={setReportDeptIds}
+                    options={depts}
+                    placeholder={t('uploads.report.allDepartmentsPlaceholder')}
+                    selectedLabel={count => t('multiSelect.departmentsSelected', { count })}
+                  />
+                  <button onClick={handleDownloadReport} disabled={reportGenerating}
+                    style={{
+                      width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: 14,
+                      background: reportGenerating ? 'var(--surface-ground)' : 'var(--primary)', color: reportGenerating ? 'var(--text-color-secondary)' : '#fff',
+                      border: 'none', borderRadius: 8, padding: '9px 12px', fontSize: 12.5, fontWeight: 700,
+                      cursor: reportGenerating ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)',
+                    }}>
+                    <Download size={13} /> {reportGenerating ? t('uploads.report.generating') : t('uploads.report.downloadButton')}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1858,16 +1967,6 @@ function ActPartsDetailModal({ item, partsData, onClose, readOnly = false, onApp
         )}
       </div>
     ));
-  }
-
-  async function handleDecide(action) {
-    if (action === 'rejected' && !comment.trim()) return;
-    setSubmitting(true);
-    try {
-      await onReject?.({ action, comment: comment.trim() || null });
-    } finally {
-      setSubmitting(false);
-    }
   }
 
   return (

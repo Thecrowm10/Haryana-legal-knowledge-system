@@ -29,5 +29,11 @@ export const getDepartmentLinkRequests = (link_status = 'pending')      => api.g
 export const getAllDepartmentLinks      = (link_status, department_id)   => api.get('/pdf/all-department-links', { params: { ...(link_status ? { link_status } : {}), ...(department_id ? { department_id } : {}) } });
 export const reviewDepartmentLink      = (link_id, action, comments, annotations_json) => api.post('/pdf/review-link', { link_id, action, comments: comments || null, annotations_json: annotations_json || null });
 export const getActChildren            = (pdf_id)                       => api.get(`/pdf/${pdf_id}/children`);
+// Full Act detail in one call — document info + related documents (relationships)
+// + every ACT part (chapters/sections/schedules/annexures/appendices/forms). Used
+// by the citizen Act reading view (ActContentsView) and DocViewModal's contents
+// panel. No token required.
+export const getPdfFull                = (act_id)                       => publicApi.get(`/pdf/${act_id}/full`);
 export const getMyDepartmentActs       = (status, skip = 0, limit = 20)  => api.get('/pdf/my-department/acts', { params: { skip, limit, ...(status ? { status } : {}) } });
 export const getMyDepartmentDocsByType = (doc_type_id, status, skip = 0, limit = 20) => api.get('/pdf/my-department/by-type', { params: { doc_type_id, skip, limit, ...(status ? { status } : {}) } });
+export const replaceDocumentFile = (docId, file_ref, resubmit = false) => api.post(`/pdf/${docId}/replace-file`, { file_ref, resubmit });

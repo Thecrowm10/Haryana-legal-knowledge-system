@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef, useMemo } from 'react';
+﻿import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   CheckCircle, XCircle, FileText, ChevronDown, Search, Clock,
@@ -195,7 +195,7 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
       })
       .catch(e => console.error('PDF load:', e));
     return () => { cancelled = true; };
-  }, [doc.fileUrl]);
+  }, [doc.fileUrl, onTotalPagesChange]);
 
   // Render all pages whenever pdfDoc / zoom / rotation changes
   useEffect(() => {
@@ -220,6 +220,26 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
     if (!docxContainerRef.current || !docxHtml) return;
     docxContainerRef.current.innerHTML = docxHtml;
   }, [docxHtml]);
+
+  function applyDocxHighlight(container, ann) {
+    if (!container || !ann.text) return;
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
+    let node;
+    while ((node = walker.nextNode())) {
+      const idx = node.textContent.indexOf(ann.text);
+      if (idx < 0) continue;
+      const range = document.createRange();
+      range.setStart(node, idx);
+      range.setEnd(node, idx + ann.text.length);
+      const span = document.createElement('span');
+      span.style.cssText = `background-color:${ann.color};border-radius:2px;cursor:pointer;padding:0 1px;`;
+      span.dataset.docxAnnot = ann.id;
+      if (ann.comment) span.title = ann.comment;
+      span.addEventListener('click', e => { e.stopPropagation(); setActiveAnnotId(ann.id); });
+      try { range.surroundContents(span); } catch { const f = range.extractContents(); span.appendChild(f); range.insertNode(span); }
+      return;
+    }
+  }
 
   useEffect(() => {
     if (!docxContainerRef.current || !docxHtml) return;
@@ -332,26 +352,6 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
     setTimeout(() => { suppressRef.current = false; }, 900);
   }
 
-  function applyDocxHighlight(container, ann) {
-    if (!container || !ann.text) return;
-    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
-    let node;
-    while ((node = walker.nextNode())) {
-      const idx = node.textContent.indexOf(ann.text);
-      if (idx < 0) continue;
-      const range = document.createRange();
-      range.setStart(node, idx);
-      range.setEnd(node, idx + ann.text.length);
-      const span = document.createElement('span');
-      span.style.cssText = `background-color:${ann.color};border-radius:2px;cursor:pointer;padding:0 1px;`;
-      span.dataset.docxAnnot = ann.id;
-      if (ann.comment) span.title = ann.comment;
-      span.addEventListener('click', e => { e.stopPropagation(); setActiveAnnotId(ann.id); });
-      try { range.surroundContents(span); } catch { const f = range.extractContents(); span.appendChild(f); range.insertNode(span); }
-      return;
-    }
-  }
-
   function handleDocxMouseUp() {
     if (!highlightMode || !onAnnotationsChange) return;
     const sel = window.getSelection();
@@ -379,14 +379,17 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
   }
 
   // Keep the ref current on every render so ThreePanelReview can call it
-  if (onScrollRef) onScrollRef.current = (ann) => {
-    if (ann.isDocx) {
-      const span = docxContainerRef.current?.querySelector(`[data-docx-annot="${ann.id}"]`);
-      if (span) span.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    } else {
-      scrollToAnnotation(ann);
-    }
-  };
+  useEffect(() => {
+    if (!onScrollRef) return;
+    onScrollRef.current = (ann) => {
+      if (ann.isDocx) {
+        const span = docxContainerRef.current?.querySelector(`[data-docx-annot="${ann.id}"]`);
+        if (span) span.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else {
+        scrollToAnnotation(ann);
+      }
+    };
+  });
 
   function confirmAnnotation() {
     if (!pendingRect) return;
@@ -738,7 +741,7 @@ function DocumentDetailsPanel({ doc, reviewAnnotations = [], onScrollToAnnotatio
                             <span style={{ fontSize: 10, fontWeight: 700, fontFamily: 'var(--mono)', color, background: `${color}18`, padding: '1px 7px', borderRadius: 8 }}>
                               {p.changeType || t('documentDetails.amendedDefault')}
                             </span>
-                            {[p.chapter, p.section, p.subsection].filter(Boolean).map((v, j, arr) => (
+                            {[p.chapter, p.section, p.subsection].filter(Boolean).map((v, j) => (
                               <span key={j} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                                 {j > 0 && <ChevronRight size={10} color="#94a3b8" />}
                                 <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-heading)', fontFamily: 'var(--mono)' }}>{v}</span>
@@ -943,13 +946,15 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, deciding })
     );
   }
 
-  const docPageData = useMemo(() => getDocPageData(doc), [doc.id]);
+  const docPageData = useMemo(() => getDocPageData(doc), [doc]);
   const totalPages   = pdfTotalPages || docPageData.pageCount;
 
   useEffect(() => {
+    // doc.id never actually changes on an already-mounted instance — ThreePanelReview is
+    // rendered once per document row in a `.map`, gated by that row's own isOpen, so a
+    // different document always means a fresh mount and these useState initial values apply.
     if (!doc.id || !localStorage.getItem('token')) return;
     let url = null;
-    setBlobUrl(null); setDocxHtml(null);
     getPdfFile(doc.id)
       .then(res => {
         const ct = (res.headers['content-type'] || '').toLowerCase();
@@ -1175,13 +1180,12 @@ function mapApiDoc(d) {
       ...(d.no_of_ordinances       ? { noOfOrdinances:      d.no_of_ordinances }       : {}),
       ...(d.no_of_orders           ? { noOfOrders:          d.no_of_orders }           : {}),
       ...(d.keywords               ? { keywords:            d.keywords }               : {}),
-      ...(d.is_repealed            ? { repealed:            'Yes' }                    : {}),
     },
     ...(() => {
       const raw = d.description || '';
       const match = raw.match(/\n?__PROVISIONS__:(.+)$/s);
       let amendmentProvisions = [];
-      if (match) { try { amendmentProvisions = JSON.parse(match[1]); } catch {} }
+      if (match) { try { amendmentProvisions = JSON.parse(match[1]); } catch { /* malformed JSON in remarks — keep default */ } }
       return {
         desc: raw.replace(/\n?__PROVISIONS__:.+$/s, '').trim(),
         amendmentProvisions,
@@ -1192,6 +1196,15 @@ function mapApiDoc(d) {
 
 // Link Request Review Panel
 // Shows the PDF + document details for a pending link request with Approve/Reject actions.
+function InfoRow({ label, value, mono }) {
+  return (
+    <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+      <span style={{ fontSize: 11, color: 'var(--text-color-secondary)', width: 130, flexShrink: 0, paddingTop: 2 }}>{label}</span>
+      <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-heading)', fontFamily: mono ? 'var(--mono)' : 'var(--font)', flex: 1, lineHeight: 1.5 }}>{value || '—'}</span>
+    </div>
+  );
+}
+
 function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
   const { t } = useTranslation('approver');
   const isReadOnly = lr.link_status !== 'pending';
@@ -1254,14 +1267,15 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
 
   const docPageData = useMemo(
     () => getDocPageData({ title: lr.document_name || '', type: lr.document_type_name || 'Act' }),
-    [lr.pdf_id],
+    [lr.document_name, lr.document_type_name],
   );
   const totalPages = pdfTotalPages || docPageData.pageCount;
 
   useEffect(() => {
+    // lr never changes to a different link on an already-mounted instance — the parent
+    // only ever renders this with a link or unmounts it (see setViewingLink call sites).
     if (!lr.pdf_id || !localStorage.getItem('token')) return;
     let url = null;
-    setBlobUrl(null); setDocxHtml(null);
     getPdfFile(lr.pdf_id)
       .then(res => {
         const ct = (res.headers['content-type'] || '').toLowerCase();
@@ -1287,15 +1301,6 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
   const requesterName = lr.requested_by_first_name
     ? `${lr.requested_by_first_name} ${lr.requested_by_last_name || ''}`.trim()
     : lr.requested_by_username || t('common.unknown');
-
-  function InfoRow({ label, value, mono }) {
-    return (
-      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-        <span style={{ fontSize: 11, color: 'var(--text-color-secondary)', width: 130, flexShrink: 0, paddingTop: 2 }}>{label}</span>
-        <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-heading)', fontFamily: mono ? 'var(--mono)' : 'var(--font)', flex: 1, lineHeight: 1.5 }}>{value || '—'}</span>
-      </div>
-    );
-  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -1653,7 +1658,7 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
     }
   }
 
-  function fetchDocs(propDocs) {
+  const fetchDocs = useCallback((propDocs) => {
     if (!localStorage.getItem('token')) {
       // Demo mode — use documents prop directly
       if (propDocs?.length > 0) setDocs(propDocs);
@@ -1665,9 +1670,9 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
       .then(res => setDocs((res.data.documents || []).map(mapApiDoc)))
       .catch(err => setApiError(err.response?.data?.detail || t('dashboard.failedToLoadDocuments')))
       .finally(() => setLoading(false));
-  }
+  }, [t]);
 
-  useEffect(() => { fetchDocs(documents); }, [activePage, documents]);
+  useEffect(() => { fetchDocs(documents); }, [activePage, documents, fetchDocs]);
 
   useEffect(() => {
     if (activePage !== 'links') { setViewingLink(null); return; } // reset when leaving link requests
@@ -1770,7 +1775,6 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
     return mType && mF && mS;
   });
 
-  const isFiltered = filter || searchQ || cardFilter;
   const list = allFiltered;
 
   const allTypes = Object.keys(TYPE_COLORS);

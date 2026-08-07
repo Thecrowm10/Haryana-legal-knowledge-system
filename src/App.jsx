@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAuth } from './hooks/useAuth';
 import Login from './pages/Login';
 import ChangePasswordScreen from './pages/ChangePasswordScreen';
@@ -46,16 +46,20 @@ export default function App() {
   const [relationships, setRelationships] = useState(SEED_RELATIONS);
   const [taxonomy, setTaxonomy]           = useState(INITIAL_TAXONOMY);
 
-  useEffect(() => {
+  // Adjust state during render rather than in an effect (React's "you might not
+  // need an effect" pattern, also used in Layout.jsx) — initializes activePage
+  // right when `user` changes (login/logout) instead of one render later.
+  const [prevUser, setPrevUser] = useState();
+  if (user !== prevUser) {
+    setPrevUser(user);
     if (user && activePage === null) {
       const saved = localStorage.getItem('activePage');
       setActivePage(saved || DEFAULT_PAGE[user.role]);
-    }
-    if (!user) {
+    } else if (!user) {
       setActivePage(null);
       localStorage.removeItem('activePage');
     }
-  }, [user]);
+  }
 
   // Citizen guests are sent back to the portal-selection screen so they can
   // choose the official/admin login path themselves, rather than being

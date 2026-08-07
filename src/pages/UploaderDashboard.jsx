@@ -5,18 +5,17 @@ import {
   RotateCcw, AlertCircle, Eye, GitBranch, Plus, FolderPlus,
   Layers, ChevronRight, AlertTriangle, CheckSquare, Square,
   Edit3, Tag, Search, MessageSquare, MessageCircle, ZoomIn, ZoomOut, RotateCw, ExternalLink,
-  Save, ArrowRight, Paperclip, Send,
+  Save, ArrowRight, Paperclip,
 } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 import mammoth from 'mammoth';
 import Card from '../components/ui/Card';
-import Badge from '../components/ui/Badge';
 import SelectField from '../components/ui/SelectField';
 import { useAuth } from '../hooks/useAuth';
 import { getDepartments, getDocumentTypes } from '../services/departments';
-import { uploadPdfFile, uploadPdfMetadata, updatePdfMetadata, getMyDocuments, searchDocuments, getPdfFile, checkDuplicateDocument, linkDocumentToDepartment, getLinkedDocuments, getActChildren, getMyDepartmentActs, getMyDepartmentDocsByType } from '../services/pdf';
+import { uploadPdfFile, uploadPdfMetadata, updatePdfMetadata, getMyDocuments, searchDocuments, getPdfFile, checkDuplicateDocument, linkDocumentToDepartment, getLinkedDocuments, getActChildren, getMyDepartmentActs, getMyDepartmentDocsByType, replaceDocumentFile } from '../services/pdf';
 import { uploadActPartFile, saveActPartSections, saveActPartEntries, getActPartSections, getActPartEntries, getActPartFile, getActPartApprovals, submitActPartForApproval } from '../services/act_parts';
 import { createNotification } from '../services/notifications';
 import HindiKeyboardInput from '../components/HindiKeyboardInput';
@@ -31,7 +30,6 @@ const DEFAULT_DEPTS = [
   'Panchayati Raj','General Administration',
 ];
 const DEFAULT_TYPES = ['Act','Amendment','Notification','Circular','Policy','Rules & Regulations','Order/Gazette','Bye Laws','Miscellaneous'];
-const LANGS  = ['English','Hindi','Bilingual'];
 const REL_TYPES = [
   'Replaces', 'Replaced by', 'Amends', 'Amended by',
   'In Continuation of', 'Continued by', 'Issued Under',
@@ -64,8 +62,6 @@ const REL_TARGET_TYPES = {
 };
 
 const AMEND_CHANGE_TYPES = ['Amended', 'Substituted', 'Inserted', 'Deleted', 'Expanded'];
-const AMEND_CHANGE_COLORS = { Amended: '#ffc107', Substituted: '#0d6efd', Inserted: '#198754', Deleted: '#dc3545', Expanded: '#8b5cf6' };
-const EMPTY_PROVISION = () => ({ section: '', chapter: '', subsection: '', page: '', changeType: 'Substituted', before: '', after: '' });
 
 // Display-only lookup maps: map the internal English enum values (used in comparisons,
 // object keys, and API payloads — never changed) to safe i18n key suffixes used purely
@@ -464,21 +460,6 @@ function VersionConflictModal({ existingDoc, newVersion, onUploadAsNew, onCancel
     </div>
   );
 }
-function WorkflowBadge({ status }) {
-  const { t } = useTranslation('uploader');
-  const config = {
-    [WORKFLOW_STATUS.DRAFT]:     { label: t('workflowBadge.draft'),          bg: 'rgba(148,163,184,.12)', color: '#64748b' },
-    [WORKFLOW_STATUS.PENDING]:   { label: t('workflowBadge.pendingReview'), bg: 'rgba(255, 193, 7,.12)', color: '#d97706' },
-    [WORKFLOW_STATUS.PUBLISHED]: { label: t('workflowBadge.published'),       bg: 'rgba(25, 135, 84,.12)',  color: '#16a34a' },
-  };
-  const c = config[status] || config[WORKFLOW_STATUS.DRAFT];
-  return (
-    <span style={{ fontSize: 10.5, fontWeight: 700, fontFamily: 'var(--mono)', padding: '3px 9px', borderRadius: 20, background: c.bg, color: c.color }}>
-      {c.label}
-    </span>
-  );
-}
-
 function Toast({ toast, onClose }) {
   if (!toast) return null;
   const isError = toast.type === 'error';
@@ -512,10 +493,11 @@ function DocViewModal({ doc, onClose }) {
   const suppressRef   = useRef(false);
   const svgRefs       = useRef([]);
   const docxViewRef   = useRef(null);
-  const annotations  = useMemo(() => {
-    try { return doc.approval?.annotations_json ? JSON.parse(doc.approval.annotations_json) : []; }
+  const annotationsJson = doc.approval?.annotations_json;
+  const annotations = useMemo(() => {
+    try { return annotationsJson ? JSON.parse(annotationsJson) : []; }
     catch { return []; }
-  }, [doc.approval?.annotations_json]);
+  }, [annotationsJson]);
 
   useEffect(() => {
     const h = e => { if (e.key === 'Escape') onClose(); };
@@ -524,8 +506,10 @@ function DocViewModal({ doc, onClose }) {
   }, [onClose]);
 
   useEffect(() => {
+    // doc.id never actually changes on an already-mounted instance — every call site
+    // gates this component behind `cond && <DocViewModal .../>`, so a new document
+    // always means a fresh mount and these useState initial values already apply.
     let url = null;
-    setBlobUrl(null); setPdfDoc(null); setCurrentPage(1); setDocxHtml(null);
     getPdfFile(doc.id)
       .then(res => {
         const ct = (res.headers['content-type'] || '').toLowerCase();
@@ -1086,7 +1070,7 @@ function DocViewModal({ doc, onClose }) {
 }
 
 // Main component
-export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, documents = [], onAddDocument, taxonomy = [] }) {
+export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, documents = [], onAddDocument }) {
   const { user } = useAuth();
   const { t } = useTranslation('uploader');
   const isMobile = useIsMobile();
@@ -1115,14 +1099,22 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const [myDocsError,   setMyDocsError]   = useState('');
   const [remarksModal,  setRemarksModal]  = useState(null);
   const [viewDoc,       setViewDoc]       = useState(null);
+  const [linkedDocs, setLinkedDocs] = useState([]);
+  // Replace-file modal: { doc } | null
+  const [replaceFileModal,    setReplaceFileModal]    = useState(null);
+  const [replaceFileSaving,   setReplaceFileSaving]   = useState(false);
+  const [replaceFileResubmit, setReplaceFileResubmit] = useState(false);
+  const [replaceFileError,    setReplaceFileError]    = useState('');
+  const [replaceFileSelected, setReplaceFileSelected] = useState(null); // File object
+  const replaceFileInputRef = useRef(null);
 
-  function mapApiDoc(d) {
+  const mapApiDoc = useCallback((d) => {
     // Amendment provisions ride along inside description as a hidden __PROVISIONS__ JSON
     // suffix (see the upload flow below) — strip it back out before displaying the description.
     const rawDesc = d.description || '';
     const provisionsMatch = rawDesc.match(/\n?__PROVISIONS__:(.+)$/s);
     let amendmentProvisions = [];
-    if (provisionsMatch) { try { amendmentProvisions = JSON.parse(provisionsMatch[1]); } catch {} }
+    if (provisionsMatch) { try { amendmentProvisions = JSON.parse(provisionsMatch[1]); } catch { /* malformed JSON in remarks — keep default */ } }
 
     return {
       id:              d.id,
@@ -1187,11 +1179,10 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         ...(d.no_of_ordinances       ? { noOfOrdinances:      d.no_of_ordinances }       : {}),
         ...(d.no_of_orders           ? { noOfOrders:          d.no_of_orders }           : {}),
         ...(d.keywords               ? { keywords:            d.keywords }               : {}),
-        ...(d.is_repealed            ? { repealed:            'Yes' }                    : {}),
       },
       approval:        d.latest_approval || null,
     };
-  }
+  }, [t]);
 
   useEffect(() => {
     if (activePage !== 'dashboard') return;
@@ -1208,7 +1199,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         setMyDocsError(typeof detail === 'string' ? detail : t('toasts.failedToLoadDocuments'));
       })
       .finally(() => setMyDocsLoading(false));
-  }, [activePage]);
+  }, [activePage, mapApiDoc, t]);
 
   // Edit Document page: pick a type → table of that type's docs → edit form for one doc
   const [editType, setEditType]             = useState(null);
@@ -1223,7 +1214,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
 
   // Loads (or reloads) the current type's document table from the API.
   // Shared by the effect below and by saveEditDoc so the table reflects an edit immediately.
-  function refreshEditList() {
+  const refreshEditList = useCallback(() => {
     if (!editType) return;
     const typeId = typesData.find(d => d.name === editType)?.id;
     if (!typeId) { setEditList([]); return () => {}; }
@@ -1244,14 +1235,14 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       })
       .finally(() => { if (!cancelled) setEditListLoading(false); });
     return () => { cancelled = true; };
-  }
+  }, [editType, typesData, mapApiDoc, t]);
 
   // Fetch the documents of the chosen type in the uploader's department once a type is picked
   useEffect(() => {
     if (activePage !== 'editdocument' || !editType) return;
     if (!localStorage.getItem('token')) return;
     return refreshEditList();
-  }, [activePage, editType, typesData]);
+  }, [activePage, editType, refreshEditList]);
 
   function openEditDoc(doc) {
     setEditingDoc(doc);
@@ -1314,7 +1305,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       no_of_ordinances:        tf.noOfOrdinances ? parseInt(tf.noOfOrdinances, 10) || null : null,
       no_of_orders:            tf.noOfOrders ? parseInt(tf.noOfOrders, 10) || null : null,
       keywords:                tf.keywords || '',
-      is_repealed:             !!tf.repealed,
       tag_ids:                 [],
     };
     try {
@@ -1358,7 +1348,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const [subDocActsLoading, setSubDocActsLoading] = useState(false);
   // approvals[partType] = { status, submitted_at, reviewed_at, comments, ... } | undefined
   const [subDocApprovals, setSubDocApprovals] = useState({});
-  const [subDocSubmitting, setSubDocSubmitting] = useState(false);
   const [secHasChapters, setSecHasChapters] = useState(null); // null = not answered yet
   const [secChapters, setSecChapters]       = useState([]); // [{ name, sections: [{name,description},...] }]
   const [activeChapterIdx, setActiveChapterIdx] = useState(-1); // -1 = all collapsed (overview); set to index to expand
@@ -1378,7 +1367,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const [sectionsBaseline, setSectionsBaseline] = useState(() => sectionsSignature(null, [], []));
   const [entriesBaseline, setEntriesBaseline] = useState({}); // { [tab]: signature string }; a missing key falls back to entriesSignature([])
   const [form, setForm]             = useState({ act: '', dept: user?.dept || '', type: '', version: '1.0', desc: '', enactmentDate: '', parentAct: '', changeTypes: [] });
-  const [amendmentProvisions, setAmendmentProvisions] = useState([]);
   const [typeFields, setTypeFields]  = useState({});
   const [hierarchy, setHierarchy]   = useState({ act: '', actId: null, chapter: '', section: '', subsection: '' });
   const [rejected, setRejected]     = useState([]);
@@ -1386,14 +1374,9 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const [versionModal, setVersionModal] = useState(null);
   const [conflictModal, setConflictModal] = useState(null); // { existingDoc, pendingDocs, pendingRelations }
   const [duplicateModal, setDuplicateModal] = useState(null); // { matches: DuplicateCheckItem[] }
-  const [linkedDocs, setLinkedDocs] = useState([]);
   const [linkingId, setLinkingId] = useState(null); // pdf_id being linked (loading state)
   const [viewingLinkedDoc, setViewingLinkedDoc] = useState(null); // linked doc open in DocViewModal
   const [viewingActChildDoc, setViewingActChildDoc] = useState(null); // existing-under-this-Act doc open in DocViewModal
-
-  // Correction request state
-  const [correctionModal, setCorrectionModal] = useState(null); // { doc }
-  const [correctionReason, setCorrectionReason] = useState('');
 
   // Relationship state
   const [relations, setRelations]     = useState([]);
@@ -1418,8 +1401,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const [relDocSuggestions, setRelDocSuggestions] = useState([]); // real API results for "Link to Document", keyed by whichever Target Document Type is selected
   const [relDocSearching,   setRelDocSearching]   = useState(false);
   const relDocSearchTimer = useRef(null);
-  const [parentActSearch, setParentActSearch] = useState('');
-  const [showParentActDrop, setShowParentActDrop] = useState(false);
   const [drawerType,      setDrawerType]      = useState(null); // null | 'hierarchy' | 'relationship'
   const [drawerHierarchy, setDrawerHierarchy] = useState({ act: '', actId: null, chapter: '', section: '', subsection: '' });
 
@@ -1560,13 +1541,28 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const [sortCol,     setSortCol]     = useState('uploadedAt');
   const [sortDir,     setSortDir]     = useState('desc');
 
-  // The Upload and Edit flows reset to their starting state on every fresh visit —
-  // navigating there from the dashboard never resumes wherever it was left mid-session.
-  useEffect(() => {
-    if (activePage === 'upload') resetUploadForm();
-  }, [activePage]);
+  // Full reset of the upload wizard back to its starting (no type chosen) state.
+  function resetUploadForm() {
+    setForm({ act: '', dept: user?.dept || '', type: '', version: '1.0', desc: '', enactmentDate: '', parentAct: '', changeTypes: [] });
+    setFiles([]); setFileRefs([]); setFileMeta({});
+    setRelations([]);
+    setHierarchy({ act: '', chapter: '', section: '', subsection: '' });
+    setLegalAuthorities([{ act: '', sections: [''] }]);
+    setRelNote('');
+    setTypeFields({});
+    setUploadStep(null);
+    setUploadError('');
+  }
 
-  useEffect(() => {
+  // The Upload, Dashboard and Edit tabs reset to their starting state on every fresh
+  // visit — navigating there never resumes wherever it was left mid-session. Adjusted
+  // during render (React's "you might not need an effect" pattern, also used in
+  // Layout.jsx/App.jsx) rather than in an effect, since these are plain resets with
+  // no I/O or subscriptions.
+  const [prevActivePage, setPrevActivePage] = useState(activePage);
+  if (activePage !== prevActivePage) {
+    setPrevActivePage(activePage);
+    if (activePage === 'upload') resetUploadForm();
     if (activePage === 'dashboard') {
       setTableSearch('');
       setFilterType('');
@@ -1578,11 +1574,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       setBulkEditOpen(false);
       setBulkFields({ dept: '', type: '', year: '' });
     }
-  }, [activePage]);
-
-  useEffect(() => {
     if (activePage === 'editdocument') setEditType(null);
-  }, [activePage]);
+  }
 
   const inputRef     = useRef();
   const uploadsTableRef = useRef();
@@ -1661,11 +1654,14 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   }, [activePage, subDocTab, subDocAct]);
 
   // Switching tabs (schedule → annexure, etc.) shouldn't leave an entry from the previous
-  // tab's list expanded — start each tab's entries collapsed.
-  useEffect(() => {
+  // tab's list expanded — start each tab's entries collapsed. Adjusted during render
+  // rather than in an effect, since it's a plain reset with no I/O.
+  const [prevSubDocTab, setPrevSubDocTab] = useState(subDocTab);
+  if (subDocTab !== prevSubDocTab) {
+    setPrevSubDocTab(subDocTab);
     setActiveEntryIdx(-1);
     setEntryPreviewIdx(null);
-  }, [subDocTab]);
+  }
 
   // Load existing entries from DB when act or tab changes.
   // Skips if this (actId, tab) pair was already loaded — preserves unsaved additions across tab switches.
@@ -1686,13 +1682,17 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   }
 
   // Switching (or adding) a chapter should default to its own last section being the open one,
-  // not whatever section index was active in the previously-open chapter.
-  useEffect(() => {
+  // not whatever section index was active in the previously-open chapter. Adjusted during
+  // render rather than in an effect — intentionally keyed on activePage/activeChapterIdx only,
+  // not secChapters, so editing chapter content doesn't reset which section is open.
+  const chapterKey = `${activePage}:${activeChapterIdx}`;
+  const [prevChapterKey, setPrevChapterKey] = useState(chapterKey);
+  if (chapterKey !== prevChapterKey) {
+    setPrevChapterKey(chapterKey);
     if (activePage === 'adddocuments') {
       setActiveSectionIdx(Math.max(0, (secChapters[activeChapterIdx]?.sections.length || 1) - 1));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activePage, activeChapterIdx]);
+  }
 
   useEffect(() => {
     if (activePage === 'adddocuments' && secHasChapters === true) scrollAddDocumentsToEnd();
@@ -1752,10 +1752,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
 
     return [...found].sort();
   }
-  const parentActFiltered = approvedDocs
-    .filter(d => d.title.toLowerCase().includes(parentActSearch.toLowerCase()))
-    .slice(0, 8);
-
   async function addFiles(fileList) {
     const arr = Array.from(fileList);
     setRejected(arr.filter(f => !isAccepted(f)).map(f => f.name));
@@ -1849,7 +1845,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     setForm({ act:'',dept:user?.dept||'',type:'',version:'1.0',desc:'',enactmentDate:'',parentAct:'',changeTypes:[] });
     setHierarchy({ act:'', actId: null, chapter:'',section:'',subsection:'' });
     setLegalAuthorities([{ act: '', sections: [''] }]);
-    setAmendmentProvisions([]); setParentActSearch(''); setTypeFields({});
+    setTypeFields({});
 
     // Move newly uploaded docs from DRAFT to PENDING (queued for approver review)
     setTimeout(() => {
@@ -1859,21 +1855,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     }, 1800);
 
     onAuditLog?.(`Uploaded ${docsWithWorkflow.length} document(s): ${docsWithWorkflow.map(d => d.title).join(', ')}`);
-  }
-
-  // Full reset of the upload wizard back to its starting (no type chosen) state.
-  function resetUploadForm() {
-    setForm({ act: '', dept: user?.dept || '', type: '', version: '1.0', desc: '', enactmentDate: '', parentAct: '', changeTypes: [] });
-    setFiles([]); setFileRefs([]); setFileMeta({});
-    setRelations([]);
-    setHierarchy({ act: '', chapter: '', section: '', subsection: '' });
-    setLegalAuthorities([{ act: '', sections: [''] }]);
-    setAmendmentProvisions([]);
-    setParentActSearch('');
-    setRelNote('');
-    setTypeFields({});
-    setUploadStep(null);
-    setUploadError('');
   }
 
   // Runs the OCR eligibility check (POST /pdf/upload-file) for any files not yet checked.
@@ -2059,7 +2040,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             no_of_ordinances:      typeFields.noOfOrdinances ? parseInt(typeFields.noOfOrdinances, 10) || null : null,
             no_of_orders:          typeFields.noOfOrder ? parseInt(typeFields.noOfOrder, 10) || null : null,
             keywords:              typeFields.keywords || '',
-            is_repealed:           !!typeFields.repealed,
             tag_ids:               [],
             relationships:         relationshipsPayload,
             description:           (() => {
@@ -2177,7 +2157,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       const res = await checkDuplicateDocument(docName, typeObj.id);
       const matches = Array.isArray(res.data) ? res.data : [];
       if (matches.length > 0) setDuplicateModal({ matches });
-    } catch (_) { /* silent — duplicate check is advisory */ }
+    } catch { /* silent — duplicate check is advisory */ }
   }
 
   // Called when user clicks "Link to My Department" in the duplicate modal
@@ -2188,7 +2168,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       setDuplicateModal(null);
       // Refresh linked docs
       getLinkedDocuments().then(r => setLinkedDocs(Array.isArray(r.data) ? r.data : [])).catch(() => {});
-    } catch (_) {}
+    } catch { /* link failed — surfaced via linkingId clearing without a success state */ }
     setLinkingId(null);
   }
 
@@ -2231,6 +2211,30 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     onAuditLog?.(`Bulk edited ${selectedIds.size} documents`);
   }
 
+  async function handleReplaceFileSubmit() {
+    if (!replaceFileModal || !replaceFileSelected) return;
+    setReplaceFileSaving(true);
+    setReplaceFileError('');
+    try {
+      const formData = new FormData();
+      formData.append('file', replaceFileSelected);
+      const uploadRes = await uploadPdfFile(formData);
+      const { file_ref } = uploadRes.data;
+      const updateRes = await replaceDocumentFile(replaceFileModal.id, file_ref, replaceFileResubmit);
+      const updated = mapApiDoc(updateRes.data);
+      setUploads(prev => prev.map(d => d.id === updated.id ? updated : d));
+      setToast({ type: 'success', message: replaceFileResubmit ? t('toasts.fileReplacedAndResubmitted') : t('toasts.fileReplaced') });
+      setReplaceFileModal(null);
+      setReplaceFileSelected(null);
+      setReplaceFileResubmit(false);
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      setReplaceFileError(typeof detail === 'string' ? detail : t('toasts.replaceFileFailed'));
+    } finally {
+      setReplaceFileSaving(false);
+    }
+  }
+
   function downloadAuditTrail() {
     const rows = [['Document Title','Type','Department','Year','Status','Workflow Status','Uploaded On','Version','OCR Status']];
     uploads.forEach(d => rows.push([d.title,d.type,d.dept,d.year,d.status,d.workflowStatus||'draft',d.uploadedAt,d.version||'1.0',d.ocrStatus||'completed']));
@@ -2245,7 +2249,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     const approved  = uploads.filter(d => d.status === 'approved').length;
     const pending   = uploads.filter(d => d.status === 'pending').length;
     const rejected  = uploads.filter(d => d.status === 'rejected').length;
-    const published = uploads.filter(d => d.workflowStatus === WORKFLOW_STATUS.PUBLISHED).length;
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
@@ -2388,6 +2391,115 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         {/* Full-screen document viewer */}
         {viewDoc && <DocViewModal doc={viewDoc} onClose={() => setViewDoc(null)} />}
 
+        {/* Replace File modal */}
+        {replaceFileModal && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            onClick={() => { if (!replaceFileSaving) { setReplaceFileModal(null); setReplaceFileSelected(null); setReplaceFileResubmit(false); setReplaceFileError(''); } }}>
+            <div style={{ background: 'var(--surface-card)', borderRadius: 14, padding: 28, width: 'min(520px, calc(100vw - 32px))', boxShadow: '0 24px 80px rgba(0,0,0,.3)' }}
+              onClick={e => e.stopPropagation()}>
+
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18, paddingBottom: 14, borderBottom: '1px solid var(--surface-border)' }}>
+                <div>
+                  <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)', marginBottom: 4 }}>
+                    {t('replaceFileModal.title')}
+                  </div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 360 }}>
+                    {replaceFileModal.title}
+                  </div>
+                </div>
+                {!replaceFileSaving && (
+                  <button onClick={() => { setReplaceFileModal(null); setReplaceFileSelected(null); setReplaceFileResubmit(false); setReplaceFileError(''); }}
+                    style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '5px 8px', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', flexShrink: 0 }}>
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+
+              {/* Rejection reason banner */}
+              {replaceFileModal.approval?.comments && replaceFileModal.status === 'rejected' && (
+                <div style={{ display: 'flex', gap: 10, padding: '10px 14px', borderRadius: 8, background: 'rgba(220, 53, 69,.06)', border: '1px solid rgba(220, 53, 69,.2)', marginBottom: 16 }}>
+                  <XCircle size={14} color="#dc3545" style={{ flexShrink: 0, marginTop: 2 }} />
+                  <div>
+                    <div style={{ fontSize: 11.5, fontWeight: 700, color: '#dc3545', marginBottom: 3 }}>{t('replaceFileModal.rejectionReason')}</div>
+                    <div style={{ fontSize: 12.5, color: 'var(--text-color)', lineHeight: 1.5 }}>{replaceFileModal.approval.comments}</div>
+                  </div>
+                </div>
+              )}
+
+              {/* File picker */}
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-color-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '.05em' }}>
+                  {t('replaceFileModal.newFileLabel')}
+                </div>
+                <div
+                  style={{ border: `2px dashed ${replaceFileSelected ? 'var(--primary)' : 'var(--surface-border)'}`, borderRadius: 10, padding: '20px 16px', textAlign: 'center', cursor: 'pointer', background: replaceFileSelected ? 'rgba(33, 74, 171,.04)' : 'var(--surface-ground)', transition: 'all .15s' }}
+                  onClick={() => replaceFileInputRef.current?.click()}
+                  onDragOver={e => { e.preventDefault(); e.currentTarget.style.background = 'rgba(33, 74, 171,.08)'; }}
+                  onDragLeave={e => { e.currentTarget.style.background = replaceFileSelected ? 'rgba(33, 74, 171,.04)' : 'var(--surface-ground)'; }}
+                  onDrop={e => {
+                    e.preventDefault();
+                    e.currentTarget.style.background = 'rgba(33, 74, 171,.04)';
+                    const f = e.dataTransfer.files[0];
+                    if (f) { setReplaceFileSelected(f); setReplaceFileError(''); }
+                  }}>
+                  <input ref={replaceFileInputRef} type="file" accept=".pdf,.docx" style={{ display: 'none' }}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) { setReplaceFileSelected(f); setReplaceFileError(''); } }} />
+                  {replaceFileSelected ? (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                      <FileText size={16} color="var(--primary)" />
+                      <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--primary)' }}>{replaceFileSelected.name}</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>({(replaceFileSelected.size / 1024).toFixed(0)} KB)</span>
+                    </div>
+                  ) : (
+                    <div>
+                      <Upload size={22} color="var(--text-color-secondary)" style={{ marginBottom: 6 }} />
+                      <div style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>{t('replaceFileModal.dropzone')}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 4, opacity: .7 }}>PDF or Word (.docx)</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Resubmit checkbox — only for rejected docs */}
+              {replaceFileModal.status === 'rejected' && (
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '12px 14px', borderRadius: 8, background: replaceFileResubmit ? 'rgba(33, 74, 171,.06)' : 'var(--surface-ground)', border: `1px solid ${replaceFileResubmit ? 'rgba(33, 74, 171,.25)' : 'var(--surface-border)'}`, cursor: 'pointer', marginBottom: 16, transition: 'all .15s', userSelect: 'none' }}>
+                  <input type="checkbox" checked={replaceFileResubmit} onChange={e => setReplaceFileResubmit(e.target.checked)} style={{ marginTop: 2, accentColor: 'var(--primary)', width: 14, height: 14, cursor: 'pointer', flexShrink: 0 }} />
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: replaceFileResubmit ? 'var(--primary)' : 'var(--text-heading)' }}>
+                      {t('replaceFileModal.resubmitLabel')}
+                    </div>
+                    <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 3, lineHeight: 1.5 }}>
+                      {t('replaceFileModal.resubmitDesc')}
+                    </div>
+                  </div>
+                </label>
+              )}
+
+              {/* Error */}
+              {replaceFileError && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px', borderRadius: 8, background: 'rgba(220, 53, 69,.06)', border: '1px solid rgba(220, 53, 69,.2)', color: '#dc2626', fontSize: 12.5, marginBottom: 14 }}>
+                  <AlertCircle size={13} style={{ flexShrink: 0 }} />
+                  {replaceFileError}
+                </div>
+              )}
+
+              {/* Actions */}
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                <button disabled={replaceFileSaving} onClick={() => { setReplaceFileModal(null); setReplaceFileSelected(null); setReplaceFileResubmit(false); setReplaceFileError(''); }}
+                  style={{ padding: '9px 20px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 13, cursor: replaceFileSaving ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: replaceFileSaving ? .5 : 1 }}>
+                  {t('common.cancel')}
+                </button>
+                <button disabled={!replaceFileSelected || replaceFileSaving} onClick={handleReplaceFileSubmit}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 22px', borderRadius: 8, border: 'none', background: replaceFileResubmit ? 'var(--primary)' : '#475569', color: 'white', fontSize: 13, fontWeight: 700, cursor: (!replaceFileSelected || replaceFileSaving) ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: (!replaceFileSelected || replaceFileSaving) ? .5 : 1, transition: 'background .15s' }}>
+                  {replaceFileSaving ? <RotateCcw size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Upload size={13} />}
+                  {replaceFileSaving ? '…' : replaceFileResubmit ? t('replaceFileModal.replaceAndResubmitButton') : t('replaceFileModal.replaceButton')}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* API error */}
         {myDocsError && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderRadius: 10, background: 'rgba(220, 53, 69,.08)', border: '1px solid rgba(220, 53, 69,.2)', color: '#dc2626' }}>
@@ -2518,16 +2630,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
             else { setSortCol(col); setSortDir('asc'); }
           }
-
-          const SortBtn = ({ col, label }) => {
-            const active = sortCol === col;
-            return (
-              <button onClick={() => toggleSort(col)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3, padding: 0, fontFamily: 'var(--mono)', fontSize: 10.5, fontWeight: 700, letterSpacing: '.07em', textTransform: 'uppercase', color: active ? 'var(--primary)' : 'var(--text-color-secondary)' }}>
-                {label}
-                <span style={{ fontSize: 9, lineHeight: 1, opacity: active ? 1 : 0.4 }}>{active ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}</span>
-              </button>
-            );
-          };
 
           return (
         <div ref={uploadsTableRef} style={{ scrollMarginTop: 16 }}>
@@ -2721,7 +2823,13 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                           {/* Row 3: date + actions */}
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
                             <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)' }}>{doc.uploadedAt}</span>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                              {(doc.status === 'pending' || doc.status === 'rejected') && (
+                                <button onClick={() => { setReplaceFileModal(doc); setReplaceFileSelected(null); setReplaceFileResubmit(false); setReplaceFileError(''); }}
+                                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 10px', borderRadius: 7, border: '1px solid rgba(100,116,139,.3)', background: 'rgba(100,116,139,.07)', color: '#475569', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                                  <RotateCcw size={12} /> {t('table.replaceFileButton')}
+                                </button>
+                              )}
                               {doc.approval?.comments && (
                                 <button onClick={() => setRemarksModal(doc)}
                                   style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 10px', borderRadius: 7, border: `1px solid ${statusBorder}`, background: statusBg, color: statusAccent, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
@@ -2806,13 +2914,21 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                         </div>
 
                         {/* Actions */}
-                        <div style={{ padding: '14px 16px', borderLeft: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 7 }}>
+                        <div style={{ padding: '14px 16px', borderLeft: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
                           <button onClick={() => setViewDoc(doc)}
                             style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 7, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', whiteSpace: 'nowrap', transition: 'background .15s' }}
                             onMouseEnter={e => e.currentTarget.style.background = 'rgba(33, 74, 171,.14)'}
                             onMouseLeave={e => e.currentTarget.style.background = 'rgba(33, 74, 171,.07)'}>
                             <Eye size={13} /> {t('common.view')}
                           </button>
+                          {(doc.status === 'pending' || doc.status === 'rejected') && (
+                            <button onClick={() => { setReplaceFileModal(doc); setReplaceFileSelected(null); setReplaceFileResubmit(false); setReplaceFileError(''); }}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 7, border: '1px solid rgba(100,116,139,.3)', background: 'rgba(100,116,139,.07)', color: '#475569', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', whiteSpace: 'nowrap', transition: 'background .15s' }}
+                              onMouseEnter={e => e.currentTarget.style.background = 'rgba(100,116,139,.14)'}
+                              onMouseLeave={e => e.currentTarget.style.background = 'rgba(100,116,139,.07)'}>
+                              <RotateCcw size={13} /> {t('table.replaceFileButton')}
+                            </button>
+                          )}
                           {doc.approval?.comments && (
                             <button onClick={() => setRemarksModal(doc)}
                               style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 7, border: `1px solid ${statusBorder}`, background: statusBg, color: statusAccent, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', whiteSpace: 'nowrap', transition: 'opacity .15s' }}>
@@ -3314,7 +3430,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
 
     function addChapter() {
       setSecChapters(prev => {
-        const nextIdx = prev.filter(c => !c.isDeleted).length + prev.filter(c => c.isDeleted).length; // = prev.length
         setActiveChapterIdx(prev.length);
         return [...prev, { id: null, name: '', isDeleted: false, sections: [] }];
       });
@@ -5014,13 +5129,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                   placeholder={t('wizard.placeholders.act.keywords')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
 
-              <div style={{ gridColumn: '1 / -1' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 12.5, color: 'var(--text-color-secondary)' }}>
-                  <input type="checkbox" checked={!!typeFields.repealed} onChange={e => setTypeFields(f => ({ ...f, repealed: e.target.checked }))}
-                    style={{ width: 15, height: 15, cursor: 'pointer', accentColor: 'var(--primary)' }} />
-                  {t('wizard.fields.act.repealCheckbox')}
-                </label>
-              </div>
             </>)}
 
             {/* ── Amendment: unified inline fields ── */}

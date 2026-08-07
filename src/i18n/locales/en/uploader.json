@@ -129,7 +129,18 @@
     "colActions": "Actions",
     "noDocumentsFound": "No documents found.",
     "remarksButton": "Remarks",
+    "replaceFileButton": "Replace File",
     "allTypes": "All Types"
+  },
+  "replaceFileModal": {
+    "title": "Replace Document File",
+    "newFileLabel": "Select New File",
+    "dropzone": "Click or drag a file here to replace",
+    "rejectionReason": "Rejection Reason",
+    "resubmitLabel": "Resubmit for review",
+    "resubmitDesc": "After replacing the file, reset the document status to pending so the approver receives it again.",
+    "replaceButton": "Replace File",
+    "replaceAndResubmitButton": "Replace & Resubmit"
   },
   "linkedDocs": {
     "title": "Linked Documents",
@@ -296,8 +307,7 @@
         "noOfStatutes": "No. of Statutes",
         "noOfOrdinances": "No. of Ordinances",
         "noOfOrder": "No. of Order",
-        "keywords": "Keywords",
-        "repealCheckbox": "Check if you want to repeal the Act. This Act will not show anywhere."
+        "keywords": "Keywords"
       },
       "amendment": {
         "nameLabel": "Amendment Name",
@@ -468,7 +478,10 @@
     "submitSuccessSingle": "\"{{title}}\" submitted successfully — pending approval.",
     "submitSuccessMulti": "{{count}} documents submitted successfully — pending approval.",
     "documentFallback": "Document",
-    "failedToLoadDocuments": "Failed to load your documents"
+    "failedToLoadDocuments": "Failed to load your documents",
+    "fileReplaced": "File replaced successfully.",
+    "fileReplacedAndResubmitted": "File replaced and resubmitted for approval.",
+    "replaceFileFailed": "Failed to replace file. Please try again."
   },
   "addDocuments": {
     "heading": "Add Documents",
