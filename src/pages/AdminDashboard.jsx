@@ -8,6 +8,7 @@ import MultiSelectField from '../components/ui/MultiSelectField';
 import DocViewModal from '../components/DocViewModal';
 import { getUsers, getRoles, updateUser, registerUser, getApproversByDepartment } from '../services/users';
 import { getDepartments, createDepartment, toggleDepartment, getDocumentTypes, createDocumentType, toggleDocumentType } from '../services/departments';
+import { getRoleCaps, upsertRoleCap, deleteRoleCap, getActiveUserCount } from '../services/roleCaps';
 import { getAllDocumentsAdmin, getAllDepartmentLinks } from '../services/pdf';
 import { getAuditLogs } from '../services/audit';
 import { useMediaQuery } from '../hooks/useMediaQuery';
@@ -341,6 +342,91 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       .catch(() => setAllLinksError(t('linkedDocs.failedToLoad')))
       .finally(() => setAllLinksLoading(false));
   }, [activePage, t]);
+
+  // Role Caps state
+  const [capsDefaultMax, setCapsDefaultMax] = useState(null);
+  const [caps, setCaps]                 = useState([]);
+  const [capsLoading, setCapsLoading]   = useState(false);
+  const [capsError, setCapsError]       = useState('');
+  const [capForm, setCapForm]           = useState({ department_id: '', role_id: '', max_users: '' });
+  const [capFormError, setCapFormError] = useState('');
+  const [capSaving, setCapSaving]       = useState(false);
+  const [capEditId, setCapEditId]       = useState(null);
+  const [capEditVal, setCapEditVal]     = useState('');
+  const [capDeptSearch, setCapDeptSearch]   = useState('');
+  const [capDeptOpen, setCapDeptOpen]       = useState(false);
+  const [capActiveCount, setCapActiveCount] = useState(null);
+
+  useEffect(() => {
+    if (!capForm.department_id || !capForm.role_id) {
+      setCapActiveCount(null);
+      return;
+    }
+    const existing = caps.find(
+      c => String(c.department_id) === String(capForm.department_id) && String(c.role_id) === String(capForm.role_id)
+    );
+    setCapForm(f => ({ ...f, max_users: existing ? String(existing.max_users) : (capsDefaultMax != null ? String(capsDefaultMax) : '') }));
+    setCapActiveCount(null);
+    getActiveUserCount(capForm.department_id, capForm.role_id)
+      .then(res => setCapActiveCount(res.data.active_count))
+      .catch(() => setCapActiveCount(null));
+  }, [capForm.department_id, capForm.role_id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (activePage !== 'rolecaps') return;
+    setCapsLoading(true);
+    setCapsError('');
+    Promise.all([getRoleCaps(), getDepartments(), getRoles()])
+      .then(([capsRes, deptsRes, rolesRes]) => {
+        setCapsDefaultMax(capsRes.data.default_max);
+        setCaps(capsRes.data.limits);
+        setDepts(deptsRes.data);
+        setRoles(rolesRes.data);
+      })
+      .catch(() => setCapsError(t('roleCaps.errors.loadFailed')))
+      .finally(() => setCapsLoading(false));
+  }, [activePage, t]);
+
+  function handleCapSave(e) {
+    e.preventDefault();
+    if (!capForm.department_id) { setCapFormError(t('roleCaps.errors.deptRequired')); return; }
+    if (!capForm.role_id)       { setCapFormError(t('roleCaps.errors.roleRequired')); return; }
+    const max = parseInt(capForm.max_users, 10);
+    if (isNaN(max) || max < 0) { setCapFormError(t('roleCaps.errors.maxRequired')); return; }
+    if (capActiveCount !== null && max < capActiveCount) {
+      setCapFormError(t('roleCaps.errors.belowActiveCount', { count: capActiveCount, defaultValue: `${capActiveCount} users are already active with this role in this department. Cap must be at least ${capActiveCount}.` }));
+      return;
+    }
+    setCapSaving(true);
+    setCapFormError('');
+    upsertRoleCap({ department_id: Number(capForm.department_id), role_id: Number(capForm.role_id), max_users: max })
+      .then(() => getRoleCaps().then(r => { setCapsDefaultMax(r.data.default_max); setCaps(r.data.limits); setCapForm({ department_id: '', role_id: '', max_users: '' }); setCapDeptSearch(''); setCapActiveCount(null); }))
+      .catch(() => setCapFormError(t('roleCaps.errors.saveFailed')))
+      .finally(() => setCapSaving(false));
+  }
+
+  function handleCapInlineEdit(cap) {
+    setCapEditId(cap.id);
+    setCapEditVal(String(cap.max_users));
+  }
+
+  function handleCapInlineSave(cap) {
+    const max = parseInt(capEditVal, 10);
+    if (isNaN(max) || max < 0) return;
+    upsertRoleCap({ department_id: cap.department_id, role_id: cap.role_id, max_users: max })
+      .then(() => {
+        setCaps(prev => prev.map(c => c.id === cap.id ? { ...c, max_users: max } : c));
+        setCapEditId(null);
+      })
+      .catch(() => {});
+  }
+
+  function handleCapDelete(cap) {
+    if (!window.confirm(t('roleCaps.deleteConfirm', { role: cap.role_name, dept: cap.department_name, default: capsDefaultMax }))) return;
+    deleteRoleCap(cap.department_id, cap.role_id)
+      .then(() => setCaps(prev => prev.filter(c => c.id !== cap.id)))
+      .catch(() => {});
+  }
 
   function handleCreateDept(e) {
     e.preventDefault();
@@ -2196,6 +2282,193 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
         </Card>
       </div>
       {viewingLink && <DocViewModal doc={viewingLink} onClose={() => setViewingLink(null)} />}
+      </>
+    );
+  }
+
+  if (activePage === 'rolecaps') {
+    const assignable = assignableRoles(roles);
+    return (
+      <>
+        <style>{ADM_RESPONSIVE_CSS}</style>
+        <div style={{ padding: '24px', maxWidth: 900, margin: '0 auto' }}>
+          <h2 style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-heading)', marginBottom: 4 }}>
+            {t('roleCaps.title')}
+          </h2>
+          <p style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', marginBottom: 24 }}>
+            {t('roleCaps.subtitle', { default: capsDefaultMax })}
+          </p>
+
+          {/* Add / Update form */}
+          <Card style={{ marginBottom: 24, padding: '18px 20px' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 14 }}>
+              {t('roleCaps.addTitle')}
+            </div>
+            <form onSubmit={handleCapSave}>
+              <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 140px auto', gap: 10, alignItems: 'end' }}>
+                <div style={{ position: 'relative' }}>
+                  <label style={{ ...LABEL, display: 'block', marginBottom: 5 }}>{t('roleCaps.department')}</label>
+                  <input
+                    type="text"
+                    autoComplete="off"
+                    value={capDeptSearch !== '' || !capForm.department_id
+                      ? capDeptSearch
+                      : (depts.find(d => String(d.id) === String(capForm.department_id))?.name ?? '')}
+                    placeholder={t('roleCaps.selectDepartment')}
+                    onFocus={() => setCapDeptOpen(true)}
+                    onBlur={() => setTimeout(() => setCapDeptOpen(false), 150)}
+                    onChange={e => {
+                      setCapDeptSearch(e.target.value);
+                      setCapForm(f => ({ ...f, department_id: '' }));
+                      setCapFormError('');
+                      setCapDeptOpen(true);
+                    }}
+                    style={{ width: '100%', padding: '10px 12px 10px 14px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: capForm.department_id ? 'var(--text-color)' : 'var(--text-color-secondary)', fontSize: 13, boxSizing: 'border-box', fontFamily: 'var(--font)', outline: 'none' }}
+                  />
+                  {capDeptOpen && (
+                    <div style={{
+                      position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 500,
+                      background: 'var(--surface-card)', border: '1px solid var(--surface-border)',
+                      borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,.12)',
+                      maxHeight: 200, overflowY: 'auto', marginTop: 2,
+                    }}>
+                      {depts.filter(d => d.is_active && (!capDeptSearch.trim() || d.name.toLowerCase().includes(capDeptSearch.toLowerCase()))).length === 0
+                        ? <div style={{ padding: '10px 14px', fontSize: 12.5, color: 'var(--text-color-secondary)' }}>{t('common.noResults', 'No departments found')}</div>
+                        : depts.filter(d => d.is_active && (!capDeptSearch.trim() || d.name.toLowerCase().includes(capDeptSearch.toLowerCase()))).map(d => (
+                          <div
+                            key={d.id}
+                            onMouseDown={() => {
+                              setCapForm(f => ({ ...f, department_id: String(d.id) }));
+                              setCapDeptSearch('');
+                              setCapDeptOpen(false);
+                              setCapFormError('');
+                            }}
+                            style={{
+                              padding: '9px 14px', fontSize: 13, cursor: 'pointer',
+                              background: String(capForm.department_id) === String(d.id) ? 'var(--primary-light)' : 'transparent',
+                              color: String(capForm.department_id) === String(d.id) ? 'var(--primary)' : 'var(--text-color)',
+                            }}
+                            onMouseEnter={e => { if (String(capForm.department_id) !== String(d.id)) e.currentTarget.style.background = 'var(--surface-hover)'; }}
+                            onMouseLeave={e => { if (String(capForm.department_id) !== String(d.id)) e.currentTarget.style.background = 'transparent'; }}
+                          >
+                            {d.name}
+                          </div>
+                        ))
+                      }
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label style={{ ...LABEL, display: 'block', marginBottom: 5 }}>{t('roleCaps.role')}</label>
+                  <SelectField
+                    value={capForm.role_id}
+                    onChange={e => { setCapForm(f => ({ ...f, role_id: e.target.value })); setCapFormError(''); }}
+                    placeholder={t('roleCaps.selectRole')}
+                  >
+                    {assignable.map(r => (
+                      <option key={r.id} value={r.id}>{r.name.charAt(0).toUpperCase() + r.name.slice(1)}</option>
+                    ))}
+                  </SelectField>
+                </div>
+                <div>
+                  <label style={{ ...LABEL, display: 'block', marginBottom: 5 }}>{t('roleCaps.maxUsers')}</label>
+                  <input
+                    type="number" min="0"
+                    value={capForm.max_users}
+                    onChange={e => { setCapForm(f => ({ ...f, max_users: e.target.value })); setCapFormError(''); }}
+                    style={{ width: '100%', padding: '10px 12px 10px 14px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color)', fontSize: 13, fontFamily: 'var(--font)', boxSizing: 'border-box', outline: 'none' }}
+                  />
+                </div>
+                <button
+                  type="submit" disabled={capSaving}
+                  style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#0d6efd', color: '#fff', fontWeight: 700, fontSize: 13, cursor: capSaving ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}
+                >
+                  {capSaving ? t('roleCaps.saving') : t('roleCaps.save')}
+                </button>
+              </div>
+              {capActiveCount !== null && (
+                <div style={{ marginTop: 6, fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
+                  {capActiveCount === 0
+                    ? t('roleCaps.activeCountZero', 'No active users currently.')
+                    : t('roleCaps.activeCount', { count: capActiveCount, defaultValue: `${capActiveCount} active user${capActiveCount > 1 ? 's' : ''} currently.` })}
+                </div>
+              )}
+              {capFormError && (
+                <div style={{ marginTop: 6, fontSize: 12, color: '#dc3545' }}>{capFormError}</div>
+              )}
+            </form>
+          </Card>
+
+          {/* Existing limits table */}
+          <Card>
+            {capsLoading && (
+              <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>{t('common.loading')}</div>
+            )}
+            {capsError && (
+              <div style={{ padding: 16, color: '#dc3545', fontSize: 13 }}>{capsError}</div>
+            )}
+            {!capsLoading && !capsError && caps.length === 0 && (
+              <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>
+                {t('roleCaps.noLimits', { default: capsDefaultMax })}
+              </div>
+            )}
+            {!capsLoading && caps.length > 0 && (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid var(--surface-border)' }}>
+                      {[t('roleCaps.headers.department'), t('roleCaps.headers.role'), t('roleCaps.headers.maxUsers'), t('roleCaps.headers.actions')].map(h => (
+                        <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, fontSize: 11, color: 'var(--text-color-secondary)', textTransform: 'uppercase', letterSpacing: '.06em' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {caps.map(cap => (
+                      <tr key={cap.id} style={{ borderBottom: '1px solid var(--surface-border)' }}>
+                        <td style={{ padding: '10px 14px', fontWeight: 600, color: 'var(--text-heading)' }}>{cap.department_name}</td>
+                        <td style={{ padding: '10px 14px', color: 'var(--text-color)' }}>{cap.role_name ? cap.role_name.charAt(0).toUpperCase() + cap.role_name.slice(1) : '—'}</td>
+                        <td style={{ padding: '10px 14px' }}>
+                          {capEditId === cap.id ? (
+                            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                              <input
+                                type="number" min="0"
+                                value={capEditVal}
+                                onChange={e => setCapEditVal(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter') handleCapInlineSave(cap); if (e.key === 'Escape') setCapEditId(null); }}
+                                autoFocus
+                                style={{ width: 70, padding: '5px 8px', borderRadius: 6, border: '1px solid var(--surface-border)', background: 'var(--surface-card)', color: 'var(--text-color)', fontSize: 13 }}
+                              />
+                              <button onClick={() => handleCapInlineSave(cap)} style={{ padding: '4px 10px', borderRadius: 6, border: 'none', background: '#198754', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>✓</button>
+                              <button onClick={() => setCapEditId(null)} style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid var(--surface-border)', background: 'transparent', color: 'var(--text-color-secondary)', fontSize: 12, cursor: 'pointer' }}>✕</button>
+                            </div>
+                          ) : (
+                            <span style={{ fontWeight: 700, color: 'var(--text-heading)' }}>{cap.max_users}</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '10px 14px' }}>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button
+                              onClick={() => handleCapInlineEdit(cap)}
+                              style={{ padding: '4px 12px', borderRadius: 6, border: '1px solid var(--surface-border)', background: 'transparent', color: 'var(--text-color)', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}
+                            >
+                              {t('roleCaps.edit')}
+                            </button>
+                            <button
+                              onClick={() => handleCapDelete(cap)}
+                              style={{ padding: '4px 12px', borderRadius: 6, border: '1px solid rgba(220,53,69,.3)', background: 'transparent', color: '#dc3545', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}
+                            >
+                              {t('roleCaps.delete')}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        </div>
       </>
     );
   }

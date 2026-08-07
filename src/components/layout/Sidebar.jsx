@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BarChart2, GitBranch, ClipboardList, Users, Settings, Activity, FileSearch, BarChart, Layers, Link2, BookOpen } from 'lucide-react';
+import { BarChart2, GitBranch, ClipboardList, Users, Settings, Activity, FileSearch, BarChart, Layers, Link2, BookOpen, ShieldCheck } from 'lucide-react';
 import haryanaLogo from '../../assets/haryana-logo.png';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 const MENU_CONFIG = {
@@ -31,6 +31,7 @@ const MENU_CONFIG = {
     ]},
     { label: 'sidebar.groups.system', items: [
       { icon: Settings,      label: 'sidebar.items.masterDataManager', id: 'taxonomy' },
+      { icon: ShieldCheck,   label: 'sidebar.items.roleCaps',          id: 'rolecaps' },
       { icon: Activity,      label: 'sidebar.items.systemMonitor',     id: 'monitor' },
       { icon: ClipboardList, label: 'sidebar.items.fullMisReport',     id: 'auditfull' },
     ]},

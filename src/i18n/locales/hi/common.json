@@ -35,7 +35,8 @@
       "auditLog": "लेखा परीक्षा लॉग",
       "queryHistory": "प्रश्न इतिहास",
       "complianceReport": "अनुपालन रिपोर्ट",
-      "actPartsReview": "अधिनियम भाग समीक्षा"
+      "actPartsReview": "अधिनियम भाग समीक्षा",
+      "roleCaps": "भूमिका उपयोगकर्ता सीमाएं"
     }
   },
   "topbar": {
