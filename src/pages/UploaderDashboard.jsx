@@ -1228,6 +1228,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const editDocxViewRef  = useRef(null);
   const [editFileRef, setEditFileRef] = useState(null); // file_ref from pre-upload on file select
   const editManualBlobRef = useRef(null); // blob URL created from a locally selected file (needs manual revoke)
+  const [editDescPreview, setEditDescPreview] = useState(false);
 
   // Loads (or reloads) the current type's document table from the API.
   // Shared by the effect below and by saveEditDoc so the table reflects an edit immediately.
@@ -1278,6 +1279,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     setEditError('');
     setEditFileSelected(null);
     setEditFileResubmit(false);
+    setEditDescPreview(false);
   }
 
   function closeEditDoc() {
@@ -1298,6 +1300,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       URL.revokeObjectURL(editManualBlobRef.current);
       editManualBlobRef.current = null;
     }
+    setEditDescPreview(false);
   }
 
   async function saveEditDoc() {
@@ -2574,7 +2577,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
           const estatusAccent = editingDoc.status === 'approved' ? '#16a34a' : editingDoc.status === 'rejected' ? '#dc3545' : '#ffc107';
           const estatusBg = editingDoc.status === 'approved' ? 'rgba(25,135,84,.1)' : editingDoc.status === 'rejected' ? 'rgba(220,53,69,.1)' : 'rgba(255,193,7,.1)';
           const EStatusIcon = editingDoc.status === 'approved' ? CheckCircle : editingDoc.status === 'rejected' ? XCircle : Clock;
-          const saveBtnDisabled = editSaving || !(editForm?.document_name || '').trim();
+          const saveBtnDisabled = editSaving || editFileUploading || !(editForm?.document_name || '').trim();
           const eIconBtn = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.15)', borderRadius: 7, width: 32, height: 32, cursor: 'pointer', color: 'rgba(255,255,255,.85)' };
           return (
             <div style={{ position: 'fixed', inset: 0, zIndex: 1500, display: 'flex', flexDirection: 'column', background: 'var(--surface-card)' }}>
@@ -2582,6 +2585,10 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                 @media (max-width: 1024px) {
                   .ud-edit-grid { grid-template-columns: 1fr !important; overflow-y: auto !important; }
                   .ud-edit-pane { max-height: 55vh !important; }
+                }
+                @keyframes editBarSlide {
+                  0%   { transform: translateX(-100%); }
+                  100% { transform: translateX(350%); }
                 }
               `}</style>
 
@@ -2756,12 +2763,27 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                       </div>
                     </div>
                     <div>
-                      <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.description')}</div>
-                      <textarea value={editForm.description} rows={4}
-                        onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
-                        style={{ ...INPUT_BASE, resize: 'vertical', fontFamily: 'var(--font)' }} onFocus={focusStyle} onBlur={blurStyle} />
-                      {editFileUploading && (
-                        <div style={{ fontSize: 11.5, color: 'var(--primary)', marginTop: 4 }}>Extracting description from new file…</div>
+                      <div style={{ ...LABEL, marginBottom: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span>{t('common.description')}</span>
+                        <div style={{ display: 'flex', gap: 2, background: 'var(--surface-ground)', borderRadius: 6, padding: 2, border: '1px solid var(--surface-border)' }}>
+                          <button type="button" onClick={() => setEditDescPreview(false)}
+                            style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 4, border: 'none', cursor: 'pointer', background: !editDescPreview ? 'var(--surface-card)' : 'transparent', color: !editDescPreview ? 'var(--text-heading)' : 'var(--text-color-secondary)', fontFamily: 'var(--font)', boxShadow: !editDescPreview ? '0 1px 3px rgba(0,0,0,.1)' : 'none', transition: 'all .15s' }}>
+                            Edit
+                          </button>
+                          <button type="button" onClick={() => setEditDescPreview(true)}
+                            style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 4, border: 'none', cursor: 'pointer', background: editDescPreview ? 'var(--surface-card)' : 'transparent', color: editDescPreview ? 'var(--text-heading)' : 'var(--text-color-secondary)', fontFamily: 'var(--font)', boxShadow: editDescPreview ? '0 1px 3px rgba(0,0,0,.1)' : 'none', transition: 'all .15s' }}>
+                            Preview
+                          </button>
+                        </div>
+                      </div>
+                      {editDescPreview ? (
+                        <div style={{ ...INPUT_BASE, minHeight: 96, whiteSpace: 'pre-wrap', lineHeight: 1.65, color: editForm.description ? 'var(--text-color)' : 'var(--text-color-secondary)', fontStyle: editForm.description ? 'normal' : 'italic', overflowY: 'auto' }}>
+                          {editForm.description || 'No description yet.'}
+                        </div>
+                      ) : (
+                        <textarea value={editForm.description} rows={4}
+                          onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+                          style={{ ...INPUT_BASE, resize: 'vertical', fontFamily: 'var(--font)' }} onFocus={focusStyle} onBlur={blurStyle} />
                       )}
                     </div>
                     {(EDIT_TYPE_FIELD_KEYS[editingDoc.type] || []).length > 0 && (
@@ -2797,6 +2819,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                         <input ref={editFileInputRef} type="file" accept=".pdf,.docx" style={{ display: 'none' }}
                           onChange={e => { const f = e.target.files?.[0]; if (f) handleEditFileSelect(f); e.target.value = ''; }} />
                         {editFileSelected ? (
+                          <>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(33,74,171,.3)', background: 'rgba(33,74,171,.05)' }}>
                             <FileText size={14} color="var(--primary)" style={{ flexShrink: 0 }} />
                             <span style={{ flex: 1, fontSize: 12.5, color: 'var(--text-color)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{editFileSelected.name}</span>
@@ -2830,6 +2853,15 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                               }
                             }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', padding: 0 }}><X size={13} /></button>
                           </div>
+                          {editFileUploading && (
+                            <div style={{ marginTop: 8 }}>
+                              <div style={{ height: 4, borderRadius: 2, background: 'rgba(33,74,171,.12)', overflow: 'hidden', marginBottom: 7, position: 'relative' }}>
+                                <div style={{ position: 'absolute', height: '100%', width: '40%', background: 'var(--primary)', borderRadius: 2, animation: 'editBarSlide 1.2s ease-in-out infinite' }} />
+                              </div>
+                              <div style={{ fontSize: 11.5, color: 'var(--primary)', lineHeight: 1.5 }}>Your file and description is loading. Please wait until it finishes.</div>
+                            </div>
+                          )}
+                          </>
                         ) : (
                           <div style={{ border: '2px dashed var(--surface-border)', borderRadius: 8, padding: '16px', textAlign: 'center', cursor: 'pointer', background: 'var(--surface-ground)', transition: 'all .15s' }}
                             onClick={() => editFileInputRef.current?.click()}
@@ -3671,7 +3703,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
           const estatusAccent = editingDoc.status === 'approved' ? '#16a34a' : editingDoc.status === 'rejected' ? '#dc3545' : '#ffc107';
           const estatusBg = editingDoc.status === 'approved' ? 'rgba(25,135,84,.1)' : editingDoc.status === 'rejected' ? 'rgba(220,53,69,.1)' : 'rgba(255,193,7,.1)';
           const EStatusIcon = editingDoc.status === 'approved' ? CheckCircle : editingDoc.status === 'rejected' ? XCircle : Clock;
-          const saveBtnDisabled = editSaving || !(editForm?.document_name || '').trim();
+          const saveBtnDisabled = editSaving || editFileUploading || !(editForm?.document_name || '').trim();
           const eIconBtn = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.15)', borderRadius: 7, width: 32, height: 32, cursor: 'pointer', color: 'rgba(255,255,255,.85)' };
           return (
             <div style={{ position: 'fixed', inset: 0, zIndex: 1500, display: 'flex', flexDirection: 'column', background: 'var(--surface-card)' }}>
@@ -3679,6 +3711,10 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                 @media (max-width: 1024px) {
                   .ud-edit-grid { grid-template-columns: 1fr !important; overflow-y: auto !important; }
                   .ud-edit-pane { max-height: 55vh !important; }
+                }
+                @keyframes editBarSlide {
+                  0%   { transform: translateX(-100%); }
+                  100% { transform: translateX(350%); }
                 }
               `}</style>
 
@@ -3853,12 +3889,27 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                       </div>
                     </div>
                     <div>
-                      <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.description')}</div>
-                      <textarea value={editForm.description} rows={4}
-                        onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
-                        style={{ ...INPUT_BASE, resize: 'vertical', fontFamily: 'var(--font)' }} onFocus={focusStyle} onBlur={blurStyle} />
-                      {editFileUploading && (
-                        <div style={{ fontSize: 11.5, color: 'var(--primary)', marginTop: 4 }}>Extracting description from new file…</div>
+                      <div style={{ ...LABEL, marginBottom: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span>{t('common.description')}</span>
+                        <div style={{ display: 'flex', gap: 2, background: 'var(--surface-ground)', borderRadius: 6, padding: 2, border: '1px solid var(--surface-border)' }}>
+                          <button type="button" onClick={() => setEditDescPreview(false)}
+                            style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 4, border: 'none', cursor: 'pointer', background: !editDescPreview ? 'var(--surface-card)' : 'transparent', color: !editDescPreview ? 'var(--text-heading)' : 'var(--text-color-secondary)', fontFamily: 'var(--font)', boxShadow: !editDescPreview ? '0 1px 3px rgba(0,0,0,.1)' : 'none', transition: 'all .15s' }}>
+                            Edit
+                          </button>
+                          <button type="button" onClick={() => setEditDescPreview(true)}
+                            style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 4, border: 'none', cursor: 'pointer', background: editDescPreview ? 'var(--surface-card)' : 'transparent', color: editDescPreview ? 'var(--text-heading)' : 'var(--text-color-secondary)', fontFamily: 'var(--font)', boxShadow: editDescPreview ? '0 1px 3px rgba(0,0,0,.1)' : 'none', transition: 'all .15s' }}>
+                            Preview
+                          </button>
+                        </div>
+                      </div>
+                      {editDescPreview ? (
+                        <div style={{ ...INPUT_BASE, minHeight: 96, whiteSpace: 'pre-wrap', lineHeight: 1.65, color: editForm.description ? 'var(--text-color)' : 'var(--text-color-secondary)', fontStyle: editForm.description ? 'normal' : 'italic', overflowY: 'auto' }}>
+                          {editForm.description || 'No description yet.'}
+                        </div>
+                      ) : (
+                        <textarea value={editForm.description} rows={4}
+                          onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+                          style={{ ...INPUT_BASE, resize: 'vertical', fontFamily: 'var(--font)' }} onFocus={focusStyle} onBlur={blurStyle} />
                       )}
                     </div>
                     {(EDIT_TYPE_FIELD_KEYS[editingDoc.type] || []).length > 0 && (
@@ -3894,6 +3945,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                         <input ref={editFileInputRef} type="file" accept=".pdf,.docx" style={{ display: 'none' }}
                           onChange={e => { const f = e.target.files?.[0]; if (f) handleEditFileSelect(f); e.target.value = ''; }} />
                         {editFileSelected ? (
+                          <>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(33,74,171,.3)', background: 'rgba(33,74,171,.05)' }}>
                             <FileText size={14} color="var(--primary)" style={{ flexShrink: 0 }} />
                             <span style={{ flex: 1, fontSize: 12.5, color: 'var(--text-color)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{editFileSelected.name}</span>
@@ -3927,6 +3979,15 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                               }
                             }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', padding: 0 }}><X size={13} /></button>
                           </div>
+                          {editFileUploading && (
+                            <div style={{ marginTop: 8 }}>
+                              <div style={{ height: 4, borderRadius: 2, background: 'rgba(33,74,171,.12)', overflow: 'hidden', marginBottom: 7, position: 'relative' }}>
+                                <div style={{ position: 'absolute', height: '100%', width: '40%', background: 'var(--primary)', borderRadius: 2, animation: 'editBarSlide 1.2s ease-in-out infinite' }} />
+                              </div>
+                              <div style={{ fontSize: 11.5, color: 'var(--primary)', lineHeight: 1.5 }}>Your file and description is loading. Please wait until it finishes.</div>
+                            </div>
+                          )}
+                          </>
                         ) : (
                           <div style={{ border: '2px dashed var(--surface-border)', borderRadius: 8, padding: '16px', textAlign: 'center', cursor: 'pointer', background: 'var(--surface-ground)', transition: 'all .15s' }}
                             onClick={() => editFileInputRef.current?.click()}
