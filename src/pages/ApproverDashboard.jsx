@@ -530,7 +530,10 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
               {pageData?.text || t('pdfViewer.documentContentNotAvailable')}
             </div>
             <div style={{ marginTop: 40, borderTop: '1px solid #ccc', paddingTop: 10, display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#777', fontFamily: 'Arial, sans-serif' }}>
+              {/* Version prefix hidden until proper API mapping for versions is wired up — keep for future use.
               <span>v{doc.version || '1.0'}&nbsp;·&nbsp;{doc.legalStatus || t('documentDetails.activeStatus')}</span>
+              */}
+              <span>{doc.legalStatus || t('documentDetails.activeStatus')}</span>
               <span>{t('pdfViewer.pageOf', { current: currentPage, total: totalPages })}</span>
               <span>{doc.uploader || '—'}</span>
             </div>
@@ -631,7 +634,8 @@ function DocumentDetailsPanel({ doc, reviewAnnotations = [], onScrollToAnnotatio
     [t('documentDetails.fields.type'),            doc.type],
     [t('documentDetails.fields.department'),      doc.dept],
     [t('documentDetails.fields.year'),            doc.year ? String(doc.year) : ''],
-    [t('documentDetails.fields.version'),         doc.version || '1.0'],
+    // Version hidden until proper API mapping for versions is wired up — keep for future use.
+    // [t('documentDetails.fields.version'),         doc.version || '1.0'],
     [t('documentDetails.fields.referenceNo'),     doc.referenceNumber || ''],
     [t('documentDetails.fields.issueDate'),       doc.enactmentDate || ''],
     [t('documentDetails.fields.effectiveFrom'),   doc.effectiveFrom || ''],
@@ -1323,11 +1327,13 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
         <span style={{ background: typeColor.bg, color: typeColor.text, padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
           {lr.document_type_name}
         </span>
+        {/* Version badge hidden until proper API mapping for versions is wired up — keep for future use.
         {lr.version_no && (
           <span style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 700, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)', padding: '2px 8px', borderRadius: 20, flexShrink: 0 }}>
             v{lr.version_no}
           </span>
         )}
+        */}
       </div>
 
       {/* 2-panel grid */}
@@ -1374,7 +1380,9 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
                     {lr.document_type_name}
                   </span>
                 } />
+                {/* Version row hidden until proper API mapping for versions is wired up — keep for future use.
                 {lr.version_no && <InfoRow label={t('linkReview.version')} value={`v${lr.version_no}`} mono />}
+                */}
                 <InfoRow label={t('linkReview.documentStatus')} value={
                   <span style={{
                     background: lr.document_status === 'approved' ? 'rgba(25, 135, 84,.12)' : lr.document_status === 'rejected' ? 'rgba(220, 53, 69,.1)' : 'rgba(255, 193, 7,.1)',
@@ -1914,11 +1922,13 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
                     <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {lr.document_name}
                     </span>
+                    {/* Version badge hidden until proper API mapping for versions is wired up — keep for future use.
                     {lr.version_no && (
                       <span style={{ fontSize: 10.5, fontFamily: 'var(--mono)', fontWeight: 700, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)', padding: '1px 7px', borderRadius: 20, flexShrink: 0 }}>
                         v{lr.version_no}
                       </span>
                     )}
+                    */}
                     <span style={{ fontSize: 10.5, fontWeight: 700, background: lsBg, color: lsColor, padding: '2px 9px', borderRadius: 20, textTransform: 'capitalize', flexShrink: 0 }}>
                       {lr.link_status}
                     </span>

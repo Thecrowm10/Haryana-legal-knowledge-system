@@ -153,7 +153,9 @@ export default function ActContentsView({ doc, onClose, onViewPdf }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)' }}>{doc.dept}</span>
             {doc.year && <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)' }}>· {doc.year}</span>}
+            {/* Version tag hidden until proper API mapping for versions is wired up — keep for future use.
             {doc.version && <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)' }}>· v{doc.version}</span>}
+            */}
           </div>
         </div>
         {onViewPdf && (

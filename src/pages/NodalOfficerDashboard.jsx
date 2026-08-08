@@ -1217,9 +1217,11 @@ export default function NodalOfficerDashboard({ activePage }) {
                           {doc.department_name && (
                             <span style={{ fontSize: 10, color: 'var(--text-color-secondary)' }}>{doc.department_name}</span>
                           )}
+                          {/* Version badge hidden until proper API mapping for versions is wired up — keep for future use.
                           {doc.version_no && (
                             <span style={{ fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', borderRadius: 4, padding: '1px 5px', border: '1px solid var(--surface-border)' }}>v{doc.version_no}</span>
                           )}
+                          */}
                         </div>
                       </div>
                     </div>
@@ -1605,7 +1607,9 @@ export default function NodalOfficerDashboard({ activePage }) {
                         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 280 }}>{link.document_name}</div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 3 }}>
                           {link.document_type_name && <span style={{ fontSize: 10, fontWeight: 600, color: '#d97706', background: 'rgba(255, 193, 7,.1)', borderRadius: 4, padding: '1px 5px' }}>{link.document_type_name}</span>}
+                          {/* Version badge hidden until proper API mapping for versions is wired up — keep for future use.
                           {link.version_no && <span style={{ fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>v{link.version_no}</span>}
+                          */}
                         </div>
                       </div>
                     </div>

@@ -369,15 +369,9 @@ function extractTypeChildren(data, type) {
   }
   return [];
 }
-// DBIM 7.1.3.3 recommends PDF-only uploads, but the department explicitly requires
-// Word support too — PDF + DOC/DOCX are accepted, everything else is rejected.
+// DBIM 7.1.3.3 recommends PDF-only uploads — DOC/DOCX are no longer accepted.
 function isAccepted(f) {
-  return (
-    f.type === 'application/pdf' || f.name.endsWith('.pdf') ||
-    /\.docx?$/i.test(f.name) ||
-    f.type === 'application/msword' ||
-    f.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-  );
+  return f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf');
 }
 // DBIM 6.1.1 / Table 6 upload size ceiling — the guideline's own tiers are photo-oriented
 // (banner/thumbnail/high-res), so the closest fit for a document upload is its "high-res" cap.
@@ -478,7 +472,7 @@ function Toast({ toast, onClose }) {
       <div style={{ width: 26, height: 26, borderRadius: 7, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
         <Icon size={14} color={accent} />
       </div>
-      <span style={{ fontSize: 13, color: 'var(--text-color)', lineHeight: 1.5, flex: 1, paddingTop: 3 }}>{toast.message}</span>
+      <span style={{ fontSize: 13, color: 'var(--text-color)', lineHeight: 1.5, flex: 1, minWidth: 0, paddingTop: 3, overflowWrap: 'break-word', wordBreak: 'break-word' }}>{toast.message}</span>
       <button type="button" onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', flexShrink: 0, padding: 3 }}>
         <X size={13} />
       </button>
@@ -688,7 +682,9 @@ function DocViewModal({ doc, onClose }) {
             <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 20, background: typeColor.bg, color: typeColor.text || typeColor.accent }}>{doc.type}</span>
             <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)' }}>{doc.dept}</span>
             <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: .7 }}>· {doc.year}</span>
+            {/* Version tag hidden until proper API mapping for versions is wired up — keep for future use.
             {doc.version && <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: .7 }}>· v{doc.version}</span>}
+            */}
           </div>
         </div>
         {/* Status chip */}
@@ -837,7 +833,8 @@ function DocViewModal({ doc, onClose }) {
                 { label: t('common.type'),       value: doc.type,           color: typeColor.accent, bg: typeColor.bg },
                 { label: t('common.department'), value: doc.dept,           color: 'var(--primary)', bg: 'rgba(33, 74, 171,.07)' },
                 { label: t('common.year'),       value: String(doc.year),   color: '#64748b',        bg: 'rgba(100,116,139,.08)' },
-                { label: t('common.version'),    value: `v${doc.version || '1.0'}`, color: '#64748b', bg: 'rgba(100,116,139,.08)' },
+                // Version tile hidden until proper API mapping for versions is wired up — keep for future use.
+                // { label: t('common.version'),    value: `v${doc.version || '1.0'}`, color: '#64748b', bg: 'rgba(100,116,139,.08)' },
               ].map(({ label, value, color, bg }) => (
                 <div key={label} style={{ padding: '12px 14px', borderRadius: 10, background: bg, border: '1px solid transparent' }}>
                   <div style={{ fontSize: 10, fontWeight: 700, color, letterSpacing: '.06em', textTransform: 'uppercase', fontFamily: 'var(--mono)', marginBottom: 4, opacity: .8 }}>{label}</div>
@@ -1568,7 +1565,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const [form, setForm]             = useState({ act: '', dept: user?.dept || '', type: '', version: '1.0', desc: '', enactmentDate: '', lastUpdatedOn: '', parentAct: '', changeTypes: [] });
   const [typeFields, setTypeFields]  = useState({});
   const [hierarchy, setHierarchy]   = useState({ act: '', actId: null, chapter: '', section: '', subsection: '' });
-  const [rejected, setRejected]     = useState([]);
   const [oversizedFiles, setOversizedFiles] = useState([]); // [{ name, size }] — files rejected for exceeding MAX_UPLOAD_SIZE_BYTES
   const [versionModal, setVersionModal] = useState(null);
   const [conflictModal, setConflictModal] = useState(null); // { existingDoc, pendingDocs, pendingRelations }
@@ -1963,7 +1959,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   }
   async function addFiles(fileList) {
     const arr = Array.from(fileList);
-    setRejected(arr.filter(f => !isAccepted(f)).map(f => f.name));
+    const badFiles = arr.filter(f => !isAccepted(f));
+    if (badFiles.length) showToast('error', t('wizard.unsupportedFileToast', { name: badFiles.map(f => f.name).join(', ') }));
     const typeOk = arr.filter(f => isAccepted(f));
     setOversizedFiles(typeOk.filter(f => !isUnderSizeLimit(f)).map(f => ({ name: f.name, size: f.size })));
     const accepted = typeOk.filter(f => isUnderSizeLimit(f));
@@ -2622,7 +2619,9 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                     <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 20, background: etypeColor.bg, color: etypeColor.text || etypeColor.accent }}>{editingDoc.type}</span>
                     <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)' }}>{editingDoc.dept}</span>
                     <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: .7 }}>· {editingDoc.year}</span>
+                    {/* Version tag hidden until proper API mapping for versions is wired up — keep for future use.
                     {editingDoc.version && <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: .7 }}>· v{editingDoc.version}</span>}
+                    */}
                   </div>
                 </div>
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px 6px 10px', borderRadius: 20, background: estatusBg, border: `1px solid ${estatusAccent}44`, flexShrink: 0 }}>
@@ -2831,8 +2830,17 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                         <div style={{ ...LABEL, marginBottom: 8 }}>
                           {t('replaceFileModal.title')} <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-color-secondary)', textTransform: 'none', letterSpacing: 0 }}>({t('common.optional', 'optional')})</span>
                         </div>
-                        <input ref={editFileInputRef} type="file" accept=".pdf,.docx" style={{ display: 'none' }}
-                          onChange={e => { const f = e.target.files?.[0]; if (f) handleEditFileSelect(f); e.target.value = ''; }} />
+                        <input ref={editFileInputRef} type="file" accept=".pdf" style={{ display: 'none' }}
+                          onChange={e => {
+                            const f = e.target.files?.[0];
+                            // showToast reads a timer ref internally, but this whole callback only
+                            // runs on the input's change event — never during render — so that's safe.
+                            // eslint-disable-next-line react-hooks/refs
+                            if (f && !isAccepted(f)) { showToast('error', t('wizard.unsupportedFileToast', { name: f.name })); e.target.value = ''; return; }
+                            // eslint-disable-next-line react-hooks/refs
+                            if (f) handleEditFileSelect(f);
+                            e.target.value = '';
+                          }} />
                         {editFileSelected ? (
                           <>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(33,74,171,.3)', background: 'rgba(33,74,171,.05)' }}>
@@ -2882,10 +2890,16 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                             onClick={() => editFileInputRef.current?.click()}
                             onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.background = 'rgba(33,74,171,.04)'; }}
                             onDragLeave={e => { e.currentTarget.style.borderColor = ''; e.currentTarget.style.background = 'var(--surface-ground)'; }}
-                            onDrop={e => { e.preventDefault(); e.currentTarget.style.borderColor = ''; e.currentTarget.style.background = 'var(--surface-ground)'; const f = e.dataTransfer.files[0]; if (f) handleEditFileSelect(f); }}>
+                            onDrop={e => {
+                              e.preventDefault(); e.currentTarget.style.borderColor = ''; e.currentTarget.style.background = 'var(--surface-ground)';
+                              const f = e.dataTransfer.files[0];
+                              if (f && !isAccepted(f)) { showToast('error', t('wizard.unsupportedFileToast', { name: f.name })); return; }
+                              // eslint-disable-next-line react-hooks/refs
+                              if (f) handleEditFileSelect(f);
+                            }}>
                             <Upload size={18} color="var(--text-color-secondary)" style={{ marginBottom: 4 }} />
                             <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)' }}>{t('replaceFileModal.dropzone')}</div>
-                            <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 3, opacity: .7 }}>PDF or Word (.docx)</div>
+                            <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 3, opacity: .7 }}>PDF only</div>
                           </div>
                         )}
                         {editingDoc.status === 'rejected' && editFileSelected && (
@@ -3305,10 +3319,12 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                                   <MessageSquare size={12} /> {t('table.remarksButton')}
                                 </button>
                               )}
+                              {/* Version button hidden until proper API mapping for versions is wired up — keep for future use.
                               <button onClick={() => setVersionModal(doc)}
                                 style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 9px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 10.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--mono)' }}>
                                 <GitBranch size={11} /> v{doc.version || '1.0'}
                               </button>
+                              */}
                               <button onClick={() => setViewDoc(doc)}
                                 style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 7, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                                 <Eye size={13} /> {t('common.view')}
@@ -3396,10 +3412,12 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                               <MessageSquare size={13} /> {t('table.remarksButton')}
                             </button>
                           )}
+                          {/* Version button hidden until proper API mapping for versions is wired up — keep for future use.
                           <button onClick={() => setVersionModal(doc)}
                             style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 11px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--mono)', whiteSpace: 'nowrap' }}>
                             <GitBranch size={12} /> v{doc.version || '1.0'}
                           </button>
+                          */}
                         </div>
                       </div>
                     );
@@ -3776,7 +3794,9 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                     <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 20, background: etypeColor.bg, color: etypeColor.text || etypeColor.accent }}>{editingDoc.type}</span>
                     <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)' }}>{editingDoc.dept}</span>
                     <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: .7 }}>· {editingDoc.year}</span>
+                    {/* Version tag hidden until proper API mapping for versions is wired up — keep for future use.
                     {editingDoc.version && <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: .7 }}>· v{editingDoc.version}</span>}
+                    */}
                   </div>
                 </div>
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px 6px 10px', borderRadius: 20, background: estatusBg, border: `1px solid ${estatusAccent}44`, flexShrink: 0 }}>
@@ -3985,8 +4005,17 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                         <div style={{ ...LABEL, marginBottom: 8 }}>
                           {t('replaceFileModal.title')} <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-color-secondary)', textTransform: 'none', letterSpacing: 0 }}>({t('common.optional', 'optional')})</span>
                         </div>
-                        <input ref={editFileInputRef} type="file" accept=".pdf,.docx" style={{ display: 'none' }}
-                          onChange={e => { const f = e.target.files?.[0]; if (f) handleEditFileSelect(f); e.target.value = ''; }} />
+                        <input ref={editFileInputRef} type="file" accept=".pdf" style={{ display: 'none' }}
+                          onChange={e => {
+                            const f = e.target.files?.[0];
+                            // showToast reads a timer ref internally, but this whole callback only
+                            // runs on the input's change event — never during render — so that's safe.
+                            // eslint-disable-next-line react-hooks/refs
+                            if (f && !isAccepted(f)) { showToast('error', t('wizard.unsupportedFileToast', { name: f.name })); e.target.value = ''; return; }
+                            // eslint-disable-next-line react-hooks/refs
+                            if (f) handleEditFileSelect(f);
+                            e.target.value = '';
+                          }} />
                         {editFileSelected ? (
                           <>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(33,74,171,.3)', background: 'rgba(33,74,171,.05)' }}>
@@ -4036,10 +4065,16 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                             onClick={() => editFileInputRef.current?.click()}
                             onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.background = 'rgba(33,74,171,.04)'; }}
                             onDragLeave={e => { e.currentTarget.style.borderColor = ''; e.currentTarget.style.background = 'var(--surface-ground)'; }}
-                            onDrop={e => { e.preventDefault(); e.currentTarget.style.borderColor = ''; e.currentTarget.style.background = 'var(--surface-ground)'; const f = e.dataTransfer.files[0]; if (f) handleEditFileSelect(f); }}>
+                            onDrop={e => {
+                              e.preventDefault(); e.currentTarget.style.borderColor = ''; e.currentTarget.style.background = 'var(--surface-ground)';
+                              const f = e.dataTransfer.files[0];
+                              if (f && !isAccepted(f)) { showToast('error', t('wizard.unsupportedFileToast', { name: f.name })); return; }
+                              // eslint-disable-next-line react-hooks/refs
+                              if (f) handleEditFileSelect(f);
+                            }}>
                             <Upload size={18} color="var(--text-color-secondary)" style={{ marginBottom: 4 }} />
                             <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)' }}>{t('replaceFileModal.dropzone')}</div>
-                            <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 3, opacity: .7 }}>PDF or Word (.docx)</div>
+                            <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 3, opacity: .7 }}>PDF only</div>
                           </div>
                         )}
                         {editingDoc.status === 'rejected' && editFileSelected && (
@@ -4664,7 +4699,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                                         onFocus={focusStyle} onBlur={blurStyle} />
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                      <input type="file" accept=".pdf,.doc,.docx" style={{ display: 'none' }}
+                                      <input type="file" accept=".pdf" style={{ display: 'none' }}
                                         id={`sec-file-ch${ci}-s${si}`}
                                         onChange={e => {
                                           const f = e.target.files?.[0] || null;
@@ -4822,7 +4857,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                               onFocus={focusStyle} onBlur={blurStyle} />
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <input type="file" accept=".pdf,.doc,.docx" style={{ display: 'none' }}
+                            <input type="file" accept=".pdf" style={{ display: 'none' }}
                               id={`sec-flat-file-${si}`}
                               onChange={e => {
                                 const f = e.target.files?.[0] || null;
@@ -5019,7 +5054,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                       onFocus={focusStyle} onBlur={blurStyle} />
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <input type="file" accept=".pdf,.doc,.docx" style={{ display: 'none' }}
+                    <input type="file" accept=".pdf" style={{ display: 'none' }}
                       id={`entry-file-${subDocTab}-${i}`}
                       onChange={e => {
                         const f = e.target.files?.[0] || null;
@@ -5277,7 +5312,9 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                   <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-heading)', marginBottom: 4 }}>{m.document_name}</div>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12, fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
                     <span style={{ background: 'rgba(13, 110, 253,.1)', color: '#0d6efd', padding: '2px 8px', borderRadius: 20, fontWeight: 600 }}>{DOC_TYPE_KEY[m.document_type_name] ? t(`docTypes.${DOC_TYPE_KEY[m.document_type_name]}`) : m.document_type_name}</span>
+                    {/* Version chip hidden until proper API mapping for versions is wired up — keep for future use.
                     <span>v{m.version_no || '1.0'}</span>
+                    */}
                     <span style={{ background: m.status === 'approved' ? 'rgba(25, 135, 84,.1)' : 'rgba(255, 193, 7,.1)', color: m.status === 'approved' ? '#16a34a' : '#d97706', padding: '2px 8px', borderRadius: 20, fontWeight: 600, textTransform: 'capitalize' }}>{{ approved: t('common.statusWordApproved'), pending: t('common.statusWordPending'), rejected: t('common.statusWordRejected') }[m.status] || m.status}</span>
                     <span>{m.created_at?.split('T')[0]}</span>
                   </div>
@@ -5334,20 +5371,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, justifyContent: form.type ? 'flex-start' : 'center', minHeight: form.type ? 'auto' : 'calc(100vh - 220px)' }}>
 
         {/* Hidden file input */}
-        <input ref={inputRef} type="file" accept=".pdf,.doc,.docx" multiple style={{ display: 'none' }}
+        <input ref={inputRef} type="file" accept=".pdf" multiple style={{ display: 'none' }}
           onChange={e => { addFiles(e.target.files); e.target.value = ''; }} />
-
-        {/* Rejected files alert */}
-        {rejected.length > 0 && (
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px', borderRadius: 10, background: 'rgba(220, 53, 69,.08)', border: '1px solid rgba(220, 53, 69,.2)', color: '#dc2626' }}>
-            <AlertCircle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 1 }}>{t('wizard.step2.unsupportedFileType')}</div>
-              <div style={{ fontSize: 11.5, fontFamily: 'var(--mono)' }}>{rejected.join(', ')}</div>
-            </div>
-            <button onClick={() => setRejected([])} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', display: 'flex' }}><X size={13} /></button>
-          </div>
-        )}
 
         {/* Oversized files alert — DBIM 6.1.1 upload size ceiling */}
         {oversizedFiles.length > 0 && (
@@ -5553,7 +5578,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
                       <span style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>{t('wizard.step2.fileTypeHint', { size: formatSize(MAX_UPLOAD_SIZE_BYTES) })}</span>
                       <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--primary)', background: 'rgba(33, 74, 171,.08)', border: '1px solid rgba(33, 74, 171,.2)', padding: '2px 7px', borderRadius: 20 }}>.PDF</span>
-                      <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: '#2b579a', background: 'rgba(43,87,154,.08)', border: '1px solid rgba(43,87,154,.3)', padding: '2px 7px', borderRadius: 20 }}>.DOC</span>
                     </div>
                 </div>
               </div>

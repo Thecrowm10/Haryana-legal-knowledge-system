@@ -310,7 +310,9 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
             <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 20, background: typeColor.bg, color: typeColor.text || typeColor.accent }}>{doc.type}</span>
             <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)' }}>{doc.dept}</span>
             <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: .7 }}>· {doc.year}</span>
+            {/* Version tag hidden until proper API mapping for versions is wired up — keep for future use.
             {doc.version && <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: .7 }}>· v{doc.version}</span>}
+            */}
           </div>
         </div>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px 6px 10px', borderRadius: 20, background: statusBg, border: `1px solid ${statusAccent}44`, flexShrink: 0 }}>
@@ -470,7 +472,8 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
                 { label: 'Type',       value: doc.type,                   color: typeColor.accent, bg: typeColor.bg },
                 { label: 'Department', value: doc.dept,                   color: 'var(--primary)', bg: 'rgba(33, 74, 171,.07)' },
                 { label: 'Year',       value: String(doc.year),           color: '#64748b',        bg: 'rgba(100,116,139,.08)' },
-                { label: 'Version',    value: `v${doc.version || '1.0'}`, color: '#64748b',        bg: 'rgba(100,116,139,.08)' },
+                // Version tile hidden until proper API mapping for versions is wired up — keep for future use.
+                // { label: 'Version',    value: `v${doc.version || '1.0'}`, color: '#64748b',        bg: 'rgba(100,116,139,.08)' },
               ].map(({ label, value, color, bg }) => (
                 <div key={label} style={{ padding: '12px 14px', borderRadius: 10, background: bg, border: '1px solid transparent' }}>
                   <div style={{ fontSize: 10, fontWeight: 700, color, letterSpacing: '.06em', textTransform: 'uppercase', fontFamily: 'var(--mono)', marginBottom: 4, opacity: .8 }}>{label}</div>
