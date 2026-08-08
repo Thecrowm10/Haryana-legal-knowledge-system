@@ -172,6 +172,7 @@
       "documentType": "दस्तावेज़ प्रकार"
     },
     "allStatuses": "सभी स्थितियां",
+    "allActions": "सभी कार्रवाइयां",
     "success": "सफल",
     "failure": "विफल",
     "to": "से",
@@ -286,6 +287,7 @@
     "cancel": "रद्द करें",
     "noLimits": "कोई कस्टम सीमा नहीं। सभी विभागों में प्रति भूमिका {{default}} उपयोगकर्ताओं का सिस्टम डिफ़ॉल्ट लागू है।",
     "defaultBadge": "डिफ़ॉल्ट: {{n}}",
+    "listHeading": "विभाग",
     "totalDepartments": "{{count}} कुल विभाग",
     "headers": {
       "department": "विभाग",

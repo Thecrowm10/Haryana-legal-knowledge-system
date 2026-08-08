@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from 'react';
+﻿import { useState, useEffect, useRef, useMemo } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
 import { Users, Trash2, Edit2, Plus, CheckCircle, XCircle, Building2, X, Eye, EyeOff, Check, Download, FileSpreadsheet, Layers, FileText, Clock, Search, Link2 } from 'lucide-react';
 import Card from '../components/ui/Card';
@@ -58,17 +58,6 @@ function exportCSV(data, filename) {
 const AUDIT_PAGE_SIZE = 10;
 const CAPS_PAGE_SIZE = 10;
 const EMAIL_FORMAT_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function auditEntityOptions(t) {
-  return [
-    { value: '',               label: t('audit.entities.all') },
-    { value: 'auth',           label: t('audit.entities.auth') },
-    { value: 'user',           label: t('audit.entities.user') },
-    { value: 'pdf',            label: t('audit.entities.pdf') },
-    { value: 'department',     label: t('audit.entities.department') },
-    { value: 'document_type',  label: t('audit.entities.documentType') },
-  ];
-}
 
 function fmtAction(action) {
   return action.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
@@ -211,27 +200,34 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   const [auditLoading, setAuditLoading]         = useState(false);
   const [auditError, setAuditError]             = useState('');
   const [auditPage, setAuditPage]               = useState(0);
-  const [auditFilterEntity, setAuditFilterEntity] = useState('');
-  const [auditFilterAction] = useState('');
-  const [auditFilterStatus, setAuditFilterStatus] = useState('');
+  const [auditFilterAction, setAuditFilterAction] = useState('');
   const [auditFromDate, setAuditFromDate]       = useState('');
   const [auditToDate, setAuditToDate]           = useState('');
   const [auditSearch, setAuditSearch]           = useState('');
+  // Action-type dropdown options are built only from actions actually seen in
+  // fetched pages (never a guessed/hardcoded list) and accumulate across
+  // fetches so the list doesn't shrink once you filter down to one action.
+  const [seenActionsRaw, setSeenActionsRaw]     = useState([]);
+  const auditActionOptions = useMemo(() => Array.from(new Set(seenActionsRaw)).sort(), [seenActionsRaw]);
 
   useEffect(() => {
     if (activePage !== 'auditfull') return;
     setAuditLoading(true);
     setAuditError('');
     const params = { skip: auditPage * AUDIT_PAGE_SIZE, limit: AUDIT_PAGE_SIZE };
-    if (auditFilterEntity) params.entity_type = auditFilterEntity;
     if (auditFilterAction) params.action       = auditFilterAction;
     if (auditFromDate)     params.from_date    = auditFromDate;
     if (auditToDate)       params.to_date      = auditToDate + 'T23:59:59';
     getAuditLogs(params)
-      .then(res => { setAuditLogs(res.data.logs || []); setAuditTotal(res.data.total || 0); })
+      .then(res => {
+        const logs = res.data.logs || [];
+        setAuditLogs(logs);
+        setAuditTotal(res.data.total || 0);
+        setSeenActionsRaw(prev => [...prev, ...logs.map(l => l.action).filter(Boolean)]);
+      })
       .catch(() => setAuditError(t('audit.failedToLoad')))
       .finally(() => setAuditLoading(false));
-  }, [activePage, auditPage, auditFilterEntity, auditFilterAction, auditFilterStatus, auditFromDate, auditToDate, t]);
+  }, [activePage, auditPage, auditFilterAction, auditFromDate, auditToDate, t]);
 
   // Linked Documents state (admin view)
   const [allLinks, setAllLinks]           = useState([]);
@@ -1561,7 +1557,6 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     const totalPages = Math.max(1, Math.ceil(auditTotal / AUDIT_PAGE_SIZE));
 
     const visibleLogs = auditLogs.filter(l => {
-      if (auditFilterStatus && l.status !== auditFilterStatus) return false;
       if (auditSearch.trim()) {
         const q = auditSearch.toLowerCase();
         const name = fmtAuditActor(l.actor).toLowerCase();
@@ -1605,22 +1600,13 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
               />
             </div>
 
-            {/* Entity type */}
+            {/* Action */}
             <SelectField
-              value={auditFilterEntity}
-              onChange={e => { setAuditFilterEntity(e.target.value); setAuditPage(0); }}
+              value={auditFilterAction}
+              onChange={e => { setAuditFilterAction(e.target.value); setAuditPage(0); }}
               style={{ flex: '0 0 155px' }}>
-              {auditEntityOptions(t).map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </SelectField>
-
-            {/* Status */}
-            <SelectField
-              value={auditFilterStatus}
-              onChange={e => { setAuditFilterStatus(e.target.value); setAuditPage(0); }}
-              style={{ flex: '0 0 130px' }}>
-              <option value="">{t('audit.allStatuses')}</option>
-              <option value="success">{t('audit.success')}</option>
-              <option value="failure">{t('audit.failure')}</option>
+              <option value="">{t('audit.allActions')}</option>
+              {auditActionOptions.map(a => <option key={a} value={a}>{fmtAction(a)}</option>)}
             </SelectField>
 
             {/* Date from */}
@@ -1631,8 +1617,8 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
               style={{ height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, padding: '0 10px', background: 'var(--surface-ground)', color: 'var(--text-color)' }} />
 
             {/* Clear */}
-            {(auditFilterEntity || auditFilterStatus || auditFromDate || auditToDate || auditSearch) && (
-              <button onClick={() => { setAuditFilterEntity(''); setAuditFilterStatus(''); setAuditFromDate(''); setAuditToDate(''); setAuditSearch(''); setAuditPage(0); }}
+            {(auditFilterAction || auditFromDate || auditToDate || auditSearch) && (
+              <button onClick={() => { setAuditFilterAction(''); setAuditFromDate(''); setAuditToDate(''); setAuditSearch(''); setAuditPage(0); }}
                 style={{ height: 34, padding: '0 12px', border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
                 <X size={11} /> {t('audit.clear')}
               </button>
@@ -1662,67 +1648,39 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
             <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>{t('audit.noRecords')}</div>
           ) : isMobile ? (
             <div>
-              {visibleLogs.map(log => {
-                const isSuccess = log.status === 'success';
-                return (
-                  <div key={log.id} style={{ padding: '11px 16px', borderBottom: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', gap: 5 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>{fmtAuditActor(log.actor)}</div>
-                      <span style={{ fontSize: 10.5, fontWeight: 700, borderRadius: 5, padding: '3px 8px', background: isSuccess ? 'rgba(25, 135, 84,.1)' : 'rgba(220, 53, 69,.1)', color: isSuccess ? '#16a34a' : '#dc3545', flexShrink: 0 }}>
-                        {isSuccess ? t('audit.success') : t('audit.failure')}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: 12.5, color: 'var(--text-color)' }}>{fmtAction(log.action)}</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 10.5, color: 'var(--text-color-secondary)' }}>
-                      <span style={{ fontFamily: 'var(--mono)' }}>{new Date(log.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })}</span>
-                      <span style={{ fontFamily: 'var(--mono)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 5, padding: '1px 6px' }}>{log.entity_type}{log.entity_id ? ` #${log.entity_id}` : ''}</span>
-                      {log.ip_address && <span style={{ fontFamily: 'var(--mono)' }}>{log.ip_address}</span>}
-                    </div>
-                  </div>
-                );
-              })}
+              {visibleLogs.map(log => (
+                <div key={log.id} style={{ padding: '11px 16px', borderBottom: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>{fmtAuditActor(log.actor)}</div>
+                  <div style={{ fontSize: 12.5, color: 'var(--text-color)' }}>{fmtAction(log.action)}</div>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 10.5, color: 'var(--text-color-secondary)' }}>{new Date(log.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })}</span>
+                </div>
+              ))}
             </div>
           ) : (
             <div className="table-scroll-wrap">
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
-                  {[t('audit.headers.timestamp'), t('audit.headers.user'), t('audit.headers.action'), t('audit.headers.entity'), t('audit.headers.status'), t('audit.headers.ipAddress')].map((h, i) => (
+                  {[t('audit.headers.timestamp'), t('audit.headers.user'), t('audit.headers.action')].map((h, i) => (
                     <th key={h} scope="col" style={{ ...LABEL, padding: '11px 16px', textAlign: 'left', ...(i > 0 && { borderLeft: '1px solid var(--surface-border)' }) }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {visibleLogs.map(log => {
-                  const isSuccess = log.status === 'success';
-                  return (
-                    <tr key={log.id} style={{ borderBottom: '1px solid var(--surface-border)', transition: 'background .15s' }}
-                      onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                      <td style={{ padding: '12px 16px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)', whiteSpace: 'nowrap' }}>
-                        {new Date(log.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })}
-                      </td>
-                      <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)' }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>{fmtAuditActor(log.actor)}</div>
-                        {log.actor?.username && <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>@{log.actor.username}</div>}
-                      </td>
-                      <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)', fontSize: 12.5, color: 'var(--text-color)' }}>{fmtAction(log.action)}</td>
-                      <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)' }}>
-                        <span style={{ fontSize: 11, fontWeight: 600, fontFamily: 'var(--mono)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 5, padding: '2px 7px', color: 'var(--text-color-secondary)' }}>
-                          {log.entity_type}{log.entity_id ? ` #${log.entity_id}` : ''}
-                        </span>
-                      </td>
-                      <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)' }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, borderRadius: 5, padding: '3px 8px', background: isSuccess ? 'rgba(25, 135, 84,.1)' : 'rgba(220, 53, 69,.1)', color: isSuccess ? '#16a34a' : '#dc3545' }}>
-                          {isSuccess ? t('audit.success') : t('audit.failure')}
-                        </span>
-                      </td>
-                      <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)', fontSize: 11.5, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>
-                        {log.ip_address || '—'}
-                      </td>
-                    </tr>
-                  );
-                })}
+                {visibleLogs.map(log => (
+                  <tr key={log.id} style={{ borderBottom: '1px solid var(--surface-border)', transition: 'background .15s' }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                    <td style={{ padding: '12px 16px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)', whiteSpace: 'nowrap' }}>
+                      {new Date(log.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })}
+                    </td>
+                    <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)' }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>{fmtAuditActor(log.actor)}</div>
+                      {log.actor?.username && <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>@{log.actor.username}</div>}
+                    </td>
+                    <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)', fontSize: 12.5, color: 'var(--text-color)' }}>{fmtAction(log.action)}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
             </div>
@@ -2325,17 +2283,16 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
         <style>{ADM_RESPONSIVE_CSS}</style>
-        <div>
-          <div style={{ fontSize: 'var(--font-size-h3)', fontWeight: 800, color: 'var(--text-heading)', letterSpacing: '-.01em' }}>
-            {t('roleCaps.title')}
-          </div>
-          <div style={{ fontSize: 'var(--font-size-p2)', color: 'var(--text-color-secondary)', marginTop: 4 }}>
-            {t('roleCaps.subtitle', { default: capsDefaultMax })}
-          </div>
-        </div>
 
-          {/* Add / Update form */}
+          {/* Heading + Add / Update form, combined in one box */}
           <Card style={{ padding: '18px 20px' }}>
+            <div style={{ fontSize: 'var(--font-size-h3)', fontWeight: 800, color: 'var(--text-heading)', letterSpacing: '-.01em' }}>
+              {t('roleCaps.title')}
+            </div>
+            <div style={{ fontSize: 'var(--font-size-p2)', color: 'var(--text-color-secondary)', marginTop: 4 }}>
+              {t('roleCaps.subtitle', { default: capsDefaultMax })}
+            </div>
+            <div style={{ borderTop: '1px solid var(--surface-border)', margin: '18px 0 14px' }} />
             <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 14 }}>
               {t('roleCaps.addTitle')}
             </div>
@@ -2435,7 +2392,12 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
           </Card>
 
           {/* Existing limits table */}
-          <Card>
+          <Card padding="0">
+            <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>{t('roleCaps.listHeading')}</div>
+              <span style={{ ...LABEL }}>{t('roleCaps.totalDepartments', { count: caps.length })}</span>
+            </div>
+
             {capsLoading && (
               <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>{t('common.loading')}</div>
             )}
@@ -2448,25 +2410,23 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
               </div>
             )}
             {!capsLoading && caps.length > 0 && (
-              <>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
-                <span style={{ ...LABEL }}>{t('roleCaps.totalDepartments', { count: caps.length })}</span>
-              </div>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <div className="table-scroll-wrap">
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
-                    <tr style={{ borderBottom: '2px solid var(--surface-border)' }}>
-                      {[t('roleCaps.headers.department'), t('roleCaps.headers.role'), t('roleCaps.headers.maxUsers'), t('roleCaps.headers.actions')].map(h => (
-                        <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 700, fontSize: 11, color: 'var(--text-color-secondary)', textTransform: 'uppercase', letterSpacing: '.06em' }}>{h}</th>
+                    <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
+                      {[t('roleCaps.headers.department'), t('roleCaps.headers.role'), t('roleCaps.headers.maxUsers'), t('roleCaps.headers.actions')].map((h, i) => (
+                        <th key={h} scope="col" style={{ ...LABEL, padding: '11px 16px', textAlign: 'left', ...(i > 0 && { borderLeft: '1px solid var(--surface-border)' }) }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {pagedCaps.map(cap => (
-                      <tr key={cap.id} style={{ borderBottom: '1px solid var(--surface-border)' }}>
-                        <td style={{ padding: '10px 14px', fontWeight: 600, color: 'var(--text-heading)' }}>{cap.department_name}</td>
-                        <td style={{ padding: '10px 14px', color: 'var(--text-color)' }}>{cap.role_name ? cap.role_name.charAt(0).toUpperCase() + cap.role_name.slice(1) : '—'}</td>
-                        <td style={{ padding: '10px 14px' }}>
+                      <tr key={cap.id} style={{ borderBottom: '1px solid var(--surface-border)', transition: 'background .15s' }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                        <td style={{ padding: '12px 16px', fontWeight: 600, color: 'var(--text-heading)' }}>{cap.department_name}</td>
+                        <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)', color: 'var(--text-color)' }}>{cap.role_name ? cap.role_name.charAt(0).toUpperCase() + cap.role_name.slice(1) : '—'}</td>
+                        <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)' }}>
                           {capEditId === cap.id ? (
                             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                               <input
@@ -2484,7 +2444,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                             <span style={{ fontWeight: 700, color: 'var(--text-heading)' }}>{cap.max_users}</span>
                           )}
                         </td>
-                        <td style={{ padding: '10px 14px' }}>
+                        <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)' }}>
                           <div style={{ display: 'flex', gap: 8 }}>
                             <button
                               onClick={() => handleCapInlineEdit(cap)}
@@ -2505,12 +2465,11 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                   </tbody>
                 </table>
               </div>
-              </>
             )}
 
             {/* Pagination — only once there's more than one page */}
             {!capsLoading && capsTotalPages > 1 && (
-              <div style={{ padding: '12px 18px', borderTop: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12 }}>
+              <div style={{ padding: '12px 18px', borderTop: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{ ...LABEL }}>{t('audit.pageOf', { page: capsPageClamped + 1, total: capsTotalPages })}</span>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={() => setCapsPage(p => Math.max(0, p - 1))} disabled={capsPageClamped === 0}

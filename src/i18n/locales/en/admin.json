@@ -172,6 +172,7 @@
       "documentType": "Document Type"
     },
     "allStatuses": "All Statuses",
+    "allActions": "All Actions",
     "success": "Success",
     "failure": "Failure",
     "to": "to",
@@ -286,6 +287,7 @@
     "cancel": "Cancel",
     "noLimits": "No custom limits set. All departments use the system default of {{default}} users per role.",
     "defaultBadge": "Default: {{n}}",
+    "listHeading": "Departments",
     "totalDepartments": "{{count}} total departments",
     "headers": {
       "department": "Department",
