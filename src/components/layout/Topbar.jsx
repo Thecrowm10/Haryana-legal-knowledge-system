@@ -61,7 +61,7 @@ const CRUMB_TARGETS = {
   actparts:     ['dashboard'],
 };
 
-export default function Topbar({ user, activePage, onNavigate, onLogout, onToggleSidebar, onChangePassword }) {
+export default function Topbar({ user, activePage, onNavigate, onLogout, onToggleSidebar, onChangePassword, onMobileVerified }) {
   const { t } = useTranslation('common');
   const [profileOpen, setProfileOpen]   = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
@@ -260,6 +260,7 @@ export default function Topbar({ user, activePage, onNavigate, onLogout, onToggl
         roleLabel={t(rm.label)}
         canChangePassword={canChangePassword}
         onChangePassword={onChangePassword}
+        onMobileVerified={onMobileVerified}
         onClose={() => setProfileModalOpen(false)}
       />
     )}

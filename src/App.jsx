@@ -172,7 +172,7 @@ export default function App() {
 
   return (
     <>
-      <Layout user={user} activePage={activePage} onNavigate={navigate} onLogout={logout} onChangePassword={changePass}>
+      <Layout user={user} activePage={activePage} onNavigate={navigate} onLogout={logout} onChangePassword={changePass} onMobileVerified={loginWithToken}>
         {renderDashboard()}
       </Layout>
       <CookieBanner />
