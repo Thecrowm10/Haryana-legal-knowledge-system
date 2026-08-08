@@ -632,6 +632,7 @@ function DocViewModal({ doc, onClose }) {
     [t('common.referenceNo'),      doc.referenceNumber || ''],
     [t('common.issueDate'),        doc.enactmentDate   || ''],
     [t('common.effectiveFrom'),    doc.effectiveFrom   || ''],
+    [t('common.lastUpdatedOn'),    doc.lastUpdatedOn   || ''],
     [t('docViewModal.gazetteRef'), doc.gazette         || ''],
     [t('docViewModal.legalAuthority'), doc.authority   || ''],
     [t('docViewModal.uploader'),   doc.uploader        || ''],
@@ -1181,6 +1182,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         ...(d.keywords               ? { keywords:            d.keywords }               : {}),
       },
       approval:        d.latest_approval || null,
+      lastUpdatedOn:   d.last_updated_on || '',
     };
   }, [t]);
 
@@ -1268,6 +1270,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       reference_number:  doc.referenceNumber || '',
       issue_date:        doc.enactmentDate || '',
       effective_from:    doc.effectiveFrom || '',
+      last_updated_on:   doc.lastUpdatedOn || '',
       gazette_reference: doc.gazette || '',
       legal_authority:   doc.authority || '',
       short_title:       doc.shortTitle || '',
@@ -1351,6 +1354,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         reference_number:      editForm.reference_number,
         issue_date:             editForm.issue_date || null,
         effective_from:         editForm.effective_from || null,
+        last_updated_on:        editForm.last_updated_on || null,
         gazette_reference:      editForm.gazette_reference,
         legal_authority:        editForm.legal_authority,
         short_title:            editForm.short_title,
@@ -1557,7 +1561,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   // upload isn't possible.
   const [sectionsBaseline, setSectionsBaseline] = useState(() => sectionsSignature(null, [], []));
   const [entriesBaseline, setEntriesBaseline] = useState({}); // { [tab]: signature string }; a missing key falls back to entriesSignature([])
-  const [form, setForm]             = useState({ act: '', dept: user?.dept || '', type: '', version: '1.0', desc: '', enactmentDate: '', parentAct: '', changeTypes: [] });
+  const [form, setForm]             = useState({ act: '', dept: user?.dept || '', type: '', version: '1.0', desc: '', enactmentDate: '', lastUpdatedOn: '', parentAct: '', changeTypes: [] });
   const [typeFields, setTypeFields]  = useState({});
   const [hierarchy, setHierarchy]   = useState({ act: '', actId: null, chapter: '', section: '', subsection: '' });
   const [rejected, setRejected]     = useState([]);
@@ -2206,6 +2210,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             document_type_id:      typeObj?.id ?? null,
             document_name:         fileMeta[f.name]?.documentName || f.name.replace(/\.(pdf|docx?)$/i, ''),
             issue_date:            form.enactmentDate || null,
+            last_updated_on:       form.lastUpdatedOn || null,
             reference_number:      referenceNumber,
             effective_from:        effectiveFrom,
             gazette_reference:     typeFields.gazetteRef || '',
@@ -2756,6 +2761,10 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                         <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.effectiveFrom')}</div>
                         <input type="date" value={editForm.effective_from || ''} onChange={e => setEditForm(f => ({ ...f, effective_from: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
                       </div>
+                    </div>
+                    <div>
+                      <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.lastUpdatedOn')}</div>
+                      <input type="date" value={editForm.last_updated_on || ''} onChange={e => setEditForm(f => ({ ...f, last_updated_on: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
                     </div>
                     <div>
                       <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.gazetteReference')}</div>
@@ -3883,6 +3892,10 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                         <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.effectiveFrom')}</div>
                         <input type="date" value={editForm.effective_from || ''} onChange={e => setEditForm(f => ({ ...f, effective_from: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
                       </div>
+                    </div>
+                    <div>
+                      <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.lastUpdatedOn')}</div>
+                      <input type="date" value={editForm.last_updated_on || ''} onChange={e => setEditForm(f => ({ ...f, last_updated_on: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
                     </div>
                     <div>
                       <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.gazetteReference')}</div>
@@ -6113,6 +6126,13 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                 </div>
               ))}
             </>)}
+
+            {/* Universal — Last Updated On (optional, applies to all document types) */}
+            <div>
+              <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.lastUpdatedOn')}</div>
+              <input type="date" value={form.lastUpdatedOn || ''} onChange={e => fmt('lastUpdatedOn', e.target.value)}
+                style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+            </div>
 
             {/* Per-file description — shown last, one per file */}
             {files.length > 0 && (

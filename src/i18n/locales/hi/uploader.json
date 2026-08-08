@@ -47,6 +47,7 @@
   "common": {
     "issueDate": "जारी करने की तिथि",
     "effectiveFrom": "प्रभावी तिथि",
+    "lastUpdatedOn": "अंतिम अद्यतन तिथि",
     "gazetteReference": "राजपत्र संदर्भ",
     "validUntil": "वैध तिथि तक",
     "department": "विभाग",

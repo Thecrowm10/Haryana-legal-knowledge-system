@@ -47,6 +47,7 @@
   "common": {
     "issueDate": "Issue Date",
     "effectiveFrom": "Effective From",
+    "lastUpdatedOn": "Last Updated On",
     "gazetteReference": "Gazette Reference",
     "validUntil": "Valid Until",
     "department": "Department",
