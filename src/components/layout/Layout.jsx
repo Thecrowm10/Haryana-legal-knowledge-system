@@ -8,7 +8,7 @@ import { useMediaQuery } from '../../hooks/useMediaQuery';
 const NO_SIDEBAR_ROLES = ['citizen', 'uploader', 'approver'];
 
 export default function Layout({ user, activePage, onNavigate, onLogout, onChangePassword, onMobileVerified, children }) {
-  const [collapsed, setCollapsed] = useState(true);
+  const [collapsed, setCollapsed] = useState(false);
   // Below 1024px the Sidebar renders as an off-canvas drawer instead of an in-flow
   // column (see Sidebar.jsx) — mobileOpen tracks that drawer's visibility, separate
   // from `collapsed` which only governs the desktop pinned/hover-expand behavior.

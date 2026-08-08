@@ -82,6 +82,7 @@
     "errors": {
       "usernameRequired": "उपयोगकर्ता नाम आवश्यक है।",
       "emailRequired": "ईमेल आवश्यक है।",
+      "emailInvalid": "कृपया एक मान्य ईमेल पता दर्ज करें।",
       "passwordRequired": "पासवर्ड आवश्यक है।",
       "mobileRequired": "एक मान्य 10-अंकों का मोबाइल नंबर आवश्यक है।",
       "firstNameRequired": "पहला नाम आवश्यक है।",
@@ -285,6 +286,7 @@
     "cancel": "रद्द करें",
     "noLimits": "कोई कस्टम सीमा नहीं। सभी विभागों में प्रति भूमिका {{default}} उपयोगकर्ताओं का सिस्टम डिफ़ॉल्ट लागू है।",
     "defaultBadge": "डिफ़ॉल्ट: {{n}}",
+    "totalDepartments": "{{count}} कुल विभाग",
     "headers": {
       "department": "विभाग",
       "role": "भूमिका",

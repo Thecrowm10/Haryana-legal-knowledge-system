@@ -16,6 +16,7 @@ import { downloadUploadsExcelReport } from '../utils/uploadsExcelReport';
 
 
 const LABEL = { fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)' };
+const EMAIL_FORMAT_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // A nodal officer can only create staff below them (uploader/approver/etc) — never another admin or nodal officer.
 // Citizens are public users, not staff accounts — no one creates a "citizen" login from a dashboard.
@@ -194,6 +195,7 @@ export default function NodalOfficerDashboard({ activePage }) {
     if (!addForm.role_id)            { setAddError(t('users.errors.roleRequired')); return; }
     if (!addForm.username.trim())    { setAddError(t('users.errors.usernameRequired')); return; }
     if (!addForm.email.trim())       { setAddError(t('users.errors.emailRequired')); return; }
+    if (!EMAIL_FORMAT_RE.test(addForm.email.trim())) { setAddError(t('users.errors.emailInvalid')); return; }
     if (!addForm.password)           { setAddError(t('users.errors.passwordRequired')); return; }
     if (!addForm.department_id)      { setAddError(t('users.errors.departmentRequired')); return; }
     if (!addForm.first_name.trim())  { setAddError(t('users.errors.firstNameRequired')); return; }

@@ -70,6 +70,7 @@
       "userManagement": "User Management",
       "systemLogs": "System Logs",
       "masterDataManager": "Master Data Manager",
+      "roleCaps": "Role User Caps",
       "fullMisReport": "Full MIS Report",
       "allUploads": "All Uploads",
       "auditorLabel": "Auditor",

@@ -15,7 +15,7 @@ import Card from '../components/ui/Card';
 import SelectField from '../components/ui/SelectField';
 import { useAuth } from '../hooks/useAuth';
 import { getDepartments, getDocumentTypes } from '../services/departments';
-import { uploadPdfFile, uploadPdfMetadata, updatePdfMetadata, getMyDocuments, searchDocuments, getPdfFile, checkDuplicateDocument, linkDocumentToDepartment, getLinkedDocuments, getActChildren, getMyDepartmentActs, getMyDepartmentDocsByType, replaceDocumentFile } from '../services/pdf';
+import { uploadPdfFile, uploadPdfMetadata, updatePdfMetadata, getMyDocuments, searchDocuments, getPdfFile, checkDuplicateDocument, linkDocumentToDepartment, getLinkedDocuments, getActChildren, getMyDepartmentActs, replaceDocumentFile } from '../services/pdf';
 import { uploadActPartFile, saveActPartSections, saveActPartEntries, getActPartSections, getActPartEntries, getActPartFile, getActPartApprovals, submitActPartForApproval } from '../services/act_parts';
 import { createNotification } from '../services/notifications';
 import HindiKeyboardInput from '../components/HindiKeyboardInput';
@@ -158,6 +158,13 @@ const UD_RESPONSIVE_CSS = `
     .ud-editlist-table th, .ud-editlist-table td { padding: 6px 8px !important; }
     .ud-dropzone { padding: 40px 16px !important; }
     .ud-drawer-body { padding: 16px !important; }
+    /* Description preview/edit modal (Upload wizard + Edit Document) — go edge-to-edge
+       full-screen on phones instead of a floating card with wasted margins. */
+    .ud-descmodal-overlay { padding: 0 !important; }
+    .ud-descmodal-card { border-radius: 0 !important; height: 100% !important; max-width: none !important; }
+    .ud-descmodal-header, .ud-descmodal-footer { padding: 14px 16px !important; }
+    .ud-descmodal-body { padding: 16px !important; }
+    .ud-descmodal-close { width: 34px !important; height: 34px !important; padding: 0 !important; }
   }
 `;
 
@@ -1101,13 +1108,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const [remarksModal,  setRemarksModal]  = useState(null);
   const [viewDoc,       setViewDoc]       = useState(null);
   const [linkedDocs, setLinkedDocs] = useState([]);
-  // Replace-file modal: { doc } | null
-  const [replaceFileModal,    setReplaceFileModal]    = useState(null);
-  const [replaceFileSaving,   setReplaceFileSaving]   = useState(false);
-  const [replaceFileResubmit, setReplaceFileResubmit] = useState(false);
-  const [replaceFileError,    setReplaceFileError]    = useState('');
-  const [replaceFileSelected, setReplaceFileSelected] = useState(null); // File object
-  const replaceFileInputRef = useRef(null);
 
   const mapApiDoc = useCallback((d) => {
     // Amendment provisions ride along inside description as a hidden __PROVISIONS__ JSON
@@ -1189,6 +1189,10 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   useEffect(() => {
     if (activePage !== 'dashboard') return;
     if (!localStorage.getItem('token')) return;
+    // Standard fetch-on-mount pattern (flip loading on, fetch, flip off in finally) —
+    // the react-hooks/set-state-in-effect rule flags any sync setState in an effect,
+    // but this is the documented React pattern for kicking off a data fetch.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMyDocsLoading(true);
     setMyDocsError('');
     Promise.all([getMyDocuments(), getLinkedDocuments().catch(() => ({ data: [] }))])
@@ -1215,7 +1219,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const [editError, setEditError]       = useState('');
   const [editFileSelected, setEditFileSelected]   = useState(null);
   const [editFileUploading, setEditFileUploading] = useState(false);
-  const [editFileResubmit, setEditFileResubmit]   = useState(false);
   const editFileInputRef = useRef(null);
   const [editBlobUrl, setEditBlobUrl]         = useState(null);
   const [editPdfDoc, setEditPdfDoc]           = useState(null);
@@ -1260,6 +1263,9 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   useEffect(() => {
     if (activePage !== 'editdocument' || !editType) return;
     if (!localStorage.getItem('token')) return;
+    // refreshEditList flips a loading flag on synchronously before fetching — same
+    // documented fetch-on-mount pattern as above, shared with its manual "refresh" callers.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     return refreshEditList();
   }, [activePage, editType, refreshEditList]);
 
@@ -1282,7 +1288,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     setEditFormOriginal(initialForm);
     setEditError('');
     setEditFileSelected(null);
-    setEditFileResubmit(false);
     setEditDescPreview(false);
   }
 
@@ -1292,7 +1297,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     setEditError('');
     setEditFileSelected(null);
     setEditFileRef(null);
-    setEditFileResubmit(false);
     setEditBlobUrl(null);
     setEditPdfDoc(null);
     setEditCurrentPage(1);
@@ -1807,6 +1811,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   useEffect(() => {
     if (!primaryActId || form.type === 'Act') return;
     let cancelled = false;
+    // Same documented fetch-on-mount pattern (see the dashboard effect above).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setActChildrenLoading(true);
     getActChildren(primaryActId)
       .then(res => { if (!cancelled) setActChildren(res.data); })
@@ -1820,6 +1826,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   useEffect(() => {
     if (form.type !== 'Act') return;
     let cancelled = false;
+    // Same documented fetch-on-mount pattern (see the dashboard effect above).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDepartmentActsLoading(true);
     getMyDepartmentActs()
       .then(res => { if (!cancelled) setDepartmentActs(res.data?.documents || res.data?.results || (Array.isArray(res.data) ? res.data : [])); })
@@ -1833,6 +1841,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   useEffect(() => {
     if (activePage !== 'adddocuments') return;
     let cancelled = false;
+    // Same documented fetch-on-mount pattern (see the dashboard effect above).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSubDocActsLoading(true);
     getMyDepartmentActs()
       .then(res => { if (!cancelled) setSubDocActsList(res.data?.documents || res.data?.results || (Array.isArray(res.data) ? res.data : [])); })
@@ -1864,7 +1874,10 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   useEffect(() => {
     if (!subDocAct || !subDocTab) return;
     if (subDocLoadedFor.actId === subDocAct && subDocLoadedFor.tab === subDocTab) return;
+    // loadActPartSections/Entries eventually call setState once their fetch resolves —
+    // same documented fetch-on-mount pattern as the other effects above.
     const loader = subDocTab === 'sections'
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       ? loadActPartSections(subDocAct)
       : loadActPartEntries(subDocAct, subDocTab);
     loader.then(() => setSubDocLoadedFor({ actId: subDocAct, tab: subDocTab }));
@@ -2276,6 +2289,10 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         : { text: '', numPages: null, pageTexts: [], pageWords: [] };
 
       newDocs.push({
+        // This runs inside handleSubmit, a form-submit event handler — not render — so a
+        // non-deterministic temp id is fine here. The react-hooks/purity rule can't see
+        // that distinction from this nested closure and flags it as if it ran during render.
+        // eslint-disable-next-line react-hooks/purity
         id:            apiDoc?.id ?? (Date.now() + Math.random()),
         title:         apiDoc?.document_name || fileMeta[f.name]?.documentName || f.name.replace(/\.(pdf|docx?)$/i, ''),
         type:          typeObj?.name || form.type || 'Act',
@@ -2406,30 +2423,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     setBulkEditOpen(false);
     setBulkFields({ dept: '', type: '', year: '' });
     onAuditLog?.(`Bulk edited ${selectedIds.size} documents`);
-  }
-
-  async function handleReplaceFileSubmit() {
-    if (!replaceFileModal || !replaceFileSelected) return;
-    setReplaceFileSaving(true);
-    setReplaceFileError('');
-    try {
-      const formData = new FormData();
-      formData.append('file', replaceFileSelected);
-      const uploadRes = await uploadPdfFile(formData);
-      const { file_ref } = uploadRes.data;
-      const updateRes = await replaceDocumentFile(replaceFileModal.id, file_ref, replaceFileResubmit);
-      const updated = mapApiDoc(updateRes.data);
-      setUploads(prev => prev.map(d => d.id === updated.id ? updated : d));
-      setToast({ type: 'success', message: replaceFileResubmit ? t('toasts.fileReplacedAndResubmitted') : t('toasts.fileReplaced') });
-      setReplaceFileModal(null);
-      setReplaceFileSelected(null);
-      setReplaceFileResubmit(false);
-    } catch (err) {
-      const detail = err.response?.data?.detail;
-      setReplaceFileError(typeof detail === 'string' ? detail : t('toasts.replaceFileFailed'));
-    } finally {
-      setReplaceFileSaving(false);
-    }
   }
 
   function downloadAuditTrail() {
@@ -2604,18 +2597,26 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                   .ud-edit-grid { grid-template-columns: 1fr !important; overflow-y: auto !important; }
                   .ud-edit-pane { max-height: 55vh !important; }
                 }
+                @media (max-width: 640px) {
+                  .ud-edit-topbar { padding: 10px 14px !important; gap: 8px !important; }
+                  .ud-edit-topbar .ud-edit-titlebox { min-width: 140px !important; }
+                  .ud-edit-topbar .ud-edit-actions-btn { flex: 1 1 auto !important; justify-content: center !important; }
+                  .ud-edit-pane { max-height: 42vh !important; }
+                }
                 @keyframes editBarSlide {
                   0%   { transform: translateX(-100%); }
                   100% { transform: translateX(350%); }
                 }
               `}</style>
 
-              {/* Top bar */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 24px', borderBottom: '1px solid var(--surface-border)', background: 'var(--surface-50)', flexShrink: 0, minHeight: 64 }}>
+              {/* Top bar — wraps onto multiple lines on narrow screens (title row, then status
+                  badge + actions) rather than overflowing, since it packs a title, a status
+                  badge, and two buttons that don't have room to share one line on mobile. */}
+              <div className="ud-edit-topbar" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 16, rowGap: 10, padding: '14px 24px', borderBottom: '1px solid var(--surface-border)', background: 'var(--surface-50)', flexShrink: 0, minHeight: 64 }}>
                 <div style={{ width: 40, height: 40, borderRadius: 10, background: etypeColor.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <FileText size={18} color={etypeColor.accent} />
                 </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="ud-edit-titlebox" style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{editingDoc.title}</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 20, background: etypeColor.bg, color: etypeColor.text || etypeColor.accent }}>{editingDoc.type}</span>
@@ -2630,12 +2631,12 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                     {editingDoc.status === 'approved' ? 'APPROVED' : editingDoc.status === 'rejected' ? 'REJECTED' : 'PENDING'}
                   </span>
                 </div>
-                <button type="button" onClick={closeEditDoc} disabled={editSaving}
+                <button type="button" className="ud-edit-actions-btn" onClick={closeEditDoc} disabled={editSaving}
                   style={{ padding: '8px 18px', borderRadius: 9, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 13, fontWeight: 600, cursor: editSaving ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: editSaving ? .5 : 1, flexShrink: 0 }}>
                   {t('common.cancel')}
                 </button>
-                <button type="button" onClick={saveEditDoc} disabled={saveBtnDisabled}
-                  style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 20px', borderRadius: 9, border: 'none', background: saveBtnDisabled ? 'rgba(33,74,171,.5)' : 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: saveBtnDisabled ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+                <button type="button" className="ud-edit-actions-btn" onClick={saveEditDoc} disabled={saveBtnDisabled}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '8px 20px', borderRadius: 9, border: 'none', background: saveBtnDisabled ? 'rgba(33,74,171,.5)' : 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: saveBtnDisabled ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
                   {editFileUploading ? <RotateCcw size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={14} />}
                   {editSaving ? t('editDocument.saving') : t('editDocument.saveChanges')}
                 </button>
@@ -2702,7 +2703,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                   )}
 
                   {!editDocxHtml && (
-                    <div style={{ padding: '10px 20px', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, background: '#2d2f31', flexShrink: 0 }}>
+                    <div style={{ padding: '10px 20px', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: 12, rowGap: 8, background: '#2d2f31', flexShrink: 0 }}>
                       <button onClick={() => scrollEditPage(editCurrentPage - 1)} disabled={editCurrentPage === 1}
                         style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px', borderRadius: 7, border: '1px solid rgba(255,255,255,.12)', background: editCurrentPage === 1 ? 'transparent' : 'rgba(255,255,255,.07)', color: editCurrentPage === 1 ? 'rgba(255,255,255,.25)' : 'rgba(255,255,255,.75)', fontSize: 12, fontWeight: 600, cursor: editCurrentPage === 1 ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)' }}>
                         ← Prev
@@ -2787,26 +2788,18 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                     <div>
                       <div style={{ ...LABEL, marginBottom: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <span>{t('common.description')}</span>
-                        <div style={{ display: 'flex', gap: 2, background: 'var(--surface-ground)', borderRadius: 6, padding: 2, border: '1px solid var(--surface-border)' }}>
-                          <button type="button" onClick={() => setEditDescPreview(false)}
-                            style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 4, border: 'none', cursor: 'pointer', background: !editDescPreview ? 'var(--surface-card)' : 'transparent', color: !editDescPreview ? 'var(--text-heading)' : 'var(--text-color-secondary)', fontFamily: 'var(--font)', boxShadow: !editDescPreview ? '0 1px 3px rgba(0,0,0,.1)' : 'none', transition: 'all .15s' }}>
-                            Edit
-                          </button>
-                          <button type="button" onClick={() => setEditDescPreview(true)}
-                            style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 4, border: 'none', cursor: 'pointer', background: editDescPreview ? 'var(--surface-card)' : 'transparent', color: editDescPreview ? 'var(--text-heading)' : 'var(--text-color-secondary)', fontFamily: 'var(--font)', boxShadow: editDescPreview ? '0 1px 3px rgba(0,0,0,.1)' : 'none', transition: 'all .15s' }}>
-                            Preview
-                          </button>
-                        </div>
+                        {/* Full-page preview/edit — same pattern as the Upload wizard's per-file
+                            description: the inline box is read-only, actual editing happens in
+                            the bigger modal so it's not cramped into a few rows. */}
+                        <button type="button" onClick={() => setEditDescPreview(true)}
+                          style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 10.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+                          <Eye size={11} /> {t('wizard.step3.previewButton')}
+                        </button>
                       </div>
-                      {editDescPreview ? (
-                        <div style={{ ...INPUT_BASE, minHeight: 96, whiteSpace: 'pre-wrap', lineHeight: 1.65, color: editForm.description ? 'var(--text-color)' : 'var(--text-color-secondary)', fontStyle: editForm.description ? 'normal' : 'italic', overflowY: 'auto' }}>
-                          {editForm.description || 'No description yet.'}
-                        </div>
-                      ) : (
-                        <textarea value={editForm.description} rows={4}
-                          onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
-                          style={{ ...INPUT_BASE, resize: 'vertical', fontFamily: 'var(--font)' }} onFocus={focusStyle} onBlur={blurStyle} />
-                      )}
+                      <textarea value={editForm.description} readOnly
+                        onClick={() => setEditDescPreview(true)}
+                        rows={4}
+                        style={{ ...INPUT_BASE, resize: 'none', lineHeight: 1.6, cursor: 'pointer', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)' }} />
                     </div>
                     {(EDIT_TYPE_FIELD_KEYS[editingDoc.type] || []).length > 0 && (
                       <div>
@@ -2844,7 +2837,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                           <>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(33,74,171,.3)', background: 'rgba(33,74,171,.05)' }}>
                             <FileText size={14} color="var(--primary)" style={{ flexShrink: 0 }} />
-                            <span style={{ flex: 1, fontSize: 12.5, color: 'var(--text-color)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{editFileSelected.name}</span>
+                            <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: 'var(--text-color)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{editFileSelected.name}</span>
                             <span style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', whiteSpace: 'nowrap' }}>({(editFileSelected.size / 1024).toFixed(0)} KB)</span>
                             <button type="button" onClick={() => {
                               setEditFileSelected(null);
@@ -2908,6 +2901,37 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             </div>
           );
         })()}
+
+        {/* Full-page description preview/edit — mirrors the Upload wizard's per-file description
+            modal so editing a document's description works the same way everywhere. */}
+        {editingDoc && editDescPreview && (
+          <div className="ud-descmodal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+            onClick={() => setEditDescPreview(false)}>
+            <div className="ud-descmodal-card" style={{ background: 'var(--surface-card)', borderRadius: 16, width: '100%', maxWidth: 1200, height: '94vh', boxShadow: '0 28px 80px rgba(0,0,0,.35)', display: 'flex', flexDirection: 'column' }}
+              onClick={e => e.stopPropagation()}>
+              <div className="ud-descmodal-header" style={{ padding: '18px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', flex: 1, minWidth: 0 }}>{t('common.description')}</div>
+                <button className="ud-descmodal-close" onClick={() => setEditDescPreview(false)}
+                  style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '5px 8px', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <X size={14} />
+                </button>
+              </div>
+              <div className="ud-descmodal-body" style={{ flex: 1, overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                <textarea value={editForm?.description ?? ''}
+                  onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+                  placeholder={t('wizard.step3.descriptionPlaceholder')}
+                  style={{ ...INPUT_BASE, width: '100%', flex: 1, background: 'var(--surface-ground)', resize: 'none', minHeight: 300, fontFamily: 'var(--font)', fontSize: 13.5, lineHeight: 1.8, boxSizing: 'border-box' }}
+                  onFocus={focusStyle} onBlur={blurStyle} autoFocus />
+              </div>
+              <div className="ud-descmodal-footer" style={{ padding: '14px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end', flexShrink: 0 }}>
+                <button type="button" onClick={() => setEditDescPreview(false)}
+                  style={{ padding: '9px 22px', borderRadius: 8, border: 'none', background: 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                  {t('wizard.step3.confirmButton')}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* API error */}
         {myDocsError && (
@@ -3366,14 +3390,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                             onMouseLeave={e => e.currentTarget.style.background = 'rgba(33, 74, 171,.07)'}>
                             <Eye size={13} /> {t('common.view')}
                           </button>
-                          {(doc.status === 'pending' || doc.status === 'rejected') && (
-                            <button onClick={() => openEditDoc(doc)}
-                              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 7, border: '1px solid rgba(100,116,139,.3)', background: 'rgba(100,116,139,.07)', color: '#475569', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', whiteSpace: 'nowrap', transition: 'background .15s' }}
-                              onMouseEnter={e => e.currentTarget.style.background = 'rgba(100,116,139,.14)'}
-                              onMouseLeave={e => e.currentTarget.style.background = 'rgba(100,116,139,.07)'}>
-                              <Edit3 size={13} /> {t('editDocument.editButton')}
-                            </button>
-                          )}
                           {doc.approval?.comments && (
                             <button onClick={() => setRemarksModal(doc)}
                               style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 7, border: `1px solid ${statusBorder}`, background: statusBg, color: statusAccent, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', whiteSpace: 'nowrap', transition: 'opacity .15s' }}>
@@ -3735,18 +3751,26 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                   .ud-edit-grid { grid-template-columns: 1fr !important; overflow-y: auto !important; }
                   .ud-edit-pane { max-height: 55vh !important; }
                 }
+                @media (max-width: 640px) {
+                  .ud-edit-topbar { padding: 10px 14px !important; gap: 8px !important; }
+                  .ud-edit-topbar .ud-edit-titlebox { min-width: 140px !important; }
+                  .ud-edit-topbar .ud-edit-actions-btn { flex: 1 1 auto !important; justify-content: center !important; }
+                  .ud-edit-pane { max-height: 42vh !important; }
+                }
                 @keyframes editBarSlide {
                   0%   { transform: translateX(-100%); }
                   100% { transform: translateX(350%); }
                 }
               `}</style>
 
-              {/* Top bar */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 24px', borderBottom: '1px solid var(--surface-border)', background: 'var(--surface-50)', flexShrink: 0, minHeight: 64 }}>
+              {/* Top bar — wraps onto multiple lines on narrow screens (title row, then status
+                  badge + actions) rather than overflowing, since it packs a title, a status
+                  badge, and two buttons that don't have room to share one line on mobile. */}
+              <div className="ud-edit-topbar" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 16, rowGap: 10, padding: '14px 24px', borderBottom: '1px solid var(--surface-border)', background: 'var(--surface-50)', flexShrink: 0, minHeight: 64 }}>
                 <div style={{ width: 40, height: 40, borderRadius: 10, background: etypeColor.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <FileText size={18} color={etypeColor.accent} />
                 </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
+                <div className="ud-edit-titlebox" style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{editingDoc.title}</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
                     <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 20, background: etypeColor.bg, color: etypeColor.text || etypeColor.accent }}>{editingDoc.type}</span>
@@ -3761,12 +3785,12 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                     {editingDoc.status === 'approved' ? 'APPROVED' : editingDoc.status === 'rejected' ? 'REJECTED' : 'PENDING'}
                   </span>
                 </div>
-                <button type="button" onClick={closeEditDoc} disabled={editSaving}
+                <button type="button" className="ud-edit-actions-btn" onClick={closeEditDoc} disabled={editSaving}
                   style={{ padding: '8px 18px', borderRadius: 9, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 13, fontWeight: 600, cursor: editSaving ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: editSaving ? .5 : 1, flexShrink: 0 }}>
                   {t('common.cancel')}
                 </button>
-                <button type="button" onClick={saveEditDoc} disabled={saveBtnDisabled}
-                  style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 20px', borderRadius: 9, border: 'none', background: saveBtnDisabled ? 'rgba(33,74,171,.5)' : 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: saveBtnDisabled ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+                <button type="button" className="ud-edit-actions-btn" onClick={saveEditDoc} disabled={saveBtnDisabled}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '8px 20px', borderRadius: 9, border: 'none', background: saveBtnDisabled ? 'rgba(33,74,171,.5)' : 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: saveBtnDisabled ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
                   {editFileUploading ? <RotateCcw size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={14} />}
                   {editSaving ? t('editDocument.saving') : t('editDocument.saveChanges')}
                 </button>
@@ -3833,7 +3857,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                   )}
 
                   {!editDocxHtml && (
-                    <div style={{ padding: '10px 20px', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, background: '#2d2f31', flexShrink: 0 }}>
+                    <div style={{ padding: '10px 20px', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: 12, rowGap: 8, background: '#2d2f31', flexShrink: 0 }}>
                       <button onClick={() => scrollEditPage(editCurrentPage - 1)} disabled={editCurrentPage === 1}
                         style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px', borderRadius: 7, border: '1px solid rgba(255,255,255,.12)', background: editCurrentPage === 1 ? 'transparent' : 'rgba(255,255,255,.07)', color: editCurrentPage === 1 ? 'rgba(255,255,255,.25)' : 'rgba(255,255,255,.75)', fontSize: 12, fontWeight: 600, cursor: editCurrentPage === 1 ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)' }}>
                         ← Prev
@@ -3918,26 +3942,18 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                     <div>
                       <div style={{ ...LABEL, marginBottom: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                         <span>{t('common.description')}</span>
-                        <div style={{ display: 'flex', gap: 2, background: 'var(--surface-ground)', borderRadius: 6, padding: 2, border: '1px solid var(--surface-border)' }}>
-                          <button type="button" onClick={() => setEditDescPreview(false)}
-                            style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 4, border: 'none', cursor: 'pointer', background: !editDescPreview ? 'var(--surface-card)' : 'transparent', color: !editDescPreview ? 'var(--text-heading)' : 'var(--text-color-secondary)', fontFamily: 'var(--font)', boxShadow: !editDescPreview ? '0 1px 3px rgba(0,0,0,.1)' : 'none', transition: 'all .15s' }}>
-                            Edit
-                          </button>
-                          <button type="button" onClick={() => setEditDescPreview(true)}
-                            style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 4, border: 'none', cursor: 'pointer', background: editDescPreview ? 'var(--surface-card)' : 'transparent', color: editDescPreview ? 'var(--text-heading)' : 'var(--text-color-secondary)', fontFamily: 'var(--font)', boxShadow: editDescPreview ? '0 1px 3px rgba(0,0,0,.1)' : 'none', transition: 'all .15s' }}>
-                            Preview
-                          </button>
-                        </div>
+                        {/* Full-page preview/edit — same pattern as the Upload wizard's per-file
+                            description: the inline box is read-only, actual editing happens in
+                            the bigger modal so it's not cramped into a few rows. */}
+                        <button type="button" onClick={() => setEditDescPreview(true)}
+                          style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 10.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+                          <Eye size={11} /> {t('wizard.step3.previewButton')}
+                        </button>
                       </div>
-                      {editDescPreview ? (
-                        <div style={{ ...INPUT_BASE, minHeight: 96, whiteSpace: 'pre-wrap', lineHeight: 1.65, color: editForm.description ? 'var(--text-color)' : 'var(--text-color-secondary)', fontStyle: editForm.description ? 'normal' : 'italic', overflowY: 'auto' }}>
-                          {editForm.description || 'No description yet.'}
-                        </div>
-                      ) : (
-                        <textarea value={editForm.description} rows={4}
-                          onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
-                          style={{ ...INPUT_BASE, resize: 'vertical', fontFamily: 'var(--font)' }} onFocus={focusStyle} onBlur={blurStyle} />
-                      )}
+                      <textarea value={editForm.description} readOnly
+                        onClick={() => setEditDescPreview(true)}
+                        rows={4}
+                        style={{ ...INPUT_BASE, resize: 'none', lineHeight: 1.6, cursor: 'pointer', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)' }} />
                     </div>
                     {(EDIT_TYPE_FIELD_KEYS[editingDoc.type] || []).length > 0 && (
                       <div>
@@ -3975,7 +3991,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                           <>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(33,74,171,.3)', background: 'rgba(33,74,171,.05)' }}>
                             <FileText size={14} color="var(--primary)" style={{ flexShrink: 0 }} />
-                            <span style={{ flex: 1, fontSize: 12.5, color: 'var(--text-color)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{editFileSelected.name}</span>
+                            <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: 'var(--text-color)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{editFileSelected.name}</span>
                             <span style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', whiteSpace: 'nowrap' }}>({(editFileSelected.size / 1024).toFixed(0)} KB)</span>
                             <button type="button" onClick={() => {
                               setEditFileSelected(null);
@@ -4039,6 +4055,37 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             </div>
           );
         })()}
+
+        {/* Full-page description preview/edit — mirrors the Upload wizard's per-file description
+            modal so editing a document's description works the same way everywhere. */}
+        {editingDoc && editDescPreview && (
+          <div className="ud-descmodal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+            onClick={() => setEditDescPreview(false)}>
+            <div className="ud-descmodal-card" style={{ background: 'var(--surface-card)', borderRadius: 16, width: '100%', maxWidth: 1200, height: '94vh', boxShadow: '0 28px 80px rgba(0,0,0,.35)', display: 'flex', flexDirection: 'column' }}
+              onClick={e => e.stopPropagation()}>
+              <div className="ud-descmodal-header" style={{ padding: '18px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', flex: 1, minWidth: 0 }}>{t('common.description')}</div>
+                <button className="ud-descmodal-close" onClick={() => setEditDescPreview(false)}
+                  style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '5px 8px', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <X size={14} />
+                </button>
+              </div>
+              <div className="ud-descmodal-body" style={{ flex: 1, overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                <textarea value={editForm?.description ?? ''}
+                  onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+                  placeholder={t('wizard.step3.descriptionPlaceholder')}
+                  style={{ ...INPUT_BASE, width: '100%', flex: 1, background: 'var(--surface-ground)', resize: 'none', minHeight: 300, fontFamily: 'var(--font)', fontSize: 13.5, lineHeight: 1.8, boxSizing: 'border-box' }}
+                  onFocus={focusStyle} onBlur={blurStyle} autoFocus />
+              </div>
+              <div className="ud-descmodal-footer" style={{ padding: '14px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end', flexShrink: 0 }}>
+                <button type="button" onClick={() => setEditDescPreview(false)}
+                  style={{ padding: '9px 22px', borderRadius: 8, border: 'none', background: 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                  {t('wizard.step3.confirmButton')}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -4288,21 +4335,16 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       : entriesSignature(subDocEntries[subDocTab] || []) !== (entriesBaseline[subDocTab] ?? entriesSignature([]));
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease', justifyContent: subDocTab ? 'flex-start' : 'center', minHeight: subDocTab ? 'auto' : 'calc(100vh - 220px)' }}>
         <style>{UD_RESPONSIVE_CSS}</style>
         <Toast toast={toast} onClose={() => setToast(null)} />
 
-        <div>
-          <div style={{ fontSize: 'var(--font-size-h3)', fontWeight: 800, color: 'var(--text-heading)', letterSpacing: '-.01em' }}>{t('addDocuments.heading')}</div>
-          <div style={{ fontSize: 'var(--font-size-p2)', color: 'var(--text-color-secondary)', marginTop: 4 }}>{t('addDocuments.subheading')}</div>
-        </div>
-
         {!subDocTab ? (
-          /* Big centered picker — identical design to the Upload wizard's Document Type picker */
+          /* Starting state — big centered part picker, identical to the Edit Document page's type picker */
           <Card padding="28px 26px">
             <div style={{ maxWidth: 1180, margin: '0 auto' }}>
               <div style={{ textAlign: 'center', marginBottom: 32 }}>
-                <div style={{ fontSize: 'var(--font-size-h2)', fontWeight: 800, color: 'var(--text-heading)', marginBottom: 8 }}>{t('addDocuments.pickHeading')} <span style={{ color: '#dc3545' }}>*</span></div>
+                <div style={{ fontSize: 'var(--font-size-h2)', fontWeight: 800, color: 'var(--text-heading)', marginBottom: 8 }}>{t('addDocuments.pickHeading')}</div>
                 <div style={{ fontSize: 'var(--font-size-p2)', color: 'var(--text-color-secondary)' }}>{t('addDocuments.pickSubheading')}</div>
               </div>
               <div className="ud-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(240px, 1fr))', gap: 20 }}>
@@ -4981,6 +5023,9 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                       id={`entry-file-${subDocTab}-${i}`}
                       onChange={e => {
                         const f = e.target.files?.[0] || null;
+                        // showToast reads a timer ref internally, but this whole callback only
+                        // runs on the input's change event — never during render — so that's safe.
+                        // eslint-disable-next-line react-hooks/refs
                         if (f && !isAccepted(f)) { showToast('error', t('wizard.unsupportedFileToast', { name: f.name })); e.target.value = ''; return; }
                         if (f && !isUnderSizeLimit(f)) { showToast('error', t('wizard.fileTooLargeToast', { name: f.name, size: formatSize(MAX_UPLOAD_SIZE_BYTES) })); e.target.value = ''; return; }
                         setEntryField(i, 'file', f); setEntryField(i, 'fileRef', null); e.target.value = '';
@@ -5000,6 +5045,9 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-card)', flex: 1, minWidth: 0 }}>
                           <Paperclip size={12} color={activeSubTab ? activeSubTab.accent : 'var(--primary)'} />
                           <span style={{ fontSize: 11.5, color: 'var(--text-heading)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.existingFilename}</span>
+                          {/* openActPartFile calls showToast (reads a timer ref) in its catch
+                              block, but this only runs on click — never during render. */}
+                          {/* eslint-disable-next-line react-hooks/refs */}
                           <button type="button" onClick={() => openActPartFile(entry.existingFileRef, entry.existingFilename)}
                             style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 6, background: 'var(--primary)', color: 'white', border: 'none', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
                             <ExternalLink size={11} /> Open
@@ -5676,9 +5724,9 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                   placeholder={t('wizard.placeholders.act.year')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.act.shortTitle')}</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.act.shortTitle')} <span style={{ color: '#dc3545' }}>*</span></div>
                 <input value={typeFields.shortTitle || ''} onChange={e => setTypeFields(f => ({ ...f, shortTitle: e.target.value }))}
-                  placeholder={t('wizard.placeholders.act.shortTitle')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  placeholder={t('wizard.placeholders.act.shortTitle')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} required />
               </div>
               <div className="ud-grid-2" style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div>
@@ -6834,22 +6882,22 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       {/* Full-page description preview/edit — the inline textarea is only 3 rows, too small to
           read a longer auto-generated summary comfortably; this gives it room, still editable. */}
       {descPreviewFile && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+        <div className="ud-descmodal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
           onClick={() => setDescPreviewFile(null)}>
-          <div style={{ background: 'var(--surface-card)', borderRadius: 16, width: '100%', maxWidth: 1200, height: '94vh', boxShadow: '0 28px 80px rgba(0,0,0,.35)', display: 'flex', flexDirection: 'column' }}
+          <div className="ud-descmodal-card" style={{ background: 'var(--surface-card)', borderRadius: 16, width: '100%', maxWidth: 1200, height: '94vh', boxShadow: '0 28px 80px rgba(0,0,0,.35)', display: 'flex', flexDirection: 'column' }}
             onClick={e => e.stopPropagation()}>
-            <div style={{ padding: '18px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+            <div className="ud-descmodal-header" style={{ padding: '18px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)' }}>{t('wizard.step3.descriptionLabel')}</div>
                 <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{descPreviewFile}</div>
               </div>
-              <button onClick={() => setDescPreviewFile(null)}
-                style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '5px 8px', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', flexShrink: 0 }}>
+              <button className="ud-descmodal-close" onClick={() => setDescPreviewFile(null)}
+                style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '5px 8px', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <X size={14} />
               </button>
             </div>
 
-            <div style={{ flex: 1, overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            <div className="ud-descmodal-body" style={{ flex: 1, overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
               <textarea value={fileMeta[descPreviewFile]?.desc ?? ''}
                 onChange={e => setFileMeta(prev => ({ ...prev, [descPreviewFile]: { ...prev[descPreviewFile], desc: e.target.value } }))}
                 placeholder={t('wizard.step3.descriptionPlaceholder')}
@@ -6857,7 +6905,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                 onFocus={focusStyle} onBlur={blurStyle} autoFocus />
             </div>
 
-            <div style={{ padding: '14px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end', flexShrink: 0 }}>
+            <div className="ud-descmodal-footer" style={{ padding: '14px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end', flexShrink: 0 }}>
               <button type="button" onClick={() => setDescPreviewFile(null)}
                 style={{ padding: '9px 22px', borderRadius: 8, border: 'none', background: 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                 {t('wizard.step3.confirmButton')}

@@ -82,6 +82,7 @@
     "errors": {
       "usernameRequired": "Username is required.",
       "emailRequired": "Email is required.",
+      "emailInvalid": "Please enter a valid email address.",
       "passwordRequired": "Password is required.",
       "mobileRequired": "A valid 10-digit mobile number is required.",
       "firstNameRequired": "First name is required.",
@@ -285,6 +286,7 @@
     "cancel": "Cancel",
     "noLimits": "No custom limits set. All departments use the system default of {{default}} users per role.",
     "defaultBadge": "Default: {{n}}",
+    "totalDepartments": "{{count}} total departments",
     "headers": {
       "department": "Department",
       "role": "Role",

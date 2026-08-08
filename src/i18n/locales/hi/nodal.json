@@ -91,6 +91,7 @@
       "firstNameRequired": "पहला नाम आवश्यक है।",
       "usernameRequired": "उपयोगकर्ता नाम आवश्यक है।",
       "emailRequired": "ईमेल आवश्यक है।",
+      "emailInvalid": "कृपया एक मान्य ईमेल पता दर्ज करें।",
       "passwordRequired": "पासवर्ड आवश्यक है।",
       "mobileRequired": "एक मान्य 10-अंकों का मोबाइल नंबर आवश्यक है।",
       "departmentRequired": "विभाग आवश्यक है।",

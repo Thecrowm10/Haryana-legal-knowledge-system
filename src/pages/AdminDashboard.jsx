@@ -56,6 +56,8 @@ function exportCSV(data, filename) {
 }
 
 const AUDIT_PAGE_SIZE = 10;
+const CAPS_PAGE_SIZE = 10;
+const EMAIL_FORMAT_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function auditEntityOptions(t) {
   return [
@@ -356,6 +358,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   const [capDeptSearch, setCapDeptSearch]   = useState('');
   const [capDeptOpen, setCapDeptOpen]       = useState(false);
   const [capActiveCount, setCapActiveCount] = useState(null);
+  const [capsPage, setCapsPage]             = useState(0);
 
   useEffect(() => {
     if (!capForm.department_id || !capForm.role_id) {
@@ -557,6 +560,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     if (isUploader && !addForm.approver_id) { setAddError('Please select an approver for this uploader.'); return; }
     if (!addForm.username.trim()) { setAddError(t('users.errors.usernameRequired')); return; }
     if (!addForm.email.trim())    { setAddError(t('users.errors.emailRequired')); return; }
+    if (!EMAIL_FORMAT_RE.test(addForm.email.trim())) { setAddError(t('users.errors.emailInvalid')); return; }
     if (!addForm.password)        { setAddError(t('users.errors.passwordRequired')); return; }
     if (!addForm.first_name.trim()) { setAddError(t('users.errors.firstNameRequired')); return; }
     if (!addForm.last_name.trim())  { setAddError(t('users.errors.lastNameRequired')); return; }
@@ -1507,6 +1511,10 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   }
 
   // System Monitor
+  // System Monitor — disabled for now, not wired to a real API yet (all stats/health
+  // below are hardcoded placeholders, not live data). Kept commented out rather than
+  // deleted so it's ready to wire up once that API exists.
+  /*
   if (activePage === 'monitor') {
     const stats = [
       { label: t('monitor.stats.totalDocuments'), value: '1,284', sub: t('monitor.subs.todayCount') },
@@ -1546,6 +1554,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       </div>
     );
   }
+  */
 
   // Full MIS Report — real audit log data, excludes current user
   if (activePage === 'auditfull') {
@@ -2310,19 +2319,23 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
 
   if (activePage === 'rolecaps') {
     const assignable = assignableRoles(roles);
+    const capsTotalPages = Math.max(1, Math.ceil(caps.length / CAPS_PAGE_SIZE));
+    const capsPageClamped = Math.min(capsPage, capsTotalPages - 1);
+    const pagedCaps = caps.slice(capsPageClamped * CAPS_PAGE_SIZE, capsPageClamped * CAPS_PAGE_SIZE + CAPS_PAGE_SIZE);
     return (
-      <>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
         <style>{ADM_RESPONSIVE_CSS}</style>
-        <div style={{ padding: '24px', maxWidth: 900, margin: '0 auto' }}>
-          <h2 style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-heading)', marginBottom: 4 }}>
+        <div>
+          <div style={{ fontSize: 'var(--font-size-h3)', fontWeight: 800, color: 'var(--text-heading)', letterSpacing: '-.01em' }}>
             {t('roleCaps.title')}
-          </h2>
-          <p style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', marginBottom: 24 }}>
+          </div>
+          <div style={{ fontSize: 'var(--font-size-p2)', color: 'var(--text-color-secondary)', marginTop: 4 }}>
             {t('roleCaps.subtitle', { default: capsDefaultMax })}
-          </p>
+          </div>
+        </div>
 
           {/* Add / Update form */}
-          <Card style={{ marginBottom: 24, padding: '18px 20px' }}>
+          <Card style={{ padding: '18px 20px' }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 14 }}>
               {t('roleCaps.addTitle')}
             </div>
@@ -2403,7 +2416,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 </div>
                 <button
                   type="submit" disabled={capSaving}
-                  style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#0d6efd', color: '#fff', fontWeight: 700, fontSize: 13, cursor: capSaving ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}
+                  style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: 'var(--primary)', color: 'white', fontWeight: 700, fontSize: 13, cursor: capSaving ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}
                 >
                   {capSaving ? t('roleCaps.saving') : t('roleCaps.save')}
                 </button>
@@ -2435,6 +2448,10 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
               </div>
             )}
             {!capsLoading && caps.length > 0 && (
+              <>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+                <span style={{ ...LABEL }}>{t('roleCaps.totalDepartments', { count: caps.length })}</span>
+              </div>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
@@ -2445,7 +2462,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                     </tr>
                   </thead>
                   <tbody>
-                    {caps.map(cap => (
+                    {pagedCaps.map(cap => (
                       <tr key={cap.id} style={{ borderBottom: '1px solid var(--surface-border)' }}>
                         <td style={{ padding: '10px 14px', fontWeight: 600, color: 'var(--text-heading)' }}>{cap.department_name}</td>
                         <td style={{ padding: '10px 14px', color: 'var(--text-color)' }}>{cap.role_name ? cap.role_name.charAt(0).toUpperCase() + cap.role_name.slice(1) : '—'}</td>
@@ -2488,10 +2505,27 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                   </tbody>
                 </table>
               </div>
+              </>
+            )}
+
+            {/* Pagination — only once there's more than one page */}
+            {!capsLoading && capsTotalPages > 1 && (
+              <div style={{ padding: '12px 18px', borderTop: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12 }}>
+                <span style={{ ...LABEL }}>{t('audit.pageOf', { page: capsPageClamped + 1, total: capsTotalPages })}</span>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => setCapsPage(p => Math.max(0, p - 1))} disabled={capsPageClamped === 0}
+                    style={{ padding: '6px 14px', border: '1px solid var(--surface-border)', borderRadius: 7, fontSize: 12.5, background: 'var(--surface-ground)', color: capsPageClamped === 0 ? 'var(--text-color-secondary)' : 'var(--text-color)', cursor: capsPageClamped === 0 ? 'default' : 'pointer', opacity: capsPageClamped === 0 ? 0.5 : 1 }}>
+                    {t('audit.previous')}
+                  </button>
+                  <button onClick={() => setCapsPage(p => Math.min(capsTotalPages - 1, p + 1))} disabled={capsPageClamped >= capsTotalPages - 1}
+                    style={{ padding: '6px 14px', border: '1px solid var(--surface-border)', borderRadius: 7, fontSize: 12.5, background: 'var(--surface-ground)', color: capsPageClamped >= capsTotalPages - 1 ? 'var(--text-color-secondary)' : 'var(--text-color)', cursor: capsPageClamped >= capsTotalPages - 1 ? 'default' : 'pointer', opacity: capsPageClamped >= capsTotalPages - 1 ? 0.5 : 1 }}>
+                    {t('audit.next')}
+                  </button>
+                </div>
+              </div>
             )}
           </Card>
-        </div>
-      </>
+      </div>
     );
   }
 
