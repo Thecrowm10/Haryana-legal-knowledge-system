@@ -1774,7 +1774,9 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     async function handleDownloadReport() {
       setReportGenerating(true);
       try {
-        const selectedNames = depts.filter(d => reportDeptIds.includes(d.id)).map(d => d.name);
+        const selectedNames = reportDeptIds.length
+          ? depts.filter(d => reportDeptIds.includes(d.id)).map(d => d.name)
+          : depts.map(d => d.name);
         await downloadUploadsExcelReport({ docs: allDocs, departments: selectedNames, fileLabel: 'Admin' });
         setShowReportPanel(false);
         setReportDeptIds([]);
