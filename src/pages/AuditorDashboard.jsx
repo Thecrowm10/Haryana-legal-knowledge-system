@@ -1,6 +1,5 @@
-﻿import { useState } from 'react';
-import { useTranslation, Trans } from 'react-i18next';
-import { ClipboardList, FileSearch, BarChart2, Download, CheckCircle, AlertCircle } from 'lucide-react';
+﻿import { useTranslation, Trans } from 'react-i18next';
+import { ClipboardList, Download, CheckCircle } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 

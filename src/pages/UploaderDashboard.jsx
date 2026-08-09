@@ -3,20 +3,19 @@ import { useTranslation } from 'react-i18next';
 import {
   Upload, FileText, CheckCircle, XCircle, X, TrendingUp, FileType, Download, Clock,
   RotateCcw, AlertCircle, Eye, GitBranch, Plus, FolderPlus,
-  Layers, ChevronRight, AlertTriangle, CheckSquare, Square,
+  Layers, ChevronRight, ChevronDown, AlertTriangle, CheckSquare, Square,
   Edit3, Tag, Search, MessageSquare, MessageCircle, ZoomIn, ZoomOut, RotateCw, ExternalLink,
-  Save, ArrowRight, Paperclip, Send,
+  Save, ArrowRight, Paperclip,
 } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 import mammoth from 'mammoth';
 import Card from '../components/ui/Card';
-import Badge from '../components/ui/Badge';
 import SelectField from '../components/ui/SelectField';
 import { useAuth } from '../hooks/useAuth';
 import { getDepartments, getDocumentTypes } from '../services/departments';
-import { uploadPdfFile, uploadPdfMetadata, updatePdfMetadata, getMyDocuments, searchDocuments, getPdfFile, checkDuplicateDocument, linkDocumentToDepartment, getLinkedDocuments, getActChildren, getMyDepartmentActs, getMyDepartmentDocsByType } from '../services/pdf';
+import { uploadPdfFile, uploadPdfMetadata, updatePdfMetadata, getMyDocuments, searchDocuments, getPdfFile, checkDuplicateDocument, linkDocumentToDepartment, getLinkedDocuments, getActChildren, getMyDepartmentActs, replaceDocumentFile } from '../services/pdf';
 import { uploadActPartFile, saveActPartSections, saveActPartEntries, getActPartSections, getActPartEntries, getActPartFile, getActPartApprovals, submitActPartForApproval } from '../services/act_parts';
 import { createNotification } from '../services/notifications';
 import HindiKeyboardInput from '../components/HindiKeyboardInput';
@@ -31,7 +30,6 @@ const DEFAULT_DEPTS = [
   'Panchayati Raj','General Administration',
 ];
 const DEFAULT_TYPES = ['Act','Amendment','Notification','Circular','Policy','Rules & Regulations','Order/Gazette','Bye Laws','Miscellaneous'];
-const LANGS  = ['English','Hindi','Bilingual'];
 const REL_TYPES = [
   'Replaces', 'Replaced by', 'Amends', 'Amended by',
   'In Continuation of', 'Continued by', 'Issued Under',
@@ -64,8 +62,6 @@ const REL_TARGET_TYPES = {
 };
 
 const AMEND_CHANGE_TYPES = ['Amended', 'Substituted', 'Inserted', 'Deleted', 'Expanded'];
-const AMEND_CHANGE_COLORS = { Amended: '#ffc107', Substituted: '#0d6efd', Inserted: '#198754', Deleted: '#dc3545', Expanded: '#8b5cf6' };
-const EMPTY_PROVISION = () => ({ section: '', chapter: '', subsection: '', page: '', changeType: 'Substituted', before: '', after: '' });
 
 // Display-only lookup maps: map the internal English enum values (used in comparisons,
 // object keys, and API payloads — never changed) to safe i18n key suffixes used purely
@@ -162,6 +158,13 @@ const UD_RESPONSIVE_CSS = `
     .ud-editlist-table th, .ud-editlist-table td { padding: 6px 8px !important; }
     .ud-dropzone { padding: 40px 16px !important; }
     .ud-drawer-body { padding: 16px !important; }
+    /* Description preview/edit modal (Upload wizard + Edit Document) — go edge-to-edge
+       full-screen on phones instead of a floating card with wasted margins. */
+    .ud-descmodal-overlay { padding: 0 !important; }
+    .ud-descmodal-card { border-radius: 0 !important; height: 100% !important; max-width: none !important; }
+    .ud-descmodal-header, .ud-descmodal-footer { padding: 14px 16px !important; }
+    .ud-descmodal-body { padding: 16px !important; }
+    .ud-descmodal-close { width: 34px !important; height: 34px !important; padding: 0 !important; }
   }
 `;
 
@@ -366,15 +369,9 @@ function extractTypeChildren(data, type) {
   }
   return [];
 }
-// DBIM 7.1.3.3 recommends PDF-only uploads, but the department explicitly requires
-// Word support too — PDF + DOC/DOCX are accepted, everything else is rejected.
+// DBIM 7.1.3.3 recommends PDF-only uploads — DOC/DOCX are no longer accepted.
 function isAccepted(f) {
-  return (
-    f.type === 'application/pdf' || f.name.endsWith('.pdf') ||
-    /\.docx?$/i.test(f.name) ||
-    f.type === 'application/msword' ||
-    f.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-  );
+  return f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf');
 }
 // DBIM 6.1.1 / Table 6 upload size ceiling — the guideline's own tiers are photo-oriented
 // (banner/thumbnail/high-res), so the closest fit for a document upload is its "high-res" cap.
@@ -464,21 +461,6 @@ function VersionConflictModal({ existingDoc, newVersion, onUploadAsNew, onCancel
     </div>
   );
 }
-function WorkflowBadge({ status }) {
-  const { t } = useTranslation('uploader');
-  const config = {
-    [WORKFLOW_STATUS.DRAFT]:     { label: t('workflowBadge.draft'),          bg: 'rgba(148,163,184,.12)', color: '#64748b' },
-    [WORKFLOW_STATUS.PENDING]:   { label: t('workflowBadge.pendingReview'), bg: 'rgba(255, 193, 7,.12)', color: '#d97706' },
-    [WORKFLOW_STATUS.PUBLISHED]: { label: t('workflowBadge.published'),       bg: 'rgba(25, 135, 84,.12)',  color: '#16a34a' },
-  };
-  const c = config[status] || config[WORKFLOW_STATUS.DRAFT];
-  return (
-    <span style={{ fontSize: 10.5, fontWeight: 700, fontFamily: 'var(--mono)', padding: '3px 9px', borderRadius: 20, background: c.bg, color: c.color }}>
-      {c.label}
-    </span>
-  );
-}
-
 function Toast({ toast, onClose }) {
   if (!toast) return null;
   const isError = toast.type === 'error';
@@ -490,7 +472,7 @@ function Toast({ toast, onClose }) {
       <div style={{ width: 26, height: 26, borderRadius: 7, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
         <Icon size={14} color={accent} />
       </div>
-      <span style={{ fontSize: 13, color: 'var(--text-color)', lineHeight: 1.5, flex: 1, paddingTop: 3 }}>{toast.message}</span>
+      <span style={{ fontSize: 13, color: 'var(--text-color)', lineHeight: 1.5, flex: 1, minWidth: 0, paddingTop: 3, overflowWrap: 'break-word', wordBreak: 'break-word' }}>{toast.message}</span>
       <button type="button" onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', flexShrink: 0, padding: 3 }}>
         <X size={13} />
       </button>
@@ -512,10 +494,11 @@ function DocViewModal({ doc, onClose }) {
   const suppressRef   = useRef(false);
   const svgRefs       = useRef([]);
   const docxViewRef   = useRef(null);
-  const annotations  = useMemo(() => {
-    try { return doc.approval?.annotations_json ? JSON.parse(doc.approval.annotations_json) : []; }
+  const annotationsJson = doc.approval?.annotations_json;
+  const annotations = useMemo(() => {
+    try { return annotationsJson ? JSON.parse(annotationsJson) : []; }
     catch { return []; }
-  }, [doc.approval?.annotations_json]);
+  }, [annotationsJson]);
 
   useEffect(() => {
     const h = e => { if (e.key === 'Escape') onClose(); };
@@ -524,8 +507,10 @@ function DocViewModal({ doc, onClose }) {
   }, [onClose]);
 
   useEffect(() => {
+    // doc.id never actually changes on an already-mounted instance — every call site
+    // gates this component behind `cond && <DocViewModal .../>`, so a new document
+    // always means a fresh mount and these useState initial values already apply.
     let url = null;
-    setBlobUrl(null); setPdfDoc(null); setCurrentPage(1); setDocxHtml(null);
     getPdfFile(doc.id)
       .then(res => {
         const ct = (res.headers['content-type'] || '').toLowerCase();
@@ -648,8 +633,9 @@ function DocViewModal({ doc, onClose }) {
     [t('common.referenceNo'),      doc.referenceNumber || ''],
     [t('common.issueDate'),        doc.enactmentDate   || ''],
     [t('common.effectiveFrom'),    doc.effectiveFrom   || ''],
+    [t('common.lastUpdatedOn'),    doc.lastUpdatedOn   || ''],
     [t('docViewModal.gazetteRef'), doc.gazette         || ''],
-    [t('docViewModal.legalAuthority'), doc.authority   || ''],
+    ...(doc.type !== 'Act' ? [[t('docViewModal.legalAuthority'), doc.authority || '']] : []),
     [t('docViewModal.uploader'),   doc.uploader        || ''],
     [t('docViewModal.uploadDate'), doc.uploadedAt      || ''],
     [t('docViewModal.file'),       doc.fileName        || ''],
@@ -696,7 +682,9 @@ function DocViewModal({ doc, onClose }) {
             <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 20, background: typeColor.bg, color: typeColor.text || typeColor.accent }}>{doc.type}</span>
             <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)' }}>{doc.dept}</span>
             <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: .7 }}>· {doc.year}</span>
+            {/* Version tag hidden until proper API mapping for versions is wired up — keep for future use.
             {doc.version && <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: .7 }}>· v{doc.version}</span>}
+            */}
           </div>
         </div>
         {/* Status chip */}
@@ -845,7 +833,8 @@ function DocViewModal({ doc, onClose }) {
                 { label: t('common.type'),       value: doc.type,           color: typeColor.accent, bg: typeColor.bg },
                 { label: t('common.department'), value: doc.dept,           color: 'var(--primary)', bg: 'rgba(33, 74, 171,.07)' },
                 { label: t('common.year'),       value: String(doc.year),   color: '#64748b',        bg: 'rgba(100,116,139,.08)' },
-                { label: t('common.version'),    value: `v${doc.version || '1.0'}`, color: '#64748b', bg: 'rgba(100,116,139,.08)' },
+                // Version tile hidden until proper API mapping for versions is wired up — keep for future use.
+                // { label: t('common.version'),    value: `v${doc.version || '1.0'}`, color: '#64748b', bg: 'rgba(100,116,139,.08)' },
               ].map(({ label, value, color, bg }) => (
                 <div key={label} style={{ padding: '12px 14px', borderRadius: 10, background: bg, border: '1px solid transparent' }}>
                   <div style={{ fontSize: 10, fontWeight: 700, color, letterSpacing: '.06em', textTransform: 'uppercase', fontFamily: 'var(--mono)', marginBottom: 4, opacity: .8 }}>{label}</div>
@@ -1086,7 +1075,7 @@ function DocViewModal({ doc, onClose }) {
 }
 
 // Main component
-export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, documents = [], onAddDocument, taxonomy = [] }) {
+export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, documents = [], onAddDocument }) {
   const { user } = useAuth();
   const { t } = useTranslation('uploader');
   const isMobile = useIsMobile();
@@ -1115,14 +1104,15 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const [myDocsError,   setMyDocsError]   = useState('');
   const [remarksModal,  setRemarksModal]  = useState(null);
   const [viewDoc,       setViewDoc]       = useState(null);
+  const [linkedDocs, setLinkedDocs] = useState([]);
 
-  function mapApiDoc(d) {
+  const mapApiDoc = useCallback((d) => {
     // Amendment provisions ride along inside description as a hidden __PROVISIONS__ JSON
     // suffix (see the upload flow below) — strip it back out before displaying the description.
     const rawDesc = d.description || '';
     const provisionsMatch = rawDesc.match(/\n?__PROVISIONS__:(.+)$/s);
     let amendmentProvisions = [];
-    if (provisionsMatch) { try { amendmentProvisions = JSON.parse(provisionsMatch[1]); } catch {} }
+    if (provisionsMatch) { try { amendmentProvisions = JSON.parse(provisionsMatch[1]); } catch { /* malformed JSON in remarks — keep default */ } }
 
     return {
       id:              d.id,
@@ -1187,15 +1177,19 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         ...(d.no_of_ordinances       ? { noOfOrdinances:      d.no_of_ordinances }       : {}),
         ...(d.no_of_orders           ? { noOfOrders:          d.no_of_orders }           : {}),
         ...(d.keywords               ? { keywords:            d.keywords }               : {}),
-        ...(d.is_repealed            ? { repealed:            'Yes' }                    : {}),
       },
       approval:        d.latest_approval || null,
+      lastUpdatedOn:   d.last_updated_on || '',
     };
-  }
+  }, [t]);
 
   useEffect(() => {
     if (activePage !== 'dashboard') return;
     if (!localStorage.getItem('token')) return;
+    // Standard fetch-on-mount pattern (flip loading on, fetch, flip off in finally) —
+    // the react-hooks/set-state-in-effect rule flags any sync setState in an effect,
+    // but this is the documented React pattern for kicking off a data fetch.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMyDocsLoading(true);
     setMyDocsError('');
     Promise.all([getMyDocuments(), getLinkedDocuments().catch(() => ({ data: [] }))])
@@ -1208,7 +1202,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         setMyDocsError(typeof detail === 'string' ? detail : t('toasts.failedToLoadDocuments'));
       })
       .finally(() => setMyDocsLoading(false));
-  }, [activePage]);
+  }, [activePage, mapApiDoc, t]);
 
   // Edit Document page: pick a type → table of that type's docs → edit form for one doc
   const [editType, setEditType]             = useState(null);
@@ -1216,25 +1210,41 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const [editListLoading, setEditListLoading] = useState(false);
   const [editListError, setEditListError]   = useState('');
   const [viewingEditDoc, setViewingEditDoc] = useState(null); // doc open in DocViewModal (read-only "View")
-  const [editingDoc, setEditingDoc]   = useState(null);
-  const [editForm, setEditForm]       = useState(null);
-  const [editSaving, setEditSaving]   = useState(false);
-  const [editError, setEditError]     = useState('');
+  const [editingDoc, setEditingDoc]     = useState(null);
+  const [editForm, setEditForm]         = useState(null);
+  const [editSaving, setEditSaving]     = useState(false);
+  const [editError, setEditError]       = useState('');
+  const [editFileSelected, setEditFileSelected]   = useState(null);
+  const [editFileUploading, setEditFileUploading] = useState(false);
+  const editFileInputRef = useRef(null);
+  const [editBlobUrl, setEditBlobUrl]         = useState(null);
+  const [editPdfDoc, setEditPdfDoc]           = useState(null);
+  const [editCurrentPage, setEditCurrentPage] = useState(1);
+  const [editTotalPages, setEditTotalPages]   = useState(1);
+  const [editZoom, setEditZoom]               = useState(100);
+  const [editRotation, setEditRotation]       = useState(0);
+  const [editDocxHtml, setEditDocxHtml]       = useState(null);
+  const editCanvasRefs   = useRef([]);
+  const editContainerRef = useRef(null);
+  const editSuppressRef  = useRef(false);
+  const editDocxViewRef  = useRef(null);
+  const [editFileRef, setEditFileRef] = useState(null); // file_ref from pre-upload on file select
+  const editManualBlobRef = useRef(null); // blob URL created from a locally selected file (needs manual revoke)
+  const [editDescPreview, setEditDescPreview] = useState(false);
+  const [editFormOriginal, setEditFormOriginal] = useState(null);
 
   // Loads (or reloads) the current type's document table from the API.
   // Shared by the effect below and by saveEditDoc so the table reflects an edit immediately.
-  function refreshEditList() {
+  const refreshEditList = useCallback(() => {
     if (!editType) return;
-    const typeId = typesData.find(d => d.name === editType)?.id;
-    if (!typeId) { setEditList([]); return () => {}; }
     let cancelled = false;
     setEditListLoading(true);
     setEditListError('');
-    getMyDepartmentDocsByType(typeId, null, 0, 200)
+    getMyDocuments()
       .then(res => {
         if (cancelled) return;
-        const list = res.data?.documents || res.data?.results || (Array.isArray(res.data) ? res.data : []);
-        setEditList(list.map(mapApiDoc));
+        const all = (res.data?.documents || []).map(mapApiDoc);
+        setEditList(all.filter(d => d.type === editType));
       })
       .catch(err => {
         if (cancelled) return;
@@ -1244,36 +1254,59 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       })
       .finally(() => { if (!cancelled) setEditListLoading(false); });
     return () => { cancelled = true; };
-  }
+  }, [editType, mapApiDoc, t]);
 
   // Fetch the documents of the chosen type in the uploader's department once a type is picked
   useEffect(() => {
     if (activePage !== 'editdocument' || !editType) return;
     if (!localStorage.getItem('token')) return;
+    // refreshEditList flips a loading flag on synchronously before fetching — same
+    // documented fetch-on-mount pattern as above, shared with its manual "refresh" callers.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     return refreshEditList();
-  }, [activePage, editType, typesData]);
+  }, [activePage, editType, refreshEditList]);
 
   function openEditDoc(doc) {
     setEditingDoc(doc);
-    setEditForm({
+    const initialForm = {
       document_name:     doc.title || '',
       reference_number:  doc.referenceNumber || '',
       issue_date:        doc.enactmentDate || '',
       effective_from:    doc.effectiveFrom || '',
+      last_updated_on:   doc.lastUpdatedOn || '',
       gazette_reference: doc.gazette || '',
       legal_authority:   doc.authority || '',
       short_title:       doc.shortTitle || '',
       version_no:        doc.version || '1.0',
       description:       doc.desc || '',
       typeFields:        { ...(doc.typeFields || {}) },
-    });
+    };
+    setEditForm(initialForm);
+    setEditFormOriginal(initialForm);
     setEditError('');
+    setEditFileSelected(null);
+    setEditDescPreview(false);
   }
 
   function closeEditDoc() {
     setEditingDoc(null);
     setEditForm(null);
     setEditError('');
+    setEditFileSelected(null);
+    setEditFileRef(null);
+    setEditBlobUrl(null);
+    setEditPdfDoc(null);
+    setEditCurrentPage(1);
+    setEditTotalPages(1);
+    setEditZoom(100);
+    setEditRotation(0);
+    setEditDocxHtml(null);
+    if (editManualBlobRef.current) {
+      URL.revokeObjectURL(editManualBlobRef.current);
+      editManualBlobRef.current = null;
+    }
+    setEditDescPreview(false);
+    setEditFormOriginal(null);
   }
 
   async function saveEditDoc() {
@@ -1281,45 +1314,85 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     setEditSaving(true);
     setEditError('');
     const tf = editForm.typeFields || {};
-    // Prefer the id the document already carries from the API (reliable); only fall back to
-    // matching on the display name if that's somehow missing (e.g. an older cached row).
     const typeId = editingDoc.docTypeId ?? typesData.find(d => d.name === editingDoc.type)?.id ?? null;
-    const payload = {
-      document_type_id:      typeId,
-      document_name:         editForm.document_name,
-      reference_number:      editForm.reference_number,
-      issue_date:             editForm.issue_date || null,
-      effective_from:         editForm.effective_from || null,
-      gazette_reference:      editForm.gazette_reference,
-      legal_authority:        editForm.legal_authority,
-      short_title:            editForm.short_title,
-      version_no:             editForm.version_no || '1.0',
-      description:            editForm.description,
-      valid_until:            tf.validity || null,
-      sector_domain:          tf.sector || '',
-      implementing_agency:    tf.implementingAgency || '',
-      next_review_date:       tf.reviewDate || null,
-      rule_making_authority:  tf.ruleAuthority || '',
-      act_year:               tf.actYear ? parseInt(tf.actYear, 10) || null : null,
-      long_title:             tf.longTitle || '',
-      regional_title:         tf.regionalTitle || '',
-      notification_no:        tf.notificationNo || '',
-      act_code:                tf.actCode || '',
-      so_reason:               tf.soReason || '',
-      no_of_rules:             tf.noOfRules ? parseInt(tf.noOfRules, 10) || null : null,
-      no_of_notifications:     tf.noOfNotifications ? parseInt(tf.noOfNotifications, 10) || null : null,
-      no_of_regulations:       tf.noOfRegulations ? parseInt(tf.noOfRegulations, 10) || null : null,
-      no_of_circulars:         tf.noOfCirculars ? parseInt(tf.noOfCirculars, 10) || null : null,
-      no_of_statutes:          tf.noOfStatutes ? parseInt(tf.noOfStatutes, 10) || null : null,
-      no_of_ordinances:        tf.noOfOrdinances ? parseInt(tf.noOfOrdinances, 10) || null : null,
-      no_of_orders:            tf.noOfOrders ? parseInt(tf.noOfOrders, 10) || null : null,
-      keywords:                tf.keywords || '',
-      is_repealed:             !!tf.repealed,
-      tag_ids:                 [],
-    };
+    let description = editForm.description;
     try {
+      // 1. If a new file was chosen — use the pre-uploaded ref (from handleEditFileSelect),
+      //    or upload now if the pre-upload hasn't finished yet.
+      if (editFileSelected) {
+        let file_ref = editFileRef;
+        if (!file_ref) {
+          setEditFileUploading(true);
+          const fd = new FormData();
+          fd.append('file', editFileSelected);
+          const uploadRes = await uploadPdfFile(fd);
+          file_ref = uploadRes.data.file_ref;
+          setEditFileUploading(false);
+          if (uploadRes.data.summary) {
+            description = uploadRes.data.summary;
+            setEditForm(f => ({ ...f, description: uploadRes.data.summary }));
+          }
+        } else {
+          description = editForm.description; // already updated by handleEditFileSelect
+        }
+        // Rejected docs are always resubmitted when file is replaced
+        const resubmit = editingDoc.status === 'rejected';
+        const replaceRes = await replaceDocumentFile(editingDoc.id, file_ref, resubmit);
+        const updatedDoc = mapApiDoc(replaceRes.data);
+        // Old annotation positions don't apply to the new file — clear them immediately
+        // in local state so DocViewModal never renders stale highlights, even before
+        // the DB-level patch has had a chance to propagate through getMyDocuments().
+        if (updatedDoc.approval) {
+          updatedDoc.approval = { ...updatedDoc.approval, annotations_json: null };
+        }
+        setUploads(prev => prev.map(d => d.id === updatedDoc.id ? updatedDoc : d));
+      }
+
+      // 2. Save metadata (always, even if only file changed — keeps description in sync)
+      const payload = {
+        document_type_id:      typeId,
+        document_name:         editForm.document_name,
+        reference_number:      editForm.reference_number,
+        issue_date:             editForm.issue_date || null,
+        effective_from:         editForm.effective_from || null,
+        last_updated_on:        editForm.last_updated_on || null,
+        gazette_reference:      editForm.gazette_reference,
+        legal_authority:        editForm.legal_authority,
+        short_title:            editForm.short_title,
+        version_no:             editForm.version_no || '1.0',
+        description,
+        valid_until:            tf.validity || null,
+        sector_domain:          tf.sector || '',
+        implementing_agency:    tf.implementingAgency || '',
+        next_review_date:       tf.reviewDate || null,
+        rule_making_authority:  tf.ruleAuthority || '',
+        act_year:               tf.actYear ? parseInt(tf.actYear, 10) || null : null,
+        long_title:             tf.longTitle || '',
+        regional_title:         tf.regionalTitle || '',
+        notification_no:        tf.notificationNo || '',
+        act_code:               tf.actCode || '',
+        so_reason:              tf.soReason || '',
+        no_of_rules:            tf.noOfRules ? parseInt(tf.noOfRules, 10) || null : null,
+        no_of_notifications:    tf.noOfNotifications ? parseInt(tf.noOfNotifications, 10) || null : null,
+        no_of_regulations:      tf.noOfRegulations ? parseInt(tf.noOfRegulations, 10) || null : null,
+        no_of_circulars:        tf.noOfCirculars ? parseInt(tf.noOfCirculars, 10) || null : null,
+        no_of_statutes:         tf.noOfStatutes ? parseInt(tf.noOfStatutes, 10) || null : null,
+        no_of_ordinances:       tf.noOfOrdinances ? parseInt(tf.noOfOrdinances, 10) || null : null,
+        no_of_orders:           tf.noOfOrders ? parseInt(tf.noOfOrders, 10) || null : null,
+        keywords:               tf.keywords || '',
+        tag_ids:                [],
+        resubmit:               !editFileSelected && editingDoc.status === 'rejected',
+      };
       await updatePdfMetadata(editingDoc.id, payload);
-      showToast('success', t('editDocument.updateSuccess', { name: editForm.document_name }));
+      if (!editFileSelected && editingDoc.status === 'rejected') {
+        setUploads(prev => prev.map(d => d.id === editingDoc.id ? { ...d, status: 'pending' } : d));
+      }
+      const successMsg = editFileSelected && editingDoc.status === 'rejected'
+        ? t('toasts.fileReplacedAndResubmitted')
+        : editFileSelected
+          ? t('toasts.fileReplaced')
+          : t('editDocument.updateSuccess', { name: editForm.document_name });
+      showToast('success', successMsg);
       closeEditDoc();
       refreshEditList();
       setMyDocsLoading(true);
@@ -1328,18 +1401,131 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         .catch(() => {})
         .finally(() => setMyDocsLoading(false));
     } catch (err) {
+      setEditFileUploading(false);
       const detail = err.response?.data?.detail;
       let message = t('editDocument.updateFailed');
-      if (typeof detail === 'string') {
-        message = detail;
-      } else if (Array.isArray(detail)) {
-        // FastAPI validation errors: [{ loc: ['body','field'], msg: '...' }, ...]
-        message = detail.map(e => `${(e.loc || []).slice(1).join('.')}: ${e.msg}`).join('; ') || message;
-      }
+      if (typeof detail === 'string') message = detail;
+      else if (Array.isArray(detail)) message = detail.map(e => `${(e.loc || []).slice(1).join('.')}: ${e.msg}`).join('; ') || message;
       setEditError(message);
     } finally {
       setEditSaving(false);
     }
+  }
+
+  // PDF viewer for the full-screen edit modal
+  useEffect(() => {
+    if (!editingDoc) return;
+    let url = null;
+    getPdfFile(editingDoc.id)
+      .then(res => {
+        const ct = (res.headers['content-type'] || '').toLowerCase();
+        if (ct.includes('wordprocessingml') || ct.includes('officedocument')) {
+          return mammoth.convertToHtml({ arrayBuffer: res.data }).then(r => setEditDocxHtml(r.value));
+        }
+        const blob = new Blob([res.data], { type: 'application/pdf' });
+        url = URL.createObjectURL(blob);
+        setEditBlobUrl(url);
+      })
+      .catch(() => {});
+    return () => { if (url) URL.revokeObjectURL(url); };
+  }, [editingDoc?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!editBlobUrl) return;
+    let cancelled = false;
+    pdfjsLib.getDocument({ url: editBlobUrl }).promise
+      .then(pdf => { if (!cancelled) { setEditPdfDoc(pdf); setEditTotalPages(pdf.numPages); } })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [editBlobUrl]);
+
+  useEffect(() => {
+    if (!editPdfDoc) return;
+    let cancelled = false;
+    const scale = (editZoom / 100) * 1.5;
+    editCanvasRefs.current = editCanvasRefs.current.slice(0, editPdfDoc.numPages);
+    for (let i = 0; i < editPdfDoc.numPages; i++) {
+      const canvas = editCanvasRefs.current[i];
+      if (!canvas) continue;
+      editPdfDoc.getPage(i + 1).then(page => {
+        if (cancelled) return;
+        const vp = page.getViewport({ scale, rotation: editRotation });
+        canvas.width = vp.width; canvas.height = vp.height;
+        page.render({ canvasContext: canvas.getContext('2d'), viewport: vp });
+      });
+    }
+    return () => { cancelled = true; };
+  }, [editPdfDoc, editZoom, editRotation]);
+
+  useEffect(() => {
+    if (!editDocxViewRef.current || !editDocxHtml) return;
+    editDocxViewRef.current.innerHTML = editDocxHtml;
+  }, [editDocxHtml]);
+
+  function scrollEditPage(page) {
+    const clamped = Math.max(1, Math.min(editTotalPages, page));
+    const canvas = editCanvasRefs.current[clamped - 1];
+    if (!canvas || !editContainerRef.current) { setEditCurrentPage(clamped); return; }
+    editSuppressRef.current = true;
+    const top = canvas.parentElement?.offsetTop ?? canvas.offsetTop;
+    editContainerRef.current.scrollTo({ top: top - 8, behavior: 'smooth' });
+    setEditCurrentPage(clamped);
+    setTimeout(() => { editSuppressRef.current = false; }, 700);
+  }
+
+  function handleEditScroll() {
+    if (editSuppressRef.current || !editContainerRef.current) return;
+    const st = editContainerRef.current.scrollTop;
+    const ch = editContainerRef.current.clientHeight;
+    let best = 0, bestVis = -1;
+    editCanvasRefs.current.forEach((canvas, i) => {
+      if (!canvas) return;
+      const top = canvas.parentElement?.offsetTop ?? canvas.offsetTop;
+      const vis = Math.max(0, Math.min(top + canvas.offsetHeight, st + ch) - Math.max(top, st));
+      if (vis > bestVis) { bestVis = vis; best = i; }
+    });
+    if (best + 1 !== editCurrentPage) setEditCurrentPage(best + 1);
+  }
+
+  async function handleEditFileSelect(file) {
+    setEditFileSelected(file);
+    setEditFileRef(null);
+
+    // Immediately show the selected file in the left panel
+    if (editManualBlobRef.current) {
+      URL.revokeObjectURL(editManualBlobRef.current);
+      editManualBlobRef.current = null;
+    }
+    setEditPdfDoc(null);
+    setEditCurrentPage(1);
+    setEditTotalPages(1);
+    setEditDocxHtml(null);
+
+    const isDocx = file.type.includes('wordprocessingml') || file.name.toLowerCase().endsWith('.docx');
+    if (isDocx) {
+      try {
+        const buf = await file.arrayBuffer();
+        const { value } = await mammoth.convertToHtml({ arrayBuffer: buf });
+        setEditDocxHtml(value);
+      } catch { /* show nothing on failure */ }
+    } else {
+      const url = URL.createObjectURL(file);
+      editManualBlobRef.current = url;
+      setEditBlobUrl(url);
+    }
+
+    // Pre-upload to get description/summary
+    setEditFileUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await uploadPdfFile(fd);
+      setEditFileRef(res.data.file_ref);
+      if (res.data.summary) {
+        setEditForm(f => ({ ...f, description: res.data.summary }));
+      }
+    } catch { /* non-fatal — save will retry the upload */ }
+    finally { setEditFileUploading(false); }
   }
 
   const [files, setFiles]           = useState([]);
@@ -1358,7 +1544,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const [subDocActsLoading, setSubDocActsLoading] = useState(false);
   // approvals[partType] = { status, submitted_at, reviewed_at, comments, ... } | undefined
   const [subDocApprovals, setSubDocApprovals] = useState({});
-  const [subDocSubmitting, setSubDocSubmitting] = useState(false);
   const [secHasChapters, setSecHasChapters] = useState(null); // null = not answered yet
   const [secChapters, setSecChapters]       = useState([]); // [{ name, sections: [{name,description},...] }]
   const [activeChapterIdx, setActiveChapterIdx] = useState(-1); // -1 = all collapsed (overview); set to index to expand
@@ -1377,23 +1562,16 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   // upload isn't possible.
   const [sectionsBaseline, setSectionsBaseline] = useState(() => sectionsSignature(null, [], []));
   const [entriesBaseline, setEntriesBaseline] = useState({}); // { [tab]: signature string }; a missing key falls back to entriesSignature([])
-  const [form, setForm]             = useState({ act: '', dept: user?.dept || '', type: '', version: '1.0', desc: '', enactmentDate: '', parentAct: '', changeTypes: [] });
-  const [amendmentProvisions, setAmendmentProvisions] = useState([]);
+  const [form, setForm]             = useState({ act: '', dept: user?.dept || '', type: '', version: '1.0', desc: '', enactmentDate: '', lastUpdatedOn: '', parentAct: '', changeTypes: [] });
   const [typeFields, setTypeFields]  = useState({});
   const [hierarchy, setHierarchy]   = useState({ act: '', actId: null, chapter: '', section: '', subsection: '' });
-  const [rejected, setRejected]     = useState([]);
   const [oversizedFiles, setOversizedFiles] = useState([]); // [{ name, size }] — files rejected for exceeding MAX_UPLOAD_SIZE_BYTES
   const [versionModal, setVersionModal] = useState(null);
   const [conflictModal, setConflictModal] = useState(null); // { existingDoc, pendingDocs, pendingRelations }
   const [duplicateModal, setDuplicateModal] = useState(null); // { matches: DuplicateCheckItem[] }
-  const [linkedDocs, setLinkedDocs] = useState([]);
   const [linkingId, setLinkingId] = useState(null); // pdf_id being linked (loading state)
   const [viewingLinkedDoc, setViewingLinkedDoc] = useState(null); // linked doc open in DocViewModal
   const [viewingActChildDoc, setViewingActChildDoc] = useState(null); // existing-under-this-Act doc open in DocViewModal
-
-  // Correction request state
-  const [correctionModal, setCorrectionModal] = useState(null); // { doc }
-  const [correctionReason, setCorrectionReason] = useState('');
 
   // Relationship state
   const [relations, setRelations]     = useState([]);
@@ -1418,8 +1596,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const [relDocSuggestions, setRelDocSuggestions] = useState([]); // real API results for "Link to Document", keyed by whichever Target Document Type is selected
   const [relDocSearching,   setRelDocSearching]   = useState(false);
   const relDocSearchTimer = useRef(null);
-  const [parentActSearch, setParentActSearch] = useState('');
-  const [showParentActDrop, setShowParentActDrop] = useState(false);
   const [drawerType,      setDrawerType]      = useState(null); // null | 'hierarchy' | 'relationship'
   const [drawerHierarchy, setDrawerHierarchy] = useState({ act: '', actId: null, chapter: '', section: '', subsection: '' });
 
@@ -1557,16 +1733,32 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const [tableSearch, setTableSearch] = useState('');
   const [filterType,   setFilterType]   = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
   const [sortCol,     setSortCol]     = useState('uploadedAt');
   const [sortDir,     setSortDir]     = useState('desc');
 
-  // The Upload and Edit flows reset to their starting state on every fresh visit —
-  // navigating there from the dashboard never resumes wherever it was left mid-session.
-  useEffect(() => {
-    if (activePage === 'upload') resetUploadForm();
-  }, [activePage]);
+  // Full reset of the upload wizard back to its starting (no type chosen) state.
+  function resetUploadForm() {
+    setForm({ act: '', dept: user?.dept || '', type: '', version: '1.0', desc: '', enactmentDate: '', parentAct: '', changeTypes: [] });
+    setFiles([]); setFileRefs([]); setFileMeta({});
+    setRelations([]);
+    setHierarchy({ act: '', chapter: '', section: '', subsection: '' });
+    setLegalAuthorities([{ act: '', sections: [''] }]);
+    setRelNote('');
+    setTypeFields({});
+    setUploadStep(null);
+    setUploadError('');
+  }
 
-  useEffect(() => {
+  // The Upload, Dashboard and Edit tabs reset to their starting state on every fresh
+  // visit — navigating there never resumes wherever it was left mid-session. Adjusted
+  // during render (React's "you might not need an effect" pattern, also used in
+  // Layout.jsx/App.jsx) rather than in an effect, since these are plain resets with
+  // no I/O or subscriptions.
+  const [prevActivePage, setPrevActivePage] = useState(activePage);
+  if (activePage !== prevActivePage) {
+    setPrevActivePage(activePage);
+    if (activePage === 'upload') resetUploadForm();
     if (activePage === 'dashboard') {
       setTableSearch('');
       setFilterType('');
@@ -1578,11 +1770,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       setBulkEditOpen(false);
       setBulkFields({ dept: '', type: '', year: '' });
     }
-  }, [activePage]);
-
-  useEffect(() => {
     if (activePage === 'editdocument') setEditType(null);
-  }, [activePage]);
+  }
 
   const inputRef     = useRef();
   const uploadsTableRef = useRef();
@@ -1618,6 +1807,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   useEffect(() => {
     if (!primaryActId || form.type === 'Act') return;
     let cancelled = false;
+    // Same documented fetch-on-mount pattern (see the dashboard effect above).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setActChildrenLoading(true);
     getActChildren(primaryActId)
       .then(res => { if (!cancelled) setActChildren(res.data); })
@@ -1631,6 +1822,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   useEffect(() => {
     if (form.type !== 'Act') return;
     let cancelled = false;
+    // Same documented fetch-on-mount pattern (see the dashboard effect above).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDepartmentActsLoading(true);
     getMyDepartmentActs()
       .then(res => { if (!cancelled) setDepartmentActs(res.data?.documents || res.data?.results || (Array.isArray(res.data) ? res.data : [])); })
@@ -1644,6 +1837,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   useEffect(() => {
     if (activePage !== 'adddocuments') return;
     let cancelled = false;
+    // Same documented fetch-on-mount pattern (see the dashboard effect above).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSubDocActsLoading(true);
     getMyDepartmentActs()
       .then(res => { if (!cancelled) setSubDocActsList(res.data?.documents || res.data?.results || (Array.isArray(res.data) ? res.data : [])); })
@@ -1661,18 +1856,24 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   }, [activePage, subDocTab, subDocAct]);
 
   // Switching tabs (schedule → annexure, etc.) shouldn't leave an entry from the previous
-  // tab's list expanded — start each tab's entries collapsed.
-  useEffect(() => {
+  // tab's list expanded — start each tab's entries collapsed. Adjusted during render
+  // rather than in an effect, since it's a plain reset with no I/O.
+  const [prevSubDocTab, setPrevSubDocTab] = useState(subDocTab);
+  if (subDocTab !== prevSubDocTab) {
+    setPrevSubDocTab(subDocTab);
     setActiveEntryIdx(-1);
     setEntryPreviewIdx(null);
-  }, [subDocTab]);
+  }
 
   // Load existing entries from DB when act or tab changes.
   // Skips if this (actId, tab) pair was already loaded — preserves unsaved additions across tab switches.
   useEffect(() => {
     if (!subDocAct || !subDocTab) return;
     if (subDocLoadedFor.actId === subDocAct && subDocLoadedFor.tab === subDocTab) return;
+    // loadActPartSections/Entries eventually call setState once their fetch resolves —
+    // same documented fetch-on-mount pattern as the other effects above.
     const loader = subDocTab === 'sections'
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       ? loadActPartSections(subDocAct)
       : loadActPartEntries(subDocAct, subDocTab);
     loader.then(() => setSubDocLoadedFor({ actId: subDocAct, tab: subDocTab }));
@@ -1686,13 +1887,17 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   }
 
   // Switching (or adding) a chapter should default to its own last section being the open one,
-  // not whatever section index was active in the previously-open chapter.
-  useEffect(() => {
+  // not whatever section index was active in the previously-open chapter. Adjusted during
+  // render rather than in an effect — intentionally keyed on activePage/activeChapterIdx only,
+  // not secChapters, so editing chapter content doesn't reset which section is open.
+  const chapterKey = `${activePage}:${activeChapterIdx}`;
+  const [prevChapterKey, setPrevChapterKey] = useState(chapterKey);
+  if (chapterKey !== prevChapterKey) {
+    setPrevChapterKey(chapterKey);
     if (activePage === 'adddocuments') {
       setActiveSectionIdx(Math.max(0, (secChapters[activeChapterIdx]?.sections.length || 1) - 1));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activePage, activeChapterIdx]);
+  }
 
   useEffect(() => {
     if (activePage === 'adddocuments' && secHasChapters === true) scrollAddDocumentsToEnd();
@@ -1752,13 +1957,10 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
 
     return [...found].sort();
   }
-  const parentActFiltered = approvedDocs
-    .filter(d => d.title.toLowerCase().includes(parentActSearch.toLowerCase()))
-    .slice(0, 8);
-
   async function addFiles(fileList) {
     const arr = Array.from(fileList);
-    setRejected(arr.filter(f => !isAccepted(f)).map(f => f.name));
+    const badFiles = arr.filter(f => !isAccepted(f));
+    if (badFiles.length) showToast('error', t('wizard.unsupportedFileToast', { name: badFiles.map(f => f.name).join(', ') }));
     const typeOk = arr.filter(f => isAccepted(f));
     setOversizedFiles(typeOk.filter(f => !isUnderSizeLimit(f)).map(f => ({ name: f.name, size: f.size })));
     const accepted = typeOk.filter(f => isUnderSizeLimit(f));
@@ -1849,7 +2051,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     setForm({ act:'',dept:user?.dept||'',type:'',version:'1.0',desc:'',enactmentDate:'',parentAct:'',changeTypes:[] });
     setHierarchy({ act:'', actId: null, chapter:'',section:'',subsection:'' });
     setLegalAuthorities([{ act: '', sections: [''] }]);
-    setAmendmentProvisions([]); setParentActSearch(''); setTypeFields({});
+    setTypeFields({});
 
     // Move newly uploaded docs from DRAFT to PENDING (queued for approver review)
     setTimeout(() => {
@@ -1859,21 +2061,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     }, 1800);
 
     onAuditLog?.(`Uploaded ${docsWithWorkflow.length} document(s): ${docsWithWorkflow.map(d => d.title).join(', ')}`);
-  }
-
-  // Full reset of the upload wizard back to its starting (no type chosen) state.
-  function resetUploadForm() {
-    setForm({ act: '', dept: user?.dept || '', type: '', version: '1.0', desc: '', enactmentDate: '', parentAct: '', changeTypes: [] });
-    setFiles([]); setFileRefs([]); setFileMeta({});
-    setRelations([]);
-    setHierarchy({ act: '', chapter: '', section: '', subsection: '' });
-    setLegalAuthorities([{ act: '', sections: [''] }]);
-    setAmendmentProvisions([]);
-    setParentActSearch('');
-    setRelNote('');
-    setTypeFields({});
-    setUploadStep(null);
-    setUploadError('');
   }
 
   // Runs the OCR eligibility check (POST /pdf/upload-file) for any files not yet checked.
@@ -2033,6 +2220,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             document_type_id:      typeObj?.id ?? null,
             document_name:         fileMeta[f.name]?.documentName || f.name.replace(/\.(pdf|docx?)$/i, ''),
             issue_date:            form.enactmentDate || null,
+            last_updated_on:       form.lastUpdatedOn || null,
             reference_number:      referenceNumber,
             effective_from:        effectiveFrom,
             gazette_reference:     typeFields.gazetteRef || '',
@@ -2059,7 +2247,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             no_of_ordinances:      typeFields.noOfOrdinances ? parseInt(typeFields.noOfOrdinances, 10) || null : null,
             no_of_orders:          typeFields.noOfOrder ? parseInt(typeFields.noOfOrder, 10) || null : null,
             keywords:              typeFields.keywords || '',
-            is_repealed:           !!typeFields.repealed,
             tag_ids:               [],
             relationships:         relationshipsPayload,
             description:           (() => {
@@ -2099,6 +2286,10 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         : { text: '', numPages: null, pageTexts: [], pageWords: [] };
 
       newDocs.push({
+        // This runs inside handleSubmit, a form-submit event handler — not render — so a
+        // non-deterministic temp id is fine here. The react-hooks/purity rule can't see
+        // that distinction from this nested closure and flags it as if it ran during render.
+        // eslint-disable-next-line react-hooks/purity
         id:            apiDoc?.id ?? (Date.now() + Math.random()),
         title:         apiDoc?.document_name || fileMeta[f.name]?.documentName || f.name.replace(/\.(pdf|docx?)$/i, ''),
         type:          typeObj?.name || form.type || 'Act',
@@ -2177,7 +2368,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       const res = await checkDuplicateDocument(docName, typeObj.id);
       const matches = Array.isArray(res.data) ? res.data : [];
       if (matches.length > 0) setDuplicateModal({ matches });
-    } catch (_) { /* silent — duplicate check is advisory */ }
+    } catch { /* silent — duplicate check is advisory */ }
   }
 
   // Called when user clicks "Link to My Department" in the duplicate modal
@@ -2188,7 +2379,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       setDuplicateModal(null);
       // Refresh linked docs
       getLinkedDocuments().then(r => setLinkedDocs(Array.isArray(r.data) ? r.data : [])).catch(() => {});
-    } catch (_) {}
+    } catch { /* link failed — surfaced via linkingId clearing without a success state */ }
     setLinkingId(null);
   }
 
@@ -2245,7 +2436,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     const approved  = uploads.filter(d => d.status === 'approved').length;
     const pending   = uploads.filter(d => d.status === 'pending').length;
     const rejected  = uploads.filter(d => d.status === 'rejected').length;
-    const published = uploads.filter(d => d.workflowStatus === WORKFLOW_STATUS.PUBLISHED).length;
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
@@ -2388,6 +2578,377 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         {/* Full-screen document viewer */}
         {viewDoc && <DocViewModal doc={viewDoc} onClose={() => setViewDoc(null)} />}
 
+        {/* Full-screen edit modal */}
+        {editingDoc && editForm && (() => {
+          const etypeColor = TYPE_CARD_COLORS[editingDoc.type] || { accent: '#94a3b8', bg: 'rgba(148,163,184,.12)', text: '#64748b' };
+          const estatusAccent = editingDoc.status === 'approved' ? '#16a34a' : editingDoc.status === 'rejected' ? '#dc3545' : '#ffc107';
+          const estatusBg = editingDoc.status === 'approved' ? 'rgba(25,135,84,.1)' : editingDoc.status === 'rejected' ? 'rgba(220,53,69,.1)' : 'rgba(255,193,7,.1)';
+          const EStatusIcon = editingDoc.status === 'approved' ? CheckCircle : editingDoc.status === 'rejected' ? XCircle : Clock;
+          const hasEditChanges = editFileSelected !== null || JSON.stringify(editForm) !== JSON.stringify(editFormOriginal);
+          const saveBtnDisabled = editSaving || editFileUploading || !(editForm?.document_name || '').trim() || !hasEditChanges;
+          const eIconBtn = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.15)', borderRadius: 7, width: 32, height: 32, cursor: 'pointer', color: 'rgba(255,255,255,.85)' };
+          return (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 1500, display: 'flex', flexDirection: 'column', background: 'var(--surface-card)' }}>
+              <style>{`
+                @media (max-width: 1024px) {
+                  .ud-edit-grid { grid-template-columns: 1fr !important; overflow-y: auto !important; }
+                  .ud-edit-pane { max-height: 55vh !important; }
+                }
+                @media (max-width: 640px) {
+                  .ud-edit-topbar { padding: 10px 14px !important; gap: 8px !important; }
+                  .ud-edit-topbar .ud-edit-titlebox { min-width: 140px !important; }
+                  .ud-edit-topbar .ud-edit-actions-btn { flex: 1 1 auto !important; justify-content: center !important; }
+                  .ud-edit-pane { max-height: 42vh !important; }
+                }
+                @keyframes editBarSlide {
+                  0%   { transform: translateX(-100%); }
+                  100% { transform: translateX(350%); }
+                }
+              `}</style>
+
+              {/* Top bar — wraps onto multiple lines on narrow screens (title row, then status
+                  badge + actions) rather than overflowing, since it packs a title, a status
+                  badge, and two buttons that don't have room to share one line on mobile. */}
+              <div className="ud-edit-topbar" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 16, rowGap: 10, padding: '14px 24px', borderBottom: '1px solid var(--surface-border)', background: 'var(--surface-50)', flexShrink: 0, minHeight: 64 }}>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: etypeColor.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <FileText size={18} color={etypeColor.accent} />
+                </div>
+                <div className="ud-edit-titlebox" style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{editingDoc.title}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 20, background: etypeColor.bg, color: etypeColor.text || etypeColor.accent }}>{editingDoc.type}</span>
+                    <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)' }}>{editingDoc.dept}</span>
+                    <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: .7 }}>· {editingDoc.year}</span>
+                    {/* Version tag hidden until proper API mapping for versions is wired up — keep for future use.
+                    {editingDoc.version && <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: .7 }}>· v{editingDoc.version}</span>}
+                    */}
+                  </div>
+                </div>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px 6px 10px', borderRadius: 20, background: estatusBg, border: `1px solid ${estatusAccent}44`, flexShrink: 0 }}>
+                  <EStatusIcon size={13} color={estatusAccent} />
+                  <span style={{ fontSize: 11.5, fontWeight: 700, color: estatusAccent, fontFamily: 'var(--mono)', letterSpacing: '.04em' }}>
+                    {editingDoc.status === 'approved' ? 'APPROVED' : editingDoc.status === 'rejected' ? 'REJECTED' : 'PENDING'}
+                  </span>
+                </div>
+                <button type="button" className="ud-edit-actions-btn" onClick={closeEditDoc} disabled={editSaving}
+                  style={{ padding: '8px 18px', borderRadius: 9, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 13, fontWeight: 600, cursor: editSaving ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: editSaving ? .5 : 1, flexShrink: 0 }}>
+                  {t('common.cancel')}
+                </button>
+                <button type="button" className="ud-edit-actions-btn" onClick={saveEditDoc} disabled={saveBtnDisabled}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '8px 20px', borderRadius: 9, border: 'none', background: saveBtnDisabled ? 'rgba(33,74,171,.5)' : 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: saveBtnDisabled ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+                  {editFileUploading ? <RotateCcw size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={14} />}
+                  {editSaving ? t('editDocument.saving') : t('editDocument.saveChanges')}
+                </button>
+              </div>
+
+              {/* 2-panel body */}
+              <div className="ud-edit-grid" style={{ flex: 1, display: 'grid', gridTemplateColumns: '57% 43%', overflow: 'hidden' }}>
+
+                {/* Left: PDF viewer */}
+                <div className="ud-edit-pane" style={{ borderRight: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#3a3d40' }}>
+                  <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', rowGap: 8, background: '#2d2f31', flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,.08)' }}>
+                    <Eye size={14} color="rgba(255,255,255,.7)" />
+                    <span style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(255,255,255,.85)' }}>{editDocxHtml ? 'Document Preview' : 'Original PDF'}</span>
+                    <span style={{ flex: 1 }} />
+                    {!editDocxHtml && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,.06)', borderRadius: 8, padding: '3px 6px', border: '1px solid rgba(255,255,255,.1)' }}>
+                        <button onClick={() => setEditZoom(z => Math.max(70, z - 10))} style={{ ...eIconBtn, width: 28, height: 28, background: 'transparent', border: 'none' }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.1)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                          <ZoomOut size={13} />
+                        </button>
+                        <span style={{ fontSize: 11.5, fontFamily: 'var(--mono)', color: 'rgba(255,255,255,.75)', minWidth: 38, textAlign: 'center', userSelect: 'none' }}>{editZoom}%</span>
+                        <button onClick={() => setEditZoom(z => Math.min(150, z + 10))} style={{ ...eIconBtn, width: 28, height: 28, background: 'transparent', border: 'none' }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.1)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                          <ZoomIn size={13} />
+                        </button>
+                      </div>
+                    )}
+                    {!editDocxHtml && (
+                      <button onClick={() => setEditRotation(r => (r + 90) % 360)} style={eIconBtn}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.15)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,.08)'}>
+                        <RotateCw size={14} />
+                      </button>
+                    )}
+                    {editBlobUrl && !editDocxHtml && (
+                      <a href={editBlobUrl} target="_blank" rel="noreferrer"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 7, background: 'rgba(33,74,171,.25)', border: '1px solid rgba(33,74,171,.4)', color: '#93c5fd', textDecoration: 'none', fontSize: 11.5, fontWeight: 600, fontFamily: 'var(--font)' }}>
+                        <ExternalLink size={12} /> Open
+                      </a>
+                    )}
+                  </div>
+
+                  {editDocxHtml ? (
+                    <div ref={editDocxViewRef}
+                      style={{ flex: 1, overflow: 'auto', background: 'white', padding: '40px 48px', color: '#1a1a1a', lineHeight: 1.8, fontSize: 13 }} />
+                  ) : (
+                    <div ref={editContainerRef} onScroll={handleEditScroll}
+                      style={{ flex: 1, overflow: 'auto', background: '#525659', padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center' }}>
+                      {!editBlobUrl && (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 14 }}>
+                          <div style={{ width: 36, height: 36, border: '3px solid rgba(255,255,255,.2)', borderTopColor: 'rgba(255,255,255,.8)', borderRadius: '50%', animation: 'spin .7s linear infinite' }} />
+                          <span style={{ fontSize: 13, fontFamily: 'var(--mono)', color: 'rgba(255,255,255,.6)', letterSpacing: '.04em' }}>Loading document…</span>
+                        </div>
+                      )}
+                      {editBlobUrl && Array.from({ length: editTotalPages }, (_, i) => (
+                        <div key={i} style={{ position: 'relative', display: 'inline-block' }}>
+                          <canvas ref={el => { editCanvasRefs.current[i] = el; }}
+                            style={{ display: 'block', borderRadius: 4, boxShadow: '0 4px 20px rgba(0,0,0,.6)', maxWidth: '100%' }} />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {!editDocxHtml && (
+                    <div style={{ padding: '10px 20px', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: 12, rowGap: 8, background: '#2d2f31', flexShrink: 0 }}>
+                      <button onClick={() => scrollEditPage(editCurrentPage - 1)} disabled={editCurrentPage === 1}
+                        style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px', borderRadius: 7, border: '1px solid rgba(255,255,255,.12)', background: editCurrentPage === 1 ? 'transparent' : 'rgba(255,255,255,.07)', color: editCurrentPage === 1 ? 'rgba(255,255,255,.25)' : 'rgba(255,255,255,.75)', fontSize: 12, fontWeight: 600, cursor: editCurrentPage === 1 ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)' }}>
+                        ← Prev
+                      </button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 14px', borderRadius: 7, background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)' }}>
+                        <span style={{ fontSize: 12.5, fontFamily: 'var(--mono)', color: 'rgba(255,255,255,.85)', fontWeight: 600 }}>{editCurrentPage}</span>
+                        <span style={{ fontSize: 11, color: 'rgba(255,255,255,.35)' }}>of</span>
+                        <span style={{ fontSize: 12.5, fontFamily: 'var(--mono)', color: 'rgba(255,255,255,.55)' }}>{editTotalPages}</span>
+                      </div>
+                      <button onClick={() => scrollEditPage(editCurrentPage + 1)} disabled={editCurrentPage === editTotalPages}
+                        style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px', borderRadius: 7, border: '1px solid rgba(255,255,255,.12)', background: editCurrentPage === editTotalPages ? 'transparent' : 'rgba(255,255,255,.07)', color: editCurrentPage === editTotalPages ? 'rgba(255,255,255,.25)' : 'rgba(255,255,255,.75)', fontSize: 12, fontWeight: 600, cursor: editCurrentPage === editTotalPages ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)' }}>
+                        Next →
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right: Editable form */}
+                <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--surface-card)' }}>
+                  <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, background: 'var(--surface-50)', flexShrink: 0 }}>
+                    <div style={{ width: 30, height: 30, borderRadius: 8, background: 'rgba(33,74,171,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <FileText size={14} color="var(--primary)" />
+                    </div>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)' }}>{t('editDocument.editHeading')}</span>
+                  </div>
+
+                  <div style={{ flex: 1, overflowY: 'auto', padding: '20px 20px 28px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    {editingDoc.status === 'rejected' && editingDoc.approval?.comments && (
+                      <div style={{ display: 'flex', gap: 10, padding: '10px 14px', borderRadius: 8, background: 'rgba(220,53,69,.06)', border: '1px solid rgba(220,53,69,.2)' }}>
+                        <XCircle size={14} color="#dc3545" style={{ flexShrink: 0, marginTop: 2 }} />
+                        <div>
+                          <div style={{ fontSize: 11.5, fontWeight: 700, color: '#dc3545', marginBottom: 3 }}>{t('replaceFileModal.rejectionReason')}</div>
+                          <div style={{ fontSize: 12.5, color: 'var(--text-color)', lineHeight: 1.5 }}>{editingDoc.approval.comments}</div>
+                        </div>
+                      </div>
+                    )}
+                    {editError && (
+                      <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(220,53,69,.08)', border: '1px solid rgba(220,53,69,.2)', color: '#dc2626', fontSize: 12.5 }}>
+                        {editError}
+                      </div>
+                    )}
+                    <div>
+                      <div style={{ ...LABEL, marginBottom: 6 }}>{t('editDocument.documentName')} <span style={{ color: '#dc3545' }}>*</span></div>
+                      <input value={editForm.document_name} onChange={e => setEditForm(f => ({ ...f, document_name: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                    </div>
+                    <div>
+                      <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.referenceNo')}</div>
+                      <input value={editForm.reference_number} onChange={e => setEditForm(f => ({ ...f, reference_number: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                    </div>
+                    <div className="ud-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                      <div>
+                        <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')}</div>
+                        <input type="date" value={editForm.issue_date || ''} onChange={e => setEditForm(f => ({ ...f, issue_date: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                      </div>
+                      <div>
+                        <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.effectiveFrom')}</div>
+                        <input type="date" value={editForm.effective_from || ''} onChange={e => setEditForm(f => ({ ...f, effective_from: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.lastUpdatedOn')}</div>
+                      <input type="date" value={editForm.last_updated_on || ''} onChange={e => setEditForm(f => ({ ...f, last_updated_on: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                    </div>
+                    <div>
+                      <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.gazetteReference')}</div>
+                      <input value={editForm.gazette_reference} onChange={e => setEditForm(f => ({ ...f, gazette_reference: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                    </div>
+                    {editingDoc.type !== 'Act' && (
+                    <div>
+                      <div style={{ ...LABEL, marginBottom: 6 }}>{t('docViewModal.legalAuthority')}</div>
+                      <input value={editForm.legal_authority} onChange={e => setEditForm(f => ({ ...f, legal_authority: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                    </div>
+                    )}
+                    <div className="ud-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                      <div>
+                        <div style={{ ...LABEL, marginBottom: 6 }}>{t('editDocument.shortTitle')}</div>
+                        <input value={editForm.short_title} onChange={e => setEditForm(f => ({ ...f, short_title: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                      </div>
+                      <div>
+                        <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.version')}</div>
+                        <input value={editForm.version_no} onChange={e => setEditForm(f => ({ ...f, version_no: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ ...LABEL, marginBottom: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span>{t('common.description')}</span>
+                        {/* Full-page preview/edit — same pattern as the Upload wizard's per-file
+                            description: the inline box is read-only, actual editing happens in
+                            the bigger modal so it's not cramped into a few rows. */}
+                        <button type="button" onClick={() => setEditDescPreview(true)}
+                          style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 10.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+                          <Eye size={11} /> {t('wizard.step3.previewButton')}
+                        </button>
+                      </div>
+                      <textarea value={editForm.description} readOnly
+                        onClick={() => setEditDescPreview(true)}
+                        rows={4}
+                        style={{ ...INPUT_BASE, resize: 'none', lineHeight: 1.6, cursor: 'pointer', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)' }} />
+                    </div>
+                    {(EDIT_TYPE_FIELD_KEYS[editingDoc.type] || []).length > 0 && (
+                      <div>
+                        <div style={{ ...LABEL, marginBottom: 10 }}>{t('editDocument.typeSpecificFields')}</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                          {EDIT_TYPE_FIELD_KEYS[editingDoc.type].map(({ key, inputType }) => (
+                            <div key={key}>
+                              {inputType === 'checkbox' ? (
+                                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--text-color)', cursor: 'pointer' }}>
+                                  <input type="checkbox" checked={!!editForm.typeFields[key]}
+                                    onChange={e => setEditForm(f => ({ ...f, typeFields: { ...f.typeFields, [key]: e.target.checked } }))} />
+                                  {fieldLabel(key)}
+                                </label>
+                              ) : (
+                                <>
+                                  <div style={{ ...LABEL, marginBottom: 6 }}>{fieldLabel(key)}</div>
+                                  <input type={inputType} value={editForm.typeFields[key] || ''}
+                                    onChange={e => setEditForm(f => ({ ...f, typeFields: { ...f.typeFields, [key]: e.target.value } }))}
+                                    style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                                </>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {(editingDoc.status === 'pending' || editingDoc.status === 'rejected') && (
+                      <div style={{ borderTop: '1px solid var(--surface-border)', paddingTop: 16 }}>
+                        <div style={{ ...LABEL, marginBottom: 8 }}>
+                          {t('replaceFileModal.title')} <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-color-secondary)', textTransform: 'none', letterSpacing: 0 }}>({t('common.optional', 'optional')})</span>
+                        </div>
+                        <input ref={editFileInputRef} type="file" accept=".pdf" style={{ display: 'none' }}
+                          onChange={e => {
+                            const f = e.target.files?.[0];
+                            // showToast reads a timer ref internally, but this whole callback only
+                            // runs on the input's change event — never during render — so that's safe.
+                            // eslint-disable-next-line react-hooks/refs
+                            if (f && !isAccepted(f)) { showToast('error', t('wizard.unsupportedFileToast', { name: f.name })); e.target.value = ''; return; }
+                            // eslint-disable-next-line react-hooks/refs
+                            if (f) handleEditFileSelect(f);
+                            e.target.value = '';
+                          }} />
+                        {editFileSelected ? (
+                          <>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(33,74,171,.3)', background: 'rgba(33,74,171,.05)' }}>
+                            <FileText size={14} color="var(--primary)" style={{ flexShrink: 0 }} />
+                            <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: 'var(--text-color)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{editFileSelected.name}</span>
+                            <span style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', whiteSpace: 'nowrap' }}>({(editFileSelected.size / 1024).toFixed(0)} KB)</span>
+                            <button type="button" onClick={() => {
+                              setEditFileSelected(null);
+                              setEditFileRef(null);
+                              if (editManualBlobRef.current) {
+                                URL.revokeObjectURL(editManualBlobRef.current);
+                                editManualBlobRef.current = null;
+                              }
+                              // Restore the original document in the viewer
+                              setEditBlobUrl(null);
+                              setEditPdfDoc(null);
+                              setEditDocxHtml(null);
+                              setEditCurrentPage(1);
+                              setEditTotalPages(1);
+                              if (editingDoc) {
+                                let url = null;
+                                getPdfFile(editingDoc.id)
+                                  .then(res => {
+                                    const ct = (res.headers['content-type'] || '').toLowerCase();
+                                    if (ct.includes('wordprocessingml') || ct.includes('officedocument')) {
+                                      return mammoth.convertToHtml({ arrayBuffer: res.data }).then(r => setEditDocxHtml(r.value));
+                                    }
+                                    const blob = new Blob([res.data], { type: 'application/pdf' });
+                                    url = URL.createObjectURL(blob);
+                                    setEditBlobUrl(url);
+                                  })
+                                  .catch(() => {});
+                              }
+                            }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', padding: 0 }}><X size={13} /></button>
+                          </div>
+                          {editFileUploading && (
+                            <div style={{ marginTop: 8 }}>
+                              <div style={{ height: 4, borderRadius: 2, background: 'rgba(33,74,171,.12)', overflow: 'hidden', marginBottom: 7, position: 'relative' }}>
+                                <div style={{ position: 'absolute', height: '100%', width: '40%', background: 'var(--primary)', borderRadius: 2, animation: 'editBarSlide 1.2s ease-in-out infinite' }} />
+                              </div>
+                              <div style={{ fontSize: 11.5, color: 'var(--primary)', lineHeight: 1.5 }}>Your file and description is loading. Please wait until it finishes.</div>
+                            </div>
+                          )}
+                          </>
+                        ) : (
+                          <div style={{ border: '2px dashed var(--surface-border)', borderRadius: 8, padding: '16px', textAlign: 'center', cursor: 'pointer', background: 'var(--surface-ground)', transition: 'all .15s' }}
+                            onClick={() => editFileInputRef.current?.click()}
+                            onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.background = 'rgba(33,74,171,.04)'; }}
+                            onDragLeave={e => { e.currentTarget.style.borderColor = ''; e.currentTarget.style.background = 'var(--surface-ground)'; }}
+                            onDrop={e => {
+                              e.preventDefault(); e.currentTarget.style.borderColor = ''; e.currentTarget.style.background = 'var(--surface-ground)';
+                              const f = e.dataTransfer.files[0];
+                              if (f && !isAccepted(f)) { showToast('error', t('wizard.unsupportedFileToast', { name: f.name })); return; }
+                              // eslint-disable-next-line react-hooks/refs
+                              if (f) handleEditFileSelect(f);
+                            }}>
+                            <Upload size={18} color="var(--text-color-secondary)" style={{ marginBottom: 4 }} />
+                            <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)' }}>{t('replaceFileModal.dropzone')}</div>
+                            <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 3, opacity: .7 }}>PDF only</div>
+                          </div>
+                        )}
+                        {editingDoc.status === 'rejected' && editFileSelected && (
+                          <div style={{ marginTop: 10, padding: '8px 14px', borderRadius: 8, background: 'rgba(33,74,171,.06)', border: '1px solid rgba(33,74,171,.25)', fontSize: 12.5, color: 'var(--primary)' }}>
+                            {t('replaceFileModal.resubmitDesc')}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Full-page description preview/edit — mirrors the Upload wizard's per-file description
+            modal so editing a document's description works the same way everywhere. */}
+        {editingDoc && editDescPreview && (
+          <div className="ud-descmodal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+            onClick={() => setEditDescPreview(false)}>
+            <div className="ud-descmodal-card" style={{ background: 'var(--surface-card)', borderRadius: 16, width: '100%', maxWidth: 1200, height: '94vh', boxShadow: '0 28px 80px rgba(0,0,0,.35)', display: 'flex', flexDirection: 'column' }}
+              onClick={e => e.stopPropagation()}>
+              <div className="ud-descmodal-header" style={{ padding: '18px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', flex: 1, minWidth: 0 }}>{t('common.description')}</div>
+                <button className="ud-descmodal-close" onClick={() => setEditDescPreview(false)}
+                  style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '5px 8px', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <X size={14} />
+                </button>
+              </div>
+              <div className="ud-descmodal-body" style={{ flex: 1, overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                <textarea value={editForm?.description ?? ''}
+                  onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+                  placeholder={t('wizard.step3.descriptionPlaceholder')}
+                  style={{ ...INPUT_BASE, width: '100%', flex: 1, background: 'var(--surface-ground)', resize: 'none', minHeight: 300, fontFamily: 'var(--font)', fontSize: 13.5, lineHeight: 1.8, boxSizing: 'border-box' }}
+                  onFocus={focusStyle} onBlur={blurStyle} autoFocus />
+              </div>
+              <div className="ud-descmodal-footer" style={{ padding: '14px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end', flexShrink: 0 }}>
+                <button type="button" onClick={() => setEditDescPreview(false)}
+                  style={{ padding: '9px 22px', borderRadius: 8, border: 'none', background: 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                  {t('wizard.step3.confirmButton')}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* API error */}
         {myDocsError && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderRadius: 10, background: 'rgba(220, 53, 69,.08)', border: '1px solid rgba(220, 53, 69,.2)', color: '#dc2626' }}>
@@ -2519,16 +3080,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             else { setSortCol(col); setSortDir('asc'); }
           }
 
-          const SortBtn = ({ col, label }) => {
-            const active = sortCol === col;
-            return (
-              <button onClick={() => toggleSort(col)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3, padding: 0, fontFamily: 'var(--mono)', fontSize: 10.5, fontWeight: 700, letterSpacing: '.07em', textTransform: 'uppercase', color: active ? 'var(--primary)' : 'var(--text-color-secondary)' }}>
-                {label}
-                <span style={{ fontSize: 9, lineHeight: 1, opacity: active ? 1 : 0.4 }}>{active ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}</span>
-              </button>
-            );
-          };
-
           return (
         <div ref={uploadsTableRef} style={{ scrollMarginTop: 16 }}>
         <Card padding="0">
@@ -2596,19 +3147,61 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             </div>
             {/* Type filter: dropdown on mobile (pill row wraps to too many lines to be usable), pills on desktop */}
             {isMobile ? (
-              <select value={filterType} onChange={e => setFilterType(e.target.value)}
-                style={{ ...INPUT_BASE, cursor: 'pointer', appearance: 'none', fontSize: 12.5 }}
-                onFocus={focusStyle} onBlur={blurStyle}>
-                <option value="">{t('table.allTypes')}</option>
-                {TYPES.map(type => {
-                  const count = uploads.filter(d => d.type === type).length;
-                  return (
-                    <option key={type} value={type}>
-                      {(DOC_TYPE_KEY[type] ? t(`docTypes.${DOC_TYPE_KEY[type]}`) : type)} ({count})
-                    </option>
-                  );
-                })}
-              </select>
+              <div style={{ position: 'relative' }}>
+                <button type="button" onClick={() => setTypeDropdownOpen(o => !o)}
+                  style={{
+                    width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                    padding: '10px 14px', borderRadius: 12, cursor: 'pointer', fontFamily: 'var(--font)',
+                    fontSize: 13, fontWeight: 600,
+                    color: filterType ? (TYPE_CARD_COLORS[filterType]?.text || TYPE_CARD_COLORS[filterType]?.accent) : 'var(--text-color)',
+                    background: 'rgba(255,255,255,.5)',
+                    backdropFilter: 'blur(16px) saturate(180%)', WebkitBackdropFilter: 'blur(16px) saturate(180%)',
+                    border: `1px solid ${filterType ? `${TYPE_CARD_COLORS[filterType]?.accent}55` : 'rgba(255,255,255,.7)'}`,
+                    boxShadow: typeDropdownOpen ? '0 4px 18px rgba(0,0,0,.1), inset 0 1px 0 rgba(255,255,255,.6)' : '0 2px 10px rgba(0,0,0,.05), inset 0 1px 0 rgba(255,255,255,.6)',
+                    transition: 'all .15s',
+                  }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {filterType && <span style={{ width: 8, height: 8, borderRadius: '50%', background: TYPE_CARD_COLORS[filterType]?.accent, flexShrink: 0 }} />}
+                    {filterType ? (DOC_TYPE_KEY[filterType] ? t(`docTypes.${DOC_TYPE_KEY[filterType]}`) : filterType) : t('table.allTypes')}
+                  </span>
+                  <ChevronDown size={15} color="var(--text-color-secondary)" style={{ transform: typeDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s', flexShrink: 0 }} />
+                </button>
+                {typeDropdownOpen && (
+                  <>
+                    <div onClick={() => setTypeDropdownOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 150 }} />
+                    <div style={{
+                      position: 'absolute', top: 'calc(100% + 8px)', left: 0, right: 0, zIndex: 160,
+                      background: 'rgba(255,255,255,.7)',
+                      backdropFilter: 'blur(24px) saturate(180%)', WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+                      border: '1px solid rgba(255,255,255,.7)', borderRadius: 14,
+                      boxShadow: '0 20px 56px rgba(0,0,0,.2), inset 0 1px 0 rgba(255,255,255,.7)',
+                      padding: 6, maxHeight: 300, overflowY: 'auto',
+                      animation: 'fadeSlideIn .15s ease',
+                    }}>
+                      <button type="button" onClick={() => { setFilterType(''); setTypeDropdownOpen(false); }}
+                        style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '9px 12px', borderRadius: 9, border: 'none', background: !filterType ? 'rgba(33, 74, 171,.12)' : 'transparent', color: !filterType ? 'var(--primary)' : 'var(--text-color)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                        {t('table.allTypes')}
+                        <span style={{ fontSize: 11, fontFamily: 'var(--mono)', opacity: .6 }}>{uploads.length}</span>
+                      </button>
+                      {TYPES.map(type => {
+                        const count  = uploads.filter(d => d.type === type).length;
+                        const active = filterType === type;
+                        const c = TYPE_CARD_COLORS[type] || { accent: '#94a3b8', bg: 'rgba(148,163,184,.1)', text: '#64748b' };
+                        return (
+                          <button key={type} type="button" onClick={() => { setFilterType(active ? '' : type); setTypeDropdownOpen(false); }}
+                            style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '9px 12px', borderRadius: 9, border: 'none', background: active ? `${c.accent}20` : 'transparent', color: active ? (c.text || c.accent) : 'var(--text-color)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', opacity: count === 0 ? .5 : 1 }}>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span style={{ width: 8, height: 8, borderRadius: '50%', background: c.accent, flexShrink: 0 }} />
+                              {DOC_TYPE_KEY[type] ? t(`docTypes.${DOC_TYPE_KEY[type]}`) : type}
+                            </span>
+                            <span style={{ fontSize: 11, fontFamily: 'var(--mono)', opacity: .6 }}>{count}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
             ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               {TYPES.map(type => {
@@ -2721,17 +3314,19 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                           {/* Row 3: date + actions */}
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
                             <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)' }}>{doc.uploadedAt}</span>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                               {doc.approval?.comments && (
                                 <button onClick={() => setRemarksModal(doc)}
                                   style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 10px', borderRadius: 7, border: `1px solid ${statusBorder}`, background: statusBg, color: statusAccent, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                                   <MessageSquare size={12} /> {t('table.remarksButton')}
                                 </button>
                               )}
+                              {/* Version button hidden until proper API mapping for versions is wired up — keep for future use.
                               <button onClick={() => setVersionModal(doc)}
                                 style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '6px 9px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 10.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--mono)' }}>
                                 <GitBranch size={11} /> v{doc.version || '1.0'}
                               </button>
+                              */}
                               <button onClick={() => setViewDoc(doc)}
                                 style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 7, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                                 <Eye size={13} /> {t('common.view')}
@@ -2806,7 +3401,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                         </div>
 
                         {/* Actions */}
-                        <div style={{ padding: '14px 16px', borderLeft: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 7 }}>
+                        <div style={{ padding: '14px 16px', borderLeft: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
                           <button onClick={() => setViewDoc(doc)}
                             style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 7, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', whiteSpace: 'nowrap', transition: 'background .15s' }}
                             onMouseEnter={e => e.currentTarget.style.background = 'rgba(33, 74, 171,.14)'}
@@ -2819,10 +3414,12 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                               <MessageSquare size={13} /> {t('table.remarksButton')}
                             </button>
                           )}
+                          {/* Version button hidden until proper API mapping for versions is wired up — keep for future use.
                           <button onClick={() => setVersionModal(doc)}
                             style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 11px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--mono)', whiteSpace: 'nowrap' }}>
                             <GitBranch size={12} /> v{doc.version || '1.0'}
                           </button>
+                          */}
                         </div>
                       </div>
                     );
@@ -3158,134 +3755,372 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
           <DocViewModal doc={viewingEditDoc} onClose={() => setViewingEditDoc(null)} />
         )}
 
-        {/* Edit form drawer */}
-        {editingDoc && editForm && (
-          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 1500, display: 'flex', justifyContent: 'flex-end' }} onClick={closeEditDoc}>
-            <div style={{ width: 520, maxWidth: '100%', height: '100%', background: 'var(--surface-card)', boxShadow: '-8px 0 32px rgba(0,0,0,.18)', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
-              <div style={{ padding: '18px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t('editDocument.editHeading')}</div>
-                  <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{editingDoc.title}</div>
+        {/* Full-screen edit modal */}
+        {editingDoc && editForm && (() => {
+          const etypeColor = TYPE_CARD_COLORS[editingDoc.type] || { accent: '#94a3b8', bg: 'rgba(148,163,184,.12)', text: '#64748b' };
+          const estatusAccent = editingDoc.status === 'approved' ? '#16a34a' : editingDoc.status === 'rejected' ? '#dc3545' : '#ffc107';
+          const estatusBg = editingDoc.status === 'approved' ? 'rgba(25,135,84,.1)' : editingDoc.status === 'rejected' ? 'rgba(220,53,69,.1)' : 'rgba(255,193,7,.1)';
+          const EStatusIcon = editingDoc.status === 'approved' ? CheckCircle : editingDoc.status === 'rejected' ? XCircle : Clock;
+          const hasEditChanges = editFileSelected !== null || JSON.stringify(editForm) !== JSON.stringify(editFormOriginal);
+          const saveBtnDisabled = editSaving || editFileUploading || !(editForm?.document_name || '').trim() || !hasEditChanges;
+          const eIconBtn = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.15)', borderRadius: 7, width: 32, height: 32, cursor: 'pointer', color: 'rgba(255,255,255,.85)' };
+          return (
+            <div style={{ position: 'fixed', inset: 0, zIndex: 1500, display: 'flex', flexDirection: 'column', background: 'var(--surface-card)' }}>
+              <style>{`
+                @media (max-width: 1024px) {
+                  .ud-edit-grid { grid-template-columns: 1fr !important; overflow-y: auto !important; }
+                  .ud-edit-pane { max-height: 55vh !important; }
+                }
+                @media (max-width: 640px) {
+                  .ud-edit-topbar { padding: 10px 14px !important; gap: 8px !important; }
+                  .ud-edit-topbar .ud-edit-titlebox { min-width: 140px !important; }
+                  .ud-edit-topbar .ud-edit-actions-btn { flex: 1 1 auto !important; justify-content: center !important; }
+                  .ud-edit-pane { max-height: 42vh !important; }
+                }
+                @keyframes editBarSlide {
+                  0%   { transform: translateX(-100%); }
+                  100% { transform: translateX(350%); }
+                }
+              `}</style>
+
+              {/* Top bar — wraps onto multiple lines on narrow screens (title row, then status
+                  badge + actions) rather than overflowing, since it packs a title, a status
+                  badge, and two buttons that don't have room to share one line on mobile. */}
+              <div className="ud-edit-topbar" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 16, rowGap: 10, padding: '14px 24px', borderBottom: '1px solid var(--surface-border)', background: 'var(--surface-50)', flexShrink: 0, minHeight: 64 }}>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: etypeColor.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <FileText size={18} color={etypeColor.accent} />
                 </div>
-                <button type="button" onClick={closeEditDoc}
-                  style={{ width: 30, height: 30, borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-color-secondary)', flexShrink: 0 }}>
-                  <X size={14} />
+                <div className="ud-edit-titlebox" style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{editingDoc.title}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 20, background: etypeColor.bg, color: etypeColor.text || etypeColor.accent }}>{editingDoc.type}</span>
+                    <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)' }}>{editingDoc.dept}</span>
+                    <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: .7 }}>· {editingDoc.year}</span>
+                    {/* Version tag hidden until proper API mapping for versions is wired up — keep for future use.
+                    {editingDoc.version && <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: .7 }}>· v{editingDoc.version}</span>}
+                    */}
+                  </div>
+                </div>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px 6px 10px', borderRadius: 20, background: estatusBg, border: `1px solid ${estatusAccent}44`, flexShrink: 0 }}>
+                  <EStatusIcon size={13} color={estatusAccent} />
+                  <span style={{ fontSize: 11.5, fontWeight: 700, color: estatusAccent, fontFamily: 'var(--mono)', letterSpacing: '.04em' }}>
+                    {editingDoc.status === 'approved' ? 'APPROVED' : editingDoc.status === 'rejected' ? 'REJECTED' : 'PENDING'}
+                  </span>
+                </div>
+                <button type="button" className="ud-edit-actions-btn" onClick={closeEditDoc} disabled={editSaving}
+                  style={{ padding: '8px 18px', borderRadius: 9, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 13, fontWeight: 600, cursor: editSaving ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: editSaving ? .5 : 1, flexShrink: 0 }}>
+                  {t('common.cancel')}
+                </button>
+                <button type="button" className="ud-edit-actions-btn" onClick={saveEditDoc} disabled={saveBtnDisabled}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '8px 20px', borderRadius: 9, border: 'none', background: saveBtnDisabled ? 'rgba(33,74,171,.5)' : 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: saveBtnDisabled ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+                  {editFileUploading ? <RotateCcw size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={14} />}
+                  {editSaving ? t('editDocument.saving') : t('editDocument.saveChanges')}
                 </button>
               </div>
 
-              <div className="ud-drawer-body" style={{ flex: 1, overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
-                {editError && (
-                  <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(220, 53, 69,.08)', border: '1px solid rgba(220, 53, 69,.2)', color: '#dc2626', fontSize: 12.5 }}>
-                    {editError}
+              {/* 2-panel body */}
+              <div className="ud-edit-grid" style={{ flex: 1, display: 'grid', gridTemplateColumns: '57% 43%', overflow: 'hidden' }}>
+
+                {/* Left: PDF viewer */}
+                <div className="ud-edit-pane" style={{ borderRight: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#3a3d40' }}>
+                  <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', rowGap: 8, background: '#2d2f31', flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,.08)' }}>
+                    <Eye size={14} color="rgba(255,255,255,.7)" />
+                    <span style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(255,255,255,.85)' }}>{editDocxHtml ? 'Document Preview' : 'Original PDF'}</span>
+                    <span style={{ flex: 1 }} />
+                    {!editDocxHtml && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,.06)', borderRadius: 8, padding: '3px 6px', border: '1px solid rgba(255,255,255,.1)' }}>
+                        <button onClick={() => setEditZoom(z => Math.max(70, z - 10))} style={{ ...eIconBtn, width: 28, height: 28, background: 'transparent', border: 'none' }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.1)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                          <ZoomOut size={13} />
+                        </button>
+                        <span style={{ fontSize: 11.5, fontFamily: 'var(--mono)', color: 'rgba(255,255,255,.75)', minWidth: 38, textAlign: 'center', userSelect: 'none' }}>{editZoom}%</span>
+                        <button onClick={() => setEditZoom(z => Math.min(150, z + 10))} style={{ ...eIconBtn, width: 28, height: 28, background: 'transparent', border: 'none' }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.1)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                          <ZoomIn size={13} />
+                        </button>
+                      </div>
+                    )}
+                    {!editDocxHtml && (
+                      <button onClick={() => setEditRotation(r => (r + 90) % 360)} style={eIconBtn}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.15)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,.08)'}>
+                        <RotateCw size={14} />
+                      </button>
+                    )}
+                    {editBlobUrl && !editDocxHtml && (
+                      <a href={editBlobUrl} target="_blank" rel="noreferrer"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 7, background: 'rgba(33,74,171,.25)', border: '1px solid rgba(33,74,171,.4)', color: '#93c5fd', textDecoration: 'none', fontSize: 11.5, fontWeight: 600, fontFamily: 'var(--font)' }}>
+                        <ExternalLink size={12} /> Open
+                      </a>
+                    )}
                   </div>
-                )}
 
-                <div>
-                  <div style={{ ...LABEL, marginBottom: 6 }}>{t('editDocument.documentName')} <span style={{ color: '#dc3545' }}>*</span></div>
-                  <input value={editForm.document_name}
-                    onChange={e => setEditForm(f => ({ ...f, document_name: e.target.value }))}
-                    style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
-                </div>
-
-                <div>
-                  <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.referenceNo')}</div>
-                  <input value={editForm.reference_number}
-                    onChange={e => setEditForm(f => ({ ...f, reference_number: e.target.value }))}
-                    style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
-                </div>
-
-                <div className="ud-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div>
-                    <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')}</div>
-                    <input type="date" value={editForm.issue_date || ''}
-                      onChange={e => setEditForm(f => ({ ...f, issue_date: e.target.value }))}
-                      style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
-                  </div>
-                  <div>
-                    <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.effectiveFrom')}</div>
-                    <input type="date" value={editForm.effective_from || ''}
-                      onChange={e => setEditForm(f => ({ ...f, effective_from: e.target.value }))}
-                      style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
-                  </div>
-                </div>
-
-                <div>
-                  <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.gazetteReference')}</div>
-                  <input value={editForm.gazette_reference}
-                    onChange={e => setEditForm(f => ({ ...f, gazette_reference: e.target.value }))}
-                    style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
-                </div>
-
-                <div>
-                  <div style={{ ...LABEL, marginBottom: 6 }}>{t('docViewModal.legalAuthority')}</div>
-                  <input value={editForm.legal_authority}
-                    onChange={e => setEditForm(f => ({ ...f, legal_authority: e.target.value }))}
-                    style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
-                </div>
-
-                <div className="ud-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div>
-                    <div style={{ ...LABEL, marginBottom: 6 }}>{t('editDocument.shortTitle')}</div>
-                    <input value={editForm.short_title}
-                      onChange={e => setEditForm(f => ({ ...f, short_title: e.target.value }))}
-                      style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
-                  </div>
-                  <div>
-                    <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.version')}</div>
-                    <input value={editForm.version_no}
-                      onChange={e => setEditForm(f => ({ ...f, version_no: e.target.value }))}
-                      style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
-                  </div>
-                </div>
-
-                <div>
-                  <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.description')}</div>
-                  <textarea value={editForm.description} rows={5}
-                    onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
-                    style={{ ...INPUT_BASE, resize: 'vertical', fontFamily: 'var(--font)' }} onFocus={focusStyle} onBlur={blurStyle} />
-                </div>
-
-                {(EDIT_TYPE_FIELD_KEYS[editingDoc.type] || []).length > 0 && (
-                  <div>
-                    <div style={{ ...LABEL, marginBottom: 10 }}>{t('editDocument.typeSpecificFields')}</div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                      {EDIT_TYPE_FIELD_KEYS[editingDoc.type].map(({ key, inputType }) => (
-                        <div key={key}>
-                          {inputType === 'checkbox' ? (
-                            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--text-color)', cursor: 'pointer' }}>
-                              <input type="checkbox" checked={!!editForm.typeFields[key]}
-                                onChange={e => setEditForm(f => ({ ...f, typeFields: { ...f.typeFields, [key]: e.target.checked } }))} />
-                              {fieldLabel(key)}
-                            </label>
-                          ) : (
-                            <>
-                              <div style={{ ...LABEL, marginBottom: 6 }}>{fieldLabel(key)}</div>
-                              <input type={inputType} value={editForm.typeFields[key] || ''}
-                                onChange={e => setEditForm(f => ({ ...f, typeFields: { ...f.typeFields, [key]: e.target.value } }))}
-                                style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
-                            </>
-                          )}
+                  {editDocxHtml ? (
+                    <div ref={editDocxViewRef}
+                      style={{ flex: 1, overflow: 'auto', background: 'white', padding: '40px 48px', color: '#1a1a1a', lineHeight: 1.8, fontSize: 13 }} />
+                  ) : (
+                    <div ref={editContainerRef} onScroll={handleEditScroll}
+                      style={{ flex: 1, overflow: 'auto', background: '#525659', padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center' }}>
+                      {!editBlobUrl && (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 14 }}>
+                          <div style={{ width: 36, height: 36, border: '3px solid rgba(255,255,255,.2)', borderTopColor: 'rgba(255,255,255,.8)', borderRadius: '50%', animation: 'spin .7s linear infinite' }} />
+                          <span style={{ fontSize: 13, fontFamily: 'var(--mono)', color: 'rgba(255,255,255,.6)', letterSpacing: '.04em' }}>Loading document…</span>
+                        </div>
+                      )}
+                      {editBlobUrl && Array.from({ length: editTotalPages }, (_, i) => (
+                        <div key={i} style={{ position: 'relative', display: 'inline-block' }}>
+                          <canvas ref={el => { editCanvasRefs.current[i] = el; }}
+                            style={{ display: 'block', borderRadius: 4, boxShadow: '0 4px 20px rgba(0,0,0,.6)', maxWidth: '100%' }} />
                         </div>
                       ))}
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
 
-              <div style={{ padding: '16px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end', gap: 10, flexShrink: 0 }}>
-                <button type="button" onClick={closeEditDoc}
-                  style={{ padding: '9px 18px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'transparent', color: 'var(--text-color-secondary)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                  {t('common.cancel')}
+                  {!editDocxHtml && (
+                    <div style={{ padding: '10px 20px', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: 12, rowGap: 8, background: '#2d2f31', flexShrink: 0 }}>
+                      <button onClick={() => scrollEditPage(editCurrentPage - 1)} disabled={editCurrentPage === 1}
+                        style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px', borderRadius: 7, border: '1px solid rgba(255,255,255,.12)', background: editCurrentPage === 1 ? 'transparent' : 'rgba(255,255,255,.07)', color: editCurrentPage === 1 ? 'rgba(255,255,255,.25)' : 'rgba(255,255,255,.75)', fontSize: 12, fontWeight: 600, cursor: editCurrentPage === 1 ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)' }}>
+                        ← Prev
+                      </button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 14px', borderRadius: 7, background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)' }}>
+                        <span style={{ fontSize: 12.5, fontFamily: 'var(--mono)', color: 'rgba(255,255,255,.85)', fontWeight: 600 }}>{editCurrentPage}</span>
+                        <span style={{ fontSize: 11, color: 'rgba(255,255,255,.35)' }}>of</span>
+                        <span style={{ fontSize: 12.5, fontFamily: 'var(--mono)', color: 'rgba(255,255,255,.55)' }}>{editTotalPages}</span>
+                      </div>
+                      <button onClick={() => scrollEditPage(editCurrentPage + 1)} disabled={editCurrentPage === editTotalPages}
+                        style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px', borderRadius: 7, border: '1px solid rgba(255,255,255,.12)', background: editCurrentPage === editTotalPages ? 'transparent' : 'rgba(255,255,255,.07)', color: editCurrentPage === editTotalPages ? 'rgba(255,255,255,.25)' : 'rgba(255,255,255,.75)', fontSize: 12, fontWeight: 600, cursor: editCurrentPage === editTotalPages ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)' }}>
+                        Next →
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right: Editable form */}
+                <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--surface-card)' }}>
+                  <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, background: 'var(--surface-50)', flexShrink: 0 }}>
+                    <div style={{ width: 30, height: 30, borderRadius: 8, background: 'rgba(33,74,171,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <FileText size={14} color="var(--primary)" />
+                    </div>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)' }}>{t('editDocument.editHeading')}</span>
+                  </div>
+
+                  <div style={{ flex: 1, overflowY: 'auto', padding: '20px 20px 28px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    {editingDoc.status === 'rejected' && editingDoc.approval?.comments && (
+                      <div style={{ display: 'flex', gap: 10, padding: '10px 14px', borderRadius: 8, background: 'rgba(220,53,69,.06)', border: '1px solid rgba(220,53,69,.2)' }}>
+                        <XCircle size={14} color="#dc3545" style={{ flexShrink: 0, marginTop: 2 }} />
+                        <div>
+                          <div style={{ fontSize: 11.5, fontWeight: 700, color: '#dc3545', marginBottom: 3 }}>{t('replaceFileModal.rejectionReason')}</div>
+                          <div style={{ fontSize: 12.5, color: 'var(--text-color)', lineHeight: 1.5 }}>{editingDoc.approval.comments}</div>
+                        </div>
+                      </div>
+                    )}
+                    {editError && (
+                      <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(220,53,69,.08)', border: '1px solid rgba(220,53,69,.2)', color: '#dc2626', fontSize: 12.5 }}>
+                        {editError}
+                      </div>
+                    )}
+                    <div>
+                      <div style={{ ...LABEL, marginBottom: 6 }}>{t('editDocument.documentName')} <span style={{ color: '#dc3545' }}>*</span></div>
+                      <input value={editForm.document_name} onChange={e => setEditForm(f => ({ ...f, document_name: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                    </div>
+                    <div>
+                      <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.referenceNo')}</div>
+                      <input value={editForm.reference_number} onChange={e => setEditForm(f => ({ ...f, reference_number: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                    </div>
+                    <div className="ud-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                      <div>
+                        <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')}</div>
+                        <input type="date" value={editForm.issue_date || ''} onChange={e => setEditForm(f => ({ ...f, issue_date: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                      </div>
+                      <div>
+                        <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.effectiveFrom')}</div>
+                        <input type="date" value={editForm.effective_from || ''} onChange={e => setEditForm(f => ({ ...f, effective_from: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.lastUpdatedOn')}</div>
+                      <input type="date" value={editForm.last_updated_on || ''} onChange={e => setEditForm(f => ({ ...f, last_updated_on: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                    </div>
+                    <div>
+                      <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.gazetteReference')}</div>
+                      <input value={editForm.gazette_reference} onChange={e => setEditForm(f => ({ ...f, gazette_reference: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                    </div>
+                    {editingDoc.type !== 'Act' && (
+                    <div>
+                      <div style={{ ...LABEL, marginBottom: 6 }}>{t('docViewModal.legalAuthority')}</div>
+                      <input value={editForm.legal_authority} onChange={e => setEditForm(f => ({ ...f, legal_authority: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                    </div>
+                    )}
+                    <div className="ud-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                      <div>
+                        <div style={{ ...LABEL, marginBottom: 6 }}>{t('editDocument.shortTitle')}</div>
+                        <input value={editForm.short_title} onChange={e => setEditForm(f => ({ ...f, short_title: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                      </div>
+                      <div>
+                        <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.version')}</div>
+                        <input value={editForm.version_no} onChange={e => setEditForm(f => ({ ...f, version_no: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ ...LABEL, marginBottom: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span>{t('common.description')}</span>
+                        {/* Full-page preview/edit — same pattern as the Upload wizard's per-file
+                            description: the inline box is read-only, actual editing happens in
+                            the bigger modal so it's not cramped into a few rows. */}
+                        <button type="button" onClick={() => setEditDescPreview(true)}
+                          style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 20, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 10.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+                          <Eye size={11} /> {t('wizard.step3.previewButton')}
+                        </button>
+                      </div>
+                      <textarea value={editForm.description} readOnly
+                        onClick={() => setEditDescPreview(true)}
+                        rows={4}
+                        style={{ ...INPUT_BASE, resize: 'none', lineHeight: 1.6, cursor: 'pointer', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)' }} />
+                    </div>
+                    {(EDIT_TYPE_FIELD_KEYS[editingDoc.type] || []).length > 0 && (
+                      <div>
+                        <div style={{ ...LABEL, marginBottom: 10 }}>{t('editDocument.typeSpecificFields')}</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                          {EDIT_TYPE_FIELD_KEYS[editingDoc.type].map(({ key, inputType }) => (
+                            <div key={key}>
+                              {inputType === 'checkbox' ? (
+                                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--text-color)', cursor: 'pointer' }}>
+                                  <input type="checkbox" checked={!!editForm.typeFields[key]}
+                                    onChange={e => setEditForm(f => ({ ...f, typeFields: { ...f.typeFields, [key]: e.target.checked } }))} />
+                                  {fieldLabel(key)}
+                                </label>
+                              ) : (
+                                <>
+                                  <div style={{ ...LABEL, marginBottom: 6 }}>{fieldLabel(key)}</div>
+                                  <input type={inputType} value={editForm.typeFields[key] || ''}
+                                    onChange={e => setEditForm(f => ({ ...f, typeFields: { ...f.typeFields, [key]: e.target.value } }))}
+                                    style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                                </>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {(editingDoc.status === 'pending' || editingDoc.status === 'rejected') && (
+                      <div style={{ borderTop: '1px solid var(--surface-border)', paddingTop: 16 }}>
+                        <div style={{ ...LABEL, marginBottom: 8 }}>
+                          {t('replaceFileModal.title')} <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-color-secondary)', textTransform: 'none', letterSpacing: 0 }}>({t('common.optional', 'optional')})</span>
+                        </div>
+                        <input ref={editFileInputRef} type="file" accept=".pdf" style={{ display: 'none' }}
+                          onChange={e => {
+                            const f = e.target.files?.[0];
+                            // showToast reads a timer ref internally, but this whole callback only
+                            // runs on the input's change event — never during render — so that's safe.
+                            // eslint-disable-next-line react-hooks/refs
+                            if (f && !isAccepted(f)) { showToast('error', t('wizard.unsupportedFileToast', { name: f.name })); e.target.value = ''; return; }
+                            // eslint-disable-next-line react-hooks/refs
+                            if (f) handleEditFileSelect(f);
+                            e.target.value = '';
+                          }} />
+                        {editFileSelected ? (
+                          <>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(33,74,171,.3)', background: 'rgba(33,74,171,.05)' }}>
+                            <FileText size={14} color="var(--primary)" style={{ flexShrink: 0 }} />
+                            <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: 'var(--text-color)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{editFileSelected.name}</span>
+                            <span style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)', whiteSpace: 'nowrap' }}>({(editFileSelected.size / 1024).toFixed(0)} KB)</span>
+                            <button type="button" onClick={() => {
+                              setEditFileSelected(null);
+                              setEditFileRef(null);
+                              if (editManualBlobRef.current) {
+                                URL.revokeObjectURL(editManualBlobRef.current);
+                                editManualBlobRef.current = null;
+                              }
+                              // Restore the original document in the viewer
+                              setEditBlobUrl(null);
+                              setEditPdfDoc(null);
+                              setEditDocxHtml(null);
+                              setEditCurrentPage(1);
+                              setEditTotalPages(1);
+                              if (editingDoc) {
+                                let url = null;
+                                getPdfFile(editingDoc.id)
+                                  .then(res => {
+                                    const ct = (res.headers['content-type'] || '').toLowerCase();
+                                    if (ct.includes('wordprocessingml') || ct.includes('officedocument')) {
+                                      return mammoth.convertToHtml({ arrayBuffer: res.data }).then(r => setEditDocxHtml(r.value));
+                                    }
+                                    const blob = new Blob([res.data], { type: 'application/pdf' });
+                                    url = URL.createObjectURL(blob);
+                                    setEditBlobUrl(url);
+                                  })
+                                  .catch(() => {});
+                              }
+                            }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', padding: 0 }}><X size={13} /></button>
+                          </div>
+                          {editFileUploading && (
+                            <div style={{ marginTop: 8 }}>
+                              <div style={{ height: 4, borderRadius: 2, background: 'rgba(33,74,171,.12)', overflow: 'hidden', marginBottom: 7, position: 'relative' }}>
+                                <div style={{ position: 'absolute', height: '100%', width: '40%', background: 'var(--primary)', borderRadius: 2, animation: 'editBarSlide 1.2s ease-in-out infinite' }} />
+                              </div>
+                              <div style={{ fontSize: 11.5, color: 'var(--primary)', lineHeight: 1.5 }}>Your file and description is loading. Please wait until it finishes.</div>
+                            </div>
+                          )}
+                          </>
+                        ) : (
+                          <div style={{ border: '2px dashed var(--surface-border)', borderRadius: 8, padding: '16px', textAlign: 'center', cursor: 'pointer', background: 'var(--surface-ground)', transition: 'all .15s' }}
+                            onClick={() => editFileInputRef.current?.click()}
+                            onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.background = 'rgba(33,74,171,.04)'; }}
+                            onDragLeave={e => { e.currentTarget.style.borderColor = ''; e.currentTarget.style.background = 'var(--surface-ground)'; }}
+                            onDrop={e => {
+                              e.preventDefault(); e.currentTarget.style.borderColor = ''; e.currentTarget.style.background = 'var(--surface-ground)';
+                              const f = e.dataTransfer.files[0];
+                              if (f && !isAccepted(f)) { showToast('error', t('wizard.unsupportedFileToast', { name: f.name })); return; }
+                              // eslint-disable-next-line react-hooks/refs
+                              if (f) handleEditFileSelect(f);
+                            }}>
+                            <Upload size={18} color="var(--text-color-secondary)" style={{ marginBottom: 4 }} />
+                            <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)' }}>{t('replaceFileModal.dropzone')}</div>
+                            <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 3, opacity: .7 }}>PDF only</div>
+                          </div>
+                        )}
+                        {editingDoc.status === 'rejected' && editFileSelected && (
+                          <div style={{ marginTop: 10, padding: '8px 14px', borderRadius: 8, background: 'rgba(33,74,171,.06)', border: '1px solid rgba(33,74,171,.25)', fontSize: 12.5, color: 'var(--primary)' }}>
+                            {t('replaceFileModal.resubmitDesc')}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Full-page description preview/edit — mirrors the Upload wizard's per-file description
+            modal so editing a document's description works the same way everywhere. */}
+        {editingDoc && editDescPreview && (
+          <div className="ud-descmodal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+            onClick={() => setEditDescPreview(false)}>
+            <div className="ud-descmodal-card" style={{ background: 'var(--surface-card)', borderRadius: 16, width: '100%', maxWidth: 1200, height: '94vh', boxShadow: '0 28px 80px rgba(0,0,0,.35)', display: 'flex', flexDirection: 'column' }}
+              onClick={e => e.stopPropagation()}>
+              <div className="ud-descmodal-header" style={{ padding: '18px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', flex: 1, minWidth: 0 }}>{t('common.description')}</div>
+                <button className="ud-descmodal-close" onClick={() => setEditDescPreview(false)}
+                  style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '5px 8px', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <X size={14} />
                 </button>
-                {(() => {
-                  const editDocBtnDisabled = editSaving || !(editForm?.document_name || '').trim();
-                  return (
-                    <button type="button" onClick={saveEditDoc} disabled={editDocBtnDisabled}
-                      style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 20px', borderRadius: 8, border: 'none', background: editDocBtnDisabled ? 'rgba(33, 74, 171,.5)' : 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: editDocBtnDisabled ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)' }}>
-                      <Save size={14} /> {editSaving ? t('editDocument.saving') : t('editDocument.saveChanges')}
-                    </button>
-                  );
-                })()}
+              </div>
+              <div className="ud-descmodal-body" style={{ flex: 1, overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                <textarea value={editForm?.description ?? ''}
+                  onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+                  placeholder={t('wizard.step3.descriptionPlaceholder')}
+                  style={{ ...INPUT_BASE, width: '100%', flex: 1, background: 'var(--surface-ground)', resize: 'none', minHeight: 300, fontFamily: 'var(--font)', fontSize: 13.5, lineHeight: 1.8, boxSizing: 'border-box' }}
+                  onFocus={focusStyle} onBlur={blurStyle} autoFocus />
+              </div>
+              <div className="ud-descmodal-footer" style={{ padding: '14px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end', flexShrink: 0 }}>
+                <button type="button" onClick={() => setEditDescPreview(false)}
+                  style={{ padding: '9px 22px', borderRadius: 8, border: 'none', background: 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                  {t('wizard.step3.confirmButton')}
+                </button>
               </div>
             </div>
           </div>
@@ -3314,7 +4149,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
 
     function addChapter() {
       setSecChapters(prev => {
-        const nextIdx = prev.filter(c => !c.isDeleted).length + prev.filter(c => c.isDeleted).length; // = prev.length
         setActiveChapterIdx(prev.length);
         return [...prev, { id: null, name: '', isDeleted: false, sections: [] }];
       });
@@ -3540,21 +4374,16 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       : entriesSignature(subDocEntries[subDocTab] || []) !== (entriesBaseline[subDocTab] ?? entriesSignature([]));
 
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease', justifyContent: subDocTab ? 'flex-start' : 'center', minHeight: subDocTab ? 'auto' : 'calc(100vh - 220px)' }}>
         <style>{UD_RESPONSIVE_CSS}</style>
         <Toast toast={toast} onClose={() => setToast(null)} />
 
-        <div>
-          <div style={{ fontSize: 'var(--font-size-h3)', fontWeight: 800, color: 'var(--text-heading)', letterSpacing: '-.01em' }}>{t('addDocuments.heading')}</div>
-          <div style={{ fontSize: 'var(--font-size-p2)', color: 'var(--text-color-secondary)', marginTop: 4 }}>{t('addDocuments.subheading')}</div>
-        </div>
-
         {!subDocTab ? (
-          /* Big centered picker — identical design to the Upload wizard's Document Type picker */
+          /* Starting state — big centered part picker, identical to the Edit Document page's type picker */
           <Card padding="28px 26px">
             <div style={{ maxWidth: 1180, margin: '0 auto' }}>
               <div style={{ textAlign: 'center', marginBottom: 32 }}>
-                <div style={{ fontSize: 'var(--font-size-h2)', fontWeight: 800, color: 'var(--text-heading)', marginBottom: 8 }}>{t('addDocuments.pickHeading')} <span style={{ color: '#dc3545' }}>*</span></div>
+                <div style={{ fontSize: 'var(--font-size-h2)', fontWeight: 800, color: 'var(--text-heading)', marginBottom: 8 }}>{t('addDocuments.pickHeading')}</div>
                 <div style={{ fontSize: 'var(--font-size-p2)', color: 'var(--text-color-secondary)' }}>{t('addDocuments.pickSubheading')}</div>
               </div>
               <div className="ud-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(240px, 1fr))', gap: 20 }}>
@@ -3874,7 +4703,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                                         onFocus={focusStyle} onBlur={blurStyle} />
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                      <input type="file" accept=".pdf,.doc,.docx" style={{ display: 'none' }}
+                                      <input type="file" accept=".pdf" style={{ display: 'none' }}
                                         id={`sec-file-ch${ci}-s${si}`}
                                         onChange={e => {
                                           const f = e.target.files?.[0] || null;
@@ -4032,7 +4861,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                               onFocus={focusStyle} onBlur={blurStyle} />
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <input type="file" accept=".pdf,.doc,.docx" style={{ display: 'none' }}
+                            <input type="file" accept=".pdf" style={{ display: 'none' }}
                               id={`sec-flat-file-${si}`}
                               onChange={e => {
                                 const f = e.target.files?.[0] || null;
@@ -4229,10 +5058,13 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                       onFocus={focusStyle} onBlur={blurStyle} />
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <input type="file" accept=".pdf,.doc,.docx" style={{ display: 'none' }}
+                    <input type="file" accept=".pdf" style={{ display: 'none' }}
                       id={`entry-file-${subDocTab}-${i}`}
                       onChange={e => {
                         const f = e.target.files?.[0] || null;
+                        // showToast reads a timer ref internally, but this whole callback only
+                        // runs on the input's change event — never during render — so that's safe.
+                        // eslint-disable-next-line react-hooks/refs
                         if (f && !isAccepted(f)) { showToast('error', t('wizard.unsupportedFileToast', { name: f.name })); e.target.value = ''; return; }
                         if (f && !isUnderSizeLimit(f)) { showToast('error', t('wizard.fileTooLargeToast', { name: f.name, size: formatSize(MAX_UPLOAD_SIZE_BYTES) })); e.target.value = ''; return; }
                         setEntryField(i, 'file', f); setEntryField(i, 'fileRef', null); e.target.value = '';
@@ -4252,6 +5084,9 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-card)', flex: 1, minWidth: 0 }}>
                           <Paperclip size={12} color={activeSubTab ? activeSubTab.accent : 'var(--primary)'} />
                           <span style={{ fontSize: 11.5, color: 'var(--text-heading)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{entry.existingFilename}</span>
+                          {/* openActPartFile calls showToast (reads a timer ref) in its catch
+                              block, but this only runs on click — never during render. */}
+                          {/* eslint-disable-next-line react-hooks/refs */}
                           <button type="button" onClick={() => openActPartFile(entry.existingFileRef, entry.existingFilename)}
                             style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 10px', borderRadius: 6, background: 'var(--primary)', color: 'white', border: 'none', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
                             <ExternalLink size={11} /> Open
@@ -4481,7 +5316,9 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                   <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-heading)', marginBottom: 4 }}>{m.document_name}</div>
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12, fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
                     <span style={{ background: 'rgba(13, 110, 253,.1)', color: '#0d6efd', padding: '2px 8px', borderRadius: 20, fontWeight: 600 }}>{DOC_TYPE_KEY[m.document_type_name] ? t(`docTypes.${DOC_TYPE_KEY[m.document_type_name]}`) : m.document_type_name}</span>
+                    {/* Version chip hidden until proper API mapping for versions is wired up — keep for future use.
                     <span>v{m.version_no || '1.0'}</span>
+                    */}
                     <span style={{ background: m.status === 'approved' ? 'rgba(25, 135, 84,.1)' : 'rgba(255, 193, 7,.1)', color: m.status === 'approved' ? '#16a34a' : '#d97706', padding: '2px 8px', borderRadius: 20, fontWeight: 600, textTransform: 'capitalize' }}>{{ approved: t('common.statusWordApproved'), pending: t('common.statusWordPending'), rejected: t('common.statusWordRejected') }[m.status] || m.status}</span>
                     <span>{m.created_at?.split('T')[0]}</span>
                   </div>
@@ -4538,20 +5375,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, justifyContent: form.type ? 'flex-start' : 'center', minHeight: form.type ? 'auto' : 'calc(100vh - 220px)' }}>
 
         {/* Hidden file input */}
-        <input ref={inputRef} type="file" accept=".pdf,.doc,.docx" multiple style={{ display: 'none' }}
+        <input ref={inputRef} type="file" accept=".pdf" multiple style={{ display: 'none' }}
           onChange={e => { addFiles(e.target.files); e.target.value = ''; }} />
-
-        {/* Rejected files alert */}
-        {rejected.length > 0 && (
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 14px', borderRadius: 10, background: 'rgba(220, 53, 69,.08)', border: '1px solid rgba(220, 53, 69,.2)', color: '#dc2626' }}>
-            <AlertCircle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 1 }}>{t('wizard.step2.unsupportedFileType')}</div>
-              <div style={{ fontSize: 11.5, fontFamily: 'var(--mono)' }}>{rejected.join(', ')}</div>
-            </div>
-            <button onClick={() => setRejected([])} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', display: 'flex' }}><X size={13} /></button>
-          </div>
-        )}
 
         {/* Oversized files alert — DBIM 6.1.1 upload size ceiling */}
         {oversizedFiles.length > 0 && (
@@ -4757,7 +5582,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
                       <span style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>{t('wizard.step2.fileTypeHint', { size: formatSize(MAX_UPLOAD_SIZE_BYTES) })}</span>
                       <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--primary)', background: 'rgba(33, 74, 171,.08)', border: '1px solid rgba(33, 74, 171,.2)', padding: '2px 7px', borderRadius: 20 }}>.PDF</span>
-                      <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: '#2b579a', background: 'rgba(43,87,154,.08)', border: '1px solid rgba(43,87,154,.3)', padding: '2px 7px', borderRadius: 20 }}>.DOC</span>
                     </div>
                 </div>
               </div>
@@ -4928,9 +5752,9 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                   placeholder={t('wizard.placeholders.act.year')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
               <div>
-                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.act.shortTitle')}</div>
+                <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.act.shortTitle')} <span style={{ color: '#dc3545' }}>*</span></div>
                 <input value={typeFields.shortTitle || ''} onChange={e => setTypeFields(f => ({ ...f, shortTitle: e.target.value }))}
-                  placeholder={t('wizard.placeholders.act.shortTitle')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                  placeholder={t('wizard.placeholders.act.shortTitle')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} required />
               </div>
               <div className="ud-grid-2" style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div>
@@ -5014,13 +5838,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                   placeholder={t('wizard.placeholders.act.keywords')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
               </div>
 
-              <div style={{ gridColumn: '1 / -1' }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 12.5, color: 'var(--text-color-secondary)' }}>
-                  <input type="checkbox" checked={!!typeFields.repealed} onChange={e => setTypeFields(f => ({ ...f, repealed: e.target.checked }))}
-                    style={{ width: 15, height: 15, cursor: 'pointer', accentColor: 'var(--primary)' }} />
-                  {t('wizard.fields.act.repealCheckbox')}
-                </label>
-              </div>
             </>)}
 
             {/* ── Amendment: unified inline fields ── */}
@@ -5385,6 +6202,13 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                 </div>
               ))}
             </>)}
+
+            {/* Universal — Last Updated On (optional, applies to all document types) */}
+            <div>
+              <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.lastUpdatedOn')}</div>
+              <input type="date" value={form.lastUpdatedOn || ''} onChange={e => fmt('lastUpdatedOn', e.target.value)}
+                style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+            </div>
 
             {/* Per-file description — shown last, one per file */}
             {files.length > 0 && (
@@ -6086,22 +6910,22 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       {/* Full-page description preview/edit — the inline textarea is only 3 rows, too small to
           read a longer auto-generated summary comfortably; this gives it room, still editable. */}
       {descPreviewFile && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+        <div className="ud-descmodal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
           onClick={() => setDescPreviewFile(null)}>
-          <div style={{ background: 'var(--surface-card)', borderRadius: 16, width: '100%', maxWidth: 1200, height: '94vh', boxShadow: '0 28px 80px rgba(0,0,0,.35)', display: 'flex', flexDirection: 'column' }}
+          <div className="ud-descmodal-card" style={{ background: 'var(--surface-card)', borderRadius: 16, width: '100%', maxWidth: 1200, height: '94vh', boxShadow: '0 28px 80px rgba(0,0,0,.35)', display: 'flex', flexDirection: 'column' }}
             onClick={e => e.stopPropagation()}>
-            <div style={{ padding: '18px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+            <div className="ud-descmodal-header" style={{ padding: '18px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)' }}>{t('wizard.step3.descriptionLabel')}</div>
                 <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{descPreviewFile}</div>
               </div>
-              <button onClick={() => setDescPreviewFile(null)}
-                style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '5px 8px', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', flexShrink: 0 }}>
+              <button className="ud-descmodal-close" onClick={() => setDescPreviewFile(null)}
+                style={{ background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 7, padding: '5px 8px', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <X size={14} />
               </button>
             </div>
 
-            <div style={{ flex: 1, overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+            <div className="ud-descmodal-body" style={{ flex: 1, overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
               <textarea value={fileMeta[descPreviewFile]?.desc ?? ''}
                 onChange={e => setFileMeta(prev => ({ ...prev, [descPreviewFile]: { ...prev[descPreviewFile], desc: e.target.value } }))}
                 placeholder={t('wizard.step3.descriptionPlaceholder')}
@@ -6109,7 +6933,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                 onFocus={focusStyle} onBlur={blurStyle} autoFocus />
             </div>
 
-            <div style={{ padding: '14px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end', flexShrink: 0 }}>
+            <div className="ud-descmodal-footer" style={{ padding: '14px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end', flexShrink: 0 }}>
               <button type="button" onClick={() => setDescPreviewFile(null)}
                 style={{ padding: '9px 22px', borderRadius: 8, border: 'none', background: 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                 {t('wizard.step3.confirmButton')}

@@ -41,6 +41,7 @@ const BREADCRUMBS = {
   analytics: ['topbar.crumbs.analytics', 'topbar.crumbs.dashboard'], graph: ['topbar.crumbs.analytics', 'topbar.crumbs.knowledgeGraph'], audit: ['topbar.crumbs.analytics', 'topbar.crumbs.misReport'],
   users: ['topbar.crumbs.admin', 'topbar.crumbs.userManagement'], logs: ['topbar.crumbs.admin', 'topbar.crumbs.systemLogs'],
   taxonomy: ['topbar.crumbs.admin', 'topbar.crumbs.masterDataManager'],
+  rolecaps: ['topbar.crumbs.admin', 'topbar.crumbs.roleCaps'],
   auditfull: ['topbar.crumbs.admin', 'topbar.crumbs.fullMisReport'],
   alluploads: ['topbar.crumbs.admin', 'topbar.crumbs.allUploads'],
   auditlog: ['topbar.crumbs.auditorLabel', 'topbar.crumbs.misReport'],
@@ -61,7 +62,7 @@ const CRUMB_TARGETS = {
   actparts:     ['dashboard'],
 };
 
-export default function Topbar({ user, activePage, onNavigate, onLogout, onToggleSidebar, onChangePassword }) {
+export default function Topbar({ user, activePage, onNavigate, onLogout, onToggleSidebar, onChangePassword, onMobileVerified }) {
   const { t } = useTranslation('common');
   const [profileOpen, setProfileOpen]   = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
@@ -260,6 +261,7 @@ export default function Topbar({ user, activePage, onNavigate, onLogout, onToggl
         roleLabel={t(rm.label)}
         canChangePassword={canChangePassword}
         onChangePassword={onChangePassword}
+        onMobileVerified={onMobileVerified}
         onClose={() => setProfileModalOpen(false)}
       />
     )}

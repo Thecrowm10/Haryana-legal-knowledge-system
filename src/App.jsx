@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAuth } from './hooks/useAuth';
 import Login from './pages/Login';
 import ChangePasswordScreen from './pages/ChangePasswordScreen';
+import FirstLoginScreen from './pages/FirstLoginScreen';
 import Layout from './components/layout/Layout';
 import CookieBanner from './components/CookieBanner';
 import CitizenDashboard from './pages/CitizenDashboard';
@@ -33,11 +34,11 @@ const SEED_RELATIONS = [
 const INITIAL_TAXONOMY = [
   { category: 'Document Types', items: ['Act', 'Amendment', 'Notification', 'Circular', 'Policy', 'Rules & Regulations', 'Order/Gazette', 'Bye Laws', 'Miscellaneous'] },
   { category: 'Departments',    items: ['Urban Local Bodies', 'Revenue & Disaster Mgmt.', 'Home Department', 'Industries & Commerce', 'Labour Department', 'Finance Department', 'Health & Family Welfare', 'Agriculture & Farmers Welfare', 'Panchayati Raj', 'General Administration'] },
-  { category: 'Legal Status',   items: ['Active', 'Repealed', 'Amended', 'Under Review', 'Suspended'] },
+  // { category: 'Legal Status',   items: ['Active', 'Repealed', 'Amended', 'Under Review', 'Suspended'] },
 ];
 
 export default function App() {
-  const { user, loading, error: authError, loginAsRole, changePass, logout } = useAuth();
+  const { user, loading, error: authError, loginAsRole, loginWithToken, changePass, logout } = useAuth();
   const [activePage, setActivePage]       = useState(null);
   const [auditLog, setAuditLog]           = useState([]);
   const [documents, setDocuments]         = useState(
@@ -46,16 +47,20 @@ export default function App() {
   const [relationships, setRelationships] = useState(SEED_RELATIONS);
   const [taxonomy, setTaxonomy]           = useState(INITIAL_TAXONOMY);
 
-  useEffect(() => {
+  // Adjust state during render rather than in an effect (React's "you might not
+  // need an effect" pattern, also used in Layout.jsx) — initializes activePage
+  // right when `user` changes (login/logout) instead of one render later.
+  const [prevUser, setPrevUser] = useState();
+  if (user !== prevUser) {
+    setPrevUser(user);
     if (user && activePage === null) {
       const saved = localStorage.getItem('activePage');
       setActivePage(saved || DEFAULT_PAGE[user.role]);
-    }
-    if (!user) {
+    } else if (!user) {
       setActivePage(null);
       localStorage.removeItem('activePage');
     }
-  }, [user]);
+  }
 
   // Citizen guests are sent back to the portal-selection screen so they can
   // choose the official/admin login path themselves, rather than being
@@ -105,7 +110,12 @@ export default function App() {
   }
 
   if (!user) return <><Login onLogin={loginAsRole} loading={loading} authError={authError} /><CookieBanner /></>;
-  if (user.mustChangePassword) return <><ChangePasswordScreen user={user} onPasswordChanged={changePass} onLogout={logout} reason={user.passwordExpired ? 'expired' : 'first_login'} /><CookieBanner /></>;
+  if (user.mustChangePassword) {
+    if (user.passwordExpired) {
+      return <><ChangePasswordScreen user={user} onPasswordChanged={changePass} onLogout={logout} reason="expired" /><CookieBanner /></>;
+    }
+    return <><FirstLoginScreen user={user} onTokenReceived={loginWithToken} onLogout={logout} /><CookieBanner /></>;
+  }
   if (activePage === null) return <CookieBanner />;
 
   function renderDashboard() {
@@ -162,7 +172,7 @@ export default function App() {
 
   return (
     <>
-      <Layout user={user} activePage={activePage} onNavigate={navigate} onLogout={logout} onChangePassword={changePass}>
+      <Layout user={user} activePage={activePage} onNavigate={navigate} onLogout={logout} onChangePassword={changePass} onMobileVerified={loginWithToken}>
         {renderDashboard()}
       </Layout>
       <CookieBanner />

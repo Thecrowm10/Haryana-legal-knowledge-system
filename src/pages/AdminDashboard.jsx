@@ -1,15 +1,18 @@
 ﻿import { useState, useEffect, useRef } from 'react';
-import { useTranslation } from 'react-i18next';
-import { Users, ShieldCheck, Settings, Activity, ClipboardList, Trash2, Edit2, Plus, CheckCircle, XCircle, Building2, X, Eye, EyeOff, ChevronDown, Check, Download, Layers, FileText, Clock, Search, Filter, Link2 } from 'lucide-react';
+import { useTranslation, Trans } from 'react-i18next';
+import { Users, Trash2, Edit2, Plus, CheckCircle, XCircle, Building2, X, Eye, EyeOff, Check, Download, FileSpreadsheet, Layers, FileText, Clock, Search, Link2 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import SelectField from '../components/ui/SelectField';
+import MultiSelectField from '../components/ui/MultiSelectField';
 import DocViewModal from '../components/DocViewModal';
-import { getUsers, getRoles, updateUser, registerUser } from '../services/users';
+import { getUsers, getRoles, updateUser, registerUser, getApproversByDepartment } from '../services/users';
 import { getDepartments, createDepartment, toggleDepartment, getDocumentTypes, createDocumentType, toggleDocumentType } from '../services/departments';
+import { getRoleCaps, upsertRoleCap, deleteRoleCap, getActiveUserCount } from '../services/roleCaps';
 import { getAllDocumentsAdmin, getAllDepartmentLinks } from '../services/pdf';
-import { getAuditLogs } from '../services/audit';
+import { getAuditLogs, getAuditLogActions } from '../services/audit';
 import { useMediaQuery } from '../hooks/useMediaQuery';
+import { downloadUploadsExcelReport } from '../utils/uploadsExcelReport';
 
 const LABEL = { fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)' };
 
@@ -53,17 +56,8 @@ function exportCSV(data, filename) {
 }
 
 const AUDIT_PAGE_SIZE = 10;
-
-function auditEntityOptions(t) {
-  return [
-    { value: '',               label: t('audit.entities.all') },
-    { value: 'auth',           label: t('audit.entities.auth') },
-    { value: 'user',           label: t('audit.entities.user') },
-    { value: 'pdf',            label: t('audit.entities.pdf') },
-    { value: 'department',     label: t('audit.entities.department') },
-    { value: 'document_type',  label: t('audit.entities.documentType') },
-  ];
-}
+const CAPS_PAGE_SIZE = 10;
+const EMAIL_FORMAT_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function fmtAction(action) {
   return action.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
@@ -89,6 +83,14 @@ const ADM_RESPONSIVE_CSS = `
     .adm-users-actions { width: 100% !important; }
     .adm-users-actions > * { flex: 1 1 auto !important; min-width: 0 !important; }
   }
+  .adm-mdm-scroll { scrollbar-width: thin; }
+  .adm-mdm-scroll::-webkit-scrollbar { width: 6px; }
+  .adm-mdm-scroll::-webkit-scrollbar-thumb { background: var(--surface-border); border-radius: 4px; }
+  @media (max-width: 640px) {
+    .adm-filter-bar { flex-direction: column !important; align-items: stretch !important; }
+    .adm-filter-bar > * { width: 100% !important; flex: 1 1 auto !important; margin-left: 0 !important; }
+    .adm-filter-bar button { width: 100% !important; justify-content: center !important; }
+  }
 `;
 
 export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxonomy }) {
@@ -112,7 +114,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       })
       .catch(() => setUsersError(t('users.failedToLoadUsers')))
       .finally(() => setUsersLoading(false));
-  }, [activePage]);
+  }, [activePage, t]);
 
   // Departments state — full list for add/edit selectors
   const [depts, setDepts]               = useState([]);
@@ -131,7 +133,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       .then(res => setDepts(res.data))
       .catch(() => setDeptsError(t('taxonomy.errors.departmentsLoadFailed')))
       .finally(() => setDeptsLoading(false));
-  }, [activePage]);
+  }, [activePage, t]);
 
   // Document Types state
   const [docTypes, setDocTypes]               = useState([]);
@@ -142,6 +144,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   const [deptMdmCreating, setDeptMdmCreating]         = useState(false);
   const [deptMdmCreateError, setDeptMdmCreateError]   = useState('');
   const [mdmToggling, setMdmToggling]                 = useState(null); // { category, id }
+  const [confirmToggleMdm, setConfirmToggleMdm]       = useState(null); // { category, item }
 
   useEffect(() => {
     if (activePage !== 'taxonomy') return;
@@ -151,7 +154,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       .then(res => setDocTypes(res.data))
       .catch(() => setDocTypesError(t('taxonomy.errors.docTypesLoadFailed')))
       .finally(() => setDocTypesLoading(false));
-  }, [activePage]);
+  }, [activePage, t]);
 
   // All Uploads state
   const [allDocs, setAllDocs]           = useState([]);
@@ -163,6 +166,17 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   const [uploadsFilterUploader, setUploadsFilterUploader] = useState('');
   const [uploadsFilterApprover, setUploadsFilterApprover] = useState('');
   const [viewDoc, setViewDoc]                             = useState(null);
+  const [showReportPanel, setShowReportPanel] = useState(false);
+  const [reportDeptIds, setReportDeptIds]     = useState([]);
+  const [reportGenerating, setReportGenerating] = useState(false);
+  const reportPanelRef = useRef(null);
+
+  useEffect(() => {
+    if (!showReportPanel) return;
+    const close = e => { if (!reportPanelRef.current?.contains(e.target)) setShowReportPanel(false); };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [showReportPanel]);
 
   useEffect(() => {
     if (activePage !== 'alluploads') return;
@@ -178,7 +192,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       })
       .catch(() => setAllDocsError(t('uploads.failedToLoad')))
       .finally(() => setAllDocsLoading(false));
-  }, [activePage]);
+  }, [activePage, t]);
 
   // Audit Log state
   const [auditLogs, setAuditLogs]               = useState([]);
@@ -186,27 +200,42 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   const [auditLoading, setAuditLoading]         = useState(false);
   const [auditError, setAuditError]             = useState('');
   const [auditPage, setAuditPage]               = useState(0);
-  const [auditFilterEntity, setAuditFilterEntity] = useState('');
   const [auditFilterAction, setAuditFilterAction] = useState('');
-  const [auditFilterStatus, setAuditFilterStatus] = useState('');
   const [auditFromDate, setAuditFromDate]       = useState('');
   const [auditToDate, setAuditToDate]           = useState('');
   const [auditSearch, setAuditSearch]           = useState('');
+  const [auditActionOptions, setAuditActionOptions] = useState([]);
+  const [auditExporting, setAuditExporting]     = useState(false);
+
+  // Fetch all distinct action values once when the MIS page is first opened.
+  const [auditActionsLoaded, setAuditActionsLoaded] = useState(false);
+  useEffect(() => {
+    if (activePage !== 'auditfull' || auditActionsLoaded) return;
+    getAuditLogActions()
+      .then(res => {
+        setAuditActionOptions(res.data.actions || []);
+        setAuditActionsLoaded(true);
+      })
+      .catch(() => {});
+  }, [activePage, auditActionsLoaded]);
 
   useEffect(() => {
     if (activePage !== 'auditfull') return;
     setAuditLoading(true);
     setAuditError('');
     const params = { skip: auditPage * AUDIT_PAGE_SIZE, limit: AUDIT_PAGE_SIZE };
-    if (auditFilterEntity) params.entity_type = auditFilterEntity;
     if (auditFilterAction) params.action       = auditFilterAction;
     if (auditFromDate)     params.from_date    = auditFromDate;
     if (auditToDate)       params.to_date      = auditToDate + 'T23:59:59';
     getAuditLogs(params)
-      .then(res => { setAuditLogs(res.data.logs || []); setAuditTotal(res.data.total || 0); })
+      .then(res => {
+        const logs = res.data.logs || [];
+        setAuditLogs(logs);
+        setAuditTotal(res.data.total || 0);
+      })
       .catch(() => setAuditError(t('audit.failedToLoad')))
       .finally(() => setAuditLoading(false));
-  }, [activePage, auditPage, auditFilterEntity, auditFilterAction, auditFilterStatus, auditFromDate, auditToDate]);
+  }, [activePage, auditPage, auditFilterAction, auditFromDate, auditToDate, t]);
 
   // Linked Documents state (admin view)
   const [allLinks, setAllLinks]           = useState([]);
@@ -264,7 +293,6 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
         ...(d.no_of_ordinances      ? { noOfOrdinances:     d.no_of_ordinances }      : {}),
         ...(d.no_of_orders          ? { noOfOrders:         d.no_of_orders }          : {}),
         ...(d.keywords              ? { keywords:           d.keywords }              : {}),
-        ...(d.is_repealed           ? { repealed:           'Yes' }                   : {}),
       },
       // Amend / replace / issued-under links to other documents
       docRelations: (d.relationships || [])
@@ -319,7 +347,93 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       })
       .catch(() => setAllLinksError(t('linkedDocs.failedToLoad')))
       .finally(() => setAllLinksLoading(false));
-  }, [activePage]);
+  }, [activePage, t]);
+
+  // Role Caps state
+  const [capsDefaultMax, setCapsDefaultMax] = useState(null);
+  const [caps, setCaps]                 = useState([]);
+  const [capsLoading, setCapsLoading]   = useState(false);
+  const [capsError, setCapsError]       = useState('');
+  const [capForm, setCapForm]           = useState({ department_id: '', role_id: '', max_users: '' });
+  const [capFormError, setCapFormError] = useState('');
+  const [capSaving, setCapSaving]       = useState(false);
+  const [capEditId, setCapEditId]       = useState(null);
+  const [capEditVal, setCapEditVal]     = useState('');
+  const [capDeptSearch, setCapDeptSearch]   = useState('');
+  const [capDeptOpen, setCapDeptOpen]       = useState(false);
+  const [capActiveCount, setCapActiveCount] = useState(null);
+  const [capsPage, setCapsPage]             = useState(0);
+
+  useEffect(() => {
+    if (!capForm.department_id || !capForm.role_id) {
+      setCapActiveCount(null);
+      return;
+    }
+    const existing = caps.find(
+      c => String(c.department_id) === String(capForm.department_id) && String(c.role_id) === String(capForm.role_id)
+    );
+    setCapForm(f => ({ ...f, max_users: existing ? String(existing.max_users) : (capsDefaultMax != null ? String(capsDefaultMax) : '') }));
+    setCapActiveCount(null);
+    getActiveUserCount(capForm.department_id, capForm.role_id)
+      .then(res => setCapActiveCount(res.data.active_count))
+      .catch(() => setCapActiveCount(null));
+  }, [capForm.department_id, capForm.role_id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (activePage !== 'rolecaps') return;
+    setCapsLoading(true);
+    setCapsError('');
+    Promise.all([getRoleCaps(), getDepartments(), getRoles()])
+      .then(([capsRes, deptsRes, rolesRes]) => {
+        setCapsDefaultMax(capsRes.data.default_max);
+        setCaps(capsRes.data.limits);
+        setDepts(deptsRes.data);
+        setRoles(rolesRes.data);
+      })
+      .catch(() => setCapsError(t('roleCaps.errors.loadFailed')))
+      .finally(() => setCapsLoading(false));
+  }, [activePage, t]);
+
+  function handleCapSave(e) {
+    e.preventDefault();
+    if (!capForm.department_id) { setCapFormError(t('roleCaps.errors.deptRequired')); return; }
+    if (!capForm.role_id)       { setCapFormError(t('roleCaps.errors.roleRequired')); return; }
+    const max = parseInt(capForm.max_users, 10);
+    if (isNaN(max) || max < 0) { setCapFormError(t('roleCaps.errors.maxRequired')); return; }
+    if (capActiveCount !== null && max < capActiveCount) {
+      setCapFormError(t('roleCaps.errors.belowActiveCount', { count: capActiveCount, defaultValue: `${capActiveCount} users are already active with this role in this department. Cap must be at least ${capActiveCount}.` }));
+      return;
+    }
+    setCapSaving(true);
+    setCapFormError('');
+    upsertRoleCap({ department_id: Number(capForm.department_id), role_id: Number(capForm.role_id), max_users: max })
+      .then(() => getRoleCaps().then(r => { setCapsDefaultMax(r.data.default_max); setCaps(r.data.limits); setCapForm({ department_id: '', role_id: '', max_users: '' }); setCapDeptSearch(''); setCapActiveCount(null); }))
+      .catch(() => setCapFormError(t('roleCaps.errors.saveFailed')))
+      .finally(() => setCapSaving(false));
+  }
+
+  function handleCapInlineEdit(cap) {
+    setCapEditId(cap.id);
+    setCapEditVal(String(cap.max_users));
+  }
+
+  function handleCapInlineSave(cap) {
+    const max = parseInt(capEditVal, 10);
+    if (isNaN(max) || max < 0) return;
+    upsertRoleCap({ department_id: cap.department_id, role_id: cap.role_id, max_users: max })
+      .then(() => {
+        setCaps(prev => prev.map(c => c.id === cap.id ? { ...c, max_users: max } : c));
+        setCapEditId(null);
+      })
+      .catch(() => {});
+  }
+
+  function handleCapDelete(cap) {
+    if (!window.confirm(t('roleCaps.deleteConfirm', { role: cap.role_name, dept: cap.department_name, default: capsDefaultMax }))) return;
+    deleteRoleCap(cap.department_id, cap.role_id)
+      .then(() => setCaps(prev => prev.filter(c => c.id !== cap.id)))
+      .catch(() => {});
+  }
 
   function handleCreateDept(e) {
     e.preventDefault();
@@ -403,6 +517,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
 
   function handleMdmToggle(category, item) {
     const id = item.id;
+    setConfirmToggleMdm(null);
     setMdmToggling({ category, id });
     const toggleFn = category === 'Departments' ? toggleDepartment : toggleDocumentType;
     toggleFn(id)
@@ -418,25 +533,49 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   }
 
   // Add User modal state
-  const EMPTY_ADD_FORM = { username: '', email: '', mobile_number: '', password: '', first_name: '', last_name: '', role_id: '', department_id: '', dept_ids: [] };
+  const EMPTY_ADD_FORM = { username: '', email: '', mobile_number: '', password: '', first_name: '', last_name: '', role_id: '', department_id: '', dept_ids: [], approver_id: '' };
   const [addingUser, setAddingUser]   = useState(false);
   const [addForm, setAddForm]         = useState(EMPTY_ADD_FORM);
   const [addSaving, setAddSaving]     = useState(false);
   const [addError, setAddError]       = useState('');
   const [showAddPass, setShowAddPass] = useState(false);
+  const [approvers, setApprovers]     = useState([]);
+  const [approversLoading, setApproversLoading] = useState(false);
+
+  const _addFormRoleName = roles.find(r => String(r.id) === String(addForm.role_id))?.name;
+  useEffect(() => {
+    if (_addFormRoleName !== 'uploader' || !addForm.department_id) {
+      setApprovers([]);
+      return;
+    }
+    setApproversLoading(true);
+    getApproversByDepartment(addForm.department_id)
+      .then(res => setApprovers(res.data || []))
+      .catch(() => setApprovers([]))
+      .finally(() => setApproversLoading(false));
+  }, [_addFormRoleName, addForm.department_id]);
 
   async function handleAddUser() {
+    const selectedRole = roles.find(r => String(r.id) === String(addForm.role_id));
+    const isNodal    = selectedRole?.name === 'nodal Officer';
+    const isUploader = selectedRole?.name === 'uploader';
+    if (!addForm.role_id)         { setAddError(t('users.errors.roleRequired')); return; }
+    if (isNodal ? addForm.dept_ids.length === 0 : !addForm.department_id) { setAddError(t('users.errors.departmentRequired')); return; }
+    if (isUploader && !addForm.approver_id) { setAddError('Please select an approver for this uploader.'); return; }
     if (!addForm.username.trim()) { setAddError(t('users.errors.usernameRequired')); return; }
     if (!addForm.email.trim())    { setAddError(t('users.errors.emailRequired')); return; }
+    if (!EMAIL_FORMAT_RE.test(addForm.email.trim())) { setAddError(t('users.errors.emailInvalid')); return; }
     if (!addForm.password)        { setAddError(t('users.errors.passwordRequired')); return; }
+    if (!addForm.first_name.trim()) { setAddError(t('users.errors.firstNameRequired')); return; }
+    if (!addForm.last_name.trim())  { setAddError(t('users.errors.lastNameRequired')); return; }
+    if (addForm.mobile_number.trim().length !== 10) { setAddError(t('users.errors.mobileRequired')); return; }
     setAddSaving(true);
     setAddError('');
     try {
-      const isNodal = roles.find(r => String(r.id) === String(addForm.role_id))?.name === 'nodal Officer';
       const res = await registerUser({
         username:      addForm.username.trim(),
         email:         addForm.email.trim(),
-        mobile_number: addForm.mobile_number.trim() || undefined,
+        mobile_number: addForm.mobile_number.trim(),
         password:      addForm.password,
         first_name:    addForm.first_name.trim(),
         last_name:     addForm.last_name.trim(),
@@ -444,6 +583,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
         department_id: isNodal
           ? (addForm.dept_ids.length > 0 ? addForm.dept_ids.join(',') : undefined)
           : (addForm.department_id || undefined),
+        approver_id:   isUploader && addForm.approver_id ? Number(addForm.approver_id) : undefined,
       });
       setUsers(prev => [normalizeUser(res.data), ...prev]);
       setAddingUser(false);
@@ -463,9 +603,9 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   const [editSaving, setEditSaving]   = useState(false);
   const [editError, setEditError]     = useState('');
   const [togglingId, setTogglingId]   = useState(null);
+  const [confirmToggleUser, setConfirmToggleUser] = useState(null);
 
   function openEdit(u) {
-    const isNodal = u.role === 'nodal Officer';
     setEditingUser(u);
     setEditForm({
       first_name:    u.firstName,
@@ -473,14 +613,12 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       email:         u.email,
       is_active:     u.isActive,
       role_id:       u.roleId,
-      department_id: isNodal ? '' : String(u.deptId ?? ''),
-      dept_ids:      isNodal ? u.deptIds : [],
+      department_id: String(u.deptId ?? ''),
     });
     setEditError('');
   }
 
   function handleEditSave() {
-    const isNodal = roles.find(r => String(r.id) === String(editForm.role_id))?.name === 'nodal Officer';
     setEditSaving(true);
     setEditError('');
     updateUser({
@@ -490,9 +628,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       email:         editForm.email,
       is_active:     editForm.is_active,
       role_id:       editForm.role_id,
-      department_id: isNodal
-        ? (editForm.dept_ids.length > 0 ? editForm.dept_ids.join(',') : undefined)
-        : (editForm.department_id || undefined),
+      department_id: editForm.department_id || undefined,
     })
       .then(res => {
         setUsers(prev => prev.map(u => u.id === editingUser.id ? normalizeUser(res.data) : u));
@@ -506,6 +642,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   }
 
   function handleToggle(u) {
+    setConfirmToggleUser(null);
     setTogglingId(u.id);
     updateUser({
       user_id:       u.id,
@@ -582,7 +719,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
             <div className="adm-users-actions" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <SelectField value={deptFilter} onChange={e => setDeptFilter(e.target.value)} placeholder={t('users.allDepartments')} style={{ width: 200, maxWidth: '100%' }}>
                 <option value="">{t('users.allDepartments')}</option>
-                {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                {depts.filter(d => d.is_active !== false).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
               </SelectField>
               <button
                 onClick={() => { setAddingUser(true); setAddError(''); setAddForm({ ...EMPTY_ADD_FORM, department_id: deptFilter }); setShowAddPass(false); }}
@@ -635,7 +772,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                       <button
                         title={u.isActive ? t('users.deactivate') : t('users.activate')}
                         disabled={togglingId === u.id}
-                        onClick={() => handleToggle(u)}
+                        onClick={() => setConfirmToggleUser(u)}
                         style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: u.isActive ? 'rgba(220, 53, 69,.08)' : 'rgba(25, 135, 84,.08)', border: `1px solid ${u.isActive ? 'rgba(220, 53, 69,.2)' : 'rgba(25, 135, 84,.2)'}`, borderRadius: 7, padding: '7px 10px', cursor: togglingId === u.id ? 'not-allowed' : 'pointer', color: u.isActive ? '#dc3545' : '#198754', fontSize: 12, fontWeight: 600, fontFamily: 'var(--font)', opacity: togglingId === u.id ? 0.5 : 1 }}>
                         {u.isActive ? <XCircle size={12} /> : <CheckCircle size={12} />} {u.isActive ? t('users.deactivate') : t('users.activate')}
                       </button>
@@ -681,7 +818,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                       <button
                         title={u.isActive ? t('users.deactivate') : t('users.activate')}
                         disabled={togglingId === u.id}
-                        onClick={() => handleToggle(u)}
+                        onClick={() => setConfirmToggleUser(u)}
                         style={{ background: u.isActive ? 'rgba(220, 53, 69,.08)' : 'rgba(25, 135, 84,.08)', border: `1px solid ${u.isActive ? 'rgba(220, 53, 69,.2)' : 'rgba(25, 135, 84,.2)'}`, borderRadius: 6, padding: '5px 8px', cursor: togglingId === u.id ? 'not-allowed' : 'pointer', color: u.isActive ? '#dc3545' : '#198754', display: 'flex', opacity: togglingId === u.id ? 0.5 : 1 }}>
                         {u.isActive ? <XCircle size={12} /> : <CheckCircle size={12} />}
                       </button>
@@ -701,14 +838,14 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
           <>
             <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.25)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', zIndex: 300, animation: 'drawerFadeIn .2s ease' }} />
             <div className="adm-drawer" style={{
-              position: 'fixed', right: 0, top: 0, height: '100vh', width: 460,
+              position: 'fixed', right: 0, top: 0, bottom: 0, width: 460,
               background: 'var(--surface-card)', boxShadow: '-4px 0 40px rgba(0,0,0,.18)',
               zIndex: 301, display: 'flex', flexDirection: 'column',
               animation: 'drawerSlideIn .28s cubic-bezier(.22,1,.36,1)',
             }}>
 
               {/* Header */}
-              <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
                 <div>
                   <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)' }}>{t('users.addDrawer.title')}</div>
                   <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-color-secondary)', marginTop: 1 }}>{t('users.addDrawer.subtitle')}</div>
@@ -721,6 +858,81 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
 
               {/* Body */}
               <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+                {/* Role + Department */}
+                {(() => {
+                  const isNodal = roles.find(r => String(r.id) === String(addForm.role_id))?.name === 'nodal Officer';
+                  return (
+                    <>
+                      <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: isNodal ? '1fr' : '1fr 1fr', gap: 12 }}>
+                        <div>
+                          <label htmlFor="adm-add-role" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.role')} <span style={{ color: '#dc3545' }}>*</span></label>
+                          <SelectField
+                            id="adm-add-role"
+                            required
+                            value={addForm.role_id}
+                            onChange={e => setAddForm(f => ({ ...f, role_id: e.target.value, department_id: '', dept_ids: [], approver_id: '' }))}
+                            placeholder={t('users.addDrawer.roleSelectPlaceholder')}
+                          >
+                            {assignableRoles(roles).map(r => (
+                              <option key={r.id} value={r.id}>{r.name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</option>
+                            ))}
+                          </SelectField>
+                        </div>
+                        {!isNodal && (
+                          <div>
+                            <label htmlFor="adm-add-department" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.department')} <span style={{ color: '#dc3545' }}>*</span></label>
+                            <SelectField id="adm-add-department" required value={addForm.department_id} onChange={e => setAddForm(f => ({ ...f, department_id: e.target.value, approver_id: '' }))} placeholder={t('users.addDrawer.departmentSelectPlaceholder')}>
+                              {depts.filter(d => d.is_active !== false).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                            </SelectField>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Approver assignment — uploader role only */}
+                      {!isNodal && roles.find(r => String(r.id) === String(addForm.role_id))?.name === 'uploader' && addForm.department_id && (
+                        <div>
+                          <label htmlFor="adm-add-approver" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>
+                            Assign Approver <span style={{ color: '#dc3545' }}>*</span>
+                          </label>
+                          <SelectField
+                            id="adm-add-approver"
+                            required
+                            value={addForm.approver_id}
+                            onChange={e => setAddForm(f => ({ ...f, approver_id: e.target.value }))}
+                            placeholder={approversLoading ? 'Loading approvers…' : approvers.length === 0 ? 'No approvers in this department' : 'Select approver'}
+                          >
+                            {approvers.map(a => (
+                              <option key={a.id} value={a.id}>
+                                {a.first_name} {a.last_name} ({a.username})
+                              </option>
+                            ))}
+                          </SelectField>
+                          {approvers.length === 0 && !approversLoading && (
+                            <div style={{ fontSize: 11.5, color: '#e67e22', marginTop: 5 }}>
+                              ⚠ No active approvers found for this department. Create an approver first.
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Managed Departments — nodal officer only */}
+                      {isNodal && (
+                        <div>
+                          <label htmlFor="adm-add-dept-multi" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.department')} <span style={{ color: '#dc3545' }}>*</span></label>
+                          <MultiSelectField
+                            id="adm-add-dept-multi"
+                            value={addForm.dept_ids}
+                            onChange={ids => setAddForm(f => ({ ...f, dept_ids: ids }))}
+                            options={depts}
+                            placeholder={t('multiSelect.selectDepartments')}
+                            selectedLabel={count => t('multiSelect.departmentsSelected', { count })}
+                          />
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
 
                 {/* Username + Email */}
                 <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -764,13 +976,13 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 {/* First + Last name */}
                 <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
-                    <label htmlFor="adm-add-firstname" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.firstName')}</label>
+                    <label htmlFor="adm-add-firstname" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.firstName')} <span style={{ color: '#dc3545' }}>*</span></label>
                     <input id="adm-add-firstname" style={INP_STYLE} placeholder={t('users.addDrawer.firstNamePlaceholder')}
                       value={addForm.first_name}
                       onChange={e => setAddForm(f => ({ ...f, first_name: e.target.value }))} />
                   </div>
                   <div>
-                    <label htmlFor="adm-add-lastname" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.lastName')}</label>
+                    <label htmlFor="adm-add-lastname" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.lastName')} <span style={{ color: '#dc3545' }}>*</span></label>
                     <input id="adm-add-lastname" style={INP_STYLE} placeholder={t('users.addDrawer.lastNamePlaceholder')}
                       value={addForm.last_name}
                       onChange={e => setAddForm(f => ({ ...f, last_name: e.target.value }))} />
@@ -779,7 +991,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
 
                 {/* Mobile Number */}
                 <div>
-                  <label htmlFor="adm-add-mobile" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.mobileNumber')}</label>
+                  <label htmlFor="adm-add-mobile" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.mobileNumber')} <span style={{ color: '#dc3545' }}>*</span></label>
                   <input id="adm-add-mobile" style={INP_STYLE}
                     type="tel"
                     inputMode="numeric"
@@ -789,52 +1001,6 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                     onChange={e => setAddForm(f => ({ ...f, mobile_number: e.target.value.replace(/\D/g, '') }))} />
                 </div>
 
-                {/* Role + Department */}
-                {(() => {
-                  const isNodal = roles.find(r => String(r.id) === String(addForm.role_id))?.name === 'nodal Officer';
-                  return (
-                    <>
-                      <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: isNodal ? '1fr' : '1fr 1fr', gap: 12 }}>
-                        <div>
-                          <label htmlFor="adm-add-role" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.role')}</label>
-                          <SelectField
-                            id="adm-add-role"
-                            value={addForm.role_id}
-                            onChange={e => setAddForm(f => ({ ...f, role_id: e.target.value, department_id: '', dept_ids: [] }))}
-                            placeholder={t('users.addDrawer.roleSelectPlaceholder')}
-                          >
-                            {assignableRoles(roles).map(r => (
-                              <option key={r.id} value={r.id}>{r.name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</option>
-                            ))}
-                          </SelectField>
-                        </div>
-                        {!isNodal && (
-                          <div>
-                            <label htmlFor="adm-add-department" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.department')}</label>
-                            <SelectField id="adm-add-department" value={addForm.department_id} onChange={e => setAddForm(f => ({ ...f, department_id: e.target.value }))} placeholder={t('users.addDrawer.departmentSelectPlaceholder')}>
-                              {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                            </SelectField>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Managed Departments — nodal officer only */}
-                      {isNodal && (
-                        <div>
-                          <label htmlFor="adm-add-dept-multi" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.department')}</label>
-                          <MultiSelectField
-                            id="adm-add-dept-multi"
-                            value={addForm.dept_ids}
-                            onChange={ids => setAddForm(f => ({ ...f, dept_ids: ids }))}
-                            options={depts}
-                            placeholder={t('multiSelect.selectDepartments')}
-                          />
-                        </div>
-                      )}
-                    </>
-                  );
-                })()}
-
                 {addError && (
                   <div style={{ padding: '9px 12px', background: 'rgba(220, 53, 69,.08)', border: '1px solid rgba(220, 53, 69,.25)', borderRadius: 8, fontSize: 12.5, color: '#dc3545', display: 'flex', gap: 7, alignItems: 'center' }}>
                     <span>⚠</span> {addError}
@@ -843,17 +1009,27 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
               </div>
 
               {/* Footer */}
-              <div style={{ padding: '16px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <div style={{ padding: '16px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end', gap: 10, flexShrink: 0 }}>
                 <button onClick={() => setAddingUser(false)}
                   style={{ padding: '9px 18px', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'var(--text-color)', fontFamily: 'var(--font)' }}>
                   {t('users.addDrawer.cancel')}
                 </button>
                 {(() => {
-                  const addFormInvalid = !addForm.username.trim() || !addForm.email.trim() || !addForm.password;
+                  const _footerRole = roles.find(r => String(r.id) === String(addForm.role_id));
+                  const isNodal    = _footerRole?.name === 'nodal Officer';
+                  const isUploader = _footerRole?.name === 'uploader';
+                  const addFormInvalid = !addForm.role_id
+                    || (isNodal ? addForm.dept_ids.length === 0 : !addForm.department_id)
+                    || (isUploader && !addForm.approver_id)
+                    || !addForm.username.trim() || !addForm.email.trim() || !addForm.password
+                    || !addForm.first_name.trim() || !addForm.last_name.trim()
+                    || addForm.mobile_number.trim().length !== 10;
                   const addBtnDisabled = addSaving || addFormInvalid;
                   return (
-                    <button onClick={handleAddUser} disabled={addBtnDisabled}
-                      style={{ padding: '9px 20px', background: addBtnDisabled ? 'var(--surface-border)' : 'var(--primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: addBtnDisabled ? 'not-allowed' : 'pointer', color: addBtnDisabled ? 'var(--text-color-secondary)' : 'white', fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 7 }}>
+                    <button
+                      onClick={() => { if (addFormInvalid) { setAddError(t('users.errors.fillMandatory')); return; } handleAddUser(); }}
+                      disabled={addSaving}
+                      style={{ padding: '9px 20px', background: addBtnDisabled ? 'var(--surface-border)' : 'var(--primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: addSaving ? 'not-allowed' : 'pointer', color: addBtnDisabled ? 'var(--text-color-secondary)' : 'white', fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 7 }}>
                       {addSaving
                         ? <><div style={{ width: 12, height: 12, border: '2px solid rgba(0,0,0,.2)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin .7s linear infinite' }} /> {t('users.addDrawer.creating')}</>
                         : <><Plus size={13} /> {t('users.addDrawer.createUser')}</>
@@ -935,7 +1111,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                           <div>
                             <label htmlFor="adm-edit-department" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.department')}</label>
                             <SelectField id="adm-edit-department" value={editForm.department_id ?? ''} onChange={e => setEditForm(f => ({ ...f, department_id: e.target.value || null }))} placeholder={t('users.editModal.selectDepartment')}>
-                              {depts.map(d => (
+                              {depts.filter(d => d.is_active !== false).map(d => (
                                 <option key={d.id} value={d.id}>{d.name}</option>
                               ))}
                             </SelectField>
@@ -951,6 +1127,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                             onChange={ids => setEditForm(f => ({ ...f, dept_ids: ids }))}
                             options={depts}
                             placeholder={t('multiSelect.selectDepartments')}
+                            selectedLabel={count => t('multiSelect.departmentsSelected', { count })}
                           />
                         </div>
                       )}
@@ -1003,6 +1180,43 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
           </div>
         )}
 
+        {/* Activate/Deactivate Confirm Modal */}
+        {confirmToggleUser && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            onClick={e => { if (e.target === e.currentTarget) setConfirmToggleUser(null); }}>
+            <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.45)', backdropFilter: 'blur(4px)' }} />
+            <div style={{
+              position: 'relative', zIndex: 1,
+              background: 'var(--surface-card)',
+              border: '1px solid var(--surface-border)',
+              borderRadius: 16,
+              width: 'clamp(300px, 90vw, 420px)',
+              boxShadow: '0 24px 64px rgba(0,0,0,.25)',
+              padding: '22px',
+            }}>
+              <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)' }}>
+                {confirmToggleUser.isActive ? t('users.confirmToggle.deactivateTitle') : t('users.confirmToggle.activateTitle')}
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--text-color-secondary)', marginTop: 10, lineHeight: 1.5 }}>
+                {confirmToggleUser.isActive
+                  ? <Trans t={t} i18nKey="users.confirmToggle.confirmDeactivate" values={{ name: confirmToggleUser.name }} components={[<strong key="s" style={{ color: 'var(--text-heading)' }} />]} />
+                  : <Trans t={t} i18nKey="users.confirmToggle.confirmActivate" values={{ name: confirmToggleUser.name }} components={[<strong key="s" style={{ color: 'var(--text-heading)' }} />]} />}
+                {confirmToggleUser.isActive && ' ' + t('users.confirmToggle.loginBlockedNote')}
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
+                <button onClick={() => setConfirmToggleUser(null)}
+                  style={{ padding: '9px 18px', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'var(--text-color)', fontFamily: 'var(--font)' }}>
+                  {t('users.confirmToggle.cancel')}
+                </button>
+                <button onClick={() => handleToggle(confirmToggleUser)}
+                  style={{ padding: '9px 20px', background: confirmToggleUser.isActive ? '#dc3545' : '#198754', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'white', fontFamily: 'var(--font)' }}>
+                  {confirmToggleUser.isActive ? t('users.confirmToggle.deactivate') : t('users.confirmToggle.activate')}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
     );
   }
@@ -1029,6 +1243,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
           const canCreateApi = cat.category === 'Document Types' || cat.category === 'Departments';
           const apiItems     = cat.category === 'Departments' ? depts : cat.category === 'Document Types' ? docTypes : [];
           const apiLoading   = cat.category === 'Departments' ? deptsLoading : docTypesLoading;
+          const apiError     = cat.category === 'Departments' ? deptsError : cat.category === 'Document Types' ? docTypesError : '';
           const displayItems = isApiDriven ? apiItems : cat.items;
           const addCreating  = cat.category === 'Document Types' ? docTypeCreating : cat.category === 'Departments' ? deptMdmCreating : false;
           const addError     = cat.category === 'Document Types' ? docTypeCreateError : cat.category === 'Departments' ? deptMdmCreateError : '';
@@ -1039,9 +1254,9 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, paddingBottom: 12, borderBottom: '1px solid var(--surface-border)' }}>
               <div>
                 <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>{cat.category}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 2 }}>
+                <div style={{ fontSize: 11, color: apiError ? '#dc3545' : 'var(--text-color-secondary)', marginTop: 2 }}>
                   {isApiDriven
-                    ? (apiLoading ? t('taxonomy.loading') : t('taxonomy.activeOfTotal', { active: activeCount, total: apiItems.length }))
+                    ? (apiLoading ? t('taxonomy.loading') : apiError || t('taxonomy.activeOfTotal', { active: activeCount, total: apiItems.length }))
                     : t('taxonomy.itemsCount', { count: cat.items.length })
                   }
                 </div>
@@ -1064,6 +1279,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              <div className="adm-mdm-scroll" style={{ display: 'flex', flexDirection: 'column', gap: 5, maxHeight: 340, overflowY: 'auto', overscrollBehavior: 'contain', paddingRight: 4 }}>
               {displayItems.map((item, idx) => {
                 const isApiItem  = isApiDriven;
                 const itemName   = isApiItem ? item.name : item;
@@ -1094,7 +1310,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                         <span style={{ fontSize: 12.5, color: 'var(--text-color)', flex: 1 }}>{itemName}</span>
                         {isApiItem && (
                           <button
-                            onClick={() => handleMdmToggle(cat.category, item)}
+                            onClick={() => setConfirmToggleMdm({ category: cat.category, item })}
                             disabled={isToggling}
                             title={isActive ? t('taxonomy.deactivate') : t('taxonomy.activate')}
                             style={{ background: 'transparent', border: 'none', cursor: isToggling ? 'not-allowed' : 'pointer', color: isActive ? '#dc3545' : '#198754', padding: 2, display: 'flex' }}>
@@ -1119,6 +1335,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                   </div>
                 );
               })}
+              </div>
 
               {(!isApiDriven || canCreateApi) && addState?.category === cat.category && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: 4 }}>
@@ -1249,11 +1466,59 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
           </div>
         </>
       )}
+
+      {/* Activate/Deactivate Confirm Modal (Master Data) */}
+      {confirmToggleMdm && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={e => { if (e.target === e.currentTarget) setConfirmToggleMdm(null); }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,.45)', backdropFilter: 'blur(4px)' }} />
+          <div style={{
+            position: 'relative', zIndex: 1,
+            background: 'var(--surface-card)',
+            border: '1px solid var(--surface-border)',
+            borderRadius: 16,
+            width: 'clamp(300px, 90vw, 420px)',
+            boxShadow: '0 24px 64px rgba(0,0,0,.25)',
+            padding: '22px',
+          }}>
+            {(() => {
+              const { category, item } = confirmToggleMdm;
+              const isActive = item.is_active !== false;
+              return (
+                <>
+                  <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)' }}>
+                    {isActive ? t('taxonomy.confirmToggle.deactivateTitle', { category }) : t('taxonomy.confirmToggle.activateTitle', { category })}
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--text-color-secondary)', marginTop: 10, lineHeight: 1.5 }}>
+                    {isActive
+                      ? <Trans t={t} i18nKey="taxonomy.confirmToggle.confirmDeactivate" values={{ name: item.name }} components={[<strong key="s" style={{ color: 'var(--text-heading)' }} />]} />
+                      : <Trans t={t} i18nKey="taxonomy.confirmToggle.confirmActivate" values={{ name: item.name }} components={[<strong key="s" style={{ color: 'var(--text-heading)' }} />]} />}
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
+                    <button onClick={() => setConfirmToggleMdm(null)}
+                      style={{ padding: '9px 18px', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'var(--text-color)', fontFamily: 'var(--font)' }}>
+                      {t('taxonomy.confirmToggle.cancel')}
+                    </button>
+                    <button onClick={() => handleMdmToggle(category, item)}
+                      style={{ padding: '9px 20px', background: isActive ? '#dc3545' : '#198754', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'white', fontFamily: 'var(--font)' }}>
+                      {isActive ? t('taxonomy.confirmToggle.deactivate') : t('taxonomy.confirmToggle.activate')}
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
     </>
     );
   }
 
   // System Monitor
+  // System Monitor — disabled for now, not wired to a real API yet (all stats/health
+  // below are hardcoded placeholders, not live data). Kept commented out rather than
+  // deleted so it's ready to wire up once that API exists.
+  /*
   if (activePage === 'monitor') {
     const stats = [
       { label: t('monitor.stats.totalDocuments'), value: '1,284', sub: t('monitor.subs.todayCount') },
@@ -1293,13 +1558,13 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       </div>
     );
   }
+  */
 
   // Full MIS Report — real audit log data, excludes current user
   if (activePage === 'auditfull') {
     const totalPages = Math.max(1, Math.ceil(auditTotal / AUDIT_PAGE_SIZE));
 
     const visibleLogs = auditLogs.filter(l => {
-      if (auditFilterStatus && l.status !== auditFilterStatus) return false;
       if (auditSearch.trim()) {
         const q = auditSearch.toLowerCase();
         const name = fmtAuditActor(l.actor).toLowerCase();
@@ -1310,19 +1575,49 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       return true;
     });
 
-    function exportAuditCSV() {
-      if (!visibleLogs.length) return;
-      const rows = visibleLogs.map(l => ({
-        timestamp:   l.created_at,
-        user:        fmtAuditActor(l.actor),
-        username:    l.actor?.username || '',
-        action:      l.action,
-        entity_type: l.entity_type,
-        entity_id:   l.entity_id ?? '',
-        status:      l.status,
-        ip_address:  l.ip_address || '',
-      }));
-      exportCSV(rows, 'mis-audit-report.csv');
+    async function exportAuditCSV() {
+      if (auditExporting) return;
+      setAuditExporting(true);
+      try {
+        const FETCH_LIMIT = 100;
+        const baseParams = {};
+        if (auditFilterAction) baseParams.action    = auditFilterAction;
+        if (auditFromDate)     baseParams.from_date = auditFromDate;
+        if (auditToDate)       baseParams.to_date   = auditToDate + 'T23:59:59';
+        let all = [];
+        let skip = 0;
+        let total = Infinity;
+        while (skip < total) {
+          const res = await getAuditLogs({ ...baseParams, skip, limit: FETCH_LIMIT });
+          const page = res.data.logs || [];
+          total = res.data.total ?? page.length;
+          all = all.concat(page);
+          if (page.length < FETCH_LIMIT) break;
+          skip += FETCH_LIMIT;
+        }
+        if (auditSearch.trim()) {
+          const q = auditSearch.toLowerCase();
+          all = all.filter(l =>
+            fmtAuditActor(l.actor).toLowerCase().includes(q) ||
+            (l.actor?.username || '').toLowerCase().includes(q) ||
+            (l.action || '').toLowerCase().includes(q)
+          );
+        }
+        if (!all.length) return;
+        const rows = all.map(l => ({
+          timestamp:   l.created_at,
+          user:        fmtAuditActor(l.actor),
+          username:    l.actor?.username || '',
+          action:      l.action,
+          entity_type: l.entity_type,
+          entity_id:   l.entity_id ?? '',
+          status:      l.status,
+          ip_address:  l.ip_address || '',
+        }));
+        exportCSV(rows, 'mis-audit-report.csv');
+      } finally {
+        setAuditExporting(false);
+      }
     }
 
     return (
@@ -1331,7 +1626,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
 
         {/* Filter bar */}
         <Card>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div className="adm-filter-bar" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             {/* Search */}
             <div style={{ position: 'relative', flex: '1 1 180px', minWidth: 160 }}>
               <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-color-secondary)' }} />
@@ -1343,23 +1638,14 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
               />
             </div>
 
-            {/* Entity type */}
-            <select
-              value={auditFilterEntity}
-              onChange={e => { setAuditFilterEntity(e.target.value); setAuditPage(0); }}
-              style={{ height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, padding: '0 10px', background: 'var(--surface-ground)', color: 'var(--text-color)', cursor: 'pointer' }}>
-              {auditEntityOptions(t).map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-
-            {/* Status */}
-            <select
-              value={auditFilterStatus}
-              onChange={e => { setAuditFilterStatus(e.target.value); setAuditPage(0); }}
-              style={{ height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, padding: '0 10px', background: 'var(--surface-ground)', color: 'var(--text-color)', cursor: 'pointer' }}>
-              <option value="">{t('audit.allStatuses')}</option>
-              <option value="success">{t('audit.success')}</option>
-              <option value="failure">{t('audit.failure')}</option>
-            </select>
+            {/* Action */}
+            <SelectField
+              value={auditFilterAction}
+              onChange={e => { setAuditFilterAction(e.target.value); setAuditPage(0); }}
+              style={{ flex: '0 0 155px' }}>
+              <option value="">{t('audit.allActions')}</option>
+              {auditActionOptions.map(a => <option key={a} value={a}>{fmtAction(a)}</option>)}
+            </SelectField>
 
             {/* Date from */}
             <input type="date" value={auditFromDate} onChange={e => { setAuditFromDate(e.target.value); setAuditPage(0); }}
@@ -1369,8 +1655,8 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
               style={{ height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, padding: '0 10px', background: 'var(--surface-ground)', color: 'var(--text-color)' }} />
 
             {/* Clear */}
-            {(auditFilterEntity || auditFilterStatus || auditFromDate || auditToDate || auditSearch) && (
-              <button onClick={() => { setAuditFilterEntity(''); setAuditFilterStatus(''); setAuditFromDate(''); setAuditToDate(''); setAuditSearch(''); setAuditPage(0); }}
+            {(auditFilterAction || auditFromDate || auditToDate || auditSearch) && (
+              <button onClick={() => { setAuditFilterAction(''); setAuditFromDate(''); setAuditToDate(''); setAuditSearch(''); setAuditPage(0); }}
                 style={{ height: 34, padding: '0 12px', border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
                 <X size={11} /> {t('audit.clear')}
               </button>
@@ -1378,9 +1664,9 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
 
             <div className="adm-audit-spacer" style={{ flex: 1 }} />
 
-            <button className="adm-export-btn" onClick={exportAuditCSV}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'var(--surface-ground)', color: 'var(--text-color)', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '0 14px', height: 34, fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
-              <Download size={13} /> {t('audit.exportCsv')}
+            <button className="adm-export-btn" onClick={exportAuditCSV} disabled={auditExporting}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'var(--surface-ground)', color: auditExporting ? 'var(--text-color-secondary)' : 'var(--text-color)', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '0 14px', height: 34, fontSize: 12.5, fontWeight: 600, cursor: auditExporting ? 'not-allowed' : 'pointer', opacity: auditExporting ? 0.7 : 1 }}>
+              <Download size={13} /> {auditExporting ? t('audit.exporting') : t('audit.exportCsv')}
             </button>
           </div>
         </Card>
@@ -1400,67 +1686,39 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
             <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>{t('audit.noRecords')}</div>
           ) : isMobile ? (
             <div>
-              {visibleLogs.map(log => {
-                const isSuccess = log.status === 'success';
-                return (
-                  <div key={log.id} style={{ padding: '11px 16px', borderBottom: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', gap: 5 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>{fmtAuditActor(log.actor)}</div>
-                      <span style={{ fontSize: 10.5, fontWeight: 700, borderRadius: 5, padding: '3px 8px', background: isSuccess ? 'rgba(25, 135, 84,.1)' : 'rgba(220, 53, 69,.1)', color: isSuccess ? '#16a34a' : '#dc3545', flexShrink: 0 }}>
-                        {isSuccess ? t('audit.success') : t('audit.failure')}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: 12.5, color: 'var(--text-color)' }}>{fmtAction(log.action)}</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 10.5, color: 'var(--text-color-secondary)' }}>
-                      <span style={{ fontFamily: 'var(--mono)' }}>{new Date(log.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })}</span>
-                      <span style={{ fontFamily: 'var(--mono)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 5, padding: '1px 6px' }}>{log.entity_type}{log.entity_id ? ` #${log.entity_id}` : ''}</span>
-                      {log.ip_address && <span style={{ fontFamily: 'var(--mono)' }}>{log.ip_address}</span>}
-                    </div>
-                  </div>
-                );
-              })}
+              {visibleLogs.map(log => (
+                <div key={log.id} style={{ padding: '11px 16px', borderBottom: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>{fmtAuditActor(log.actor)}</div>
+                  <div style={{ fontSize: 12.5, color: 'var(--text-color)' }}>{fmtAction(log.action)}</div>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 10.5, color: 'var(--text-color-secondary)' }}>{new Date(log.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })}</span>
+                </div>
+              ))}
             </div>
           ) : (
             <div className="table-scroll-wrap">
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
-                  {[t('audit.headers.timestamp'), t('audit.headers.user'), t('audit.headers.action'), t('audit.headers.entity'), t('audit.headers.status'), t('audit.headers.ipAddress')].map((h, i) => (
+                  {[t('audit.headers.timestamp'), t('audit.headers.user'), t('audit.headers.action')].map((h, i) => (
                     <th key={h} scope="col" style={{ ...LABEL, padding: '11px 16px', textAlign: 'left', ...(i > 0 && { borderLeft: '1px solid var(--surface-border)' }) }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {visibleLogs.map(log => {
-                  const isSuccess = log.status === 'success';
-                  return (
-                    <tr key={log.id} style={{ borderBottom: '1px solid var(--surface-border)', transition: 'background .15s' }}
-                      onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                      <td style={{ padding: '12px 16px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)', whiteSpace: 'nowrap' }}>
-                        {new Date(log.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })}
-                      </td>
-                      <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)' }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>{fmtAuditActor(log.actor)}</div>
-                        {log.actor?.username && <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>@{log.actor.username}</div>}
-                      </td>
-                      <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)', fontSize: 12.5, color: 'var(--text-color)' }}>{fmtAction(log.action)}</td>
-                      <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)' }}>
-                        <span style={{ fontSize: 11, fontWeight: 600, fontFamily: 'var(--mono)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 5, padding: '2px 7px', color: 'var(--text-color-secondary)' }}>
-                          {log.entity_type}{log.entity_id ? ` #${log.entity_id}` : ''}
-                        </span>
-                      </td>
-                      <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)' }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, borderRadius: 5, padding: '3px 8px', background: isSuccess ? 'rgba(25, 135, 84,.1)' : 'rgba(220, 53, 69,.1)', color: isSuccess ? '#16a34a' : '#dc3545' }}>
-                          {isSuccess ? t('audit.success') : t('audit.failure')}
-                        </span>
-                      </td>
-                      <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)', fontSize: 11.5, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>
-                        {log.ip_address || '—'}
-                      </td>
-                    </tr>
-                  );
-                })}
+                {visibleLogs.map(log => (
+                  <tr key={log.id} style={{ borderBottom: '1px solid var(--surface-border)', transition: 'background .15s' }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                    <td style={{ padding: '12px 16px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)', whiteSpace: 'nowrap' }}>
+                      {new Date(log.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })}
+                    </td>
+                    <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)' }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>{fmtAuditActor(log.actor)}</div>
+                      {log.actor?.username && <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>@{log.actor.username}</div>}
+                    </td>
+                    <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)', fontSize: 12.5, color: 'var(--text-color)' }}>{fmtAction(log.action)}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
             </div>
@@ -1494,10 +1752,15 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     const pendingDocs  = allDocs.filter(d => d.status === 'pending').length;
     const rejectedDocs = allDocs.filter(d => d.status === 'rejected').length;
 
+    // Uploader/Approver options are scoped to the selected department — pick a
+    // department first and only that department's people show up; "All Departments"
+    // shows everyone system-wide.
+    const deptScopedForOptions = uploadsFilterDept ? allDocs.filter(d => d.department_name === uploadsFilterDept) : allDocs;
+
     // unique uploaders
     const uploaderOptions = [];
     const seenUp = new Set();
-    for (const d of allDocs) {
+    for (const d of deptScopedForOptions) {
       if (d.uploader_username && !seenUp.has(d.uploader_username)) {
         seenUp.add(d.uploader_username);
         const label = [d.uploader_first_name, d.uploader_last_name].filter(Boolean).join(' ') || d.uploader_username;
@@ -1507,7 +1770,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     // unique approvers
     const approverOptions = [];
     const seenAp = new Set();
-    for (const d of allDocs) {
+    for (const d of deptScopedForOptions) {
       const key = d.latest_approval?.approver_username;
       if (key && !seenAp.has(key)) {
         seenAp.add(key);
@@ -1538,6 +1801,20 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     };
     const cols = '4px 1fr 175px 155px 155px 90px';
     const anyFilter = uploadsSearch || uploadsFilterStatus || uploadsFilterDept || uploadsFilterUploader || uploadsFilterApprover;
+
+    async function handleDownloadReport() {
+      setReportGenerating(true);
+      try {
+        const selectedNames = reportDeptIds.length
+          ? depts.filter(d => reportDeptIds.includes(d.id)).map(d => d.name)
+          : depts.map(d => d.name);
+        await downloadUploadsExcelReport({ docs: allDocs, departments: selectedNames, fileLabel: 'Admin' });
+        setShowReportPanel(false);
+        setReportDeptIds([]);
+      } finally {
+        setReportGenerating(false);
+      }
+    }
 
     return (
       <>
@@ -1574,7 +1851,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
 
         {/* Filter bar + table */}
         <Card padding="0">
-          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div className="adm-filter-bar" style={{ padding: '14px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <div style={{ position: 'relative', flex: '1 1 200px', minWidth: 180 }}>
               <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-color-secondary)', pointerEvents: 'none' }} />
               <input
@@ -1584,6 +1861,10 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                 style={{ width: '100%', padding: '7px 12px 7px 30px', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, color: 'var(--text-color)', outline: 'none', boxSizing: 'border-box' }}
               />
             </div>
+            <SelectField value={uploadsFilterDept} onChange={e => { setUploadsFilterDept(e.target.value); setUploadsFilterUploader(''); setUploadsFilterApprover(''); }} style={{ flex: '0 0 155px' }}>
+              <option value="">{t('uploads.allDepartments')}</option>
+              {depts.filter(d => d.is_active !== false).map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+            </SelectField>
             <SelectField value={uploadsFilterUploader} onChange={e => setUploadsFilterUploader(e.target.value)} style={{ flex: '0 0 155px' }}>
               <option value="">{t('uploads.allUploaders')}</option>
               {uploaderOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -1591,10 +1872,6 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
             <SelectField value={uploadsFilterApprover} onChange={e => setUploadsFilterApprover(e.target.value)} style={{ flex: '0 0 155px' }}>
               <option value="">{t('uploads.allApprovers')}</option>
               {approverOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </SelectField>
-            <SelectField value={uploadsFilterDept} onChange={e => setUploadsFilterDept(e.target.value)} style={{ flex: '0 0 155px' }}>
-              <option value="">{t('uploads.allDepartments')}</option>
-              {depts.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
             </SelectField>
             <SelectField value={uploadsFilterStatus} onChange={e => setUploadsFilterStatus(e.target.value)} style={{ flex: '0 0 130px' }}>
               <option value="">{t('uploads.allStatuses')}</option>
@@ -1610,6 +1887,41 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
             )}
             <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
               {t('uploads.countOf', { shown: filteredDocs.length, total: totalDocs })}
+            </div>
+
+            <div ref={reportPanelRef} style={{ position: 'relative' }}>
+              <button onClick={() => setShowReportPanel(o => !o)}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--surface-ground)', color: 'var(--text-color)', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '7px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                <FileSpreadsheet size={13} /> {t('uploads.report.button')}
+              </button>
+
+              {showReportPanel && (
+                <div style={{
+                  position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 620, width: 300,
+                  background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 12,
+                  boxShadow: '0 12px 32px rgba(0,0,0,.14)', padding: 16, animation: 'dropdownIn .15s cubic-bezier(.2,.8,.3,1)',
+                }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 4 }}>{t('uploads.report.panelTitle')}</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginBottom: 12, lineHeight: 1.5 }}>{t('uploads.report.panelDesc')}</div>
+                  <MultiSelectField
+                    id="adm-report-dept-multi"
+                    value={reportDeptIds}
+                    onChange={setReportDeptIds}
+                    options={depts}
+                    placeholder={t('uploads.report.allDepartmentsPlaceholder')}
+                    selectedLabel={count => t('multiSelect.departmentsSelected', { count })}
+                  />
+                  <button onClick={handleDownloadReport} disabled={reportGenerating}
+                    style={{
+                      width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: 14,
+                      background: reportGenerating ? 'var(--surface-ground)' : 'var(--primary)', color: reportGenerating ? 'var(--text-color-secondary)' : '#fff',
+                      border: 'none', borderRadius: 8, padding: '9px 12px', fontSize: 12.5, fontWeight: 700,
+                      cursor: reportGenerating ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)',
+                    }}>
+                    <Download size={13} /> {reportGenerating ? t('uploads.report.generating') : t('uploads.report.downloadButton')}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1708,9 +2020,11 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                           {doc.department_name && (
                             <span style={{ fontSize: 10, color: 'var(--text-color-secondary)' }}>{doc.department_name}</span>
                           )}
+                          {/* Version badge hidden until proper API mapping for versions is wired up — keep for future use.
                           {doc.version_no && (
                             <span style={{ fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', borderRadius: 4, padding: '1px 5px', border: '1px solid var(--surface-border)' }}>v{doc.version_no}</span>
                           )}
+                          */}
                         </div>
                       </div>
                     </div>
@@ -1833,7 +2147,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
 
         {/* Filter + table */}
         <Card padding="0">
-          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div className="adm-filter-bar" style={{ padding: '14px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <div style={{ position: 'relative', flex: '1 1 200px', minWidth: 180 }}>
               <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-color-secondary)', pointerEvents: 'none' }} />
               <input
@@ -1943,7 +2257,9 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 3 }}>
                           {link.document_type_name && <span style={{ fontSize: 10, fontWeight: 600, color: '#d97706', background: 'rgba(255, 193, 7,.1)', borderRadius: 4, padding: '1px 5px' }}>{link.document_type_name}</span>}
+                          {/* Version badge hidden until proper API mapping for versions is wired up — keep for future use.
                           {link.version_no && <span style={{ fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>v{link.version_no}</span>}
+                          */}
                         </div>
                       </div>
                     </div>
@@ -2003,112 +2319,219 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
     );
   }
 
+  if (activePage === 'rolecaps') {
+    const assignable = assignableRoles(roles);
+    const capsTotalPages = Math.max(1, Math.ceil(caps.length / CAPS_PAGE_SIZE));
+    const capsPageClamped = Math.min(capsPage, capsTotalPages - 1);
+    const pagedCaps = caps.slice(capsPageClamped * CAPS_PAGE_SIZE, capsPageClamped * CAPS_PAGE_SIZE + CAPS_PAGE_SIZE);
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
+        <style>{ADM_RESPONSIVE_CSS}</style>
+
+          {/* Heading + Add / Update form, combined in one box */}
+          <Card style={{ padding: '18px 20px' }}>
+            <div style={{ fontSize: 'var(--font-size-h3)', fontWeight: 800, color: 'var(--text-heading)', letterSpacing: '-.01em' }}>
+              {t('roleCaps.title')}
+            </div>
+            <div style={{ fontSize: 'var(--font-size-p2)', color: 'var(--text-color-secondary)', marginTop: 4 }}>
+              {t('roleCaps.subtitle', { default: capsDefaultMax })}
+            </div>
+            <div style={{ borderTop: '1px solid var(--surface-border)', margin: '18px 0 14px' }} />
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 14 }}>
+              {t('roleCaps.addTitle')}
+            </div>
+            <form onSubmit={handleCapSave}>
+              <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 140px auto', gap: 10, alignItems: 'end' }}>
+                <div style={{ position: 'relative' }}>
+                  <label style={{ ...LABEL, display: 'block', marginBottom: 5 }}>{t('roleCaps.department')}</label>
+                  <input
+                    type="text"
+                    autoComplete="off"
+                    value={capDeptSearch !== '' || !capForm.department_id
+                      ? capDeptSearch
+                      : (depts.find(d => String(d.id) === String(capForm.department_id))?.name ?? '')}
+                    placeholder={t('roleCaps.selectDepartment')}
+                    onFocus={() => setCapDeptOpen(true)}
+                    onBlur={() => setTimeout(() => setCapDeptOpen(false), 150)}
+                    onChange={e => {
+                      setCapDeptSearch(e.target.value);
+                      setCapForm(f => ({ ...f, department_id: '' }));
+                      setCapFormError('');
+                      setCapDeptOpen(true);
+                    }}
+                    style={{ width: '100%', padding: '10px 12px 10px 14px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: capForm.department_id ? 'var(--text-color)' : 'var(--text-color-secondary)', fontSize: 13, boxSizing: 'border-box', fontFamily: 'var(--font)', outline: 'none' }}
+                  />
+                  {capDeptOpen && (
+                    <div style={{
+                      position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 500,
+                      background: 'var(--surface-card)', border: '1px solid var(--surface-border)',
+                      borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,.12)',
+                      maxHeight: 200, overflowY: 'auto', marginTop: 2,
+                    }}>
+                      {depts.filter(d => d.is_active && (!capDeptSearch.trim() || d.name.toLowerCase().includes(capDeptSearch.toLowerCase()))).length === 0
+                        ? <div style={{ padding: '10px 14px', fontSize: 12.5, color: 'var(--text-color-secondary)' }}>{t('common.noResults', 'No departments found')}</div>
+                        : depts.filter(d => d.is_active && (!capDeptSearch.trim() || d.name.toLowerCase().includes(capDeptSearch.toLowerCase()))).map(d => (
+                          <div
+                            key={d.id}
+                            onMouseDown={() => {
+                              setCapForm(f => ({ ...f, department_id: String(d.id) }));
+                              setCapDeptSearch('');
+                              setCapDeptOpen(false);
+                              setCapFormError('');
+                            }}
+                            style={{
+                              padding: '9px 14px', fontSize: 13, cursor: 'pointer',
+                              background: String(capForm.department_id) === String(d.id) ? 'var(--primary-light)' : 'transparent',
+                              color: String(capForm.department_id) === String(d.id) ? 'var(--primary)' : 'var(--text-color)',
+                            }}
+                            onMouseEnter={e => { if (String(capForm.department_id) !== String(d.id)) e.currentTarget.style.background = 'var(--surface-hover)'; }}
+                            onMouseLeave={e => { if (String(capForm.department_id) !== String(d.id)) e.currentTarget.style.background = 'transparent'; }}
+                          >
+                            {d.name}
+                          </div>
+                        ))
+                      }
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <label style={{ ...LABEL, display: 'block', marginBottom: 5 }}>{t('roleCaps.role')}</label>
+                  <SelectField
+                    value={capForm.role_id}
+                    onChange={e => { setCapForm(f => ({ ...f, role_id: e.target.value })); setCapFormError(''); }}
+                    placeholder={t('roleCaps.selectRole')}
+                  >
+                    {assignable.map(r => (
+                      <option key={r.id} value={r.id}>{r.name.charAt(0).toUpperCase() + r.name.slice(1)}</option>
+                    ))}
+                  </SelectField>
+                </div>
+                <div>
+                  <label style={{ ...LABEL, display: 'block', marginBottom: 5 }}>{t('roleCaps.maxUsers')}</label>
+                  <input
+                    type="number" min="0"
+                    value={capForm.max_users}
+                    onChange={e => { setCapForm(f => ({ ...f, max_users: e.target.value })); setCapFormError(''); }}
+                    style={{ width: '100%', padding: '10px 12px 10px 14px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color)', fontSize: 13, fontFamily: 'var(--font)', boxSizing: 'border-box', outline: 'none' }}
+                  />
+                </div>
+                <button
+                  type="submit" disabled={capSaving}
+                  style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: 'var(--primary)', color: 'white', fontWeight: 700, fontSize: 13, cursor: capSaving ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}
+                >
+                  {capSaving ? t('roleCaps.saving') : t('roleCaps.save')}
+                </button>
+              </div>
+              {capActiveCount !== null && (
+                <div style={{ marginTop: 6, fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
+                  {capActiveCount === 0
+                    ? t('roleCaps.activeCountZero', 'No active users currently.')
+                    : t('roleCaps.activeCount', { count: capActiveCount, defaultValue: `${capActiveCount} active user${capActiveCount > 1 ? 's' : ''} currently.` })}
+                </div>
+              )}
+              {capFormError && (
+                <div style={{ marginTop: 6, fontSize: 12, color: '#dc3545' }}>{capFormError}</div>
+              )}
+            </form>
+          </Card>
+
+          {/* Existing limits table */}
+          <Card padding="0">
+            <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>{t('roleCaps.listHeading')}</div>
+              <span style={{ ...LABEL }}>{t('roleCaps.totalDepartments', { count: caps.length })}</span>
+            </div>
+
+            {capsLoading && (
+              <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>{t('common.loading')}</div>
+            )}
+            {capsError && (
+              <div style={{ padding: 16, color: '#dc3545', fontSize: 13 }}>{capsError}</div>
+            )}
+            {!capsLoading && !capsError && caps.length === 0 && (
+              <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>
+                {t('roleCaps.noLimits', { default: capsDefaultMax })}
+              </div>
+            )}
+            {!capsLoading && caps.length > 0 && (
+              <div className="table-scroll-wrap">
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
+                      {[t('roleCaps.headers.department'), t('roleCaps.headers.role'), t('roleCaps.headers.maxUsers'), t('roleCaps.headers.actions')].map((h, i) => (
+                        <th key={h} scope="col" style={{ ...LABEL, padding: '11px 16px', textAlign: 'left', ...(i > 0 && { borderLeft: '1px solid var(--surface-border)' }) }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pagedCaps.map(cap => (
+                      <tr key={cap.id} style={{ borderBottom: '1px solid var(--surface-border)', transition: 'background .15s' }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                        <td style={{ padding: '12px 16px', fontWeight: 600, color: 'var(--text-heading)' }}>{cap.department_name}</td>
+                        <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)', color: 'var(--text-color)' }}>{cap.role_name ? cap.role_name.charAt(0).toUpperCase() + cap.role_name.slice(1) : '—'}</td>
+                        <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)' }}>
+                          {capEditId === cap.id ? (
+                            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                              <input
+                                type="number" min="0"
+                                value={capEditVal}
+                                onChange={e => setCapEditVal(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter') handleCapInlineSave(cap); if (e.key === 'Escape') setCapEditId(null); }}
+                                autoFocus
+                                style={{ width: 70, padding: '5px 8px', borderRadius: 6, border: '1px solid var(--surface-border)', background: 'var(--surface-card)', color: 'var(--text-color)', fontSize: 13 }}
+                              />
+                              <button onClick={() => handleCapInlineSave(cap)} style={{ padding: '4px 10px', borderRadius: 6, border: 'none', background: '#198754', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>✓</button>
+                              <button onClick={() => setCapEditId(null)} style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid var(--surface-border)', background: 'transparent', color: 'var(--text-color-secondary)', fontSize: 12, cursor: 'pointer' }}>✕</button>
+                            </div>
+                          ) : (
+                            <span style={{ fontWeight: 700, color: 'var(--text-heading)' }}>{cap.max_users}</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)' }}>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <button
+                              onClick={() => handleCapInlineEdit(cap)}
+                              style={{ padding: '4px 12px', borderRadius: 6, border: '1px solid var(--surface-border)', background: 'transparent', color: 'var(--text-color)', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}
+                            >
+                              {t('roleCaps.edit')}
+                            </button>
+                            <button
+                              onClick={() => handleCapDelete(cap)}
+                              style={{ padding: '4px 12px', borderRadius: 6, border: '1px solid rgba(220,53,69,.3)', background: 'transparent', color: '#dc3545', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}
+                            >
+                              {t('roleCaps.delete')}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Pagination — only once there's more than one page */}
+            {!capsLoading && capsTotalPages > 1 && (
+              <div style={{ padding: '12px 18px', borderTop: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ ...LABEL }}>{t('audit.pageOf', { page: capsPageClamped + 1, total: capsTotalPages })}</span>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={() => setCapsPage(p => Math.max(0, p - 1))} disabled={capsPageClamped === 0}
+                    style={{ padding: '6px 14px', border: '1px solid var(--surface-border)', borderRadius: 7, fontSize: 12.5, background: 'var(--surface-ground)', color: capsPageClamped === 0 ? 'var(--text-color-secondary)' : 'var(--text-color)', cursor: capsPageClamped === 0 ? 'default' : 'pointer', opacity: capsPageClamped === 0 ? 0.5 : 1 }}>
+                    {t('audit.previous')}
+                  </button>
+                  <button onClick={() => setCapsPage(p => Math.min(capsTotalPages - 1, p + 1))} disabled={capsPageClamped >= capsTotalPages - 1}
+                    style={{ padding: '6px 14px', border: '1px solid var(--surface-border)', borderRadius: 7, fontSize: 12.5, background: 'var(--surface-ground)', color: capsPageClamped >= capsTotalPages - 1 ? 'var(--text-color-secondary)' : 'var(--text-color)', cursor: capsPageClamped >= capsTotalPages - 1 ? 'default' : 'pointer', opacity: capsPageClamped >= capsTotalPages - 1 ? 0.5 : 1 }}>
+                    {t('audit.next')}
+                  </button>
+                </div>
+              </div>
+            )}
+          </Card>
+      </div>
+    );
+  }
+
   return null;
 }
 
-function MultiSelectField({ id, value = [], onChange, options = [], placeholder = 'Select...' }) {
-  const { t } = useTranslation('admin');
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const close = e => { if (!ref.current?.contains(e.target)) setOpen(false); };
-    document.addEventListener('mousedown', close);
-    return () => document.removeEventListener('mousedown', close);
-  }, [open]);
-
-  function toggle(id) {
-    onChange(value.includes(id) ? value.filter(v => v !== id) : [...value, id]);
-  }
-
-  const selectedOptions = options.filter(o => value.includes(o.id));
-
-  return (
-    <div ref={ref} style={{ position: 'relative' }}>
-      {/* Trigger */}
-      <button id={id} type="button" onClick={() => setOpen(o => !o)} style={{
-        width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-        padding: '10px 12px 10px 14px', fontFamily: 'var(--font)', fontSize: 13,
-        borderRadius: 8, background: 'var(--surface-ground)',
-        border: `1px solid ${open ? 'var(--primary)' : 'var(--surface-border)'}`,
-        boxShadow: open ? '0 0 0 3px rgba(33, 74, 171,.1)' : 'none',
-        cursor: 'pointer', outline: 'none', textAlign: 'left',
-        color: selectedOptions.length ? 'var(--text-color)' : 'var(--text-color-secondary)',
-        transition: 'border-color .2s, box-shadow .2s',
-      }}>
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {selectedOptions.length === 0
-            ? placeholder
-            : selectedOptions.length === 1
-            ? selectedOptions[0].name
-            : t('multiSelect.departmentsSelected', { count: selectedOptions.length })}
-        </span>
-        <ChevronDown size={15} strokeWidth={2} style={{
-          flexShrink: 0, color: 'var(--text-color-secondary)',
-          transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .2s',
-        }} />
-      </button>
-
-      {/* Dropdown panel */}
-      {open && (
-        <div style={{
-          position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 600,
-          background: 'rgba(255,255,255,.75)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
-          border: '1.5px solid rgba(255,255,255,.8)', borderRadius: 12,
-          boxShadow: '0 8px 32px rgba(0,0,0,.1), 0 2px 8px rgba(0,0,0,.06), inset 0 1px 0 rgba(255,255,255,.95)',
-          maxHeight: 200, overflowY: 'auto', animation: 'dropdownIn .15s cubic-bezier(.2,.8,.3,1)',
-        }}>
-          {options.map(opt => {
-            const isChecked = value.includes(opt.id);
-            return (
-              <div key={opt.id} onMouseDown={() => toggle(opt.id)} style={{
-                display: 'flex', alignItems: 'center', gap: 9,
-                padding: '10px 14px', fontSize: 13, fontFamily: 'var(--font)',
-                color: isChecked ? 'var(--primary)' : 'var(--text-color)',
-                fontWeight: isChecked ? 600 : 400, cursor: 'pointer',
-                transition: 'background .12s', background: 'transparent',
-              }}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(33, 74, 171,.08)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-              >
-                <div style={{
-                  width: 15, height: 15, borderRadius: 4, flexShrink: 0,
-                  border: `2px solid ${isChecked ? 'var(--primary)' : 'var(--surface-border)'}`,
-                  background: isChecked ? 'var(--primary)' : 'transparent',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  transition: 'background .15s, border-color .15s',
-                }}>
-                  {isChecked && <Check size={9} color="white" strokeWidth={3} />}
-                </div>
-                {opt.name}
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Selected tags */}
-      {selectedOptions.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 8 }}>
-          {selectedOptions.map(o => (
-            <span key={o.id} style={{
-              display: 'inline-flex', alignItems: 'center', gap: 4,
-              padding: '3px 6px 3px 10px', borderRadius: 20,
-              background: 'rgba(33, 74, 171,.1)', border: '1px solid rgba(33, 74, 171,.2)',
-              fontSize: 11.5, color: 'var(--primary)', fontWeight: 600,
-            }}>
-              {o.name}
-              <button type="button" onMouseDown={e => { e.stopPropagation(); toggle(o.id); }} style={{
-                background: 'none', border: 'none', cursor: 'pointer',
-                color: 'var(--primary)', display: 'flex', padding: '1px',
-              }}>
-                <X size={10} />
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}

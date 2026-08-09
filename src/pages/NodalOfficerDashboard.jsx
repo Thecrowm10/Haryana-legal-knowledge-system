@@ -1,19 +1,22 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
-import { Users, CheckCircle, XCircle, Plus, Edit2, X, Eye, EyeOff, Download, Layers, FileText, Clock, Search, Link2, Activity } from 'lucide-react';
+import { Users, CheckCircle, XCircle, Plus, Edit2, X, Eye, EyeOff, Download, FileSpreadsheet, Layers, FileText, Clock, Search, Link2, Activity } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import SelectField from '../components/ui/SelectField';
+import MultiSelectField from '../components/ui/MultiSelectField';
 import DocViewModal from '../components/DocViewModal';
-import { getUsers, getRoles, updateUser, registerUser } from '../services/users';
+import { getUsers, getRoles, updateUser, registerUser, getApproversByDepartment } from '../services/users';
 import { getMyDepartments } from '../services/departments';
 import { getAllDocumentsAdmin, getAllDepartmentLinks } from '../services/pdf';
-import { getAuditLogs } from '../services/audit';
+import { getAuditLogs, getAuditLogActions } from '../services/audit';
 import { getAllActPartSubmissions, getAllActParts } from '../services/act_parts';
 import { useMediaQuery } from '../hooks/useMediaQuery';
+import { downloadUploadsExcelReport } from '../utils/uploadsExcelReport';
 
 
 const LABEL = { fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)' };
+const EMAIL_FORMAT_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // A nodal officer can only create staff below them (uploader/approver/etc) — never another admin or nodal officer.
 // Citizens are public users, not staff accounts — no one creates a "citizen" login from a dashboard.
@@ -56,15 +59,6 @@ function exportCSV(data, filename) {
 
 const NODAL_AUDIT_PAGE_SIZE = 10;
 
-function auditEntityOptions(t) {
-  return [
-    { value: '',       label: t('audit.entities.all') },
-    { value: 'user',   label: t('audit.entities.user') },
-    { value: 'pdf',    label: t('audit.entities.pdf') },
-    { value: 'system', label: t('audit.entities.system') },
-  ];
-}
-
 function fmtAuditActor(actor) {
   if (!actor) return 'System';
   const full = [actor.first_name, actor.last_name].filter(Boolean).join(' ');
@@ -90,6 +84,9 @@ const NOD_RESPONSIVE_CSS = `
     .nod-export-btn { width: 100% !important; }
     .nod-users-actions { width: 100% !important; }
     .nod-users-actions > * { flex: 1 1 auto !important; min-width: 0 !important; }
+    .nod-filter-bar { flex-direction: column !important; align-items: stretch !important; }
+    .nod-filter-bar > * { width: 100% !important; flex: 1 1 auto !important; margin-left: 0 !important; }
+    .nod-filter-bar button { width: 100% !important; justify-content: center !important; }
   }
 `;
 
@@ -112,7 +109,7 @@ export default function NodalOfficerDashboard({ activePage }) {
       })
       .catch(() => setUsersError(t('users.failedToLoadUsers')))
       .finally(() => setUsersLoading(false));
-  }, [activePage]);
+  }, [activePage, t]);
 
   // Nodal officer's authorised departments — drives both the user management selectors and the uploads dept filter.
   const [depts, setDepts] = useState([]);
@@ -130,10 +127,20 @@ export default function NodalOfficerDashboard({ activePage }) {
   const [allDocsError, setAllDocsError]                   = useState('');
   const [uploadsSearch, setUploadsSearch]                 = useState('');
   const [uploadsFilterStatus, setUploadsFilterStatus]     = useState('');
-  const [uploadsFilterDept, setUploadsFilterDept]         = useState('');
   const [uploadsFilterUploader, setUploadsFilterUploader] = useState('');
   const [uploadsFilterApprover, setUploadsFilterApprover] = useState('');
   const [viewDoc, setViewDoc]                             = useState(null);
+  const [showReportPanel, setShowReportPanel] = useState(false);
+  const [reportDeptIds, setReportDeptIds]     = useState([]);
+  const [reportGenerating, setReportGenerating] = useState(false);
+  const reportPanelRef = useRef(null);
+
+  useEffect(() => {
+    if (!showReportPanel) return;
+    const close = e => { if (!reportPanelRef.current?.contains(e.target)) setShowReportPanel(false); };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [showReportPanel]);
 
   useEffect(() => {
     if (activePage !== 'nodaluploads') return;
@@ -146,32 +153,57 @@ export default function NodalOfficerDashboard({ activePage }) {
       })
       .catch(() => setAllDocsError(t('uploads.failedToLoad')))
       .finally(() => setAllDocsLoading(false));
-  }, [activePage]);
+  }, [activePage, t]);
 
   // Add User drawer state
-  const EMPTY_ADD_FORM = { username: '', email: '', mobile_number: '', password: '', first_name: '', last_name: '', role_id: '', department_id: '' };
+  const EMPTY_ADD_FORM = { username: '', email: '', mobile_number: '', password: '', first_name: '', last_name: '', role_id: '', department_id: '', approver_id: '' };
   const [addingUser, setAddingUser]   = useState(false);
   const [addForm, setAddForm]         = useState(EMPTY_ADD_FORM);
   const [addSaving, setAddSaving]     = useState(false);
   const [addError, setAddError]       = useState('');
   const [showAddPass, setShowAddPass] = useState(false);
+  const [approvers, setApprovers]         = useState([]);
+  const [approversLoading, setApproversLoading] = useState(false);
+
+  const selectedRoleName = roles.find(r => r.id === Number(addForm.role_id))?.name?.toLowerCase() || '';
+  const isUploader = selectedRoleName === 'uploader';
+
+  useEffect(() => {
+    if (!addingUser || !depts.length) return;
+    setAddForm(f => f.department_id ? f : { ...f, department_id: String(depts[0].id) });
+  }, [addingUser, depts]);
+
+  useEffect(() => {
+    if (!isUploader || !addForm.department_id) { setApprovers([]); return; }
+    setApproversLoading(true);
+    getApproversByDepartment(addForm.department_id)
+      .then(res => setApprovers(res.data || []))
+      .catch(() => setApprovers([]))
+      .finally(() => setApproversLoading(false));
+  }, [isUploader, addForm.department_id]);
 
   function handleAddUser() {
+    if (!addForm.role_id)            { setAddError(t('users.errors.roleRequired')); return; }
     if (!addForm.username.trim())    { setAddError(t('users.errors.usernameRequired')); return; }
     if (!addForm.email.trim())       { setAddError(t('users.errors.emailRequired')); return; }
+    if (!EMAIL_FORMAT_RE.test(addForm.email.trim())) { setAddError(t('users.errors.emailInvalid')); return; }
     if (!addForm.password)           { setAddError(t('users.errors.passwordRequired')); return; }
     if (!addForm.department_id)      { setAddError(t('users.errors.departmentRequired')); return; }
+    if (!addForm.first_name.trim())  { setAddError(t('users.errors.firstNameRequired')); return; }
+    if (addForm.mobile_number.trim().length !== 10) { setAddError(t('users.errors.mobileRequired')); return; }
+    if (isUploader && !addForm.approver_id) { setAddError(t('users.errors.approverRequired')); return; }
     setAddSaving(true);
     setAddError('');
     registerUser({
       username:      addForm.username.trim(),
       email:         addForm.email.trim(),
-      mobile_number: addForm.mobile_number.trim() || undefined,
+      mobile_number: addForm.mobile_number.trim(),
       password:      addForm.password,
       first_name:    addForm.first_name.trim(),
       last_name:     addForm.last_name.trim(),
       role_id:       addForm.role_id ? Number(addForm.role_id) : undefined,
       department_id: String(addForm.department_id),
+      ...(isUploader && addForm.approver_id ? { approver_id: Number(addForm.approver_id) } : {}),
     })
       .then(res => {
         setUsers(prev => [normalizeUser(res.data), ...prev]);
@@ -299,7 +331,6 @@ export default function NodalOfficerDashboard({ activePage }) {
         ...(d.no_of_ordinances      ? { noOfOrdinances:     d.no_of_ordinances }      : {}),
         ...(d.no_of_orders          ? { noOfOrders:         d.no_of_orders }          : {}),
         ...(d.keywords              ? { keywords:           d.keywords }              : {}),
-        ...(d.is_repealed           ? { repealed:           'Yes' }                   : {}),
       },
       // Amend / replace / issued-under links to other documents
       docRelations: (d.relationships || [])
@@ -343,30 +374,35 @@ export default function NodalOfficerDashboard({ activePage }) {
     }
   }
 
-  // Audit Log state 
+  // Audit Log state
   const [auditLogs, setAuditLogs]                 = useState([]);
   const [auditTotal, setAuditTotal]               = useState(0);
   const [auditLoading, setAuditLoading]           = useState(false);
   const [auditError, setAuditError]               = useState('');
   const [auditPage, setAuditPage]                 = useState(0);
-  const [auditFilterEntity, setAuditFilterEntity] = useState('');
   const [auditFilterAction, setAuditFilterAction] = useState('');
-  const [auditFilterStatus, setAuditFilterStatus] = useState('');
+  const [auditExporting, setAuditExporting]       = useState(false);
   const [auditFromDate, setAuditFromDate]         = useState('');
   const [auditToDate, setAuditToDate]             = useState('');
   const [auditSearch, setAuditSearch]             = useState('');
-  // Action-type dropdown options are built only from actions actually seen in
-  // fetched pages (never a guessed/hardcoded list) and accumulate across
-  // fetches so the list doesn't shrink once you filter down to one action.
-  const [seenActionsRaw, setSeenActionsRaw]       = useState([]);
-  const auditActionOptions = useMemo(() => Array.from(new Set(seenActionsRaw)).sort(), [seenActionsRaw]);
+  const [auditActionOptions, setAuditActionOptions] = useState([]);
+
+  const [auditActionsLoaded, setAuditActionsLoaded] = useState(false);
+  useEffect(() => {
+    if (activePage !== 'nodalauditfull' || auditActionsLoaded) return;
+    getAuditLogActions()
+      .then(res => {
+        setAuditActionOptions(res.data.actions || []);
+        setAuditActionsLoaded(true);
+      })
+      .catch(() => {});
+  }, [activePage, auditActionsLoaded]);
 
   useEffect(() => {
     if (activePage !== 'nodalauditfull') return;
     setAuditLoading(true);
     setAuditError('');
     const params = { skip: auditPage * NODAL_AUDIT_PAGE_SIZE, limit: NODAL_AUDIT_PAGE_SIZE };
-    if (auditFilterEntity) params.entity_type = auditFilterEntity;
     if (auditFilterAction) params.action       = auditFilterAction;
     if (auditFromDate)     params.from_date    = auditFromDate;
     if (auditToDate)       params.to_date      = auditToDate + 'T23:59:59';
@@ -375,11 +411,10 @@ export default function NodalOfficerDashboard({ activePage }) {
         const logs = res.data.logs || [];
         setAuditLogs(logs);
         setAuditTotal(res.data.total || 0);
-        setSeenActionsRaw(prev => [...prev, ...logs.map(l => l.action).filter(Boolean)]);
       })
       .catch(() => setAuditError(t('audit.failedToLoad')))
       .finally(() => setAuditLoading(false));
-  }, [activePage, auditPage, auditFilterEntity, auditFilterAction, auditFilterStatus, auditFromDate, auditToDate]);
+  }, [activePage, auditPage, auditFilterAction, auditFromDate, auditToDate, t]);
 
   useEffect(() => {
     if (activePage !== 'nodallinkedocs') return;
@@ -389,9 +424,9 @@ export default function NodalOfficerDashboard({ activePage }) {
       .then(res => setNodalLinks(Array.isArray(res.data) ? res.data : []))
       .catch(() => setNodalLinksError(t('linkedDocs.failedToLoad')))
       .finally(() => setNodalLinksLoading(false));
-  }, [activePage]);
+  }, [activePage, t]);
 
-  const [deptFilter, setDeptFilter] = useState('');
+  const [roleFilter, setRoleFilter] = useState('');
   const [usersStatusFilter, setUsersStatusFilter] = useState('');
 
   // ── Act Parts (view-only) state ─────────────────────────────────────────
@@ -410,7 +445,7 @@ export default function NodalOfficerDashboard({ activePage }) {
       .then(res => setActPartsItems(Array.isArray(res.data) ? res.data : []))
       .catch(() => setActPartsError(t('actParts.failedToLoad')))
       .finally(() => setActPartsLoading(false));
-  }, [activePage]);
+  }, [activePage, t]);
 
   async function openActPartsDetail(item) {
     setActPartsDetailLoading(true);
@@ -430,7 +465,7 @@ export default function NodalOfficerDashboard({ activePage }) {
     const inactive = users.filter(u => u.status === 'inactive').length;
 
     const filteredUsers = users
-      .filter(u => !deptFilter || u.deptIds.map(String).includes(String(deptFilter)))
+      .filter(u => !roleFilter || String(u.roleId) === String(roleFilter))
       .filter(u => !usersStatusFilter || u.status === usersStatusFilter);
 
     const INP_STYLE = {
@@ -474,12 +509,8 @@ export default function NodalOfficerDashboard({ activePage }) {
           <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
             <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>{t('users.systemUsers')}</div>
             <div className="nod-users-actions" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <SelectField value={deptFilter} onChange={e => setDeptFilter(e.target.value)} placeholder={t('users.allDepartments')} style={{ width: 200, maxWidth: '100%' }}>
-                <option value="">{t('users.allDepartments')}</option>
-                {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-              </SelectField>
               <button
-                onClick={() => { setAddingUser(true); setAddError(''); setAddForm({ ...EMPTY_ADD_FORM, department_id: deptFilter }); setShowAddPass(false); }}
+                onClick={() => { setAddingUser(true); setAddError(''); setAddForm({ ...EMPTY_ADD_FORM, department_id: depts[0]?.id ? String(depts[0].id) : '' }); setShowAddPass(false); }}
                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'var(--primary)', color: 'white', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
                 <Plus size={13} /> {t('users.addUser')}
               </button>
@@ -595,14 +626,14 @@ export default function NodalOfficerDashboard({ activePage }) {
           <>
             <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.25)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', zIndex: 300, animation: 'drawerFadeIn .2s ease' }} />
             <div className="nod-drawer" style={{
-              position: 'fixed', right: 0, top: 0, height: '100vh', width: 460,
+              position: 'fixed', right: 0, top: 0, bottom: 0, width: 460,
               background: 'var(--surface-card)', boxShadow: '-4px 0 40px rgba(0,0,0,.18)',
               zIndex: 301, display: 'flex', flexDirection: 'column',
               animation: 'drawerSlideIn .28s cubic-bezier(.22,1,.36,1)',
             }}>
 
               {/* Header */}
-              <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
                 <div>
                   <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)' }}>{t('users.addDrawer.title')}</div>
                   <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-color-secondary)', marginTop: 1 }}>{t('users.addDrawer.subtitle')}</div>
@@ -615,6 +646,53 @@ export default function NodalOfficerDashboard({ activePage }) {
 
               {/* Body */}
               <div style={{ flex: 1, overflowY: 'auto', padding: '24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+                {/* Role + Department */}
+                <div className="nod-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label htmlFor="nod-add-role" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.role')} <span style={{ color: '#dc3545' }}>*</span></label>
+                    <SelectField id="nod-add-role" value={addForm.role_id} onChange={e => setAddForm(f => ({ ...f, role_id: e.target.value, approver_id: '' }))} placeholder={t('users.addDrawer.roleSelectPlaceholder')}>
+                      {assignableRoles(roles).map(r => (
+                        <option key={r.id} value={r.id}>{r.name.charAt(0).toUpperCase() + r.name.slice(1)}</option>
+                      ))}
+                    </SelectField>
+                  </div>
+                  <div>
+                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.department')} <span style={{ color: '#dc3545' }}>*</span></label>
+                    <div style={{ ...INP_STYLE, background: 'var(--surface-hover)', color: 'var(--text-color-secondary)', cursor: 'not-allowed', userSelect: 'none' }}>
+                      {depts.find(d => String(d.id) === String(addForm.department_id))?.name || '—'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Approver mapping — shown only when Uploader role is selected and a department is chosen */}
+                {isUploader && addForm.department_id && (
+                  <div>
+                    <label htmlFor="nod-add-approver" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>
+                      {t('users.addDrawer.approver')} <span style={{ color: '#dc3545' }}>*</span>
+                    </label>
+                    <SelectField
+                      id="nod-add-approver"
+                      value={addForm.approver_id}
+                      onChange={e => setAddForm(f => ({ ...f, approver_id: e.target.value }))}
+                      placeholder={approversLoading ? t('users.addDrawer.loadingApprovers') : t('users.addDrawer.approverSelectPlaceholder')}
+                      disabled={approversLoading}>
+                      {approvers.map(a => {
+                        const name = `${a.first_name || ''} ${a.last_name || ''}`.trim();
+                        return (
+                          <option key={a.id} value={a.id}>
+                            {name ? `${name}, ${a.username}` : a.username}
+                          </option>
+                        );
+                      })}
+                    </SelectField>
+                    {!approversLoading && approvers.length === 0 && (
+                      <div style={{ fontSize: 11.5, color: '#d97706', marginTop: 5 }}>
+                        {t('users.addDrawer.noApproversInDept')}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Username + Email */}
                 <div className="nod-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -658,13 +736,13 @@ export default function NodalOfficerDashboard({ activePage }) {
                 {/* First + Last name */}
                 <div className="nod-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                   <div>
-                    <label htmlFor="nod-add-firstname" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.firstName')}</label>
+                    <label htmlFor="nod-add-firstname" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.firstName')} <span style={{ color: '#dc3545' }}>*</span></label>
                     <input id="nod-add-firstname" style={INP_STYLE} placeholder={t('users.addDrawer.firstNamePlaceholder')}
                       value={addForm.first_name}
                       onChange={e => setAddForm(f => ({ ...f, first_name: e.target.value }))} />
                   </div>
                   <div>
-                    <label htmlFor="nod-add-lastname" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.lastName')}</label>
+                    <label htmlFor="nod-add-lastname" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.lastName')} <span style={{ color: '#dc3545' }}>*</span></label>
                     <input id="nod-add-lastname" style={INP_STYLE} placeholder={t('users.addDrawer.lastNamePlaceholder')}
                       value={addForm.last_name}
                       onChange={e => setAddForm(f => ({ ...f, last_name: e.target.value }))} />
@@ -673,7 +751,7 @@ export default function NodalOfficerDashboard({ activePage }) {
 
                 {/* Mobile Number */}
                 <div>
-                  <label htmlFor="nod-add-mobile" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.mobileNumber')}</label>
+                  <label htmlFor="nod-add-mobile" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.mobileNumber')} <span style={{ color: '#dc3545' }}>*</span></label>
                   <input id="nod-add-mobile" style={INP_STYLE}
                     type="tel"
                     inputMode="numeric"
@@ -681,24 +759,6 @@ export default function NodalOfficerDashboard({ activePage }) {
                     placeholder={t('users.addDrawer.mobilePlaceholder')}
                     value={addForm.mobile_number}
                     onChange={e => setAddForm(f => ({ ...f, mobile_number: e.target.value.replace(/\D/g, '') }))} />
-                </div>
-
-                {/* Role + Department */}
-                <div className="nod-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div>
-                    <label htmlFor="nod-add-role" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.role')}</label>
-                    <SelectField id="nod-add-role" value={addForm.role_id} onChange={e => setAddForm(f => ({ ...f, role_id: e.target.value }))} placeholder={t('users.addDrawer.roleSelectPlaceholder')}>
-                      {assignableRoles(roles).map(r => (
-                        <option key={r.id} value={r.id}>{r.name.charAt(0).toUpperCase() + r.name.slice(1)}</option>
-                      ))}
-                    </SelectField>
-                  </div>
-                  <div>
-                    <label htmlFor="nod-add-department" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.department')} <span style={{ color: '#dc3545' }}>*</span></label>
-                    <SelectField id="nod-add-department" value={addForm.department_id} onChange={e => setAddForm(f => ({ ...f, department_id: e.target.value }))} placeholder={t('users.addDrawer.departmentSelectPlaceholder')}>
-                      {depts.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                    </SelectField>
-                  </div>
                 </div>
 
                 {addError && (
@@ -709,17 +769,19 @@ export default function NodalOfficerDashboard({ activePage }) {
               </div>
 
               {/* Footer */}
-              <div style={{ padding: '16px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <div style={{ padding: '16px 24px', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'flex-end', gap: 10, flexShrink: 0 }}>
                 <button onClick={() => setAddingUser(false)}
                   style={{ padding: '9px 18px', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: 'var(--text-color)', fontFamily: 'var(--font)' }}>
                   {t('users.addDrawer.cancel')}
                 </button>
                 {(() => {
-                  const addFormInvalid = !addForm.username.trim() || !addForm.email.trim() || !addForm.password || !addForm.department_id;
+                  const addFormInvalid = !addForm.role_id || !addForm.username.trim() || !addForm.email.trim() || !addForm.password || !addForm.department_id || !addForm.first_name.trim() || !addForm.last_name.trim() || addForm.mobile_number.trim().length !== 10 || (isUploader && !addForm.approver_id);
                   const addBtnDisabled = addSaving || addFormInvalid;
                   return (
-                    <button onClick={handleAddUser} disabled={addBtnDisabled}
-                      style={{ padding: '9px 20px', background: addBtnDisabled ? 'var(--surface-border)' : 'var(--primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: addBtnDisabled ? 'not-allowed' : 'pointer', color: addBtnDisabled ? 'var(--text-color-secondary)' : 'white', fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 7 }}>
+                    <button
+                      onClick={() => { if (addFormInvalid) { setAddError(t('users.errors.fillMandatory')); return; } handleAddUser(); }}
+                      disabled={addSaving}
+                      style={{ padding: '9px 20px', background: addBtnDisabled ? 'var(--surface-border)' : 'var(--primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: addSaving ? 'not-allowed' : 'pointer', color: addBtnDisabled ? 'var(--text-color-secondary)' : 'white', fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 7 }}>
                       {addSaving
                         ? <><div style={{ width: 12, height: 12, border: '2px solid rgba(0,0,0,.2)', borderTopColor: 'var(--primary)', borderRadius: '50%', animation: 'spin .7s linear infinite' }} /> {t('users.addDrawer.creating')}</>
                         : <><Plus size={13} /> {t('users.addDrawer.createUser')}</>
@@ -789,7 +851,7 @@ export default function NodalOfficerDashboard({ activePage }) {
                   <div>
                     <label htmlFor="nod-edit-department" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.department')}</label>
                     <SelectField id="nod-edit-department" value={editForm.department_id ?? ''} onChange={e => setEditForm(f => ({ ...f, department_id: e.target.value || null }))} placeholder={t('users.editModal.selectDepartment')}>
-                      {depts.map(d => (
+                      {depts.filter(d => d.is_active !== false).map(d => (
                         <option key={d.id} value={d.id}>{d.name}</option>
                       ))}
                     </SelectField>
@@ -922,7 +984,6 @@ export default function NodalOfficerDashboard({ activePage }) {
 
     const filteredDocs = deptScopedDocs.filter(d => {
       if (uploadsFilterStatus && d.status !== uploadsFilterStatus) return false;
-      if (uploadsFilterDept && d.department_name !== uploadsFilterDept) return false;
       if (uploadsFilterUploader && d.uploader_username !== uploadsFilterUploader) return false;
       if (uploadsFilterApprover && d.latest_approval?.approver_username !== uploadsFilterApprover) return false;
       if (uploadsSearch) {
@@ -941,7 +1002,19 @@ export default function NodalOfficerDashboard({ activePage }) {
       rejected: { color: '#dc3545', bg: 'rgba(220, 53, 69,.1)',  label: t('uploads.stats.rejected') },
     };
     const cols = '4px 1fr 175px 155px 155px 90px';
-    const anyFilter = uploadsSearch || uploadsFilterStatus || uploadsFilterDept || uploadsFilterUploader || uploadsFilterApprover;
+    const anyFilter = uploadsSearch || uploadsFilterStatus || uploadsFilterUploader || uploadsFilterApprover;
+
+    async function handleDownloadReport() {
+      setReportGenerating(true);
+      try {
+        const selectedNames = depts.filter(d => reportDeptIds.includes(d.id)).map(d => d.name);
+        await downloadUploadsExcelReport({ docs: deptScopedDocs, departments: selectedNames, fileLabel: 'Nodal' });
+        setShowReportPanel(false);
+        setReportDeptIds([]);
+      } finally {
+        setReportGenerating(false);
+      }
+    }
 
     return (
       <>
@@ -987,7 +1060,7 @@ export default function NodalOfficerDashboard({ activePage }) {
 
         {/* Filter bar + table */}
         <Card padding="0">
-          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div className="nod-filter-bar" style={{ padding: '14px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <div style={{ position: 'relative', flex: '1 1 200px', minWidth: 180 }}>
               <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-color-secondary)', pointerEvents: 'none' }} />
               <input
@@ -1005,11 +1078,6 @@ export default function NodalOfficerDashboard({ activePage }) {
               <option value="">{t('uploads.allApprovers')}</option>
               {approverOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </SelectField>
-            {/* Department filter is limited to the nodal officer's authorised departments */}
-            <SelectField value={uploadsFilterDept} onChange={e => setUploadsFilterDept(e.target.value)} style={{ flex: '0 0 155px' }}>
-              <option value="">{t('uploads.allDepartments')}</option>
-              {depts.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
-            </SelectField>
             <SelectField value={uploadsFilterStatus} onChange={e => setUploadsFilterStatus(e.target.value)} style={{ flex: '0 0 130px' }}>
               <option value="">{t('uploads.allStatuses')}</option>
               <option value="pending">{t('uploads.statusPending')}</option>
@@ -1017,13 +1085,48 @@ export default function NodalOfficerDashboard({ activePage }) {
               <option value="rejected">{t('uploads.statusRejected')}</option>
             </SelectField>
             {anyFilter && (
-              <button onClick={() => { setUploadsSearch(''); setUploadsFilterStatus(''); setUploadsFilterDept(''); setUploadsFilterUploader(''); setUploadsFilterApprover(''); }}
+              <button onClick={() => { setUploadsSearch(''); setUploadsFilterStatus(''); setUploadsFilterUploader(''); setUploadsFilterApprover(''); }}
                 style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'transparent', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '7px 12px', fontSize: 12, cursor: 'pointer', color: 'var(--text-color-secondary)', whiteSpace: 'nowrap' }}>
                 <X size={11} /> {t('uploads.clear')}
               </button>
             )}
             <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
               {t('uploads.countOf', { shown: filteredDocs.length, total: totalDocs })}
+            </div>
+
+            <div ref={reportPanelRef} style={{ position: 'relative' }}>
+              <button onClick={() => setShowReportPanel(o => !o)}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--surface-ground)', color: 'var(--text-color)', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '7px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                <FileSpreadsheet size={13} /> {t('uploads.report.button')}
+              </button>
+
+              {showReportPanel && (
+                <div style={{
+                  position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 620, width: 300,
+                  background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 12,
+                  boxShadow: '0 12px 32px rgba(0,0,0,.14)', padding: 16, animation: 'dropdownIn .15s cubic-bezier(.2,.8,.3,1)',
+                }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 4 }}>{t('uploads.report.panelTitle')}</div>
+                  <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginBottom: 12, lineHeight: 1.5 }}>{t('uploads.report.panelDesc')}</div>
+                  <MultiSelectField
+                    id="nod-report-dept-multi"
+                    value={reportDeptIds}
+                    onChange={setReportDeptIds}
+                    options={depts}
+                    placeholder={t('uploads.report.allDepartmentsPlaceholder')}
+                    selectedLabel={count => t('multiSelect.departmentsSelected', { count })}
+                  />
+                  <button onClick={handleDownloadReport} disabled={reportGenerating}
+                    style={{
+                      width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: 14,
+                      background: reportGenerating ? 'var(--surface-ground)' : 'var(--primary)', color: reportGenerating ? 'var(--text-color-secondary)' : '#fff',
+                      border: 'none', borderRadius: 8, padding: '9px 12px', fontSize: 12.5, fontWeight: 700,
+                      cursor: reportGenerating ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)',
+                    }}>
+                    <Download size={13} /> {reportGenerating ? t('uploads.report.generating') : t('uploads.report.downloadButton')}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1121,9 +1224,11 @@ export default function NodalOfficerDashboard({ activePage }) {
                           {doc.department_name && (
                             <span style={{ fontSize: 10, color: 'var(--text-color-secondary)' }}>{doc.department_name}</span>
                           )}
+                          {/* Version badge hidden until proper API mapping for versions is wired up — keep for future use.
                           {doc.version_no && (
                             <span style={{ fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', borderRadius: 4, padding: '1px 5px', border: '1px solid var(--surface-border)' }}>v{doc.version_no}</span>
                           )}
+                          */}
                         </div>
                       </div>
                     </div>
@@ -1199,7 +1304,7 @@ export default function NodalOfficerDashboard({ activePage }) {
 
         {/* Filter bar */}
         <Card>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div className="nod-filter-bar" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <div style={{ position: 'relative', flex: '1 1 180px', minWidth: 160 }}>
               <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-color-secondary)' }} />
               <input
@@ -1209,51 +1314,63 @@ export default function NodalOfficerDashboard({ activePage }) {
                 style={{ width: '100%', paddingLeft: 30, paddingRight: 10, height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, background: 'var(--surface-ground)', color: 'var(--text-color)', boxSizing: 'border-box', outline: 'none' }}
               />
             </div>
-            <select value={auditFilterEntity} onChange={e => { setAuditFilterEntity(e.target.value); setAuditPage(0); }}
-              style={{ height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, padding: '0 10px', background: 'var(--surface-ground)', color: 'var(--text-color)', cursor: 'pointer' }}>
-              {auditEntityOptions(t).map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-            </select>
-            <select value={auditFilterAction} onChange={e => { setAuditFilterAction(e.target.value); setAuditPage(0); }}
-              style={{ height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, padding: '0 10px', background: 'var(--surface-ground)', color: 'var(--text-color)', cursor: 'pointer' }}>
+            <SelectField value={auditFilterAction} onChange={e => { setAuditFilterAction(e.target.value); setAuditPage(0); }} style={{ flex: '0 0 155px' }}>
               <option value="">{t('audit.allActions')}</option>
               {auditActionOptions.map(a => <option key={a} value={a}>{fmtAction(a)}</option>)}
-            </select>
-            <select value={auditFilterStatus} onChange={e => { setAuditFilterStatus(e.target.value); setAuditPage(0); }}
-              style={{ height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, padding: '0 10px', background: 'var(--surface-ground)', color: 'var(--text-color)', cursor: 'pointer' }}>
-              <option value="">{t('audit.allStatuses')}</option>
-              <option value="success">{t('audit.success')}</option>
-              <option value="failure">{t('audit.failure')}</option>
-            </select>
+            </SelectField>
             <input type="date" value={auditFromDate} onChange={e => { setAuditFromDate(e.target.value); setAuditPage(0); }}
               style={{ height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, padding: '0 10px', background: 'var(--surface-ground)', color: 'var(--text-color)' }} />
             <span style={{ fontSize: 11, color: 'var(--text-color-secondary)' }}>{t('audit.to')}</span>
             <input type="date" value={auditToDate} onChange={e => { setAuditToDate(e.target.value); setAuditPage(0); }}
               style={{ height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, padding: '0 10px', background: 'var(--surface-ground)', color: 'var(--text-color)' }} />
-            {(auditFilterEntity || auditFilterAction || auditFilterStatus || auditFromDate || auditToDate || auditSearch) && (
-              <button onClick={() => { setAuditFilterEntity(''); setAuditFilterAction(''); setAuditFilterStatus(''); setAuditFromDate(''); setAuditToDate(''); setAuditSearch(''); setAuditPage(0); }}
+            {(auditFilterAction || auditFromDate || auditToDate || auditSearch) && (
+              <button onClick={() => { setAuditFilterAction(''); setAuditFromDate(''); setAuditToDate(''); setAuditSearch(''); setAuditPage(0); }}
                 style={{ height: 34, padding: '0 12px', border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
                 <X size={11} /> {t('audit.clear')}
               </button>
             )}
             <div className="nod-audit-spacer" style={{ flex: 1 }} />
             <button className="nod-export-btn"
-              onClick={() => {
-                const visible = auditLogs.filter(l => {
-                  if (auditFilterStatus && l.status !== auditFilterStatus) return false;
+              disabled={auditExporting}
+              onClick={async () => {
+                if (auditExporting) return;
+                setAuditExporting(true);
+                try {
+                  const FETCH_LIMIT = 100;
+                  const baseParams = {};
+                  if (auditFilterAction) baseParams.action    = auditFilterAction;
+                  if (auditFromDate)     baseParams.from_date = auditFromDate;
+                  if (auditToDate)       baseParams.to_date   = auditToDate + 'T23:59:59';
+                  let all = [];
+                  let skip = 0;
+                  let total = Infinity;
+                  while (skip < total) {
+                    const res = await getAuditLogs({ ...baseParams, skip, limit: FETCH_LIMIT });
+                    const page = res.data.logs || [];
+                    total = res.data.total ?? page.length;
+                    all = all.concat(page);
+                    if (page.length < FETCH_LIMIT) break;
+                    skip += FETCH_LIMIT;
+                  }
                   if (auditSearch.trim()) {
                     const q = auditSearch.toLowerCase();
-                    if (!fmtAuditActor(l.actor).toLowerCase().includes(q) && !(l.actor?.username || '').toLowerCase().includes(q) && !(l.action || '').toLowerCase().includes(q)) return false;
+                    all = all.filter(l =>
+                      fmtAuditActor(l.actor).toLowerCase().includes(q) ||
+                      (l.actor?.username || '').toLowerCase().includes(q) ||
+                      (l.action || '').toLowerCase().includes(q)
+                    );
                   }
-                  return true;
-                });
-                if (!visible.length) return;
-                exportCSV(visible.map(l => ({
-                  timestamp: l.created_at, user: fmtAuditActor(l.actor), username: l.actor?.username || '',
-                  action: l.action, entity_type: l.entity_type, entity_id: l.entity_id ?? '', status: l.status, ip_address: l.ip_address || '',
-                })), 'nodal-mis-report.csv');
+                  if (!all.length) return;
+                  exportCSV(all.map(l => ({
+                    timestamp: l.created_at, user: fmtAuditActor(l.actor), username: l.actor?.username || '',
+                    action: l.action, entity_type: l.entity_type, entity_id: l.entity_id ?? '', status: l.status, ip_address: l.ip_address || '',
+                  })), 'nodal-mis-report.csv');
+                } finally {
+                  setAuditExporting(false);
+                }
               }}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'var(--surface-ground)', color: 'var(--text-color)', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '0 14px', height: 34, fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
-              <Download size={13} /> {t('audit.exportCsv')}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'var(--surface-ground)', color: auditExporting ? 'var(--text-color-secondary)' : 'var(--text-color)', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '0 14px', height: 34, fontSize: 12.5, fontWeight: 600, cursor: auditExporting ? 'not-allowed' : 'pointer', opacity: auditExporting ? 0.7 : 1 }}>
+              <Download size={13} /> {auditExporting ? t('audit.exporting') : t('audit.exportCsv')}
             </button>
           </div>
         </Card>
@@ -1273,7 +1390,6 @@ export default function NodalOfficerDashboard({ activePage }) {
             <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>{t('audit.noRecords')}</div>
           ) : (() => {
             const filteredLogs = auditLogs.filter(l => {
-              if (auditFilterStatus && l.status !== auditFilterStatus) return false;
               if (auditSearch.trim()) {
                 const q = auditSearch.toLowerCase();
                 if (!fmtAuditActor(l.actor).toLowerCase().includes(q) && !(l.actor?.username || '').toLowerCase().includes(q) && !(l.action || '').toLowerCase().includes(q)) return false;
@@ -1282,67 +1398,39 @@ export default function NodalOfficerDashboard({ activePage }) {
             });
             return isMobile ? (
               <div>
-                {filteredLogs.map(log => {
-                  const isSuccess = log.status === 'success';
-                  return (
-                    <div key={log.id} style={{ padding: '11px 16px', borderBottom: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', gap: 5 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>{fmtAuditActor(log.actor)}</div>
-                        <span style={{ fontSize: 10.5, fontWeight: 700, borderRadius: 5, padding: '3px 8px', background: isSuccess ? 'rgba(25, 135, 84,.1)' : 'rgba(220, 53, 69,.1)', color: isSuccess ? '#16a34a' : '#dc3545', flexShrink: 0 }}>
-                          {isSuccess ? t('audit.success') : t('audit.failure')}
-                        </span>
-                      </div>
-                      <div style={{ fontSize: 12.5, color: 'var(--text-color)' }}>{fmtAction(log.action)}</div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', fontSize: 10.5, color: 'var(--text-color-secondary)' }}>
-                        <span style={{ fontFamily: 'var(--mono)' }}>{new Date(log.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })}</span>
-                        <span style={{ fontFamily: 'var(--mono)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 5, padding: '1px 6px' }}>{log.entity_type}{log.entity_id ? ` #${log.entity_id}` : ''}</span>
-                        {log.ip_address && <span style={{ fontFamily: 'var(--mono)' }}>{log.ip_address}</span>}
-                      </div>
-                    </div>
-                  );
-                })}
+                {filteredLogs.map(log => (
+                  <div key={log.id} style={{ padding: '11px 16px', borderBottom: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>{fmtAuditActor(log.actor)}</div>
+                    <div style={{ fontSize: 12.5, color: 'var(--text-color)' }}>{fmtAction(log.action)}</div>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: 10.5, color: 'var(--text-color-secondary)' }}>{new Date(log.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })}</span>
+                  </div>
+                ))}
               </div>
             ) : (
             <div className="table-scroll-wrap">
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
-                  {[t('audit.headers.timestamp'), t('audit.headers.user'), t('audit.headers.action'), t('audit.headers.entity'), t('audit.headers.status'), t('audit.headers.ipAddress')].map((h, i) => (
+                  {[t('audit.headers.timestamp'), t('audit.headers.user'), t('audit.headers.action')].map((h, i) => (
                     <th key={h} scope="col" style={{ ...LABEL, padding: '11px 16px', textAlign: 'left', ...(i > 0 && { borderLeft: '1px solid var(--surface-border)' }) }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {filteredLogs.map(log => {
-                    const isSuccess = log.status === 'success';
-                    return (
-                      <tr key={log.id} style={{ borderBottom: '1px solid var(--surface-border)', transition: 'background .15s' }}
-                        onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
-                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                        <td style={{ padding: '12px 16px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)', whiteSpace: 'nowrap' }}>
-                          {new Date(log.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })}
-                        </td>
-                        <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)' }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>{fmtAuditActor(log.actor)}</div>
-                          {log.actor?.username && <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>@{log.actor.username}</div>}
-                        </td>
-                        <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)', fontSize: 12.5, color: 'var(--text-color)' }}>{fmtAction(log.action)}</td>
-                        <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)' }}>
-                          <span style={{ fontSize: 11, fontWeight: 600, fontFamily: 'var(--mono)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 5, padding: '2px 7px', color: 'var(--text-color-secondary)' }}>
-                            {log.entity_type}{log.entity_id ? ` #${log.entity_id}` : ''}
-                          </span>
-                        </td>
-                        <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)' }}>
-                          <span style={{ fontSize: 11, fontWeight: 700, borderRadius: 5, padding: '3px 8px', background: isSuccess ? 'rgba(25, 135, 84,.1)' : 'rgba(220, 53, 69,.1)', color: isSuccess ? '#16a34a' : '#dc3545' }}>
-                            {isSuccess ? t('audit.success') : t('audit.failure')}
-                          </span>
-                        </td>
-                        <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)', fontSize: 11.5, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>
-                          {log.ip_address || '—'}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                {filteredLogs.map(log => (
+                  <tr key={log.id} style={{ borderBottom: '1px solid var(--surface-border)', transition: 'background .15s' }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                    <td style={{ padding: '12px 16px', fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)', whiteSpace: 'nowrap' }}>
+                      {new Date(log.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })}
+                    </td>
+                    <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)' }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>{fmtAuditActor(log.actor)}</div>
+                      {log.actor?.username && <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', fontFamily: 'var(--mono)' }}>@{log.actor.username}</div>}
+                    </td>
+                    <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)', fontSize: 12.5, color: 'var(--text-color)' }}>{fmtAction(log.action)}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
             </div>
@@ -1449,7 +1537,7 @@ export default function NodalOfficerDashboard({ activePage }) {
 
         {/* Filter + table */}
         <Card padding="0">
-          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div className="nod-filter-bar" style={{ padding: '14px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <div style={{ position: 'relative', flex: '1 1 200px', minWidth: 180 }}>
               <Search size={13} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-color-secondary)', pointerEvents: 'none' }} />
               <input
@@ -1459,13 +1547,12 @@ export default function NodalOfficerDashboard({ activePage }) {
                 style={{ width: '100%', padding: '7px 12px 7px 30px', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, color: 'var(--text-color)', outline: 'none', boxSizing: 'border-box' }}
               />
             </div>
-            <select value={nodalLinksFilterStatus} onChange={e => setNodalLinksFilterStatus(e.target.value)}
-              style={{ height: 36, padding: '0 10px', border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, background: 'var(--surface-ground)', color: 'var(--text-color)', cursor: 'pointer' }}>
+            <SelectField value={nodalLinksFilterStatus} onChange={e => setNodalLinksFilterStatus(e.target.value)} style={{ flex: '0 0 150px' }}>
               <option value="">{t('linkedDocs.allStatuses')}</option>
               <option value="pending">{t('linkedDocs.statusPending')}</option>
               <option value="approved">{t('linkedDocs.statusApproved')}</option>
               <option value="rejected">{t('linkedDocs.statusRejected')}</option>
-            </select>
+            </SelectField>
             {(nodalLinksSearch || nodalLinksFilterStatus) && (
               <button onClick={() => { setNodalLinksSearch(''); setNodalLinksFilterStatus(''); }}
                 style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'transparent', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '7px 12px', fontSize: 12, cursor: 'pointer', color: 'var(--text-color-secondary)' }}>
@@ -1551,7 +1638,9 @@ export default function NodalOfficerDashboard({ activePage }) {
                         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 280 }}>{link.document_name}</div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 3 }}>
                           {link.document_type_name && <span style={{ fontSize: 10, fontWeight: 600, color: '#d97706', background: 'rgba(255, 193, 7,.1)', borderRadius: 4, padding: '1px 5px' }}>{link.document_type_name}</span>}
+                          {/* Version badge hidden until proper API mapping for versions is wired up — keep for future use.
                           {link.version_no && <span style={{ fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>v{link.version_no}</span>}
+                          */}
                         </div>
                       </div>
                     </div>
@@ -1858,16 +1947,6 @@ function ActPartsDetailModal({ item, partsData, onClose, readOnly = false, onApp
         )}
       </div>
     ));
-  }
-
-  async function handleDecide(action) {
-    if (action === 'rejected' && !comment.trim()) return;
-    setSubmitting(true);
-    try {
-      await onReject?.({ action, comment: comment.trim() || null });
-    } finally {
-      setSubmitting(false);
-    }
   }
 
   return (

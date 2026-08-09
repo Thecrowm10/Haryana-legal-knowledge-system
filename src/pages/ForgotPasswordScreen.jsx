@@ -1,42 +1,52 @@
 import { useState, useRef } from 'react';
-import { Mail, Phone, ArrowLeft, ShieldCheck, Eye, EyeOff, RotateCcw, CheckCircle2, Lock } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { User, ArrowLeft, ShieldCheck, Eye, EyeOff, RotateCcw, CheckCircle2, Lock, Smartphone } from 'lucide-react';
 import { requestPasswordReset, resetPasswordWithOtp } from '../services/pdf';
 import haryanaLogo from '../assets/haryana-logo.png';
 import bannerBg from '../assets/banner-1-768x217.png';
 import Captcha from '../components/Captcha';
+import LanguageToggle from '../components/LanguageToggle';
+import AccessibilityMenu from '../components/AccessibilityMenu';
+
+const fpIconStyle = {
+  display: 'flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, borderRadius: '50%',
+  background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.18)', color: 'rgba(255,255,255,.85)',
+  cursor: 'pointer',
+};
 
 export default function ForgotPasswordScreen({ onBack }) {
-  const [step, setStep]         = useState(1); // 1 = request OTP, 2 = enter OTP + new password, 3 = success
-  const [identifier, setId]     = useState('');
-  const [otp, setOtp]           = useState('');
-  const [newPass, setNewPass]   = useState('');
-  const [confirm, setConfirm]   = useState('');
-  const [channel, setChannel]   = useState('');
-  const [showPass, setShowPass] = useState(false);
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState('');
-  const [resendMsg, setResendMsg] = useState('');
+  const { t, i18n } = useTranslation('login');
+  const orgNameHi = i18n.getFixedT('hi', 'login')('orgNamePortal');
+  const orgNameEn = i18n.getFixedT('en', 'login')('orgNamePortal');
+  const [step, setStep]               = useState(1); // 1 = enter username, 2 = enter OTP + new password, 3 = success
+  const [username, setUsername]       = useState('');
+  const [maskedMobile, setMaskedMobile] = useState('');
+  const [otp, setOtp]                 = useState('');
+  const [newPass, setNewPass]         = useState('');
+  const [confirm, setConfirm]         = useState('');
+  const [showPass, setShowPass]       = useState(false);
+  const [loading, setLoading]         = useState(false);
+  const [error, setError]             = useState('');
+  const [resendMsg, setResendMsg]     = useState('');
   const [captchaStatus, setCaptchaStatus] = useState({ touched: false, valid: false });
-  const captchaRef              = useRef(null);
+  const captchaRef                    = useRef(null);
 
-  const isEmail   = identifier.includes('@');
-  const InputIcon = isEmail ? Mail : Phone;
-  const canSubmitStep1 = !loading && identifier.trim() !== '';
+  const canSubmitStep1 = !loading && username.trim() !== '';
   const canSubmitStep2 = !loading && captchaStatus.valid
     && otp.length === 6 && newPass.length >= 8 && newPass === confirm;
 
-  // ── Step 1: request OTP ───────────────────────────────────
+  // ── Step 1: look up username, send OTP ───────────────────
   async function handleRequestOtp(e) {
     e?.preventDefault();
-    if (!identifier.trim()) { setError('Please enter your email or mobile number.'); return; }
+    if (!username.trim()) { setError(t('forgotPasswordScreen.errorUsernameRequired')); return; }
     setLoading(true); setError(''); setResendMsg('');
     try {
-      const res = await requestPasswordReset(identifier.trim());
-      setChannel(res.data.channel);
+      const res = await requestPasswordReset(username.trim());
+      setMaskedMobile(res.data.masked_mobile);
       setStep(2);
     } catch (err) {
       const detail = err.response?.data?.detail;
-      setError(typeof detail === 'string' ? detail : 'Could not send OTP. Please try again.');
+      setError(typeof detail === 'string' ? detail : t('forgotPasswordScreen.errorSendFailed'));
     } finally {
       setLoading(false);
     }
@@ -45,18 +55,18 @@ export default function ForgotPasswordScreen({ onBack }) {
   // ── Step 2: verify OTP + reset ────────────────────────────
   async function handleReset(e) {
     e?.preventDefault();
-    if (otp.length !== 6)       { setError('OTP must be 6 digits.'); return; }
-    if (newPass.length < 8)     { setError('Password must be at least 8 characters.'); return; }
-    if (newPass !== confirm)    { setError('Passwords do not match.'); return; }
-    if (!captchaStatus.touched)          { setError('Please fill the captcha.'); return; }
-    if (!captchaRef.current?.validate()) { setError('Please enter the correct captcha.'); return; }
+    if (otp.length !== 6)       { setError(t('forgotPasswordScreen.errorOtp6Digits')); return; }
+    if (newPass.length < 8)     { setError(t('forgotPasswordScreen.errorPasswordMin8')); return; }
+    if (newPass !== confirm)    { setError(t('forgotPasswordScreen.errorPasswordsNoMatch')); return; }
+    if (!captchaStatus.touched)          { setError(t('errorFillCaptcha')); return; }
+    if (!captchaRef.current?.validate()) { setError(t('errorCorrectCaptcha')); return; }
     setLoading(true); setError('');
     try {
-      await resetPasswordWithOtp(identifier.trim(), otp, newPass);
+      await resetPasswordWithOtp(username.trim(), otp, newPass);
       setStep(3);
     } catch (err) {
       const detail = err.response?.data?.detail;
-      setError(typeof detail === 'string' ? detail : 'Invalid or expired OTP. Please try again.');
+      setError(typeof detail === 'string' ? detail : t('forgotPasswordScreen.errorResetFailed'));
       captchaRef.current?.reset();
     } finally {
       setLoading(false);
@@ -67,11 +77,11 @@ export default function ForgotPasswordScreen({ onBack }) {
     setError(''); setOtp(''); setResendMsg('');
     setLoading(true);
     try {
-      const res = await requestPasswordReset(identifier.trim());
-      setChannel(res.data.channel);
-      setResendMsg('A new OTP has been sent.');
+      const res = await requestPasswordReset(username.trim());
+      setMaskedMobile(res.data.masked_mobile);
+      setResendMsg(t('forgotPasswordScreen.resendMsg'));
     } catch {
-      setError('Could not resend OTP. Please try again.');
+      setError(t('forgotPasswordScreen.errorResendFailed'));
     } finally {
       setLoading(false);
     }
@@ -86,10 +96,10 @@ export default function ForgotPasswordScreen({ onBack }) {
     if (/[A-Z]/.test(p)) s++;
     if (/[0-9]/.test(p)) s++;
     if (/[^A-Za-z0-9]/.test(p)) s++;
-    if (s <= 1) return { label: 'Weak',   color: '#dc3545', w: '25%' };
-    if (s <= 2) return { label: 'Fair',   color: '#b45309', w: '50%' };
-    if (s <= 3) return { label: 'Good',   color: '#0d6efd', w: '75%' };
-    return              { label: 'Strong', color: '#198754', w: '100%' };
+    if (s <= 1) return { label: t('forgotPasswordScreen.strengthWeak'),   color: '#dc3545', w: '25%' };
+    if (s <= 2) return { label: t('forgotPasswordScreen.strengthFair'),   color: '#b45309', w: '50%' };
+    if (s <= 3) return { label: t('forgotPasswordScreen.strengthGood'),   color: '#0d6efd', w: '75%' };
+    return              { label: t('forgotPasswordScreen.strengthStrong'), color: '#198754', w: '100%' };
   })();
 
   return (
@@ -108,6 +118,19 @@ export default function ForgotPasswordScreen({ onBack }) {
         input::placeholder { color:rgba(255,255,255,.3); font-size:13px; }
         .fp-otp-inp { letter-spacing:12px; font-size:24px; font-weight:700; text-align:center; }
         .fp-otp-inp::placeholder { letter-spacing:normal; font-size:14px; font-weight:400; }
+
+        @media (max-width:640px) {
+          .fp-masthead { top:10px !important; left:14px !important; gap:8px !important; }
+          .fp-masthead-logo { width:44px !important; height:44px !important; }
+          .fp-masthead-text { transform:none !important; }
+          .fp-masthead-hi { display:none !important; }
+          .fp-masthead-en { font-size:13px !important; white-space:normal !important; max-width:150px; line-height:1.2 !important; }
+          .fp-topright { top:10px !important; right:14px !important; gap:8px !important; }
+        }
+        @media (max-width:380px) {
+          .fp-masthead-logo { width:36px !important; height:36px !important; }
+          .fp-masthead-en { font-size:11.5px !important; max-width:120px; }
+        }
       `}</style>
 
       <div className="fp full-vh-min" style={{
@@ -123,6 +146,19 @@ export default function ForgotPasswordScreen({ onBack }) {
         />
         <div className="fixed-bg-img" style={{ zIndex: 1, background: 'linear-gradient(110deg, rgba(2,10,5,.82) 0%, rgba(2,10,5,.62) 45%, rgba(2,10,5,.42) 100%)' }}/>
 
+        {/* Masthead */}
+        <div className="fp-masthead" style={{ position: 'absolute', top: 14, left: 32, zIndex: 10, display: 'flex', alignItems: 'center', gap: 14, maxWidth: 'calc(100vw - 64px)' }}>
+          <img src={haryanaLogo} alt="Haryana" loading="lazy" className="fp-masthead-logo" style={{ width: 100, height: 100, objectFit: 'contain', flexShrink: 0 }} />
+          <div className="fp-masthead-text" style={{ display: 'flex', flexDirection: 'column', gap: 1, whiteSpace: 'nowrap', transform: 'translateY(12px)', minWidth: 0 }}>
+            <span className="fp-masthead-hi" style={{ fontSize: 13, fontWeight: 500, color: 'rgba(255,255,255,.62)', letterSpacing: '.01em' }}>{orgNameHi}</span>
+            <span className="fp-masthead-en" style={{ fontSize: 18, fontWeight: 700, color: 'rgba(255,255,255,.9)', letterSpacing: '.01em' }}>{orgNameEn}</span>
+          </div>
+        </div>
+        <div className="fp-topright" style={{ position: 'absolute', top: 42, right: 32, zIndex: 10, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <LanguageToggle variant="dark" iconOnly buttonStyle={fpIconStyle} />
+          <AccessibilityMenu iconButtonStyle={fpIconStyle} />
+        </div>
+
         <div className="fp-card" style={{
           position: 'relative', zIndex: 2,
           width: 'clamp(300px,90vw,420px)',
@@ -135,67 +171,57 @@ export default function ForgotPasswordScreen({ onBack }) {
           boxShadow: '0 24px 64px rgba(0,0,0,.4)',
           padding: '28px 26px 24px',
         }}>
-          {/* Brand */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid rgba(255,255,255,.1)' }}>
-            <img src={haryanaLogo} alt="Haryana Government" loading="lazy" style={{ width: 40, height: 40, objectFit: 'contain' }} />
-            <div>
-              <div style={{ fontSize: 13.5, fontWeight: 700, color: '#fff' }}>Haryana Government</div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)' }}>Digital Repository</div>
-            </div>
-          </div>
-
           {/* ── Success ── */}
           {step === 3 && (
             <div style={{ textAlign: 'center', padding: '16px 0' }}>
               <CheckCircle2 size={52} color="#198754" style={{ marginBottom: 14 }} />
-              <h2 style={{ fontSize: 20, fontWeight: 800, color: '#fff', marginBottom: 8 }}>Password Reset!</h2>
+              <h2 style={{ fontSize: 20, fontWeight: 800, color: '#fff', marginBottom: 8 }}>{t('forgotPasswordScreen.successTitle')}</h2>
               <p style={{ fontSize: 13.5, color: 'rgba(255,255,255,.6)', lineHeight: 1.6, marginBottom: 24 }}>
-                Your password has been reset successfully.<br/>You can now log in with your new password.
+                {t('forgotPasswordScreen.successMsgLine1')}<br/>{t('forgotPasswordScreen.successMsgLine2')}
               </p>
               <button className="fp-btn" onClick={onBack} style={{
                 width: '100%', padding: '12px',
                 background: 'linear-gradient(135deg,#198754,#16a34a)',
                 borderRadius: 11, color: '#fff', fontSize: 14, fontWeight: 700,
               }}>
-                Go to Login
+                {t('forgotPasswordScreen.goToLogin')}
               </button>
             </div>
           )}
 
-          {/* ── Step 1 ── */}
+          {/* ── Step 1: username ── */}
           {step === 1 && (
             <form onSubmit={handleRequestOtp}>
-              <button type="button" onClick={onBack}
-                style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.4)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, marginBottom: 14, padding: 0, fontFamily: 'inherit', letterSpacing: '.04em' }}>
-                <ArrowLeft size={12} /> Back to Login
-              </button>
-              <h2 style={{ fontSize: 21, fontWeight: 800, color: '#fff', letterSpacing: '-.02em', marginBottom: 4 }}>Forgot Password?</h2>
+              <div style={{ marginBottom: 14, paddingBottom: 14, borderBottom: '1px solid rgba(255,255,255,.1)' }}>
+                <button type="button" onClick={onBack}
+                  style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.4)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, padding: 0, fontFamily: 'inherit', letterSpacing: '.04em' }}>
+                  <ArrowLeft size={12} /> {t('forgotPasswordScreen.backToLogin')}
+                </button>
+              </div>
+              <h2 style={{ fontSize: 21, fontWeight: 800, color: '#fff', letterSpacing: '-.02em', marginBottom: 4 }}>{t('forgotPasswordScreen.title')}</h2>
               <p style={{ fontSize: 12.5, color: 'rgba(255,255,255,.42)', marginBottom: 20 }}>
-                Enter your registered email or mobile number. We'll send you a 6-digit OTP.
+                {t('forgotPasswordScreen.subtitle')}
               </p>
 
-              <label htmlFor="fp-identifier" style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10.5, fontWeight: 700, color: 'rgba(255,255,255,.5)', marginBottom: 7, letterSpacing: '.08em', textTransform: 'uppercase' }}>
-                <InputIcon size={10} color="rgba(255,255,255,.4)" />
-                {isEmail ? 'Email Address' : 'Mobile Number'}
+              <label htmlFor="fp-username" style={labelStyle}>
+                <User size={10} color="rgba(255,255,255,.4)" />
+                {t('forgotPasswordScreen.usernameLabel')}
               </label>
               <input
-                id="fp-identifier"
+                id="fp-username"
                 className="fp-inp"
                 type="text"
-                value={identifier}
-                onChange={e => { setId(e.target.value); setError(''); }}
-                placeholder="email@example.com or 9876543210"
+                value={username}
+                onChange={e => { setUsername(e.target.value); setError(''); }}
+                placeholder={t('forgotPasswordScreen.usernamePlaceholder')}
                 autoComplete="username"
                 style={{
                   width: '100%', padding: '11px 13px',
                   background: 'rgba(255,255,255,.10)',
                   border: '1px solid rgba(255,255,255,.18)',
-                  borderRadius: 11, fontSize: 13.5, color: '#fff', marginBottom: 4,
+                  borderRadius: 11, fontSize: 13.5, color: '#fff', marginBottom: 16,
                 }}
               />
-              <p style={{ fontSize: 11, color: 'rgba(255,255,255,.3)', marginBottom: 16 }}>
-                Use email for email OTP, or 10-digit mobile for SMS OTP.
-              </p>
 
               {error && <ErrorBox msg={error} />}
 
@@ -208,25 +234,32 @@ export default function ForgotPasswordScreen({ onBack }) {
                 boxShadow: canSubmitStep1 ? '0 4px 18px rgba(25, 135, 84,.35)' : 'none',
                 cursor: canSubmitStep1 ? 'pointer' : 'not-allowed',
               }}>
-                {loading ? <><Spin /> Sending OTP…</> : <>Send OTP &nbsp;→</>}
+                {loading ? <><Spin /> {t('forgotPasswordScreen.sendingOtp')}</> : <>{t('forgotPasswordScreen.sendOtp')} &nbsp;→</>}
               </button>
             </form>
           )}
 
-          {/* ── Step 2 ── */}
+          {/* ── Step 2: OTP + new password ── */}
           {step === 2 && (
             <form onSubmit={handleReset}>
-              <button type="button" onClick={() => { setStep(1); setError(''); setOtp(''); }}
-                style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.4)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, marginBottom: 14, padding: 0, fontFamily: 'inherit', letterSpacing: '.04em' }}>
-                <ArrowLeft size={12} /> Back
-              </button>
-              <h2 style={{ fontSize: 21, fontWeight: 800, color: '#fff', letterSpacing: '-.02em', marginBottom: 4 }}>Enter OTP</h2>
-              <p style={{ fontSize: 12.5, color: 'rgba(255,255,255,.42)', marginBottom: 20 }}>
-                A 6-digit OTP was sent to your {channel === 'email' ? 'email' : 'mobile'}. Valid for 10 minutes.
-              </p>
+              <div style={{ marginBottom: 14, paddingBottom: 14, borderBottom: '1px solid rgba(255,255,255,.1)' }}>
+                <button type="button" onClick={() => { setStep(1); setError(''); setOtp(''); }}
+                  style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.4)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, padding: 0, fontFamily: 'inherit', letterSpacing: '.04em' }}>
+                  <ArrowLeft size={12} /> {t('forgotPasswordScreen.back')}
+                </button>
+              </div>
+              <h2 style={{ fontSize: 21, fontWeight: 800, color: '#fff', letterSpacing: '-.02em', marginBottom: 4 }}>{t('forgotPasswordScreen.enterOtpTitle')}</h2>
+
+              {/* Masked mobile info */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, padding: '10px 12px', background: 'rgba(74,222,128,.08)', border: '1px solid rgba(74,222,128,.2)', borderRadius: 10 }}>
+                <Smartphone size={14} color="#4ade80" style={{ flexShrink: 0 }} />
+                <p style={{ fontSize: 12.5, color: 'rgba(255,255,255,.6)', lineHeight: 1.5, margin: 0 }}>
+                  {t('forgotPasswordScreen.otpSentToMobile', { maskedMobile })}
+                </p>
+              </div>
 
               {/* OTP */}
-              <label htmlFor="fp-otp" style={labelStyle}>OTP (6 digits)</label>
+              <label htmlFor="fp-otp" style={labelStyle}>{t('forgotPasswordScreen.otpLabel')}</label>
               <input
                 id="fp-otp"
                 className="fp-inp fp-otp-inp"
@@ -245,7 +278,7 @@ export default function ForgotPasswordScreen({ onBack }) {
               />
 
               {/* New password */}
-              <label htmlFor="fp-newpass" style={labelStyle}>New Password</label>
+              <label htmlFor="fp-newpass" style={labelStyle}>{t('forgotPasswordScreen.newPasswordLabel')}</label>
               <div style={{ position: 'relative', marginBottom: 4 }}>
                 <input
                   id="fp-newpass"
@@ -253,7 +286,7 @@ export default function ForgotPasswordScreen({ onBack }) {
                   type={showPass ? 'text' : 'password'}
                   value={newPass}
                   onChange={e => { setNewPass(e.target.value); setError(''); }}
-                  placeholder="Min 8 characters"
+                  placeholder={t('forgotPasswordScreen.newPasswordPlaceholder')}
                   autoComplete="new-password"
                   style={{
                     width: '100%', padding: '11px 38px 11px 13px',
@@ -264,7 +297,7 @@ export default function ForgotPasswordScreen({ onBack }) {
                 />
                 <div role="button" tabIndex={0} onClick={() => setShowPass(s => !s)}
                   onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowPass(s => !s); } }}
-                  aria-label={showPass ? 'Hide password' : 'Show password'}
+                  aria-label={showPass ? t('hidePassword') : t('showPassword')}
                   style={{ position: 'absolute', right: 11, top: '50%', transform: 'translateY(-50%)', cursor: 'pointer', color: 'rgba(255,255,255,.3)', display: 'flex' }}>
                   {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
                 </div>
@@ -280,14 +313,14 @@ export default function ForgotPasswordScreen({ onBack }) {
               )}
 
               {/* Confirm password */}
-              <label htmlFor="fp-confirm" style={labelStyle}>Confirm New Password</label>
+              <label htmlFor="fp-confirm" style={labelStyle}>{t('forgotPasswordScreen.confirmPasswordLabel')}</label>
               <input
                 id="fp-confirm"
                 className="fp-inp"
                 type="password"
                 value={confirm}
                 onChange={e => { setConfirm(e.target.value); setError(''); }}
-                placeholder="Re-enter new password"
+                placeholder={t('forgotPasswordScreen.confirmPasswordPlaceholder')}
                 autoComplete="new-password"
                 style={{
                   width: '100%', padding: '11px 13px',
@@ -312,19 +345,19 @@ export default function ForgotPasswordScreen({ onBack }) {
                 cursor: canSubmitStep2 ? 'pointer' : 'not-allowed',
                 marginBottom: 12,
               }}>
-                {loading ? <><Spin /> Resetting…</> : canSubmitStep2 ? <><ShieldCheck size={14} /> Reset Password</> : <><Lock size={13} /> Reset Password</>}
+                {loading ? <><Spin /> {t('forgotPasswordScreen.resetting')}</> : canSubmitStep2 ? <><ShieldCheck size={14} /> {t('forgotPasswordScreen.resetPassword')}</> : <><Lock size={13} /> {t('forgotPasswordScreen.resetPassword')}</>}
               </button>
 
               <button type="button" onClick={handleResend} disabled={loading}
                 style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.35)', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'inherit', margin: '0 auto' }}>
-                <RotateCcw size={11} /> Resend OTP
+                <RotateCcw size={11} /> {t('forgotPasswordScreen.resendOtp')}
               </button>
             </form>
           )}
         </div>
 
         <p style={{ position: 'absolute', bottom: 14, zIndex: 2, color: 'rgba(255,255,255,.16)', fontSize: 11 }}>
-          © 2026 Government of Haryana · HARTRON
+          {t('footerCopyright')}
         </p>
       </div>
     </>

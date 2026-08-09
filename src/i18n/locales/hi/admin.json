@@ -33,18 +33,18 @@
     "addDrawer": {
       "title": "नया उपयोगकर्ता जोड़ें",
       "subtitle": "एक नया सिस्टम खाता बनाएं",
-      "username": "उपयोगकर्ता नाम *",
+      "username": "उपयोगकर्ता नाम",
       "usernamePlaceholder": "जैसे firstname.lastname",
-      "email": "ईमेल *",
+      "email": "ईमेल",
       "emailPlaceholder": "user@example.com",
-      "password": "पासवर्ड *",
+      "password": "पासवर्ड",
       "passwordPlaceholder": "एक पासवर्ड सेट करें",
       "firstName": "पहला नाम",
       "firstNamePlaceholder": "पहला नाम",
       "lastName": "अंतिम नाम",
       "lastNamePlaceholder": "अंतिम नाम",
       "mobileNumber": "मोबाइल नंबर",
-      "mobilePlaceholder": "10 अंकों का मोबाइल नंबर (वैकल्पिक)",
+      "mobilePlaceholder": "10 अंकों का मोबाइल नंबर",
       "role": "भूमिका",
       "roleSelectPlaceholder": "भूमिका चुनें",
       "department": "विभाग",
@@ -69,12 +69,29 @@
       "saveChanges": "परिवर्तन सहेजें",
       "saving": "सहेजा जा रहा है…"
     },
+    "confirmToggle": {
+      "deactivateTitle": "उपयोगकर्ता को निष्क्रिय करें",
+      "activateTitle": "उपयोगकर्ता को सक्रिय करें",
+      "confirmDeactivate": "क्या आप वाकई <strong>{{name}}</strong> को निष्क्रिय करना चाहते हैं?",
+      "confirmActivate": "क्या आप वाकई <strong>{{name}}</strong> को सक्रिय करना चाहते हैं?",
+      "loginBlockedNote": "वे अब लॉग इन नहीं कर पाएंगे।",
+      "cancel": "रद्द करें",
+      "deactivate": "निष्क्रिय करें",
+      "activate": "सक्रिय करें"
+    },
     "errors": {
       "usernameRequired": "उपयोगकर्ता नाम आवश्यक है।",
       "emailRequired": "ईमेल आवश्यक है।",
+      "emailInvalid": "कृपया एक मान्य ईमेल पता दर्ज करें।",
       "passwordRequired": "पासवर्ड आवश्यक है।",
+      "mobileRequired": "एक मान्य 10-अंकों का मोबाइल नंबर आवश्यक है।",
+      "firstNameRequired": "पहला नाम आवश्यक है।",
+      "lastNameRequired": "अंतिम नाम आवश्यक है।",
+      "roleRequired": "भूमिका आवश्यक है।",
+      "departmentRequired": "विभाग आवश्यक है।",
       "createFailed": "उपयोगकर्ता बनाने में विफल।",
-      "saveFailed": "परिवर्तन सहेजने में विफल।"
+      "saveFailed": "परिवर्तन सहेजने में विफल।",
+      "fillMandatory": "कृपया आगे बढ़ने से पहले सभी अनिवार्य फ़ील्ड भरें।"
     }
   },
   "taxonomy": {
@@ -90,10 +107,19 @@
     "activate": "सक्रिय करें",
     "edit": "संपादित करें",
     "delete": "हटाएं",
+    "confirmToggle": {
+      "deactivateTitle": "{{category}} निष्क्रिय करें",
+      "activateTitle": "{{category}} सक्रिय करें",
+      "confirmDeactivate": "क्या आप वाकई <strong>{{name}}</strong> को निष्क्रिय करना चाहते हैं?",
+      "confirmActivate": "क्या आप वाकई <strong>{{name}}</strong> को सक्रिय करना चाहते हैं?",
+      "cancel": "रद्द करें",
+      "deactivate": "निष्क्रिय करें",
+      "activate": "सक्रिय करें"
+    },
     "addDepartment": {
       "title": "विभाग जोड़ें",
       "subtitle": "एक नया विभाग रिकॉर्ड बनाएं।",
-      "name": "विभाग का नाम *",
+      "name": "विभाग का नाम",
       "namePlaceholder": "जैसे राजस्व विभाग",
       "description": "विवरण",
       "descriptionPlaceholder": "विभाग के कार्य का संक्षिप्त विवरण…",
@@ -146,11 +172,13 @@
       "documentType": "दस्तावेज़ प्रकार"
     },
     "allStatuses": "सभी स्थितियां",
+    "allActions": "सभी कार्रवाइयां",
     "success": "सफल",
     "failure": "विफल",
     "to": "से",
     "clear": "साफ़ करें",
     "exportCsv": "CSV निर्यात करें",
+    "exporting": "निर्यात हो रहा है…",
     "heading": "उपयोगकर्ता ऑडिट इतिहास",
     "totalEntries": "कुल {{count}} प्रविष्टियां",
     "loading": "ऑडिट लॉग लोड हो रहे हैं…",
@@ -198,7 +226,15 @@
     "approvedLabel": "स्वीकृत",
     "rejectedLabel": "अस्वीकृत",
     "reviewedLabel": "समीक्षित",
-    "view": "देखें"
+    "view": "देखें",
+    "report": {
+      "button": "रिपोर्ट डाउनलोड करें",
+      "panelTitle": "एक्सेल रिपोर्ट डाउनलोड करें",
+      "panelDesc": "एक या अधिक विभाग चुनें — सभी शामिल करने के लिए खाली छोड़ें। रिपोर्ट में कुल, अपलोडर-वार गणना और लंबित दस्तावेज़ों का विभागवार विवरण होगा।",
+      "allDepartmentsPlaceholder": "सभी विभाग",
+      "downloadButton": "एक्सेल डाउनलोड करें",
+      "generating": "बन रहा है…"
+    }
   },
   "linkedDocs": {
     "failedToLoad": "लिंक किए गए दस्तावेज़ लोड करने में विफल।",
@@ -235,5 +271,39 @@
   "multiSelect": {
     "selectDepartments": "विभाग चुनें…",
     "departmentsSelected": "{{count}} विभाग चयनित"
+  },
+  "roleCaps": {
+    "title": "भूमिका उपयोगकर्ता सीमाएं",
+    "subtitle": "प्रत्येक विभाग में प्रत्येक भूमिका के लिए अधिकतम सक्रिय उपयोगकर्ताओं की संख्या निर्धारित करें। यदि कोई कस्टम सीमा नहीं है, तो सिस्टम डिफ़ॉल्ट {{default}} लागू होगा।",
+    "addTitle": "सीमा जोड़ें / अपडेट करें",
+    "department": "विभाग",
+    "role": "भूमिका",
+    "maxUsers": "अधिकतम उपयोगकर्ता",
+    "selectDepartment": "विभाग चुनें",
+    "selectRole": "भूमिका चुनें",
+    "save": "सहेजें",
+    "saving": "सहेजा जा रहा है…",
+    "delete": "हटाएं",
+    "edit": "संपादित करें",
+    "cancel": "रद्द करें",
+    "noLimits": "कोई कस्टम सीमा नहीं। सभी विभागों में प्रति भूमिका {{default}} उपयोगकर्ताओं का सिस्टम डिफ़ॉल्ट लागू है।",
+    "defaultBadge": "डिफ़ॉल्ट: {{n}}",
+    "listHeading": "विभाग",
+    "totalDepartments": "{{count}} कुल विभाग",
+    "headers": {
+      "department": "विभाग",
+      "role": "भूमिका",
+      "maxUsers": "अधिकतम उपयोगकर्ता",
+      "actions": "कार्रवाई"
+    },
+    "errors": {
+      "loadFailed": "भूमिका सीमाएं लोड करने में विफल। कृपया पुनः प्रयास करें।",
+      "saveFailed": "सीमा सहेजने में विफल।",
+      "deleteFailed": "सीमा हटाने में विफल।",
+      "deptRequired": "कृपया एक विभाग चुनें।",
+      "roleRequired": "कृपया एक भूमिका चुनें।",
+      "maxRequired": "अधिकतम उपयोगकर्ता 0 या अधिक होना चाहिए।"
+    },
+    "deleteConfirm": "{{dept}} में {{role}} की कस्टम सीमा हटाएं? सिस्टम डिफ़ॉल्ट {{default}} लागू होगा।"
   }
 }

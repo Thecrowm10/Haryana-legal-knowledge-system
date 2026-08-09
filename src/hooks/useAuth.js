@@ -23,15 +23,23 @@ function normalizeRole(role) {
 }
 
 function userFromPayload(payload) {
+  const firstName = payload.first_name || '';
+  const lastName  = payload.last_name  || '';
+  const fullName  = [firstName, lastName].filter(Boolean).join(' ');
   return {
     username:           payload.username,
     role:               normalizeRole(payload.role),
     name:               payload.username,
+    firstName,
+    lastName,
+    fullName,
     email:              payload.email,
     dept:               payload.departments?.[0]?.name ?? payload.department ?? '',
     isActive:           payload.is_active,
     mustChangePassword: payload.must_change_password ?? false,
     passwordExpired:    payload.password_expired ?? false,
+    mobileVerified:     payload.mobile_verified ?? false,
+    mobile:             payload.mobile_number || '',
   };
 }
 

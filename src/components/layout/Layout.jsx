@@ -7,8 +7,8 @@ import { useMediaQuery } from '../../hooks/useMediaQuery';
 // These roles get a single-page dashboard (no left nav) — see their Topbar branding block instead.
 const NO_SIDEBAR_ROLES = ['citizen', 'uploader', 'approver'];
 
-export default function Layout({ user, activePage, onNavigate, onLogout, onChangePassword, children }) {
-  const [collapsed, setCollapsed] = useState(true);
+export default function Layout({ user, activePage, onNavigate, onLogout, onChangePassword, onMobileVerified, children }) {
+  const [collapsed, setCollapsed] = useState(false);
   // Below 1024px the Sidebar renders as an off-canvas drawer instead of an in-flow
   // column (see Sidebar.jsx) — mobileOpen tracks that drawer's visibility, separate
   // from `collapsed` which only governs the desktop pinned/hover-expand behavior.
@@ -49,6 +49,7 @@ export default function Layout({ user, activePage, onNavigate, onLogout, onChang
               onNavigate={onNavigate}
               onLogout={onLogout}
               onChangePassword={onChangePassword}
+              onMobileVerified={onMobileVerified}
               onToggleSidebar={toggleSidebar}
             />
           )}

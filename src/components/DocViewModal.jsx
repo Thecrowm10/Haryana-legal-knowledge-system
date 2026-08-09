@@ -1,11 +1,14 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { FileText, CheckCircle, XCircle, Clock, Eye, ZoomIn, ZoomOut, RotateCw, ExternalLink, X, MessageCircle } from 'lucide-react';
+import { FileText, CheckCircle, XCircle, Clock, Eye, ZoomIn, ZoomOut, RotateCw, ExternalLink, X, MessageCircle, ListTree, ArrowRight } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 import mammoth from 'mammoth';
-import { getPdfFile } from '../services/pdf';
+import { getPdfFile, getPdfFull } from '../services/pdf';
 import { TYPE_SPECIFIC_FIELD_KEYS } from '../constants/docTypeFields';
+import { PART_META } from '../constants/mockActOutline';
+import { mapActPartsToOutline } from '../utils/actFull';
+import ActContentsView from './ActContentsView';
 
 const TYPE_CARD_COLORS = {
   'Act':                 { bg: 'rgba(33, 74, 171,.08)',  accent: '#214aab', text: '#1e40af' },
@@ -33,7 +36,7 @@ function parseDisplayRemarks(str) {
   });
 }
 
-export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuery = null, searchPages = null }) {
+export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuery = null, searchPages = null, zIndex = 2000 }) {
   const [blobUrl, setBlobUrl]         = useState(null);
   const [pdfDoc, setPdfDoc]           = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -52,10 +55,22 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
   const docxViewRef   = useRef(null);
   // Keep a current reference to scrollToPage to avoid stale closures in timeouts
   const scrollToPageRef = useRef(null);
-  const annotations  = useMemo(() => {
-    try { return doc.approval?.annotations_json ? JSON.parse(doc.approval.annotations_json) : []; }
+  const annotationsJson = doc.approval?.annotations_json;
+  const annotations = useMemo(() => {
+    try { return annotationsJson ? JSON.parse(annotationsJson) : []; }
     catch { return []; }
   }, [doc.approval?.annotations_json]);
+  const [actFull, setActFull] = useState(null);
+  const actOutline = useMemo(() => doc.type === 'Act' && actFull ? mapActPartsToOutline(actFull.act_parts) : null, [doc.type, actFull]);
+  const [showActContents, setShowActContents] = useState(false);
+
+  // Contents preview (badge counts on the info panel, before the reader opens)
+  useEffect(() => {
+    if (doc.type !== 'Act') return;
+    let cancelled = false;
+    getPdfFull(doc.id).then(res => { if (!cancelled) setActFull(res.data); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [doc.id, doc.type]);
 
   useEffect(() => {
     const h = e => { if (e.key === 'Escape') onClose(); };
@@ -64,8 +79,10 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
   }, [onClose]);
 
   useEffect(() => {
+    // doc.id never actually changes on an already-mounted instance — every call site
+    // gates this component behind `cond && <DocViewModal .../>`, so a new document
+    // always means a fresh mount and these useState initial values already apply.
     let url = null;
-    setBlobUrl(null); setPdfDoc(null); setCurrentPage(1); setDocxHtml(null);
     getPdfFile(doc.id)
       .then(res => {
         const ct = (res.headers['content-type'] || '').toLowerCase();
@@ -127,7 +144,7 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
     if (!pdfDoc || initialPage <= 1) return;
     const timer = setTimeout(() => scrollToPageRef.current?.(initialPage), 450);
     return () => clearTimeout(timer);
-  }, [pdfDoc, initialPage]); // eslint-disable-line
+  }, [pdfDoc, initialPage]);
 
   // Extract text positions for search term highlighting using PDF.js text content
   useEffect(() => {
@@ -188,7 +205,6 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
   }, [pdfDoc, zoom, rotation]);
 
   // scrollToPage is called only by Prev/Next buttons — never by handleScroll or scrollToAnnotation
-  scrollToPageRef.current = scrollToPage;
   function scrollToPage(page) {
     const clamped = Math.max(1, Math.min(totalPages, page));
     const canvas = canvasRefs.current[clamped - 1];
@@ -199,6 +215,7 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
     setCurrentPage(clamped);
     setTimeout(() => { suppressRef.current = false; }, 700);
   }
+  useEffect(() => { scrollToPageRef.current = scrollToPage; });
 
   function handleScroll() {
     if (suppressRef.current || !containerRef.current) return;
@@ -246,7 +263,7 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
     ['Issue Date',      doc.enactmentDate   || ''],
     ['Effective From',  doc.effectiveFrom   || ''],
     ['Gazette Ref.',    doc.gazette         || ''],
-    ['Legal Authority', doc.authority       || ''],
+    ...(doc.type !== 'Act' ? [['Legal Authority', doc.authority || '']] : []),
     ['Uploader',        doc.uploader        || ''],
     ['Upload Date',     doc.uploadedAt      || ''],
     ['File',            doc.fileName        || ''],
@@ -271,7 +288,7 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
   };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 2000, display: 'flex', flexDirection: 'column', background: 'var(--surface-card)' }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex, display: 'flex', flexDirection: 'column', background: 'var(--surface-card)' }}>
       <style>{`
         @media (max-width: 1024px) {
           .dvm-grid { grid-template-columns: 1fr !important; grid-auto-rows: min-content !important; overflow-y: auto !important; }
@@ -293,7 +310,9 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
             <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 20, background: typeColor.bg, color: typeColor.text || typeColor.accent }}>{doc.type}</span>
             <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)' }}>{doc.dept}</span>
             <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: .7 }}>· {doc.year}</span>
+            {/* Version tag hidden until proper API mapping for versions is wired up — keep for future use.
             {doc.version && <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: .7 }}>· v{doc.version}</span>}
+            */}
           </div>
         </div>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px 6px 10px', borderRadius: 20, background: statusBg, border: `1px solid ${statusAccent}44`, flexShrink: 0 }}>
@@ -453,7 +472,8 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
                 { label: 'Type',       value: doc.type,                   color: typeColor.accent, bg: typeColor.bg },
                 { label: 'Department', value: doc.dept,                   color: 'var(--primary)', bg: 'rgba(33, 74, 171,.07)' },
                 { label: 'Year',       value: String(doc.year),           color: '#64748b',        bg: 'rgba(100,116,139,.08)' },
-                { label: 'Version',    value: `v${doc.version || '1.0'}`, color: '#64748b',        bg: 'rgba(100,116,139,.08)' },
+                // Version tile hidden until proper API mapping for versions is wired up — keep for future use.
+                // { label: 'Version',    value: `v${doc.version || '1.0'}`, color: '#64748b',        bg: 'rgba(100,116,139,.08)' },
               ].map(({ label, value, color, bg }) => (
                 <div key={label} style={{ padding: '12px 14px', borderRadius: 10, background: bg, border: '1px solid transparent' }}>
                   <div style={{ fontSize: 10, fontWeight: 700, color, letterSpacing: '.06em', textTransform: 'uppercase', fontFamily: 'var(--mono)', marginBottom: 4, opacity: .8 }}>{label}</div>
@@ -461,6 +481,45 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
                 </div>
               ))}
             </div>
+
+            {actOutline && (
+              <div style={{ marginBottom: 22 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                  <ListTree size={13} color="var(--text-color-secondary)" />
+                  <div style={LS}>Contents</div>
+                </div>
+
+                {/* Which parts this Act actually has — no greyed-out placeholders for parts that don't exist */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+                  {Object.entries(PART_META).map(([key, m]) => {
+                    const count = key === 'sections'
+                      ? actOutline.sections.chapters.reduce((n, c) => n + c.sections.length, 0)
+                      : actOutline[key].length;
+                    if (count === 0) return null;
+                    return (
+                      <span key={key} style={{ fontSize: 10.5, fontWeight: 700, padding: '4px 10px', borderRadius: 20, background: m.bg, color: m.accent, fontFamily: 'var(--mono)' }}>
+                        {m.label} · {count}
+                      </span>
+                    );
+                  })}
+                </div>
+
+                <button type="button" onClick={() => setShowActContents(true)}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '14px 16px', borderRadius: 10, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', cursor: 'pointer', fontFamily: 'var(--font)', transition: 'background .15s' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'var(--surface-ground)'}>
+                  <span style={{ textAlign: 'left' }}>
+                    <span style={{ display: 'block', fontSize: 13, fontWeight: 700, color: 'var(--text-heading)' }}>Browse Sections & Schedules</span>
+                    <span style={{ display: 'block', fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 2 }}>Read this Act chapter by chapter, outside the PDF</span>
+                  </span>
+                  <ArrowRight size={16} color="var(--primary)" style={{ flexShrink: 0 }} />
+                </button>
+              </div>
+            )}
+
+            {showActContents && (
+              <ActContentsView doc={doc} onClose={() => setShowActContents(false)} />
+            )}
 
             {meta.length > 0 && (
               <div style={{ marginBottom: 22 }}>

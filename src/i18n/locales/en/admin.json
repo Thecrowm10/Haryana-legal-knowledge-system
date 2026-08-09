@@ -33,18 +33,18 @@
     "addDrawer": {
       "title": "Add New User",
       "subtitle": "Create a new system account",
-      "username": "Username *",
+      "username": "Username",
       "usernamePlaceholder": "e.g. firstname.lastname",
-      "email": "Email *",
+      "email": "Email",
       "emailPlaceholder": "user@example.com",
-      "password": "Password *",
+      "password": "Password",
       "passwordPlaceholder": "Set a password",
       "firstName": "First Name",
       "firstNamePlaceholder": "First name",
       "lastName": "Last Name",
       "lastNamePlaceholder": "Last name",
       "mobileNumber": "Mobile Number",
-      "mobilePlaceholder": "10-digit mobile number (optional)",
+      "mobilePlaceholder": "10-digit mobile number",
       "role": "Role",
       "roleSelectPlaceholder": "Select Role",
       "department": "Department",
@@ -69,12 +69,29 @@
       "saveChanges": "Save Changes",
       "saving": "Saving…"
     },
+    "confirmToggle": {
+      "deactivateTitle": "Deactivate User",
+      "activateTitle": "Activate User",
+      "confirmDeactivate": "Are you sure you want to deactivate <strong>{{name}}</strong>?",
+      "confirmActivate": "Are you sure you want to activate <strong>{{name}}</strong>?",
+      "loginBlockedNote": "They will no longer be able to log in.",
+      "cancel": "Cancel",
+      "deactivate": "Deactivate",
+      "activate": "Activate"
+    },
     "errors": {
       "usernameRequired": "Username is required.",
       "emailRequired": "Email is required.",
+      "emailInvalid": "Please enter a valid email address.",
       "passwordRequired": "Password is required.",
+      "mobileRequired": "A valid 10-digit mobile number is required.",
+      "firstNameRequired": "First name is required.",
+      "lastNameRequired": "Last name is required.",
+      "roleRequired": "Role is required.",
+      "departmentRequired": "Department is required.",
       "createFailed": "Failed to create user.",
-      "saveFailed": "Failed to save changes."
+      "saveFailed": "Failed to save changes.",
+      "fillMandatory": "Please fill all mandatory fields before continuing."
     }
   },
   "taxonomy": {
@@ -90,10 +107,19 @@
     "activate": "Activate",
     "edit": "Edit",
     "delete": "Delete",
+    "confirmToggle": {
+      "deactivateTitle": "Deactivate {{category}}",
+      "activateTitle": "Activate {{category}}",
+      "confirmDeactivate": "Are you sure you want to deactivate <strong>{{name}}</strong>?",
+      "confirmActivate": "Are you sure you want to activate <strong>{{name}}</strong>?",
+      "cancel": "Cancel",
+      "deactivate": "Deactivate",
+      "activate": "Activate"
+    },
     "addDepartment": {
       "title": "Add Department",
       "subtitle": "Create a new department record.",
-      "name": "Department Name *",
+      "name": "Department Name",
       "namePlaceholder": "e.g. Revenue Department",
       "description": "Description",
       "descriptionPlaceholder": "Brief description of the department's function…",
@@ -146,11 +172,13 @@
       "documentType": "Document Type"
     },
     "allStatuses": "All Statuses",
+    "allActions": "All Actions",
     "success": "Success",
     "failure": "Failure",
     "to": "to",
     "clear": "Clear",
     "exportCsv": "Export CSV",
+    "exporting": "Exporting…",
     "heading": "User Audit History",
     "totalEntries": "{{count}} total entries",
     "loading": "Loading audit logs…",
@@ -198,7 +226,15 @@
     "approvedLabel": "Approved",
     "rejectedLabel": "Rejected",
     "reviewedLabel": "Reviewed",
-    "view": "View"
+    "view": "View",
+    "report": {
+      "button": "Download Report",
+      "panelTitle": "Download Excel Report",
+      "panelDesc": "Pick one or more departments — leave blank to include all. The report breaks totals, uploader-wise counts and pending items down per department.",
+      "allDepartmentsPlaceholder": "All departments",
+      "downloadButton": "Download Excel",
+      "generating": "Generating…"
+    }
   },
   "linkedDocs": {
     "failedToLoad": "Failed to load linked documents.",
@@ -235,5 +271,39 @@
   "multiSelect": {
     "selectDepartments": "Select departments…",
     "departmentsSelected": "{{count}} departments selected"
+  },
+  "roleCaps": {
+    "title": "Role User Caps",
+    "subtitle": "Set the maximum number of active users allowed per role in each department. If no custom limit is set, the system default of {{default}} applies.",
+    "addTitle": "Add / Update Limit",
+    "department": "Department",
+    "role": "Role",
+    "maxUsers": "Max Users",
+    "selectDepartment": "Select department",
+    "selectRole": "Select role",
+    "save": "Save",
+    "saving": "Saving…",
+    "delete": "Remove",
+    "edit": "Edit",
+    "cancel": "Cancel",
+    "noLimits": "No custom limits set. All departments use the system default of {{default}} users per role.",
+    "defaultBadge": "Default: {{n}}",
+    "listHeading": "Departments",
+    "totalDepartments": "{{count}} total departments",
+    "headers": {
+      "department": "Department",
+      "role": "Role",
+      "maxUsers": "Max Users",
+      "actions": "Actions"
+    },
+    "errors": {
+      "loadFailed": "Failed to load role caps. Please try again.",
+      "saveFailed": "Failed to save limit.",
+      "deleteFailed": "Failed to remove limit.",
+      "deptRequired": "Please select a department.",
+      "roleRequired": "Please select a role.",
+      "maxRequired": "Max users must be 0 or more."
+    },
+    "deleteConfirm": "Remove the custom limit for {{role}} in {{dept}}? The system default of {{default}} will apply."
   }
 }
