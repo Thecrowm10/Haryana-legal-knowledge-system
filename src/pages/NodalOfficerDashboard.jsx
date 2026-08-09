@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
 import { Users, CheckCircle, XCircle, Plus, Edit2, X, Eye, EyeOff, Download, FileSpreadsheet, Layers, FileText, Clock, Search, Link2, Activity } from 'lucide-react';
 import Card from '../components/ui/Card';
@@ -9,7 +9,7 @@ import DocViewModal from '../components/DocViewModal';
 import { getUsers, getRoles, updateUser, registerUser, getApproversByDepartment } from '../services/users';
 import { getMyDepartments } from '../services/departments';
 import { getAllDocumentsAdmin, getAllDepartmentLinks } from '../services/pdf';
-import { getAuditLogs } from '../services/audit';
+import { getAuditLogs, getAuditLogActions } from '../services/audit';
 import { getAllActPartSubmissions, getAllActParts } from '../services/act_parts';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { downloadUploadsExcelReport } from '../utils/uploadsExcelReport';
@@ -384,11 +384,18 @@ export default function NodalOfficerDashboard({ activePage }) {
   const [auditFromDate, setAuditFromDate]         = useState('');
   const [auditToDate, setAuditToDate]             = useState('');
   const [auditSearch, setAuditSearch]             = useState('');
-  // Action-type dropdown options are built only from actions actually seen in
-  // fetched pages (never a guessed/hardcoded list) and accumulate across
-  // fetches so the list doesn't shrink once you filter down to one action.
-  const [seenActionsRaw, setSeenActionsRaw]       = useState([]);
-  const auditActionOptions = useMemo(() => Array.from(new Set(seenActionsRaw)).sort(), [seenActionsRaw]);
+  const [auditActionOptions, setAuditActionOptions] = useState([]);
+
+  const [auditActionsLoaded, setAuditActionsLoaded] = useState(false);
+  useEffect(() => {
+    if (activePage !== 'nodalauditfull' || auditActionsLoaded) return;
+    getAuditLogActions()
+      .then(res => {
+        setAuditActionOptions(res.data.actions || []);
+        setAuditActionsLoaded(true);
+      })
+      .catch(() => {});
+  }, [activePage, auditActionsLoaded]);
 
   useEffect(() => {
     if (activePage !== 'nodalauditfull') return;
@@ -403,7 +410,6 @@ export default function NodalOfficerDashboard({ activePage }) {
         const logs = res.data.logs || [];
         setAuditLogs(logs);
         setAuditTotal(res.data.total || 0);
-        setSeenActionsRaw(prev => [...prev, ...logs.map(l => l.action).filter(Boolean)]);
       })
       .catch(() => setAuditError(t('audit.failedToLoad')))
       .finally(() => setAuditLoading(false));
