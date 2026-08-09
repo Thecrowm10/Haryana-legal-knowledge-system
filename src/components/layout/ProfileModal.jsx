@@ -109,6 +109,11 @@ export default function ProfileModal({ user, roleLabel, onClose, onChangePasswor
         <div style={{ overflowY: 'auto' }}>
           {/* Account details — 2×2 grid */}
           <div className="modal-body-pad modal-grid-2" style={{ padding: '20px 24px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            {user.fullName && (
+              <div style={{ gridColumn: '1 / -1' }}>
+                <Detail icon={User} label="Full Name" value={user.fullName} />
+              </div>
+            )}
             <Detail icon={User}      label="Username"   value={user.username} />
             <Detail icon={Building2} label="Department" value={user.dept  || '—'} />
             <Detail icon={Mail}      label="Email"      value={user.email || '—'} />
