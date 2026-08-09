@@ -2770,7 +2770,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                       <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.gazetteReference')}</div>
                       <input value={editForm.gazette_reference} onChange={e => setEditForm(f => ({ ...f, gazette_reference: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
                     </div>
-                    {doc.type !== 'Act' && (
+                    {editingDoc.type !== 'Act' && (
                     <div>
                       <div style={{ ...LABEL, marginBottom: 6 }}>{t('docViewModal.legalAuthority')}</div>
                       <input value={editForm.legal_authority} onChange={e => setEditForm(f => ({ ...f, legal_authority: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
@@ -3947,7 +3947,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                       <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.gazetteReference')}</div>
                       <input value={editForm.gazette_reference} onChange={e => setEditForm(f => ({ ...f, gazette_reference: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
                     </div>
-                    {doc.type !== 'Act' && (
+                    {editingDoc.type !== 'Act' && (
                     <div>
                       <div style={{ ...LABEL, marginBottom: 6 }}>{t('docViewModal.legalAuthority')}</div>
                       <input value={editForm.legal_authority} onChange={e => setEditForm(f => ({ ...f, legal_authority: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
