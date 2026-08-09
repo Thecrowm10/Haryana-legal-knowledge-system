@@ -374,13 +374,14 @@ export default function NodalOfficerDashboard({ activePage }) {
     }
   }
 
-  // Audit Log state 
+  // Audit Log state
   const [auditLogs, setAuditLogs]                 = useState([]);
   const [auditTotal, setAuditTotal]               = useState(0);
   const [auditLoading, setAuditLoading]           = useState(false);
   const [auditError, setAuditError]               = useState('');
   const [auditPage, setAuditPage]                 = useState(0);
   const [auditFilterAction, setAuditFilterAction] = useState('');
+  const [auditExporting, setAuditExporting]       = useState(false);
   const [auditFromDate, setAuditFromDate]         = useState('');
   const [auditToDate, setAuditToDate]             = useState('');
   const [auditSearch, setAuditSearch]             = useState('');
@@ -1330,22 +1331,46 @@ export default function NodalOfficerDashboard({ activePage }) {
             )}
             <div className="nod-audit-spacer" style={{ flex: 1 }} />
             <button className="nod-export-btn"
-              onClick={() => {
-                const visible = auditLogs.filter(l => {
+              disabled={auditExporting}
+              onClick={async () => {
+                if (auditExporting) return;
+                setAuditExporting(true);
+                try {
+                  const FETCH_LIMIT = 100;
+                  const baseParams = {};
+                  if (auditFilterAction) baseParams.action    = auditFilterAction;
+                  if (auditFromDate)     baseParams.from_date = auditFromDate;
+                  if (auditToDate)       baseParams.to_date   = auditToDate + 'T23:59:59';
+                  let all = [];
+                  let skip = 0;
+                  let total = Infinity;
+                  while (skip < total) {
+                    const res = await getAuditLogs({ ...baseParams, skip, limit: FETCH_LIMIT });
+                    const page = res.data.logs || [];
+                    total = res.data.total ?? page.length;
+                    all = all.concat(page);
+                    if (page.length < FETCH_LIMIT) break;
+                    skip += FETCH_LIMIT;
+                  }
                   if (auditSearch.trim()) {
                     const q = auditSearch.toLowerCase();
-                    if (!fmtAuditActor(l.actor).toLowerCase().includes(q) && !(l.actor?.username || '').toLowerCase().includes(q) && !(l.action || '').toLowerCase().includes(q)) return false;
+                    all = all.filter(l =>
+                      fmtAuditActor(l.actor).toLowerCase().includes(q) ||
+                      (l.actor?.username || '').toLowerCase().includes(q) ||
+                      (l.action || '').toLowerCase().includes(q)
+                    );
                   }
-                  return true;
-                });
-                if (!visible.length) return;
-                exportCSV(visible.map(l => ({
-                  timestamp: l.created_at, user: fmtAuditActor(l.actor), username: l.actor?.username || '',
-                  action: l.action, entity_type: l.entity_type, entity_id: l.entity_id ?? '', status: l.status, ip_address: l.ip_address || '',
-                })), 'nodal-mis-report.csv');
+                  if (!all.length) return;
+                  exportCSV(all.map(l => ({
+                    timestamp: l.created_at, user: fmtAuditActor(l.actor), username: l.actor?.username || '',
+                    action: l.action, entity_type: l.entity_type, entity_id: l.entity_id ?? '', status: l.status, ip_address: l.ip_address || '',
+                  })), 'nodal-mis-report.csv');
+                } finally {
+                  setAuditExporting(false);
+                }
               }}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'var(--surface-ground)', color: 'var(--text-color)', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '0 14px', height: 34, fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
-              <Download size={13} /> {t('audit.exportCsv')}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'var(--surface-ground)', color: auditExporting ? 'var(--text-color-secondary)' : 'var(--text-color)', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '0 14px', height: 34, fontSize: 12.5, fontWeight: 600, cursor: auditExporting ? 'not-allowed' : 'pointer', opacity: auditExporting ? 0.7 : 1 }}>
+              <Download size={13} /> {auditExporting ? t('audit.exporting') : t('audit.exportCsv')}
             </button>
           </div>
         </Card>

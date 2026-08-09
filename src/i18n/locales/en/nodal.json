@@ -164,6 +164,7 @@
     "to": "to",
     "clear": "Clear",
     "exportCsv": "Export CSV",
+    "exporting": "Exporting…",
     "heading": "Department Audit History",
     "totalEntries": "{{count}} total entries",
     "loading": "Loading audit logs…",

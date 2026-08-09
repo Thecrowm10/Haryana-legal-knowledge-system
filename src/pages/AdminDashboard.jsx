@@ -205,6 +205,7 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   const [auditToDate, setAuditToDate]           = useState('');
   const [auditSearch, setAuditSearch]           = useState('');
   const [auditActionOptions, setAuditActionOptions] = useState([]);
+  const [auditExporting, setAuditExporting]     = useState(false);
 
   // Fetch all distinct action values once when the MIS page is first opened.
   const [auditActionsLoaded, setAuditActionsLoaded] = useState(false);
@@ -1574,19 +1575,49 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
       return true;
     });
 
-    function exportAuditCSV() {
-      if (!visibleLogs.length) return;
-      const rows = visibleLogs.map(l => ({
-        timestamp:   l.created_at,
-        user:        fmtAuditActor(l.actor),
-        username:    l.actor?.username || '',
-        action:      l.action,
-        entity_type: l.entity_type,
-        entity_id:   l.entity_id ?? '',
-        status:      l.status,
-        ip_address:  l.ip_address || '',
-      }));
-      exportCSV(rows, 'mis-audit-report.csv');
+    async function exportAuditCSV() {
+      if (auditExporting) return;
+      setAuditExporting(true);
+      try {
+        const FETCH_LIMIT = 100;
+        const baseParams = {};
+        if (auditFilterAction) baseParams.action    = auditFilterAction;
+        if (auditFromDate)     baseParams.from_date = auditFromDate;
+        if (auditToDate)       baseParams.to_date   = auditToDate + 'T23:59:59';
+        let all = [];
+        let skip = 0;
+        let total = Infinity;
+        while (skip < total) {
+          const res = await getAuditLogs({ ...baseParams, skip, limit: FETCH_LIMIT });
+          const page = res.data.logs || [];
+          total = res.data.total ?? page.length;
+          all = all.concat(page);
+          if (page.length < FETCH_LIMIT) break;
+          skip += FETCH_LIMIT;
+        }
+        if (auditSearch.trim()) {
+          const q = auditSearch.toLowerCase();
+          all = all.filter(l =>
+            fmtAuditActor(l.actor).toLowerCase().includes(q) ||
+            (l.actor?.username || '').toLowerCase().includes(q) ||
+            (l.action || '').toLowerCase().includes(q)
+          );
+        }
+        if (!all.length) return;
+        const rows = all.map(l => ({
+          timestamp:   l.created_at,
+          user:        fmtAuditActor(l.actor),
+          username:    l.actor?.username || '',
+          action:      l.action,
+          entity_type: l.entity_type,
+          entity_id:   l.entity_id ?? '',
+          status:      l.status,
+          ip_address:  l.ip_address || '',
+        }));
+        exportCSV(rows, 'mis-audit-report.csv');
+      } finally {
+        setAuditExporting(false);
+      }
     }
 
     return (
@@ -1633,9 +1664,9 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
 
             <div className="adm-audit-spacer" style={{ flex: 1 }} />
 
-            <button className="adm-export-btn" onClick={exportAuditCSV}
-              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'var(--surface-ground)', color: 'var(--text-color)', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '0 14px', height: 34, fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
-              <Download size={13} /> {t('audit.exportCsv')}
+            <button className="adm-export-btn" onClick={exportAuditCSV} disabled={auditExporting}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'var(--surface-ground)', color: auditExporting ? 'var(--text-color-secondary)' : 'var(--text-color)', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '0 14px', height: 34, fontSize: 12.5, fontWeight: 600, cursor: auditExporting ? 'not-allowed' : 'pointer', opacity: auditExporting ? 0.7 : 1 }}>
+              <Download size={13} /> {auditExporting ? t('audit.exporting') : t('audit.exportCsv')}
             </button>
           </div>
         </Card>
