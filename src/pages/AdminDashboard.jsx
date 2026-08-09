@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef, useMemo } from 'react';
+﻿import { useState, useEffect, useRef } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
 import { Users, Trash2, Edit2, Plus, CheckCircle, XCircle, Building2, X, Eye, EyeOff, Check, Download, FileSpreadsheet, Layers, FileText, Clock, Search, Link2 } from 'lucide-react';
 import Card from '../components/ui/Card';
@@ -10,7 +10,7 @@ import { getUsers, getRoles, updateUser, registerUser, getApproversByDepartment 
 import { getDepartments, createDepartment, toggleDepartment, getDocumentTypes, createDocumentType, toggleDocumentType } from '../services/departments';
 import { getRoleCaps, upsertRoleCap, deleteRoleCap, getActiveUserCount } from '../services/roleCaps';
 import { getAllDocumentsAdmin, getAllDepartmentLinks } from '../services/pdf';
-import { getAuditLogs } from '../services/audit';
+import { getAuditLogs, getAuditLogActions } from '../services/audit';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { downloadUploadsExcelReport } from '../utils/uploadsExcelReport';
 
@@ -204,11 +204,19 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
   const [auditFromDate, setAuditFromDate]       = useState('');
   const [auditToDate, setAuditToDate]           = useState('');
   const [auditSearch, setAuditSearch]           = useState('');
-  // Action-type dropdown options are built only from actions actually seen in
-  // fetched pages (never a guessed/hardcoded list) and accumulate across
-  // fetches so the list doesn't shrink once you filter down to one action.
-  const [seenActionsRaw, setSeenActionsRaw]     = useState([]);
-  const auditActionOptions = useMemo(() => Array.from(new Set(seenActionsRaw)).sort(), [seenActionsRaw]);
+  const [auditActionOptions, setAuditActionOptions] = useState([]);
+
+  // Fetch all distinct action values once when the MIS page is first opened.
+  const [auditActionsLoaded, setAuditActionsLoaded] = useState(false);
+  useEffect(() => {
+    if (activePage !== 'auditfull' || auditActionsLoaded) return;
+    getAuditLogActions()
+      .then(res => {
+        setAuditActionOptions(res.data.actions || []);
+        setAuditActionsLoaded(true);
+      })
+      .catch(() => {});
+  }, [activePage, auditActionsLoaded]);
 
   useEffect(() => {
     if (activePage !== 'auditfull') return;
@@ -223,7 +231,6 @@ export default function AdminDashboard({ activePage, taxonomy = [], onUpdateTaxo
         const logs = res.data.logs || [];
         setAuditLogs(logs);
         setAuditTotal(res.data.total || 0);
-        setSeenActionsRaw(prev => [...prev, ...logs.map(l => l.action).filter(Boolean)]);
       })
       .catch(() => setAuditError(t('audit.failedToLoad')))
       .finally(() => setAuditLoading(false));
