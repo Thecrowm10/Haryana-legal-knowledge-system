@@ -1,8 +1,8 @@
 import api, { publicApi } from './api';
 
 export const changePassword       = (current_password, new_password) => api.post('/auth/change-password', { current_password, new_password });
-export const requestPasswordReset  = (identifier) => api.post('/auth/forgot-password', { identifier });
-export const resetPasswordWithOtp  = (identifier, otp, new_password) => api.post('/auth/reset-password', { identifier, otp, new_password });
+export const requestPasswordReset  = (username) => api.post('/auth/forgot-password', { username });
+export const resetPasswordWithOtp  = (username, otp, new_password) => api.post('/auth/reset-password', { username, otp, new_password });
 export const requestAdminOtp       = (mobile_number) => api.post('/admin/auth/request-otp', { mobile_number });
 export const verifyAdminOtp        = (mobile_number, otp) => api.post('/admin/auth/verify-otp', { mobile_number, otp });
 // Content-Type is left unset — axios/the browser auto-generates it with the
