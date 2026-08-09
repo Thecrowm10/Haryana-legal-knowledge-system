@@ -263,7 +263,7 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
     ['Issue Date',      doc.enactmentDate   || ''],
     ['Effective From',  doc.effectiveFrom   || ''],
     ['Gazette Ref.',    doc.gazette         || ''],
-    ['Legal Authority', doc.authority       || ''],
+    ...(doc.type !== 'Act' ? [['Legal Authority', doc.authority || '']] : []),
     ['Uploader',        doc.uploader        || ''],
     ['Upload Date',     doc.uploadedAt      || ''],
     ['File',            doc.fileName        || ''],

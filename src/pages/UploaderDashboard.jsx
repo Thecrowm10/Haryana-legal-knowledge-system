@@ -635,7 +635,7 @@ function DocViewModal({ doc, onClose }) {
     [t('common.effectiveFrom'),    doc.effectiveFrom   || ''],
     [t('common.lastUpdatedOn'),    doc.lastUpdatedOn   || ''],
     [t('docViewModal.gazetteRef'), doc.gazette         || ''],
-    [t('docViewModal.legalAuthority'), doc.authority   || ''],
+    ...(doc.type !== 'Act' ? [[t('docViewModal.legalAuthority'), doc.authority || '']] : []),
     [t('docViewModal.uploader'),   doc.uploader        || ''],
     [t('docViewModal.uploadDate'), doc.uploadedAt      || ''],
     [t('docViewModal.file'),       doc.fileName        || ''],
@@ -2770,10 +2770,12 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                       <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.gazetteReference')}</div>
                       <input value={editForm.gazette_reference} onChange={e => setEditForm(f => ({ ...f, gazette_reference: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
                     </div>
+                    {doc.type !== 'Act' && (
                     <div>
                       <div style={{ ...LABEL, marginBottom: 6 }}>{t('docViewModal.legalAuthority')}</div>
                       <input value={editForm.legal_authority} onChange={e => setEditForm(f => ({ ...f, legal_authority: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
                     </div>
+                    )}
                     <div className="ud-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                       <div>
                         <div style={{ ...LABEL, marginBottom: 6 }}>{t('editDocument.shortTitle')}</div>
@@ -3945,10 +3947,12 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                       <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.gazetteReference')}</div>
                       <input value={editForm.gazette_reference} onChange={e => setEditForm(f => ({ ...f, gazette_reference: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
                     </div>
+                    {doc.type !== 'Act' && (
                     <div>
                       <div style={{ ...LABEL, marginBottom: 6 }}>{t('docViewModal.legalAuthority')}</div>
                       <input value={editForm.legal_authority} onChange={e => setEditForm(f => ({ ...f, legal_authority: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
                     </div>
+                    )}
                     <div className="ud-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                       <div>
                         <div style={{ ...LABEL, marginBottom: 6 }}>{t('editDocument.shortTitle')}</div>

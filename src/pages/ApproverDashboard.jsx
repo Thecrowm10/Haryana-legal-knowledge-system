@@ -641,7 +641,7 @@ function DocumentDetailsPanel({ doc, reviewAnnotations = [], onScrollToAnnotatio
     [t('documentDetails.fields.effectiveFrom'),   doc.effectiveFrom || ''],
     [t('documentDetails.fields.lastUpdatedOn'),   doc.lastUpdatedOn || ''],
     [t('documentDetails.fields.gazetteRef'),      doc.gazette || ''],
-    [t('documentDetails.fields.legalAuthority'),  doc.authority || ''],
+    ...(doc.type !== 'Act' ? [[t('documentDetails.fields.legalAuthority'), doc.authority || '']] : []),
     [t('documentDetails.fields.uploader'),        doc.uploader || ''],
     [t('documentDetails.fields.uploadDate'),      doc.uploadedAt || ''],
     [t('documentDetails.fields.pages'),           doc.pages ? t('documentDetails.pagesValue', { count: doc.pages }) : ''],
