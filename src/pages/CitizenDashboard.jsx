@@ -190,6 +190,8 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
   const [searchBarHeight, setSearchBarHeight] = useState(0);
   const [docTypes, setDocTypes]     = useState([]); // [{ id, name }] — live list; falls back to DOC_TYPE_META names if the endpoint needs auth
   const [docTypeId, setDocTypeId]   = useState(''); // selected filter — '' means search across all types
+  const [statsPublished, setStatsPublished] = useState(0);
+  const [statsDepts, setStatsDepts]         = useState(0);
   const inputRef = useRef(null);
   const rootRef = useRef(null);
   const searchBoxRef = useRef(null);
@@ -201,11 +203,16 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
 
   const typeOptions = docTypes.length > 0 ? docTypes : Object.keys(DOC_TYPE_META).map(name => ({ id: '', name }));
 
-  // Fetch recently published docs for the idle/landing state
+  // Fetch recently published docs + derive stats in one call
   useEffect(() => {
     setRecentLoading(true);
-    publicSearchDocuments({ skip: 0, limit: 8 })
-      .then(res => setRecentDocs(res.data.documents || []))
+    publicSearchDocuments({ skip: 0, limit: 200 })
+      .then(res => {
+        const docs = res.data.documents || [];
+        setRecentDocs(docs.slice(0, 8));
+        if (res.data.total != null) setStatsPublished(res.data.total);
+        setStatsDepts(new Set(docs.map(d => d.department_name).filter(Boolean)).size);
+      })
       .catch(() => {})
       .finally(() => setRecentLoading(false));
   }, []);
@@ -313,9 +320,9 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
 
   const isBookmarked = bookmarks.includes(query.trim());
 
-  const publishedCount = documents.filter(d => d.status === 'approved').length;
-  const deptCount = new Set(documents.map(d => d.dept).filter(Boolean)).size;
-  const typeCount = new Set(documents.map(d => d.type).filter(Boolean)).size;
+  const publishedCount = statsPublished;
+  const deptCount      = statsDepts;
+  const typeCount      = docTypes.length;
 
   return (
     <div ref={rootRef} style={{ minHeight: '100%', display: 'flex', flexDirection: 'column', animation: 'fadeSlideIn .3s ease', overflowX: 'hidden' }}>
@@ -439,13 +446,13 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
         <div style={{ position: 'absolute', inset: 0, zIndex: 1, background: 'linear-gradient(110deg, rgba(2,10,5,.82) 0%, rgba(2,10,5,.62) 45%, rgba(2,10,5,.42) 100%)' }} />
 
         <div style={{ position: 'relative', zIndex: 2 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-            <img src={haryanaLogo} alt="Haryana Government" loading="lazy" style={{ width: 'clamp(52px, 12vw, 76px)', height: 'clamp(52px, 12vw, 76px)', objectFit: 'contain' }} />
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 'clamp(22px, 6vw, 32px)', fontWeight: 800, color: '#fff', letterSpacing: '-.01em', lineHeight: 1.2 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 18, marginBottom: 32, textAlign: 'left' }}>
+            <img src={haryanaLogo} alt="Haryana Government" loading="lazy" style={{ width: 'clamp(64px, 14vw, 90px)', height: 'clamp(64px, 14vw, 90px)', objectFit: 'contain', flexShrink: 0 }} />
+            <div>
+              <div style={{ fontSize: 'clamp(15px, 3.5vw, 26px)', fontWeight: 800, color: '#fff', letterSpacing: '-.01em', lineHeight: 1.2 }}>
                 {t('brandTitle')}
               </div>
-              <div style={{ fontSize: 'clamp(13px, 3vw, 15px)', color: 'rgba(255,255,255,.65)', marginTop: 3 }}>{t('brandSubtitle')}</div>
+              <div style={{ fontSize: 'clamp(12px, 2.5vw, 14px)', color: 'rgba(255,255,255,.65)', marginTop: 4 }}>{t('brandSubtitle')}</div>
             </div>
           </div>
           <div style={{ fontSize: 'clamp(13px, 3vw, 16px)', color: 'rgba(255,255,255,.72)', marginBottom: 26, maxWidth: 520, margin: '0 auto 26px' }}>
