@@ -170,6 +170,9 @@ function DocumentResultCard({ doc, query, onView }) {
 
 export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAsOfficer }) {
   const { t } = useTranslation('citizen');
+  const { t: tLogin, i18n } = useTranslation('login');
+  const orgNameHi = i18n.getFixedT('hi', 'login')('orgNamePortal');
+  const orgNameEn = i18n.getFixedT('en', 'login')('orgNamePortal');
   const [loginMenuOpen, setLoginMenuOpen] = useState(false);
   const [query, setQuery]           = useState('');
   const [results, setResults]       = useState([]);
@@ -343,6 +346,15 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
           .cd-stat-item { padding: 16px 18px !important; border-right: none !important; }
           .cd-stat-item:not(:last-child) { border-bottom: 1px solid var(--surface-border); }
           .cd-content { padding: 20px 16px 32px !important; }
+          .cd-masthead { top: 10px !important; left: 14px !important; gap: 8px !important; }
+          .cd-masthead-logo { width: 44px !important; height: 44px !important; }
+          .cd-masthead-text { transform: none !important; }
+          .cd-masthead-hi { display: none !important; }
+          .cd-masthead-en { font-size: 13px !important; white-space: normal !important; max-width: 150px; line-height: 1.2 !important; }
+        }
+        @media (max-width: 380px) {
+          .cd-masthead-logo { width: 36px !important; height: 36px !important; }
+          .cd-masthead-en { font-size: 11.5px !important; max-width: 120px; }
         }
         @media (min-width: 641px) {
           .cd-stat-item:not(:last-child) { border-right: 1px solid var(--surface-border); }
@@ -445,16 +457,27 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
         <img src={bannerBg} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0, filter: 'blur(2px)', transform: 'scale(1.02)' }} />
         <div style={{ position: 'absolute', inset: 0, zIndex: 1, background: 'linear-gradient(110deg, rgba(2,10,5,.82) 0%, rgba(2,10,5,.62) 45%, rgba(2,10,5,.42) 100%)' }} />
 
-        <div style={{ position: 'relative', zIndex: 2 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 18, marginBottom: 32, textAlign: 'left' }}>
-            <img src={haryanaLogo} alt="Haryana Government" loading="lazy" style={{ width: 'clamp(64px, 14vw, 90px)', height: 'clamp(64px, 14vw, 90px)', objectFit: 'contain', flexShrink: 0 }} />
-            <div>
-              <div style={{ fontSize: 'clamp(15px, 3.5vw, 26px)', fontWeight: 800, color: '#fff', letterSpacing: '-.01em', lineHeight: 1.2 }}>
-                {t('brandTitle')}
-              </div>
-              <div style={{ fontSize: 'clamp(12px, 2.5vw, 14px)', color: 'rgba(255,255,255,.65)', marginTop: 4 }}>{t('brandSubtitle')}</div>
-            </div>
+        {/* Masthead — absolute top-left, matches the Login portal screen style; fades out on scroll
+            since the condensed topbar brand takes over at that point */}
+        <div className="cd-masthead" style={{
+          position: 'absolute', top: 14, left: 32, zIndex: 10,
+          display: 'flex', alignItems: 'center', gap: 14, maxWidth: 'calc(100vw - 64px)',
+          opacity: scrolled ? 0 : 1, pointerEvents: scrolled ? 'none' : 'auto',
+          transition: `opacity ${TOP_BAR_EASE}`,
+        }}>
+          <img src={haryanaLogo} alt="Haryana" loading="lazy" className="cd-masthead-logo"
+            style={{ width: 100, height: 100, objectFit: 'contain', flexShrink: 0 }} />
+          <div className="cd-masthead-text" style={{ display: 'flex', flexDirection: 'column', gap: 1, whiteSpace: 'nowrap', transform: 'translateY(12px)', minWidth: 0, textAlign: 'left' }}>
+            <span className="cd-masthead-hi" style={{ fontSize: 13, fontWeight: 500, color: 'rgba(255,255,255,.62)', letterSpacing: '.01em' }}>{orgNameHi}</span>
+            <span className="cd-masthead-en" style={{ fontSize: 18, fontWeight: 700, color: 'rgba(255,255,255,.9)', letterSpacing: '.01em' }}>{orgNameEn}</span>
           </div>
+        </div>
+
+        <div style={{ position: 'relative', zIndex: 2 }}>
+          <h1 style={{ fontSize: 'clamp(24px, 3.2vw, 42px)', fontWeight: 800, color: '#fff', lineHeight: 1.18, letterSpacing: '-.02em', marginBottom: 12 }}>
+            {tLogin('orgNameBrand')}<br />
+            <span style={{ color: '#4ade80' }}>{tLogin('tagline')}</span>
+          </h1>
           <div style={{ fontSize: 'clamp(13px, 3vw, 16px)', color: 'rgba(255,255,255,.72)', marginBottom: 26, maxWidth: 520, margin: '0 auto 26px' }}>
             {t('heroSubtitle')}
           </div>
