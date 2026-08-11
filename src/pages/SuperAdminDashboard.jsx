@@ -4,7 +4,6 @@ import { Users, Trash2, Edit2, Plus, CheckCircle, XCircle, Building2, X, Eye, Ey
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import SelectField from '../components/ui/SelectField';
-import MultiSelectField from '../components/ui/MultiSelectField';
 import DocViewModal from '../components/DocViewModal';
 import { getUsers, getRoles, updateUser, registerUser, getApproversByDepartment } from '../services/users';
 import { getDepartments, createDepartment, toggleDepartment, getDocumentTypes, createDocumentType, toggleDocumentType } from '../services/departments';
@@ -522,8 +521,24 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
       .finally(() => setMdmToggling(null));
   }
 
+  function slugify(str) {
+    return str.toLowerCase().replace(/[''`]/g, '').replace(/[^a-z0-9\s]/g, '').trim().replace(/\s+/g, '_');
+  }
+
+  function buildUsernamePlaceholder(roleId, deptId) {
+    const role = roles.find(r => String(r.id) === String(roleId));
+    if (!role) return t('users.addDrawer.usernamePlaceholder');
+    if (role.name === 'nodal Officer') {
+      const dept = depts.find(d => String(d.id) === String(deptId));
+      return dept ? `nodal.${slugify(dept.name)}` : 'nodal';
+    }
+    const rolePart = slugify(role.name);
+    const dept = depts.find(d => String(d.id) === String(deptId));
+    return dept ? `${rolePart}.${slugify(dept.name)}` : rolePart;
+  }
+
   // Add User modal state
-  const EMPTY_ADD_FORM = { username: '', email: '', mobile_number: '', password: '', first_name: '', last_name: '', role_id: '', department_id: '', dept_ids: [], approver_id: '' };
+  const EMPTY_ADD_FORM = { username: '', email: '', mobile_number: '', password: '', first_name: '', last_name: '', role_id: '', department_id: '', approver_id: '' };
   const [addingUser, setAddingUser]   = useState(false);
   const [addForm, setAddForm]         = useState(EMPTY_ADD_FORM);
   const [addSaving, setAddSaving]     = useState(false);
@@ -547,15 +562,14 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
 
   async function handleAddUser() {
     const selectedRole = roles.find(r => String(r.id) === String(addForm.role_id));
-    const isNodal    = selectedRole?.name === 'nodal Officer';
     const isUploader = selectedRole?.name === 'uploader';
-    if (!addForm.role_id)         { setAddError(t('users.errors.roleRequired')); return; }
-    if (isNodal ? addForm.dept_ids.length === 0 : !addForm.department_id) { setAddError(t('users.errors.departmentRequired')); return; }
+    if (!addForm.role_id)           { setAddError(t('users.errors.roleRequired')); return; }
+    if (!addForm.department_id)     { setAddError(t('users.errors.departmentRequired')); return; }
     if (isUploader && !addForm.approver_id) { setAddError('Please select an approver for this uploader.'); return; }
-    if (!addForm.username.trim()) { setAddError(t('users.errors.usernameRequired')); return; }
-    if (!addForm.email.trim())    { setAddError(t('users.errors.emailRequired')); return; }
+    if (!addForm.username.trim())   { setAddError(t('users.errors.usernameRequired')); return; }
+    if (!addForm.email.trim())      { setAddError(t('users.errors.emailRequired')); return; }
     if (!EMAIL_FORMAT_RE.test(addForm.email.trim())) { setAddError(t('users.errors.emailInvalid')); return; }
-    if (!addForm.password)        { setAddError(t('users.errors.passwordRequired')); return; }
+    if (!addForm.password)          { setAddError(t('users.errors.passwordRequired')); return; }
     if (!addForm.first_name.trim()) { setAddError(t('users.errors.firstNameRequired')); return; }
     if (!addForm.last_name.trim())  { setAddError(t('users.errors.lastNameRequired')); return; }
     if (addForm.mobile_number.trim().length !== 10) { setAddError(t('users.errors.mobileRequired')); return; }
@@ -570,9 +584,7 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
         first_name:    addForm.first_name.trim(),
         last_name:     addForm.last_name.trim(),
         role_id:       addForm.role_id ? Number(addForm.role_id) : undefined,
-        department_id: isNodal
-          ? (addForm.dept_ids.length > 0 ? addForm.dept_ids.join(',') : undefined)
-          : (addForm.department_id || undefined),
+        department_id: addForm.department_id || undefined,
         approver_id:   isUploader && addForm.approver_id ? Number(addForm.approver_id) : undefined,
       });
       setUsers(prev => [normalizeUser(res.data), ...prev]);
@@ -858,14 +870,14 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
                   const isNodal = roles.find(r => String(r.id) === String(addForm.role_id))?.name === 'nodal Officer';
                   return (
                     <>
-                      <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: isNodal ? '1fr' : '1fr 1fr', gap: 12 }}>
+                      <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                         <div>
                           <label htmlFor="adm-add-role" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.role')} <span style={{ color: '#dc3545' }}>*</span></label>
                           <SelectField
                             id="adm-add-role"
                             required
                             value={addForm.role_id}
-                            onChange={e => setAddForm(f => ({ ...f, role_id: e.target.value, department_id: '', dept_ids: [], approver_id: '' }))}
+                            onChange={e => setAddForm(f => ({ ...f, role_id: e.target.value, department_id: '', approver_id: '' }))}
                             placeholder={t('users.addDrawer.roleSelectPlaceholder')}
                           >
                             {assignableRoles(roles).map(r => (
@@ -873,14 +885,12 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
                             ))}
                           </SelectField>
                         </div>
-                        {!isNodal && (
-                          <div>
-                            <label htmlFor="adm-add-department" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.department')} <span style={{ color: '#dc3545' }}>*</span></label>
-                            <SelectField id="adm-add-department" required value={addForm.department_id} onChange={e => setAddForm(f => ({ ...f, department_id: e.target.value, approver_id: '' }))} placeholder={t('users.addDrawer.departmentSelectPlaceholder')}>
-                              {depts.filter(d => d.is_active !== false).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                            </SelectField>
-                          </div>
-                        )}
+                        <div>
+                          <label htmlFor="adm-add-department" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.department')} <span style={{ color: '#dc3545' }}>*</span></label>
+                          <SelectField id="adm-add-department" required value={addForm.department_id} onChange={e => setAddForm(f => ({ ...f, department_id: e.target.value, approver_id: '' }))} placeholder={t('users.addDrawer.departmentSelectPlaceholder')}>
+                            {depts.filter(d => d.is_active !== false).map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                          </SelectField>
+                        </div>
                       </div>
 
                       {/* Approver assignment — uploader role only */}
@@ -910,20 +920,6 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
                         </div>
                       )}
 
-                      {/* Managed Departments — nodal officer only */}
-                      {isNodal && (
-                        <div>
-                          <label htmlFor="adm-add-dept-multi" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.department')} <span style={{ color: '#dc3545' }}>*</span></label>
-                          <MultiSelectField
-                            id="adm-add-dept-multi"
-                            value={addForm.dept_ids}
-                            onChange={ids => setAddForm(f => ({ ...f, dept_ids: ids }))}
-                            options={depts}
-                            placeholder={t('multiSelect.selectDepartments')}
-                            selectedLabel={count => t('multiSelect.departmentsSelected', { count })}
-                          />
-                        </div>
-                      )}
                     </>
                   );
                 })()}
@@ -933,7 +929,7 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
                   <div>
                     <label htmlFor="adm-add-username" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.addDrawer.username')} <span style={{ color: '#dc3545' }}>*</span></label>
                     <input id="adm-add-username" style={{ ...INP_STYLE, borderColor: addError.toLowerCase().includes('username') ? 'rgba(220, 53, 69,.6)' : undefined }}
-                      placeholder={t('users.addDrawer.usernamePlaceholder')}
+                      placeholder={(() => { const s = buildUsernamePlaceholder(addForm.role_id, addForm.department_id); return s === t('users.addDrawer.usernamePlaceholder') ? s : `e.g. ${s}`; })()}
                       autoComplete="off"
                       value={addForm.username}
                       onChange={e => { setAddForm(f => ({ ...f, username: e.target.value })); setAddError(''); }} />
@@ -1010,10 +1006,9 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
                 </button>
                 {(() => {
                   const _footerRole = roles.find(r => String(r.id) === String(addForm.role_id));
-                  const isNodal    = _footerRole?.name === 'nodal Officer';
                   const isUploader = _footerRole?.name === 'uploader';
                   const addFormInvalid = !addForm.role_id
-                    || (isNodal ? addForm.dept_ids.length === 0 : !addForm.department_id)
+                    || !addForm.department_id
                     || (isUploader && !addForm.approver_id)
                     || !addForm.username.trim() || !addForm.email.trim() || !addForm.password
                     || !addForm.first_name.trim() || !addForm.last_name.trim()
@@ -1084,16 +1079,15 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
                 </div>
 
                 {(() => {
-                  const isNodal = roles.find(r => String(r.id) === String(editForm.role_id))?.name === 'nodal Officer';
                   return (
                     <>
-                      <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: isNodal ? '1fr' : '1fr 1fr', gap: 12 }}>
+                      <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                         <div>
                           <label htmlFor="adm-edit-role" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.role')}</label>
                           <SelectField
                             id="adm-edit-role"
                             value={editForm.role_id ?? ''}
-                            onChange={e => setEditForm(f => ({ ...f, role_id: e.target.value ? Number(e.target.value) : null, department_id: '', dept_ids: [] }))}
+                            onChange={e => setEditForm(f => ({ ...f, role_id: e.target.value ? Number(e.target.value) : null, department_id: '' }))}
                             placeholder={t('users.editModal.selectRole')}
                           >
                             {assignableRoles(roles).map(r => (
@@ -1101,30 +1095,15 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
                             ))}
                           </SelectField>
                         </div>
-                        {!isNodal && (
-                          <div>
-                            <label htmlFor="adm-edit-department" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.department')}</label>
-                            <SelectField id="adm-edit-department" value={editForm.department_id ?? ''} onChange={e => setEditForm(f => ({ ...f, department_id: e.target.value || null }))} placeholder={t('users.editModal.selectDepartment')}>
-                              {depts.filter(d => d.is_active !== false).map(d => (
-                                <option key={d.id} value={d.id}>{d.name}</option>
-                              ))}
-                            </SelectField>
-                          </div>
-                        )}
-                      </div>
-                      {isNodal && (
                         <div>
-                          <label htmlFor="adm-edit-dept-multi" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.department')}</label>
-                          <MultiSelectField
-                            id="adm-edit-dept-multi"
-                            value={editForm.dept_ids}
-                            onChange={ids => setEditForm(f => ({ ...f, dept_ids: ids }))}
-                            options={depts}
-                            placeholder={t('multiSelect.selectDepartments')}
-                            selectedLabel={count => t('multiSelect.departmentsSelected', { count })}
-                          />
+                          <label htmlFor="adm-edit-department" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.department')}</label>
+                          <SelectField id="adm-edit-department" value={editForm.department_id ?? ''} onChange={e => setEditForm(f => ({ ...f, department_id: e.target.value || null }))} placeholder={t('users.editModal.selectDepartment')}>
+                            {depts.filter(d => d.is_active !== false).map(d => (
+                              <option key={d.id} value={d.id}>{d.name}</option>
+                            ))}
+                          </SelectField>
                         </div>
-                      )}
+                      </div>
                     </>
                   );
                 })()}
