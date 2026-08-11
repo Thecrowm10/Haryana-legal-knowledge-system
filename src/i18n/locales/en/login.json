@@ -10,7 +10,7 @@
   "continueAsGuest": "Continue as Guest",
   "noLoginRequired": "No login required",
   "officialAccessTitle": "Official Access",
-  "officialAccessDesc": "For department uploaders, approvers, CS Office, administrators and auditors.",
+  "officialAccessDesc": "For department uploaders, approvers, nodal officers and administrators.",
   "loginWithCredentials": "Login with Credentials",
   "passwordSsoRequired": "Password / SSO required",
   "adminAccessTitle": "Super Admin Access",
