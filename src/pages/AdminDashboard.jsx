@@ -416,7 +416,8 @@ export default function AdminDashboard({ activePage }) {
       email:         u.email,
       is_active:     u.isActive,
       role_id:       u.roleId,
-      department_id: String(u.deptId ?? ''),
+      department_id: String(u.deptId ?? u.deptIds?.[0] ?? ''),
+      dept_ids:      u.deptIds || [],
     });
     setEditError('');
   }
@@ -888,13 +889,13 @@ export default function AdminDashboard({ activePage }) {
                   const isNodal = roles.find(r => String(r.id) === String(editForm.role_id))?.name === 'nodal Officer';
                   return (
                     <>
-                      <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: isNodal ? '1fr' : '1fr 1fr', gap: 12 }}>
+                      <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                         <div>
                           <label htmlFor="adm-edit-role" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.role')}</label>
                           <SelectField
                             id="adm-edit-role"
                             value={editForm.role_id ?? ''}
-                            onChange={e => setEditForm(f => ({ ...f, role_id: e.target.value ? Number(e.target.value) : null, department_id: '', dept_ids: [] }))}
+                            onChange={e => setEditForm(f => ({ ...f, role_id: e.target.value ? Number(e.target.value) : null, department_id: adminDeptId ? String(adminDeptId) : '', dept_ids: adminDeptId ? [adminDeptId] : [] }))}
                             placeholder={t('users.editModal.selectRole')}
                           >
                             {assignableRoles(roles).map(r => (
@@ -902,7 +903,20 @@ export default function AdminDashboard({ activePage }) {
                             ))}
                           </SelectField>
                         </div>
-                        {!isNodal && (
+                        {isNodal ? (
+                          <div>
+                            <label htmlFor="adm-edit-dept-multi" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.department')}</label>
+                            <MultiSelectField
+                              id="adm-edit-dept-multi"
+                              value={editForm.dept_ids}
+                              onChange={ids => setEditForm(f => ({ ...f, dept_ids: ids }))}
+                              options={managedDepts}
+                              placeholder={t('multiSelect.selectDepartments')}
+                              selectedLabel={count => t('multiSelect.departmentsSelected', { count })}
+                              disabled={!!adminDeptId}
+                            />
+                          </div>
+                        ) : (
                           <div>
                             <label htmlFor="adm-edit-department" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.department')}</label>
                             <SelectField id="adm-edit-department" value={editForm.department_id ?? ''} onChange={e => setEditForm(f => ({ ...f, department_id: e.target.value || null }))} placeholder={t('users.editModal.selectDepartment')} disabled={!!adminDeptId}>
@@ -913,20 +927,6 @@ export default function AdminDashboard({ activePage }) {
                           </div>
                         )}
                       </div>
-                      {isNodal && (
-                        <div>
-                          <label htmlFor="adm-edit-dept-multi" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.department')}</label>
-                          <MultiSelectField
-                            id="adm-edit-dept-multi"
-                            value={editForm.dept_ids}
-                            onChange={ids => setEditForm(f => ({ ...f, dept_ids: ids }))}
-                            options={managedDepts}
-                            placeholder={t('multiSelect.selectDepartments')}
-                            selectedLabel={count => t('multiSelect.departmentsSelected', { count })}
-                            disabled={!!adminDeptId}
-                          />
-                        </div>
-                      )}
                     </>
                   );
                 })()}
@@ -960,7 +960,7 @@ export default function AdminDashboard({ activePage }) {
                   {t('users.editModal.cancel')}
                 </button>
                 {(() => {
-                  const editBtnDisabled = editSaving || !(editForm.email || '').trim();
+                  const editBtnDisabled = editSaving;
                   return (
                     <button onClick={handleEditSave} disabled={editBtnDisabled}
                       style={{ padding: '9px 20px', background: editBtnDisabled ? 'var(--surface-border)' : 'var(--primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: editBtnDisabled ? 'not-allowed' : 'pointer', color: editBtnDisabled ? 'var(--text-color-secondary)' : 'white', fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 7 }}>
