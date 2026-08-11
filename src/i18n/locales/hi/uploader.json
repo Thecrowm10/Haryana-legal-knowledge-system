@@ -238,7 +238,7 @@
   },
   "wizard": {
     "fileTooLargeToast": "{{name}} {{size}} अपलोड सीमा से अधिक है।",
-    "unsupportedFileToast": "{{name}} समर्थित फ़ाइल प्रकार नहीं है (केवल PDF मान्य है)।",
+    "unsupportedFileToast": "{{name}} समर्थित फ़ाइल प्रकार नहीं है (केवल PDF या Word मान्य है)।",
     "step1": {
       "heading": "दस्तावेज़ प्रकार",
       "subheading": "आरंभ करने के लिए आप जिस प्रकार का दस्तावेज़ अपलोड कर रहे हैं उसे चुनें",
@@ -253,7 +253,7 @@
       "changeFiles": "फ़ाइलें बदलें",
       "dropHere": "फ़ाइलें यहाँ छोड़ें या",
       "clickToBrowse": "ब्राउज़ करने के लिए क्लिक करें",
-      "fileTypeHint": "केवल PDF · {{size}} तक",
+      "fileTypeHint": "PDF या Word · {{size}} तक",
       "tryAgain": "पुनः प्रयास करें",
       "uploadCheckButton": "दस्तावेज़ अपलोड करें और जाँचें",
       "checkingDocument": "दस्तावेज़ की जाँच हो रही है…",

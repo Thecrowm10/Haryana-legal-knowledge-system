@@ -238,7 +238,7 @@
   },
   "wizard": {
     "fileTooLargeToast": "{{name}} exceeds the {{size}} upload limit.",
-    "unsupportedFileToast": "{{name}} is not a supported file type (PDF only).",
+    "unsupportedFileToast": "{{name}} is not a supported file type (PDF or Word only).",
     "step1": {
       "heading": "Document Type",
       "subheading": "Choose the type of document you're uploading to get started",
@@ -253,7 +253,7 @@
       "changeFiles": "Change files",
       "dropHere": "Drop files here or",
       "clickToBrowse": "click to browse",
-      "fileTypeHint": "PDF only · up to {{size}}",
+      "fileTypeHint": "PDF or Word · up to {{size}}",
       "tryAgain": "Try Again",
       "uploadCheckButton": "Upload & Check Document",
       "checkingDocument": "Checking document…",
