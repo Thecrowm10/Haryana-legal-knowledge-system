@@ -36,7 +36,8 @@
       "queryHistory": "Query History",
       "complianceReport": "Compliance Report",
       "actPartsReview": "Act Parts Review",
-      "roleCaps": "Role User Caps"
+      "roleCaps": "Role User Caps",
+      "capRequests": "Cap Change Requests"
     }
   },
   "topbar": {
@@ -72,6 +73,7 @@
       "systemLogs": "System Logs",
       "masterDataManager": "Master Data Manager",
       "roleCaps": "Role User Caps",
+      "capRequests": "Cap Change Requests",
       "fullMisReport": "Full MIS Report",
       "allUploads": "All Uploads",
       "auditorLabel": "Auditor",

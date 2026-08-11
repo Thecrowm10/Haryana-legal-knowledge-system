@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BarChart2, GitBranch, ClipboardList, Users, Settings, FileSearch, BarChart, Layers, Link2, BookOpen, ShieldCheck, Building2, ChevronDown, CheckCircle2 } from 'lucide-react';
+import { BarChart2, GitBranch, ClipboardList, Users, Settings, FileSearch, BarChart, Layers, Link2, BookOpen, ShieldCheck, Building2, ChevronDown, CheckCircle2, ArrowUpDown } from 'lucide-react';
 import haryanaLogo from '../../assets/haryana-logo.png';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { switchAdminDepartment } from '../../services/pdf';
@@ -28,15 +28,13 @@ const MENU_CONFIG = {
   // only gets the full MIS report in this group.
   admin: [
     { label: 'sidebar.groups.administration', items: [
-      { icon: Users,       label: 'sidebar.items.userManagement',    id: 'users' },
-      { icon: Layers,      label: 'sidebar.items.allUploads',        id: 'alluploads' },
-      { icon: Link2,       label: 'sidebar.items.linkedDocuments',   id: 'linkedocs' },
+      { icon: Users,        label: 'sidebar.items.userManagement',    id: 'users' },
+      { icon: Layers,       label: 'sidebar.items.allUploads',        id: 'alluploads' },
+      { icon: Link2,        label: 'sidebar.items.linkedDocuments',   id: 'linkedocs' },
     ]},
     { label: 'sidebar.groups.system', items: [
-      // System Monitor — not wired to a real API yet (all stats are hardcoded placeholders).
-      // Hidden from the menu until that API exists; page code below is kept, not deleted.
-      // { icon: Activity,      label: 'sidebar.items.systemMonitor',     id: 'monitor' },
-      { icon: ClipboardList, label: 'sidebar.items.fullMisReport',     id: 'auditfull' },
+      { icon: ArrowUpDown,  label: 'sidebar.items.capRequests',       id: 'caprequests' },
+      { icon: ClipboardList, label: 'sidebar.items.fullMisReport',    id: 'auditfull' },
     ]},
   ],
   super_admin: [

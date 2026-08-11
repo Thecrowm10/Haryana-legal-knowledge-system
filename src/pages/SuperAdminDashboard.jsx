@@ -10,6 +10,7 @@ import { getDepartments, createDepartment, toggleDepartment, getDocumentTypes, c
 import { getRoleCaps, upsertRoleCap, deleteRoleCap, getActiveUserCount } from '../services/roleCaps';
 import { getAllDocumentsAdmin, getAllDepartmentLinks } from '../services/pdf';
 import { getAuditLogs, getAuditLogActions } from '../services/audit';
+import { getPendingCapRequests, reviewCapRequest } from '../services/capRequests';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { downloadUploadsExcelReport } from '../utils/uploadsExcelReport';
 
@@ -353,6 +354,14 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
   const [capActiveCount, setCapActiveCount] = useState(null);
   const [capsPage, setCapsPage]             = useState(0);
 
+  // Pending cap-change requests from admins
+  const [pendingCapReqs, setPendingCapReqs]         = useState([]);
+  const [pendingCapReqsLoading, setPendingCapReqsLoading] = useState(false);
+  const [capReqReviewing, setCapReqReviewing]       = useState(null); // id being reviewed
+  const [capReqRejectNote, setCapReqRejectNote]     = useState('');
+  const [capReqRejectOpen, setCapReqRejectOpen]     = useState(null); // id for reject note modal
+  const [capReqFinalCaps, setCapReqFinalCaps]       = useState({}); // { [req.id]: string } super admin override values
+
   useEffect(() => {
     if (!capForm.department_id || !capForm.role_id) {
       setCapActiveCount(null);
@@ -372,15 +381,17 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
     if (activePage !== 'rolecaps') return;
     setCapsLoading(true);
     setCapsError('');
-    Promise.all([getRoleCaps(), getDepartments(), getRoles()])
-      .then(([capsRes, deptsRes, rolesRes]) => {
+    setPendingCapReqsLoading(true);
+    Promise.all([getRoleCaps(), getDepartments(), getRoles(), getPendingCapRequests()])
+      .then(([capsRes, deptsRes, rolesRes, pendingRes]) => {
         setCapsDefaultMax(capsRes.data.default_max);
         setCaps(capsRes.data.limits);
         setDepts(deptsRes.data);
         setRoles(rolesRes.data);
+        setPendingCapReqs(pendingRes.data || []);
       })
       .catch(() => setCapsError(t('roleCaps.errors.loadFailed')))
-      .finally(() => setCapsLoading(false));
+      .finally(() => { setCapsLoading(false); setPendingCapReqsLoading(false); });
   }, [activePage, t]);
 
   function handleCapSave(e) {
@@ -2271,9 +2282,147 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
     const capsTotalPages = Math.max(1, Math.ceil(caps.length / CAPS_PAGE_SIZE));
     const capsPageClamped = Math.min(capsPage, capsTotalPages - 1);
     const pagedCaps = caps.slice(capsPageClamped * CAPS_PAGE_SIZE, capsPageClamped * CAPS_PAGE_SIZE + CAPS_PAGE_SIZE);
+
+    async function handleCapReqApprove(req) {
+      const rawVal = capReqFinalCaps[req.id];
+      const finalCap = rawVal !== undefined && rawVal !== '' ? Number(rawVal) : req.requested_cap;
+      if (isNaN(finalCap) || finalCap < 0) { alert('Cap must be 0 or more.'); return; }
+      setCapReqReviewing(req.id);
+      try {
+        await reviewCapRequest(req.id, { status: 'approved', approved_cap: finalCap });
+        setPendingCapReqs(prev => prev.filter(r => r.id !== req.id));
+        setCapReqFinalCaps(prev => { const n = { ...prev }; delete n[req.id]; return n; });
+        getRoleCaps().then(r => { setCapsDefaultMax(r.data.default_max); setCaps(r.data.limits); }).catch(() => {});
+      } catch (err) {
+        alert(err.response?.data?.detail || 'Failed to approve request.');
+      } finally {
+        setCapReqReviewing(null);
+      }
+    }
+
+    async function handleCapReqReject(req) {
+      setCapReqReviewing(req.id);
+      try {
+        await reviewCapRequest(req.id, { status: 'rejected', super_admin_note: capReqRejectNote.trim() || undefined });
+        setPendingCapReqs(prev => prev.filter(r => r.id !== req.id));
+        setCapReqRejectOpen(null);
+        setCapReqRejectNote('');
+      } catch (err) {
+        alert(err.response?.data?.detail || 'Failed to reject request.');
+      } finally {
+        setCapReqReviewing(null);
+      }
+    }
+
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
         <style>{ADM_RESPONSIVE_CSS}</style>
+
+        {/* Pending cap-change requests from admins */}
+        {(pendingCapReqsLoading || pendingCapReqs.length > 0) && (
+          <Card padding="0">
+            <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, fontSize: 'var(--font-size-p1)', color: 'var(--text-heading)' }}>Pending Cap Change Requests</div>
+                <div style={{ fontSize: 12, color: 'var(--text-color-secondary)', marginTop: 2 }}>Admins are requesting changes to role user caps for their departments.</div>
+              </div>
+              {pendingCapReqs.length > 0 && (
+                <span style={{ padding: '3px 10px', borderRadius: 20, background: 'rgba(255,193,7,.15)', border: '1px solid rgba(180,130,0,.25)', fontSize: 12, fontWeight: 700, color: '#b45309' }}>
+                  {pendingCapReqs.length} pending
+                </span>
+              )}
+            </div>
+            {pendingCapReqsLoading ? (
+              <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>Loading…</div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 110px 110px 1fr 180px', minWidth: 860, padding: '9px 16px', background: 'var(--surface-ground)', borderBottom: '1px solid var(--surface-border)' }}>
+                  {['Department', 'Role / Requested By', 'Current Cap', 'Requested Cap', 'Reason', 'Actions'].map(h => (
+                    <div key={h} style={{ ...LABEL }}>{h}</div>
+                  ))}
+                </div>
+                {pendingCapReqs.map(req => {
+                  const isReviewing = capReqReviewing === req.id;
+                  const isRejectOpen = capReqRejectOpen === req.id;
+                  return (
+                    <div key={req.id} style={{ borderBottom: '1px solid var(--surface-border)' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 110px 110px 1fr 180px', minWidth: 860, padding: '11px 16px', alignItems: 'center', transition: 'background .15s' }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>{req.department_name}</div>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>{req.role_name}</div>
+                          <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 2 }}>
+                            by {req.requested_by_name?.trim() || req.requested_by_username} · {req.created_at?.split('T')[0]}
+                          </div>
+                        </div>
+                        <div style={{ fontSize: 13, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>
+                          {req.current_cap != null ? req.current_cap : <span style={{ fontSize: 11 }}>default</span>}
+                        </div>
+                        {(() => {
+                          const rawVal  = capReqFinalCaps[req.id];
+                          const finalCap = rawVal !== undefined && rawVal !== '' ? Number(rawVal) : req.requested_cap;
+                          const baseCap  = req.current_cap ?? capsDefaultMax;
+                          const dir = finalCap > baseCap ? 'up' : finalCap < baseCap ? 'down' : 'same';
+                          const dirColor = dir === 'up' ? '#16a34a' : dir === 'down' ? '#dc3545' : 'var(--text-color-secondary)';
+                          const dirSymbol = dir === 'up' ? '▲' : dir === 'down' ? '▼' : '=';
+                          return (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <input
+                                type="number" min="0"
+                                value={rawVal !== undefined ? rawVal : req.requested_cap}
+                                onChange={e => setCapReqFinalCaps(prev => ({ ...prev, [req.id]: e.target.value }))}
+                                style={{ width: 70, padding: '5px 8px', borderRadius: 6, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', fontSize: 13, fontFamily: 'var(--mono)', fontWeight: 600, color: 'var(--text-heading)', outline: 'none', textAlign: 'center' }}
+                              />
+                              <span style={{ fontSize: 11, fontWeight: 700, color: dirColor }}>{dirSymbol}</span>
+                            </div>
+                          );
+                        })()}
+                        <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)' }}>{req.reason || '—'}</div>
+                        <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+                          <button
+                            onClick={() => handleCapReqApprove(req)}
+                            disabled={isReviewing}
+                            style={{ padding: '6px 12px', borderRadius: 7, border: 'none', background: isReviewing ? 'var(--surface-border)' : '#16a34a', color: 'white', fontSize: 12, fontWeight: 600, cursor: isReviewing ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                            <CheckCircle size={12} /> Approve
+                          </button>
+                          <button
+                            onClick={() => { setCapReqRejectOpen(req.id); setCapReqRejectNote(''); }}
+                            disabled={isReviewing}
+                            style={{ padding: '6px 12px', borderRadius: 7, border: '1px solid rgba(220,53,69,.4)', background: 'rgba(220,53,69,.07)', color: '#dc3545', fontSize: 12, fontWeight: 600, cursor: isReviewing ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                            <XCircle size={12} /> Reject
+                          </button>
+                        </div>
+                      </div>
+                      {/* Inline reject note */}
+                      {isRejectOpen && (
+                        <div style={{ padding: '10px 16px 14px', background: 'rgba(220,53,69,.03)', borderTop: '1px dashed rgba(220,53,69,.2)' }}>
+                          <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Rejection Note (optional)</label>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <input
+                              value={capReqRejectNote}
+                              onChange={e => setCapReqRejectNote(e.target.value)}
+                              placeholder="Reason for rejection…"
+                              style={{ flex: 1, padding: '8px 12px', borderRadius: 7, border: '1px solid rgba(220,53,69,.35)', background: 'var(--surface-ground)', fontSize: 13, color: 'var(--text-color)', outline: 'none', fontFamily: 'var(--font)' }}
+                            />
+                            <button onClick={() => handleCapReqReject(req)} disabled={isReviewing}
+                              style={{ padding: '8px 16px', borderRadius: 7, border: 'none', background: '#dc3545', color: 'white', fontSize: 12, fontWeight: 600, cursor: isReviewing ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', whiteSpace: 'nowrap' }}>
+                              Confirm Reject
+                            </button>
+                            <button onClick={() => { setCapReqRejectOpen(null); setCapReqRejectNote(''); }}
+                              style={{ padding: '8px 12px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Card>
+        )}
 
           {/* Heading + Add / Update form, combined in one box */}
           <Card style={{ padding: '18px 20px' }}>

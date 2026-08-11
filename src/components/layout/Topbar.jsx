@@ -43,6 +43,7 @@ const BREADCRUMBS = {
   users: ['topbar.crumbs.admin', 'topbar.crumbs.userManagement'], logs: ['topbar.crumbs.admin', 'topbar.crumbs.systemLogs'],
   taxonomy: ['topbar.crumbs.admin', 'topbar.crumbs.masterDataManager'],
   rolecaps: ['topbar.crumbs.admin', 'topbar.crumbs.roleCaps'],
+  caprequests: ['topbar.crumbs.admin', 'topbar.crumbs.capRequests'],
   auditfull: ['topbar.crumbs.admin', 'topbar.crumbs.fullMisReport'],
   alluploads: ['topbar.crumbs.admin', 'topbar.crumbs.allUploads'],
   auditlog: ['topbar.crumbs.auditorLabel', 'topbar.crumbs.misReport'],

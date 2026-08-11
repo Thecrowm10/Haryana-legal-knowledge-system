@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
-import { Users, Edit2, Plus, CheckCircle, XCircle, X, Eye, EyeOff, Download, FileSpreadsheet, Layers, FileText, Clock, Search, Link2 } from 'lucide-react';
+import { Users, Edit2, Plus, CheckCircle, XCircle, X, Eye, EyeOff, Download, FileSpreadsheet, Layers, FileText, Clock, Search, Link2, ShieldCheck } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import SelectField from '../components/ui/SelectField';
@@ -9,6 +9,8 @@ import { getUsers, getRoles, updateUser, registerUser, getApproversByDepartment 
 import { getDepartments } from '../services/departments';
 import { getAllDocumentsAdmin, getAllDepartmentLinks } from '../services/pdf';
 import { getAuditLogs, getAuditLogActions } from '../services/audit';
+import { getRoleCaps } from '../services/roleCaps';
+import { submitCapRequest, getMyCapRequests } from '../services/capRequests';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { downloadUploadsExcelReport } from '../utils/uploadsExcelReport';
 import { useAuth } from '../hooks/useAuth';
@@ -193,6 +195,30 @@ export default function AdminDashboard({ activePage }) {
       .catch(() => setAuditError(t('audit.failedToLoad')))
       .finally(() => setAuditLoading(false));
   }, [activePage, auditPage, auditFilterAction, auditFromDate, auditToDate, t]);
+
+  // Cap Change Requests state
+  const [capReqHistory, setCapReqHistory]           = useState([]);
+  const [capReqHistoryLoading, setCapReqHistoryLoading] = useState(false);
+  const [capReqCaps, setCapReqCaps]                 = useState({ limits: [], default_max: 5 });
+  const [capReqForm, setCapReqForm]                 = useState({ role_id: '', requested_cap: '', reason: '' });
+  const [capReqSaving, setCapReqSaving]             = useState(false);
+  const [capReqError, setCapReqError]               = useState('');
+  const [capReqSuccess, setCapReqSuccess]           = useState('');
+
+  useEffect(() => {
+    if (activePage !== 'caprequests') return;
+    if (roles.length === 0) {
+      getRoles().then(res => setRoles(res.data)).catch(() => {});
+    }
+    setCapReqHistoryLoading(true);
+    Promise.all([getMyCapRequests(), getRoleCaps()])
+      .then(([reqRes, capsRes]) => {
+        setCapReqHistory(reqRes.data || []);
+        setCapReqCaps(capsRes.data || { limits: [], default_max: 5 });
+      })
+      .catch(() => {})
+      .finally(() => setCapReqHistoryLoading(false));
+  }, [activePage]);
 
   // Linked Documents state (admin view)
   const [allLinks, setAllLinks]           = useState([]);
@@ -1742,6 +1768,187 @@ export default function AdminDashboard({ activePage }) {
       </div>
       {viewingLink && <DocViewModal doc={viewingLink} onClose={() => setViewingLink(null)} />}
       </>
+    );
+  }
+
+  if (activePage === 'caprequests') {
+    const adminDeptId = user?.deptId;
+    const selectedRoleId = capReqForm.role_id ? Number(capReqForm.role_id) : null;
+    const existingCap = selectedRoleId && adminDeptId
+      ? capReqCaps.limits?.find(l => l.role_id === selectedRoleId && l.department_id === adminDeptId)
+      : null;
+    const currentCap = existingCap != null ? existingCap.max_users : capReqCaps.default_max;
+
+    const INP = { width: '100%', padding: '10px 14px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', fontSize: 13, color: 'var(--text-color)', outline: 'none', boxSizing: 'border-box', fontFamily: 'var(--font)' };
+
+    function statusBadge(s) {
+      if (s === 'approved') return { color: '#16a34a', bg: 'rgba(25,135,84,.1)', label: 'Approved' };
+      if (s === 'rejected') return { color: '#dc3545', bg: 'rgba(220,53,69,.1)', label: 'Rejected' };
+      return { color: '#b45309', bg: 'rgba(255,193,7,.1)', label: 'Pending' };
+    }
+
+    async function handleCapReqSubmit() {
+      if (!capReqForm.role_id)        { setCapReqError('Please select a role.'); return; }
+      if (capReqForm.requested_cap === '') { setCapReqError('Please enter the requested cap.'); return; }
+      const reqCap = Number(capReqForm.requested_cap);
+      if (isNaN(reqCap) || reqCap < 0) { setCapReqError('Cap must be 0 or more.'); return; }
+      setCapReqSaving(true); setCapReqError(''); setCapReqSuccess('');
+      try {
+        await submitCapRequest({ role_id: Number(capReqForm.role_id), requested_cap: reqCap, reason: capReqForm.reason.trim() || undefined });
+        setCapReqForm({ role_id: '', requested_cap: '', reason: '' });
+        setCapReqSuccess('Request submitted successfully. Super Admin will review it shortly.');
+        const res = await getMyCapRequests();
+        setCapReqHistory(res.data || []);
+      } catch (err) {
+        const detail = err.response?.data?.detail;
+        setCapReqError(typeof detail === 'string' ? detail : 'Failed to submit request. Please try again.');
+      } finally {
+        setCapReqSaving(false);
+      }
+    }
+
+    const stats = {
+      total:    capReqHistory.length,
+      pending:  capReqHistory.filter(r => r.status === 'pending').length,
+      approved: capReqHistory.filter(r => r.status === 'approved').length,
+      rejected: capReqHistory.filter(r => r.status === 'rejected').length,
+    };
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
+        <style>{ADM_RESPONSIVE_CSS}</style>
+
+        {/* Stats */}
+        <div className="adm-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
+          {[
+            { label: 'Total Requests', value: stats.total,    color: 'var(--primary)', icon: ShieldCheck },
+            { label: 'Pending',        value: stats.pending,  color: '#b45309',        icon: Clock },
+            { label: 'Approved',       value: stats.approved, color: '#16a34a',        icon: CheckCircle },
+            { label: 'Rejected',       value: stats.rejected, color: '#dc3545',        icon: XCircle },
+          ].map(s => (
+            <Card key={s.label}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ ...LABEL, marginBottom: 8 }}>{s.label}</div>
+                  <div style={{ fontSize: 28, fontWeight: 700, color: s.color, fontFamily: 'var(--mono)', lineHeight: 1 }}>
+                    {capReqHistoryLoading ? '–' : s.value}
+                  </div>
+                </div>
+                <div style={{ width: 44, height: 44, borderRadius: 11, background: s.color === 'var(--primary)' ? 'rgba(33,74,171,.12)' : s.color + '22', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <s.icon size={20} color={s.color} strokeWidth={1.8} />
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+
+        {/* New Request Form */}
+        <Card>
+          <div style={{ fontWeight: 700, fontSize: 'var(--font-size-p1)', color: 'var(--text-heading)', marginBottom: 4 }}>New Cap Change Request</div>
+          <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', marginBottom: 16 }}>
+            Request Super Admin to increase or decrease the maximum users allowed for a role in your department.
+          </div>
+          <div className="adm-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Role <span style={{ color: '#dc3545' }}>*</span></label>
+              <SelectField
+                value={capReqForm.role_id}
+                onChange={e => { setCapReqForm(f => ({ ...f, role_id: e.target.value, requested_cap: '' })); setCapReqError(''); setCapReqSuccess(''); }}
+                placeholder="Select role"
+              >
+                {assignableRoles(roles).map(r => (
+                  <option key={r.id} value={r.id}>{r.name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</option>
+                ))}
+              </SelectField>
+            </div>
+            <div>
+              <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Requested Max Users <span style={{ color: '#dc3545' }}>*</span></label>
+              <input
+                type="number" min="0"
+                value={capReqForm.requested_cap}
+                onChange={e => { setCapReqForm(f => ({ ...f, requested_cap: e.target.value })); setCapReqError(''); setCapReqSuccess(''); }}
+                placeholder="Enter new cap"
+                style={INP}
+              />
+              {selectedRoleId && (
+                <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 5 }}>
+                  Current cap for your department: <strong style={{ color: 'var(--text-heading)', fontFamily: 'var(--mono)' }}>{currentCap}</strong>
+                  {!existingCap && <span style={{ color: 'var(--text-color-secondary)' }}> (system default)</span>}
+                </div>
+              )}
+            </div>
+          </div>
+          <div style={{ marginTop: 12 }}>
+            <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Reason (optional)</label>
+            <textarea
+              value={capReqForm.reason}
+              onChange={e => setCapReqForm(f => ({ ...f, reason: e.target.value }))}
+              placeholder="Briefly explain why you need this change…"
+              rows={3}
+              style={{ ...INP, resize: 'vertical' }}
+            />
+          </div>
+          {capReqError && (
+            <div style={{ marginTop: 10, padding: '8px 12px', background: 'rgba(220,53,69,.08)', border: '1px solid rgba(220,53,69,.25)', borderRadius: 8, fontSize: 12.5, color: '#dc3545' }}>
+              ⚠ {capReqError}
+            </div>
+          )}
+          {capReqSuccess && (
+            <div style={{ marginTop: 10, padding: '8px 12px', background: 'rgba(25,135,84,.08)', border: '1px solid rgba(25,135,84,.25)', borderRadius: 8, fontSize: 12.5, color: '#16a34a' }}>
+              ✓ {capReqSuccess}
+            </div>
+          )}
+          <div style={{ marginTop: 14, display: 'flex', justifyContent: 'flex-end' }}>
+            <button onClick={handleCapReqSubmit} disabled={capReqSaving}
+              style={{ padding: '9px 22px', background: capReqSaving ? 'var(--surface-border)' : 'var(--primary)', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 600, cursor: capReqSaving ? 'not-allowed' : 'pointer', color: capReqSaving ? 'var(--text-color-secondary)' : 'white', fontFamily: 'var(--font)' }}>
+              {capReqSaving ? 'Submitting…' : 'Submit Request'}
+            </button>
+          </div>
+        </Card>
+
+        {/* Request History */}
+        <Card padding="0">
+          <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--surface-border)', fontWeight: 600, fontSize: 'var(--font-size-p2)', color: 'var(--text-heading)' }}>
+            Request History
+          </div>
+          {capReqHistoryLoading ? (
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>Loading…</div>
+          ) : capReqHistory.length === 0 ? (
+            <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>No requests submitted yet.</div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px 120px 110px 100px 1fr', minWidth: 780, padding: '9px 16px', background: 'var(--surface-ground)', borderBottom: '1px solid var(--surface-border)' }}>
+                {['Role / Reason', 'Current Cap', 'Requested', 'Status', 'Date', 'Super Admin Note'].map(h => (
+                  <div key={h} style={{ ...LABEL }}>{h}</div>
+                ))}
+              </div>
+              {capReqHistory.map(req => {
+                const sb = statusBadge(req.status);
+                return (
+                  <div key={req.id}
+                    style={{ display: 'grid', gridTemplateColumns: '1fr 120px 120px 110px 100px 1fr', minWidth: 780, padding: '10px 16px', borderBottom: '1px solid var(--surface-border)', alignItems: 'center', transition: 'background .15s' }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)' }}>{req.role_name}</div>
+                      {req.reason && <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 2 }}>{req.reason}</div>}
+                    </div>
+                    <div style={{ fontSize: 13, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>
+                      {req.current_cap != null ? req.current_cap : <span style={{ fontSize: 11 }}>default ({capReqCaps.default_max})</span>}
+                    </div>
+                    <div style={{ fontSize: 13, fontFamily: 'var(--mono)', fontWeight: 600, color: 'var(--text-heading)' }}>{req.requested_cap}</div>
+                    <div>
+                      <span style={{ padding: '3px 9px', borderRadius: 6, fontSize: 11.5, fontWeight: 600, color: sb.color, background: sb.bg }}>{sb.label}</span>
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--text-color-secondary)' }}>{req.created_at?.split('T')[0] || '—'}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text-color-secondary)' }}>{req.super_admin_note || '—'}</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Card>
+      </div>
     );
   }
 
