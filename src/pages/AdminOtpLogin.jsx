@@ -63,13 +63,21 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
     setLoading(true); setError('');
     try {
       const res = await verifyAdminOtp(mobile, otp);
+      const token = res.data?.token;
       const depts = res.data?.departments || [];
+
+      // Super Admin — JWT issued directly, no department selection needed.
+      if (token) {
+        onLogin({ token });
+        return;
+      }
+
       if (depts.length === 0) {
         setError(t('adminOtpScreen.errorNoDepts'));
         return;
       }
       if (depts.length === 1) {
-        // Single department — complete login immediately without showing step 3
+        // Single department admin — complete login immediately without showing step 3
         const loginRes = await completeAdminLogin(mobile, otp, depts[0].id);
         onLogin({ token: loginRes.data.access_token });
         return;
