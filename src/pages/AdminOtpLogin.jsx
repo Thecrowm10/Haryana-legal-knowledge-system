@@ -42,10 +42,9 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
     if (cleaned.length < 10) { setError(t('adminOtpScreen.errorMobileInvalid')); return; }
     setLoading(true); setError(''); setResendMsg('');
     try {
-      const res = await requestAdminOtp(cleaned);
+      await requestAdminOtp(cleaned);
       setMobile(cleaned);
       setStep(2);
-      if (res.data?.otp) setOtp(res.data.otp);
     } catch (err) {
       const detail = err.response?.data?.detail;
       setError(typeof detail === 'string' ? detail : t('adminOtpScreen.errorSendFailed'));
@@ -112,9 +111,8 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
   async function handleResend() {
     setOtp(''); setError(''); setResendMsg(''); setLoading(true);
     try {
-      const res = await requestAdminOtp(mobile);
+      await requestAdminOtp(mobile);
       setResendMsg(t('adminOtpScreen.resendMsg'));
-      if (res.data?.otp) setOtp(res.data.otp);
     } catch {
       setError(t('adminOtpScreen.errorResendFailed'));
     } finally {
