@@ -164,6 +164,7 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
   const [uploadsFilterStatus, setUploadsFilterStatus] = useState('');
   const [uploadsFilterUploader, setUploadsFilterUploader] = useState('');
   const [uploadsFilterApprover, setUploadsFilterApprover] = useState('');
+  const [uploadsFilterDept, setUploadsFilterDept]         = useState('');
   const [viewDoc, setViewDoc]                             = useState(null);
   const [reportGenerating, setReportGenerating] = useState(false);
 
@@ -649,13 +650,15 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
 
   // User Management
   const [statusFilter, setStatusFilter] = useState(null); // null | 'active' | 'inactive'
+  const [deptFilter, setDeptFilter]     = useState('');   // '' | dept id string
 
   if (activePage === 'users') {
     const active   = users.filter(u => u.status === 'active').length;
     const inactive = users.filter(u => u.status === 'inactive').length;
 
     const filteredUsers = users
-      .filter(u => !statusFilter  || u.status === statusFilter);
+      .filter(u => !statusFilter || u.status === statusFilter)
+      .filter(u => !deptFilter   || u.deptIds.includes(Number(deptFilter)) || u.deptId === Number(deptFilter));
 
     const INP_STYLE = {
       width: '100%', padding: '9px 12px',
@@ -704,6 +707,14 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
               )}
             </div>
             <div className="adm-users-actions" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              {depts.length > 0 && (
+                <SelectField value={deptFilter} onChange={e => setDeptFilter(e.target.value)} style={{ flex: '0 0 180px' }}>
+                  <option value="">All Departments</option>
+                  {depts.filter(d => d.is_active !== false).map(d => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </SelectField>
+              )}
               <button
                 onClick={() => { setAddingUser(true); setAddError(''); setAddForm(EMPTY_ADD_FORM); setShowAddPass(false); }}
                 style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: 'var(--primary)', color: 'white', border: 'none', borderRadius: 8, padding: '7px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
@@ -1761,6 +1772,10 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
       if (uploadsFilterStatus && d.status !== uploadsFilterStatus) return false;
       if (uploadsFilterUploader && d.uploader_username !== uploadsFilterUploader) return false;
       if (uploadsFilterApprover && d.latest_approval?.approver_username !== uploadsFilterApprover) return false;
+      if (uploadsFilterDept) {
+        const dName = depts.find(dep => String(dep.id) === uploadsFilterDept)?.name;
+        if (dName && d.department_name !== dName) return false;
+      }
       if (uploadsSearch) {
         const q = uploadsSearch.toLowerCase();
         const name = (d.document_name || d.original_filename || '').toLowerCase();
@@ -1777,14 +1792,16 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
       rejected: { color: '#dc3545', bg: 'rgba(220, 53, 69,.1)',   label: t('uploads.stats.rejected') },
     };
     const cols = '4px 1fr 175px 155px 155px 90px';
-    const anyFilter = uploadsSearch || uploadsFilterStatus || uploadsFilterUploader || uploadsFilterApprover;
+    const anyFilter = uploadsSearch || uploadsFilterStatus || uploadsFilterUploader || uploadsFilterApprover || uploadsFilterDept;
 
     async function handleDownloadReport() {
       setReportGenerating(true);
       try {
-        // allDocs is already scoped server-side to this admin's own department(s) —
-        // no department picker needed, the report just covers everything in scope.
-        await downloadUploadsExcelReport({ docs: allDocs, departments: [], fileLabel: 'SuperAdmin' });
+        const deptLabel = uploadsFilterDept
+          ? (depts.find(d => String(d.id) === uploadsFilterDept)?.name || 'Department')
+          : 'AllDepartments';
+        const allDeptNames = !uploadsFilterDept ? depts.map(d => d.name) : [];
+        await downloadUploadsExcelReport({ docs: filteredDocs, departments: [], allDeptNames, fileLabel: deptLabel });
       } finally {
         setReportGenerating(false);
       }
@@ -1849,8 +1866,14 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
               <option value="approved">{t('uploads.statusApproved')}</option>
               <option value="rejected">{t('uploads.statusRejected')}</option>
             </SelectField>
+            <SelectField value={uploadsFilterDept} onChange={e => setUploadsFilterDept(e.target.value)} style={{ flex: '0 0 175px' }}>
+              <option value="">All Departments</option>
+              {depts.filter(d => d.is_active !== false).map(d => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </SelectField>
             {anyFilter && (
-              <button onClick={() => { setUploadsSearch(''); setUploadsFilterStatus(''); setUploadsFilterUploader(''); setUploadsFilterApprover(''); }}
+              <button onClick={() => { setUploadsSearch(''); setUploadsFilterStatus(''); setUploadsFilterUploader(''); setUploadsFilterApprover(''); setUploadsFilterDept(''); }}
                 style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'transparent', border: '1px solid var(--surface-border)', borderRadius: 8, padding: '7px 12px', fontSize: 12, cursor: 'pointer', color: 'var(--text-color-secondary)', whiteSpace: 'nowrap' }}>
                 <X size={11} /> {t('uploads.clear')}
               </button>
