@@ -115,7 +115,10 @@ export default function App() {
     if (user.passwordExpired) {
       return <><ChangePasswordScreen user={user} onPasswordChanged={changePass} onLogout={logout} reason="expired" /><CookieBanner /></>;
     }
-    return <><FirstLoginScreen user={user} onTokenReceived={loginWithToken} onLogout={logout} /><CookieBanner /></>;
+    // Admin and Super Admin authenticate via OTP — skip the mobile-verification first-login screen.
+    if (user.role !== 'admin' && user.role !== 'super_admin') {
+      return <><FirstLoginScreen user={user} onTokenReceived={loginWithToken} onLogout={logout} /><CookieBanner /></>;
+    }
   }
   if (activePage === null) return <CookieBanner />;
 

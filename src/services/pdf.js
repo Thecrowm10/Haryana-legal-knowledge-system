@@ -4,7 +4,8 @@ export const changePassword       = (current_password, new_password) => api.post
 export const requestPasswordReset  = (username) => api.post('/auth/forgot-password', { username });
 export const resetPasswordWithOtp  = (username, otp, new_password) => api.post('/auth/reset-password', { username, otp, new_password });
 export const requestAdminOtp       = (mobile_number) => api.post('/admin/auth/request-otp', { mobile_number });
-export const verifyAdminOtp        = (mobile_number, otp, department_id) => api.post('/admin/auth/verify-otp', { mobile_number, otp, department_id });
+export const verifyAdminOtp        = (mobile_number, otp) => api.post('/admin/auth/verify-otp', { mobile_number, otp });
+export const completeAdminLogin    = (mobile_number, otp, department_id) => api.post('/admin/auth/select-department', { mobile_number, otp, department_id });
 // Content-Type is left unset — axios/the browser auto-generates it with the
 export const uploadPdfFile     = (formData) => api.post('/pdf/upload-file', formData);
 export const uploadPdfMetadata = (data)     => api.post('/pdf/upload', data);

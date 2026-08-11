@@ -103,8 +103,13 @@
     "errorOtp6Digits": "Enter the 6-digit OTP.",
     "errorInvalidOtp": "Invalid or expired OTP.",
     "errorResendFailed": "Could not resend OTP. Please try again.",
+    "verifyOtp": "Verify OTP",
     "selectDepartment": "Select Department",
-    "errorDeptRequired": "Please select a department to continue."
+    "selectDeptSubtitle": "Your mobile is linked to multiple accounts. Select the department you want to log in as.",
+    "loginBtn": "Login",
+    "errorDeptRequired": "Please select a department to continue.",
+    "errorNoDepts": "No department found for this account. Please contact your administrator.",
+    "errorLoginFailed": "Login failed. Please try again."
   },
   "changePasswordScreen": {
     "signOut": "Sign out and log in as a different user",
