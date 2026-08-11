@@ -34,7 +34,7 @@
       "title": "Add New User",
       "subtitle": "Create a new system account",
       "username": "Username",
-      "usernamePlaceholder": "e.g. firstname.lastname",
+      "usernamePlaceholder": "e.g. Role.Department",
       "email": "Email",
       "emailPlaceholder": "user@example.com",
       "password": "Password",

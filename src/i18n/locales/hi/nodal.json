@@ -38,7 +38,7 @@
       "title": "नया उपयोगकर्ता जोड़ें",
       "subtitle": "एक नया सिस्टम खाता बनाएं",
       "username": "उपयोगकर्ता नाम",
-      "usernamePlaceholder": "जैसे firstname.lastname",
+      "usernamePlaceholder": "जैसे Role.Department",
       "email": "ईमेल",
       "emailPlaceholder": "user@example.com",
       "password": "पासवर्ड",
