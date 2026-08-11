@@ -30,8 +30,7 @@ const MENU_CONFIG = {
       { icon: Link2,       label: 'sidebar.items.linkedDocuments',   id: 'linkedocs' },
     ]},
     { label: 'sidebar.groups.system', items: [
-      { icon: Settings,      label: 'sidebar.items.masterDataManager', id: 'taxonomy' },
-      { icon: ShieldCheck,   label: 'sidebar.items.roleCaps',          id: 'rolecaps' },
+      // Master Data Manager & Role/User Capability — super_admin only, see super_admin below.
       // System Monitor — not wired to a real API yet (all stats are hardcoded placeholders).
       // Hidden from the menu until that API exists; page code below is kept, not deleted.
       // { icon: Activity,      label: 'sidebar.items.systemMonitor',     id: 'monitor' },
