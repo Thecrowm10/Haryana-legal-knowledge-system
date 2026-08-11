@@ -369,9 +369,15 @@ function extractTypeChildren(data, type) {
   }
   return [];
 }
-// DBIM 7.1.3.3 recommends PDF-only uploads — DOC/DOCX are no longer accepted.
+// DBIM 7.1.3.3 recommends PDF-only uploads, but the department explicitly requires
+// Word support too — PDF + DOC/DOCX are accepted, everything else is rejected.
 function isAccepted(f) {
-  return f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf');
+  return (
+    f.type === 'application/pdf' || f.name.endsWith('.pdf') ||
+    /\.docx?$/i.test(f.name) ||
+    f.type === 'application/msword' ||
+    f.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  );
 }
 // DBIM 6.1.1 / Table 6 upload size ceiling — the guideline's own tiers are photo-oriented
 // (banner/thumbnail/high-res), so the closest fit for a document upload is its "high-res" cap.
@@ -2832,7 +2838,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                         <div style={{ ...LABEL, marginBottom: 8 }}>
                           {t('replaceFileModal.title')} <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-color-secondary)', textTransform: 'none', letterSpacing: 0 }}>({t('common.optional', 'optional')})</span>
                         </div>
-                        <input ref={editFileInputRef} type="file" accept=".pdf" style={{ display: 'none' }}
+                        <input ref={editFileInputRef} type="file" accept=".pdf,.docx" style={{ display: 'none' }}
                           onChange={e => {
                             const f = e.target.files?.[0];
                             // showToast reads a timer ref internally, but this whole callback only
@@ -2901,7 +2907,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                             }}>
                             <Upload size={18} color="var(--text-color-secondary)" style={{ marginBottom: 4 }} />
                             <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)' }}>{t('replaceFileModal.dropzone')}</div>
-                            <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 3, opacity: .7 }}>PDF only</div>
+                            <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 3, opacity: .7 }}>PDF or Word (.docx)</div>
                           </div>
                         )}
                         {editingDoc.status === 'rejected' && editFileSelected && (
@@ -4009,7 +4015,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                         <div style={{ ...LABEL, marginBottom: 8 }}>
                           {t('replaceFileModal.title')} <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-color-secondary)', textTransform: 'none', letterSpacing: 0 }}>({t('common.optional', 'optional')})</span>
                         </div>
-                        <input ref={editFileInputRef} type="file" accept=".pdf" style={{ display: 'none' }}
+                        <input ref={editFileInputRef} type="file" accept=".pdf,.docx" style={{ display: 'none' }}
                           onChange={e => {
                             const f = e.target.files?.[0];
                             // showToast reads a timer ref internally, but this whole callback only
@@ -4078,7 +4084,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                             }}>
                             <Upload size={18} color="var(--text-color-secondary)" style={{ marginBottom: 4 }} />
                             <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)' }}>{t('replaceFileModal.dropzone')}</div>
-                            <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 3, opacity: .7 }}>PDF only</div>
+                            <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 3, opacity: .7 }}>PDF or Word (.docx)</div>
                           </div>
                         )}
                         {editingDoc.status === 'rejected' && editFileSelected && (
@@ -4703,7 +4709,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                                         onFocus={focusStyle} onBlur={blurStyle} />
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                      <input type="file" accept=".pdf" style={{ display: 'none' }}
+                                      <input type="file" accept=".pdf,.doc,.docx" style={{ display: 'none' }}
                                         id={`sec-file-ch${ci}-s${si}`}
                                         onChange={e => {
                                           const f = e.target.files?.[0] || null;
@@ -4861,7 +4867,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                               onFocus={focusStyle} onBlur={blurStyle} />
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <input type="file" accept=".pdf" style={{ display: 'none' }}
+                            <input type="file" accept=".pdf,.doc,.docx" style={{ display: 'none' }}
                               id={`sec-flat-file-${si}`}
                               onChange={e => {
                                 const f = e.target.files?.[0] || null;
@@ -5058,7 +5064,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                       onFocus={focusStyle} onBlur={blurStyle} />
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <input type="file" accept=".pdf" style={{ display: 'none' }}
+                    <input type="file" accept=".pdf,.doc,.docx" style={{ display: 'none' }}
                       id={`entry-file-${subDocTab}-${i}`}
                       onChange={e => {
                         const f = e.target.files?.[0] || null;
@@ -5375,7 +5381,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, justifyContent: form.type ? 'flex-start' : 'center', minHeight: form.type ? 'auto' : 'calc(100vh - 220px)' }}>
 
         {/* Hidden file input */}
-        <input ref={inputRef} type="file" accept=".pdf" multiple style={{ display: 'none' }}
+        <input ref={inputRef} type="file" accept=".pdf,.doc,.docx" multiple style={{ display: 'none' }}
           onChange={e => { addFiles(e.target.files); e.target.value = ''; }} />
 
         {/* Oversized files alert — DBIM 6.1.1 upload size ceiling */}
@@ -5582,6 +5588,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
                       <span style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>{t('wizard.step2.fileTypeHint', { size: formatSize(MAX_UPLOAD_SIZE_BYTES) })}</span>
                       <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--primary)', background: 'rgba(33, 74, 171,.08)', border: '1px solid rgba(33, 74, 171,.2)', padding: '2px 7px', borderRadius: 20 }}>.PDF</span>
+                      <span style={{ fontFamily: 'var(--mono)', fontSize: 10, color: '#2b579a', background: 'rgba(43,87,154,.08)', border: '1px solid rgba(43,87,154,.3)', padding: '2px 7px', borderRadius: 20 }}>.DOC</span>
                     </div>
                 </div>
               </div>
