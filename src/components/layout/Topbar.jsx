@@ -1,7 +1,6 @@
 ﻿import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Menu, ChevronDown, ChevronRight, LogOut, User, Building2, CheckCircle2 } from 'lucide-react';
-import { switchAdminDepartment } from '../../services/pdf';
+import { Menu, ChevronDown, ChevronRight, LogOut, User } from 'lucide-react';
 import NotificationBell from '../NotificationBell';
 import ProfileModal from './ProfileModal';
 import LanguageToggle from '../LanguageToggle';
@@ -68,31 +67,8 @@ export default function Topbar({ user, activePage, onNavigate, onLogout, onToggl
   const { t } = useTranslation('common');
   const [profileOpen, setProfileOpen]         = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
-  const [deptPickerOpen, setDeptPickerOpen]   = useState(false);
-  const [switchingDeptId, setSwitchingDeptId] = useState(null);
-  const [switchDeptError, setSwitchDeptError] = useState('');
 
   const isAdmin = user.role === 'admin' || user.role === 'super_admin';
-  const canSwitchDept = isAdmin && Array.isArray(user.departments) && user.departments.length > 1;
-
-  async function handleSwitchDept(deptId) {
-    if (deptId === user.deptId || switchingDeptId) return;
-    setSwitchingDeptId(deptId);
-    setSwitchDeptError('');
-    try {
-      const res = await switchAdminDepartment(deptId);
-      const token = res.data.access_token;
-      localStorage.setItem('token', token);
-      setProfileOpen(false);
-      setDeptPickerOpen(false);
-      setSwitchingDeptId(null);
-      if (onMobileVerified) onMobileVerified(token);
-    } catch (err) {
-      const detail = err.response?.data?.detail;
-      setSwitchDeptError(typeof detail === 'string' ? detail : 'Could not switch department. Please try again.');
-      setSwitchingDeptId(null);
-    }
-  }
   const rm = ROLE_META[user.role] || ROLE_META.citizen;
   const crumbs = BREADCRUMBS[activePage] || DEFAULT_CRUMB;
   const crumbTargets = CRUMB_TARGETS[activePage] || [];
@@ -199,7 +175,7 @@ export default function Topbar({ user, activePage, onNavigate, onLogout, onToggl
 
       {/* Profile dropdown */}
       <div style={{ position: 'relative' }}>
-        <button className="tb-profile-btn" onClick={() => { setProfileOpen(o => !o); if (profileOpen) { setDeptPickerOpen(false); setSwitchDeptError(''); } }} style={{
+        <button className="tb-profile-btn" onClick={() => setProfileOpen(o => !o)} style={{
           background: profileOpen ? 'var(--surface-hover)' : 'transparent',
           border: '1px solid var(--surface-border)',
           borderRadius: 999, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 9,
@@ -229,7 +205,7 @@ export default function Topbar({ user, activePage, onNavigate, onLogout, onToggl
             position: 'absolute', top: 'calc(100% + 8px)', right: 0,
             background: 'var(--surface-card)', border: '1px solid var(--surface-border)',
             borderRadius: 12, boxShadow: '0 16px 40px rgba(0,0,0,.16)',
-            width: deptPickerOpen ? 240 : 200,
+            width: 200,
             overflow: 'hidden', zIndex: 100,
             animation: 'fadeSlideIn .15s ease',
           }}>
@@ -242,83 +218,25 @@ export default function Topbar({ user, activePage, onNavigate, onLogout, onToggl
               )}
             </div>
 
-            {!deptPickerOpen ? (
-              <>
-                {/* Profile */}
-                <div role="button" tabIndex={0} onClick={() => { setProfileOpen(false); setProfileModalOpen(true); }}
-                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setProfileOpen(false); setProfileModalOpen(true); } }}
-                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer', fontSize: 13, color: 'var(--text-color)', transition: 'background .15s' }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                  <User size={14} color="var(--text-color-secondary)" />{t('topbar.profile')}
-                </div>
+            {/* Profile */}
+            <div role="button" tabIndex={0} onClick={() => { setProfileOpen(false); setProfileModalOpen(true); }}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setProfileOpen(false); setProfileModalOpen(true); } }}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer', fontSize: 13, color: 'var(--text-color)', transition: 'background .15s' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              <User size={14} color="var(--text-color-secondary)" />{t('topbar.profile')}
+            </div>
 
-                {/* Change Department — only for admin/super_admin with multiple depts */}
-                {canSwitchDept && (
-                  <div role="button" tabIndex={0}
-                    onClick={() => { setSwitchDeptError(''); setDeptPickerOpen(true); }}
-                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSwitchDeptError(''); setDeptPickerOpen(true); } }}
-                    style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer', fontSize: 13, color: 'var(--text-color)', transition: 'background .15s' }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                    <Building2 size={14} color="var(--text-color-secondary)" />{t('topbar.changeDepartment')}
-                  </div>
-                )}
+            <div style={{ height: 1, background: 'var(--surface-border)', margin: '4px 0' }} />
 
-                <div style={{ height: 1, background: 'var(--surface-border)', margin: '4px 0' }} />
-
-                {/* Logout */}
-                <div role="button" tabIndex={0} onClick={() => { setProfileOpen(false); onLogout(); }}
-                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setProfileOpen(false); onLogout(); } }}
-                  style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer', fontSize: 13, color: 'var(--red)', transition: 'background .15s' }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(220, 53, 69,.07)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                  <LogOut size={14} /> {t('topbar.logout')}
-                </div>
-              </>
-            ) : (
-              /* Department picker view */
-              <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 4 }}>
-                  {t('topbar.selectDepartment')}
-                </div>
-                {user.departments.map(dept => {
-                  const isCurrent = dept.id === user.deptId;
-                  const isSwitching = switchingDeptId === dept.id;
-                  return (
-                    <div key={dept.id} role="button" tabIndex={0}
-                      onClick={() => handleSwitchDept(dept.id)}
-                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSwitchDept(dept.id); } }}
-                      style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        gap: 8, padding: '8px 10px', borderRadius: 7, cursor: isCurrent ? 'default' : 'pointer',
-                        fontSize: 12.5, fontWeight: isCurrent ? 700 : 500,
-                        color: isCurrent ? 'var(--primary)' : 'var(--text-color)',
-                        background: isCurrent ? 'rgba(var(--primary-rgb, 33,74,171),.07)' : 'transparent',
-                        border: `1px solid ${isCurrent ? 'rgba(var(--primary-rgb, 33,74,171),.2)' : 'transparent'}`,
-                        transition: 'background .15s',
-                        opacity: switchingDeptId && !isSwitching ? 0.5 : 1,
-                      }}
-                      onMouseEnter={e => { if (!isCurrent) e.currentTarget.style.background = 'var(--surface-hover)'; }}
-                      onMouseLeave={e => { if (!isCurrent) e.currentTarget.style.background = 'transparent'; }}>
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{dept.name}</span>
-                      {isCurrent && <CheckCircle2 size={13} color="var(--primary)" style={{ flexShrink: 0 }} />}
-                      {isSwitching && <span style={{ fontSize: 11, color: 'var(--text-color-secondary)', flexShrink: 0 }}>{t('topbar.switchingDepartment')}</span>}
-                    </div>
-                  );
-                })}
-                {switchDeptError && (
-                  <div style={{ padding: '7px 10px', borderRadius: 7, background: 'rgba(220,53,69,.08)', border: '1px solid rgba(220,53,69,.2)', fontSize: 11.5, color: '#dc2626', marginTop: 2 }}>
-                    ⚠ {switchDeptError}
-                  </div>
-                )}
-                <div style={{ height: 1, background: 'var(--surface-border)', margin: '4px -14px' }} />
-                <button type="button" onClick={() => { setDeptPickerOpen(false); setSwitchDeptError(''); }}
-                  style={{ fontSize: 12, color: 'var(--text-color-secondary)', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: '4px 0', fontFamily: 'var(--font)' }}>
-                  ← {t('topbar.cancel')}
-                </button>
-              </div>
-            )}
+            {/* Logout */}
+            <div role="button" tabIndex={0} onClick={() => { setProfileOpen(false); onLogout(); }}
+              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setProfileOpen(false); onLogout(); } }}
+              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer', fontSize: 13, color: 'var(--red)', transition: 'background .15s' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(220, 53, 69,.07)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              <LogOut size={14} /> {t('topbar.logout')}
+            </div>
           </div>
         )}
       </div>

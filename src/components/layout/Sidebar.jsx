@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BarChart2, GitBranch, ClipboardList, Users, Settings, FileSearch, BarChart, Layers, Link2, BookOpen, ShieldCheck } from 'lucide-react';
+import { BarChart2, GitBranch, ClipboardList, Users, Settings, FileSearch, BarChart, Layers, Link2, BookOpen, ShieldCheck, Building2, ChevronDown, CheckCircle2 } from 'lucide-react';
 import haryanaLogo from '../../assets/haryana-logo.png';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
+import { switchAdminDepartment } from '../../services/pdf';
 const MENU_CONFIG = {
   // uploader and approver have no sidebar — see Layout.jsx (single-page dashboard instead)
   csoffice: [
@@ -80,6 +81,29 @@ export default function Sidebar({ user, activePage, onNavigate, collapsed, mobil
   const { t } = useTranslation('common');
   const groups = MENU_CONFIG[user.role] || [];
   const [hovering, setHovering] = useState(false);
+  const [deptPickerOpen, setDeptPickerOpen] = useState(false);
+  const [switchingDeptId, setSwitchingDeptId] = useState(null);
+  const [switchDeptError, setSwitchDeptError] = useState('');
+  const canSwitchDept = (user.role === 'admin' || user.role === 'super_admin')
+    && Array.isArray(user.departments) && user.departments.length > 1;
+
+  async function handleSwitchDept(deptId) {
+    if (deptId === user.deptId || switchingDeptId) return;
+    setSwitchingDeptId(deptId);
+    setSwitchDeptError('');
+    try {
+      const res = await switchAdminDepartment(deptId);
+      const token = res.data.access_token;
+      localStorage.setItem('token', token);
+      // Full reload — every dashboard fetches its data on mount for the active
+      // department, so a React state update alone would leave stale data on screen.
+      window.location.reload();
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      setSwitchDeptError(typeof detail === 'string' ? detail : 'Could not switch department. Please try again.');
+      setSwitchingDeptId(null);
+    }
+  }
   // Below 1024px the sidebar can't push content over (no room) — it becomes a
   // fixed off-canvas drawer instead, toggled by Topbar's hamburger via mobileOpen.
   const isDrawerMode = useMediaQuery('(max-width: 1024px)');
@@ -203,21 +227,82 @@ export default function Sidebar({ user, activePage, onNavigate, collapsed, mobil
 
       {/* User footer */}
       {expanded ? (
-        <div style={{ padding: 8, borderTop: '1px solid var(--surface-border)', flexShrink: 0 }}>
-          <div style={{
-            padding: '9px 10px', borderRadius: 'var(--radius-sm)', background: 'var(--surface-hover)',
-            display: 'flex', alignItems: 'center', gap: 10,
-          }}>
+        <div style={{ padding: 8, borderTop: '1px solid var(--surface-border)', flexShrink: 0, position: 'relative' }}>
+          <div
+            role={canSwitchDept ? 'button' : undefined}
+            tabIndex={canSwitchDept ? 0 : undefined}
+            onClick={canSwitchDept ? () => { setSwitchDeptError(''); setDeptPickerOpen(o => !o); } : undefined}
+            onKeyDown={canSwitchDept ? (e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSwitchDeptError(''); setDeptPickerOpen(o => !o); } }) : undefined}
+            style={{
+              padding: '9px 10px', borderRadius: 'var(--radius-sm)',
+              background: deptPickerOpen ? 'var(--primary-light)' : 'var(--surface-hover)',
+              display: 'flex', alignItems: 'center', gap: 10,
+              cursor: canSwitchDept ? 'pointer' : 'default',
+              transition: 'background .15s',
+            }}
+            onMouseEnter={e => { if (canSwitchDept && !deptPickerOpen) e.currentTarget.style.background = 'var(--surface-border)'; }}
+            onMouseLeave={e => { if (canSwitchDept && !deptPickerOpen) e.currentTarget.style.background = 'var(--surface-hover)'; }}>
             <div style={{
               width: 32, height: 32, borderRadius: '50%', background: 'var(--primary)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 12, fontWeight: 700, color: 'white', flexShrink: 0,
             }}>{user.role === 'citizen' ? 'U' : user.name[0]}</div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.role === 'citizen' ? t('sidebar.userFallback') : user.name}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-color-secondary)' }}>{user.role === 'citizen' ? '' : user.dept}</div>
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.role === 'citizen' ? t('sidebar.userFallback') : user.dept}</div>
+              {canSwitchDept && (
+                <div style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t('topbar.changeDepartment')}</div>
+              )}
             </div>
+            {canSwitchDept && (
+              <ChevronDown size={13} color="var(--text-color-secondary)" style={{ transform: deptPickerOpen ? 'rotate(180deg)' : 'none', transition: 'transform .2s', flexShrink: 0 }} />
+            )}
           </div>
+
+          {/* Department picker — opens upward since this chip sits at the bottom of the sidebar */}
+          {canSwitchDept && deptPickerOpen && (
+            <div style={{
+              position: 'absolute', bottom: 'calc(100% + 6px)', left: 8, right: 8,
+              background: 'var(--surface-card)', border: '1px solid var(--surface-border)',
+              borderRadius: 12, boxShadow: '0 16px 40px rgba(0,0,0,.16)',
+              overflow: 'hidden', zIndex: 100, animation: 'fadeSlideIn .15s ease',
+            }}>
+              <div style={{ padding: '10px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.06em', textTransform: 'uppercase', marginBottom: 2 }}>
+                  <Building2 size={12} />{t('topbar.selectDepartment')}
+                </div>
+                {user.departments.map(dept => {
+                  const isCurrent = dept.id === user.deptId;
+                  const isSwitching = switchingDeptId === dept.id;
+                  return (
+                    <div key={dept.id} role="button" tabIndex={0}
+                      onClick={() => handleSwitchDept(dept.id)}
+                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSwitchDept(dept.id); } }}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        gap: 8, padding: '8px 10px', borderRadius: 7, cursor: isCurrent ? 'default' : 'pointer',
+                        fontSize: 12.5, fontWeight: isCurrent ? 700 : 500,
+                        color: isCurrent ? 'var(--primary)' : 'var(--text-color)',
+                        background: isCurrent ? 'rgba(var(--primary-rgb, 33,74,171),.07)' : 'transparent',
+                        border: `1px solid ${isCurrent ? 'rgba(var(--primary-rgb, 33,74,171),.2)' : 'transparent'}`,
+                        transition: 'background .15s',
+                        opacity: switchingDeptId && !isSwitching ? 0.5 : 1,
+                      }}
+                      onMouseEnter={e => { if (!isCurrent) e.currentTarget.style.background = 'var(--surface-hover)'; }}
+                      onMouseLeave={e => { if (!isCurrent) e.currentTarget.style.background = 'transparent'; }}>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{dept.name}</span>
+                      {isCurrent && <CheckCircle2 size={13} color="var(--primary)" style={{ flexShrink: 0 }} />}
+                      {isSwitching && <span style={{ fontSize: 11, color: 'var(--text-color-secondary)', flexShrink: 0 }}>{t('topbar.switchingDepartment')}</span>}
+                    </div>
+                  );
+                })}
+                {switchDeptError && (
+                  <div style={{ padding: '7px 10px', borderRadius: 7, background: 'rgba(220,53,69,.08)', border: '1px solid rgba(220,53,69,.2)', fontSize: 11.5, color: '#dc2626', marginTop: 2 }}>
+                    ⚠ {switchDeptError}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <div style={{ padding: '12px 0', borderTop: '1px solid var(--surface-border)', display: 'flex', justifyContent: 'center' }}>
