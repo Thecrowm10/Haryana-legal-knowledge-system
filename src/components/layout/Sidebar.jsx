@@ -38,6 +38,18 @@ const MENU_CONFIG = {
       { icon: ClipboardList, label: 'sidebar.items.fullMisReport',     id: 'auditfull' },
     ]},
   ],
+  super_admin: [
+    { label: 'sidebar.groups.administration', items: [
+      { icon: Users,       label: 'sidebar.items.userManagement',    id: 'users' },
+      { icon: Layers,      label: 'sidebar.items.allUploads',        id: 'alluploads' },
+      { icon: Link2,       label: 'sidebar.items.linkedDocuments',   id: 'linkedocs' },
+    ]},
+    { label: 'sidebar.groups.system', items: [
+      { icon: Settings,      label: 'sidebar.items.masterDataManager', id: 'taxonomy' },
+      { icon: ShieldCheck,   label: 'sidebar.items.roleCaps',          id: 'rolecaps' },
+      { icon: ClipboardList, label: 'sidebar.items.fullMisReport',     id: 'auditfull' },
+    ]},
+  ],
   nodal_officer: [
     { label: 'sidebar.groups.administration', items: [
       { icon: Users,         label: 'sidebar.items.userManagement',  id: 'nodalusers' },

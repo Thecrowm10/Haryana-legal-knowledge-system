@@ -22,7 +22,8 @@ const ROLE_META = {
   uploader: { label: 'topbar.roles.uploader',       color: '#0d6efd', bg: 'rgba(13, 110, 253,.1)' },
   approver: { label: 'topbar.roles.approver',       color: '#b45309', bg: 'rgba(255, 193, 7,.1)' },
   csoffice: { label: 'topbar.roles.csoffice',       color: '#198754', bg: 'rgba(25, 135, 84,.1)' },
-  admin:    { label: 'topbar.roles.admin',          color: '#8b5cf6', bg: 'rgba(139,92,246,.1)' },
+  admin:       { label: 'topbar.roles.admin',       color: '#8b5cf6', bg: 'rgba(139,92,246,.1)' },
+  super_admin: { label: 'topbar.roles.superAdmin',  color: '#dc2626', bg: 'rgba(220,38,38,.1)'  },
   nodal_officer: { label: 'topbar.roles.nodalOfficer', color: '#0ea5e9', bg: 'rgba(14,165,233,.1)' },
   auditor:  { label: 'topbar.roles.auditor',        color: '#64748b', bg: 'rgba(100,116,139,.1)' },
 };
