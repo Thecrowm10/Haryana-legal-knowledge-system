@@ -17,7 +17,7 @@ const LABEL = { fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-second
 
 // Admin creates/manages every account except other admins — there is only ever one admin, seeded up front.
 // Citizens are public users, not staff accounts — no one creates a "citizen" login from a dashboard.
-const ADMIN_ROLE_NAMES = new Set(['admin', 'super_admin', 'citizen']);
+const ADMIN_ROLE_NAMES = new Set(['super_admin', 'citizen']);
 function normalizeRoleName(name) {
   return name?.trim().toLowerCase().replace(/\s+/g, '_');
 }
