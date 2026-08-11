@@ -186,6 +186,7 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
   const [activeAnnotId,  setActiveAnnotId]  = useState(null);
   const svgRefs = useRef([]);
   const docxContainerRef                      = useRef(null);
+  const pendingDocxRangeRef                   = useRef(null);
   const [pendingDocxText, setPendingDocxText] = useState(null);
 
   const pageData = ocrData.pages.find(p => p.pageNum === currentPage) || ocrData.pages[0];
@@ -226,10 +227,17 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
     return () => { cancelled = true; };
   }, [pdfDoc, zoom, rotation]);
 
+  // When docxHtml changes (new document loaded) reset the container and re-apply
+  // any already-saved annotations via text search.  Annotations added *during*
+  // this session are applied directly from their stored Range (see
+  // confirmDocxAnnotation) so they don't go through this path and are not
+  // affected by text-node boundary issues in mammoth's HTML output.
   useEffect(() => {
     if (!docxContainerRef.current || !docxHtml) return;
     docxContainerRef.current.innerHTML = docxHtml;
-  }, [docxHtml]);
+    docxContainerRef.current.normalize();
+    annotations.filter(a => a.isDocx).forEach(ann => applyDocxHighlight(docxContainerRef.current, ann));
+  }, [docxHtml]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function applyDocxHighlight(container, ann) {
     if (!container || !ann.text) return;
@@ -251,19 +259,23 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
     }
   }
 
-  useEffect(() => {
-    if (!docxContainerRef.current || !docxHtml) return;
-    docxContainerRef.current.querySelectorAll('[data-docx-annot]').forEach(span => {
-      const parent = span.parentNode;
-      if (!parent) return;
-      while (span.firstChild) parent.insertBefore(span.firstChild, span);
-      parent.removeChild(span);
-    });
-    // Merge adjacent text nodes split by the previous surroundContents calls so
-    // indexOf searches in applyDocxHighlight work correctly on subsequent highlights.
-    docxContainerRef.current.normalize();
-    annotations.filter(a => a.isDocx).forEach(ann => applyDocxHighlight(docxContainerRef.current, ann));
-  }, [annotations, docxHtml]);
+  function applySpanFromRange(range, id, color, comment) {
+    const span = document.createElement('span');
+    span.style.cssText = `background-color:${color};border-radius:2px;cursor:pointer;padding:0 1px;`;
+    span.dataset.docxAnnot = id;
+    if (comment) span.title = comment;
+    span.addEventListener('click', e => { e.stopPropagation(); setActiveAnnotId(id); });
+    try { range.surroundContents(span); } catch { const f = range.extractContents(); span.appendChild(f); range.insertNode(span); }
+  }
+
+  function removeDocxSpan(id) {
+    const span = docxContainerRef.current?.querySelector(`[data-docx-annot="${id}"]`);
+    if (!span) return;
+    const parent = span.parentNode;
+    if (!parent) return;
+    while (span.firstChild) parent.insertBefore(span.firstChild, span);
+    parent.removeChild(span);
+  }
 
   // Scroll to currentPage only when the change comes from nav buttons / external source,
   // NOT when it comes from handleScroll (which would create a conflicting scroll-back).
@@ -371,6 +383,7 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
     if (!sel || sel.isCollapsed) return;
     const text = sel.toString().trim();
     if (!text || !docxContainerRef.current?.contains(sel.anchorNode)) return;
+    pendingDocxRangeRef.current = sel.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
     setPendingDocxText(text);
     setPopupComment('');
     setDrawState('popup');
@@ -379,16 +392,28 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
 
   function confirmDocxAnnotation() {
     if (!pendingDocxText) return;
+    const newId = genId();
+    const comment = popupComment.trim();
+    if (pendingDocxRangeRef.current) {
+      applySpanFromRange(pendingDocxRangeRef.current, newId, selectedColor, comment);
+      pendingDocxRangeRef.current = null;
+    }
     onAnnotationsChange?.([...annotations, {
-      id: genId(),
+      id: newId,
       text: pendingDocxText,
-      comment: popupComment.trim(),
+      comment,
       color: selectedColor,
       isDocx: true,
     }]);
     setPendingDocxText(null);
     setPopupComment('');
     setDrawState('idle');
+  }
+
+  function handleDeleteDocxAnnotation(id) {
+    removeDocxSpan(id);
+    onAnnotationsChange?.(annotations.filter(a => a.id !== id));
+    setActiveAnnotId(null);
   }
 
   // Keep the ref current on every render so ThreePanelReview can call it
@@ -622,7 +647,7 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
               <div style={{ padding: '8px 10px', borderRadius: 7, background: ann.color, border: '1px solid rgba(0,0,0,.12)', fontSize: 13, color: 'rgba(0,0,0,.75)', lineHeight: 1.5, minHeight: 40 }}>
                 {ann.comment || <span style={{ opacity: 0.5 }}>{t('common.noComment')}</span>}
               </div>
-              <button onClick={() => { onAnnotationsChange?.(annotations.filter(a => a.id !== activeAnnotId)); setActiveAnnotId(null); }}
+              <button onClick={() => handleDeleteDocxAnnotation(activeAnnotId)}
                 style={{ background: 'rgba(220, 53, 69,.07)', border: '1px solid rgba(220, 53, 69,.25)', color: '#dc2626', borderRadius: 7, padding: '7px 0', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                 {t('pdfViewer.deleteHighlight')}
               </button>
