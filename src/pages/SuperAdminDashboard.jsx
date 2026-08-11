@@ -349,8 +349,10 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
   const [capForm, setCapForm]           = useState({ department_id: '', role_id: '', max_users: '' });
   const [capFormError, setCapFormError] = useState('');
   const [capSaving, setCapSaving]       = useState(false);
-  const [capEditId, setCapEditId]       = useState(null);
-  const [capEditVal, setCapEditVal]     = useState('');
+  const [capEditId, setCapEditId]             = useState(null);
+  const [capEditVal, setCapEditVal]           = useState('');
+  const [capEditActiveCount, setCapEditActiveCount] = useState(null);
+  const [capEditError, setCapEditError]       = useState('');
   const [capDeptSearch, setCapDeptSearch]   = useState('');
   const [capDeptOpen, setCapDeptOpen]       = useState(false);
   const [capActiveCount, setCapActiveCount] = useState(null);
@@ -359,10 +361,12 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
   // Pending cap-change requests from admins
   const [pendingCapReqs, setPendingCapReqs]         = useState([]);
   const [pendingCapReqsLoading, setPendingCapReqsLoading] = useState(false);
-  const [capReqReviewing, setCapReqReviewing]       = useState(null); // id being reviewed
-  const [capReqRejectNote, setCapReqRejectNote]     = useState('');
-  const [capReqRejectOpen, setCapReqRejectOpen]     = useState(null); // id for reject note modal
-  const [capReqFinalCaps, setCapReqFinalCaps]       = useState({}); // { [req.id]: string } super admin override values
+  const [capReqReviewing, setCapReqReviewing]         = useState(null); // id being reviewed
+  const [capReqRejectNote, setCapReqRejectNote]       = useState('');
+  const [capReqRejectOpen, setCapReqRejectOpen]       = useState(null); // id for reject note modal
+  const [capReqFinalCaps, setCapReqFinalCaps]         = useState({}); // { [req.id]: string } super admin override values
+  const [capReqActiveCounts, setCapReqActiveCounts]   = useState({}); // { [req.id]: number | null }
+  const [capReqApproveErrors, setCapReqApproveErrors] = useState({}); // { [req.id]: string }
 
   useEffect(() => {
     if (!capForm.department_id || !capForm.role_id) {
@@ -390,7 +394,20 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
         setCaps(capsRes.data.limits);
         setDepts(deptsRes.data);
         setRoles(rolesRes.data);
-        setPendingCapReqs(pendingRes.data || []);
+        const reqs = pendingRes.data || [];
+        setPendingCapReqs(reqs);
+        // Fetch active user counts for every pending request in parallel
+        Promise.all(
+          reqs.map(req =>
+            getActiveUserCount(req.department_id, req.role_id)
+              .then(res => ({ id: req.id, count: res.data.active_count ?? null }))
+              .catch(() => ({ id: req.id, count: null }))
+          )
+        ).then(results => {
+          const map = {};
+          results.forEach(r => { map[r.id] = r.count; });
+          setCapReqActiveCounts(map);
+        });
       })
       .catch(() => setCapsError(t('roleCaps.errors.loadFailed')))
       .finally(() => { setCapsLoading(false); setPendingCapReqsLoading(false); });
@@ -417,17 +434,28 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
   function handleCapInlineEdit(cap) {
     setCapEditId(cap.id);
     setCapEditVal(String(cap.max_users));
+    setCapEditError('');
+    setCapEditActiveCount(null);
+    getActiveUserCount(cap.department_id, cap.role_id)
+      .then(res => setCapEditActiveCount(res.data.active_count))
+      .catch(() => setCapEditActiveCount(null));
   }
 
   function handleCapInlineSave(cap) {
     const max = parseInt(capEditVal, 10);
-    if (isNaN(max) || max < 0) return;
+    if (isNaN(max) || max < 0) { setCapEditError('Please enter a valid non-negative number.'); return; }
+    if (capEditActiveCount !== null && max < capEditActiveCount) {
+      setCapEditError(`${capEditActiveCount} user${capEditActiveCount !== 1 ? 's' : ''} are currently active in this role. Cap must be at least ${capEditActiveCount}.`);
+      return;
+    }
+    setCapEditError('');
     upsertRoleCap({ department_id: cap.department_id, role_id: cap.role_id, max_users: max })
       .then(() => {
         setCaps(prev => prev.map(c => c.id === cap.id ? { ...c, max_users: max } : c));
         setCapEditId(null);
+        setCapEditActiveCount(null);
       })
-      .catch(() => {});
+      .catch(() => setCapEditError('Failed to save. Please try again.'));
   }
 
   function handleCapDelete(cap) {
@@ -2326,15 +2354,25 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
     async function handleCapReqApprove(req) {
       const rawVal = capReqFinalCaps[req.id];
       const finalCap = rawVal !== undefined && rawVal !== '' ? Number(rawVal) : req.requested_cap;
-      if (isNaN(finalCap) || finalCap < 0) { alert('Cap must be 0 or more.'); return; }
+      if (isNaN(finalCap) || finalCap < 0) {
+        setCapReqApproveErrors(prev => ({ ...prev, [req.id]: 'Cap must be 0 or more.' }));
+        return;
+      }
+      const activeCount = capReqActiveCounts[req.id];
+      if (activeCount !== null && activeCount !== undefined && finalCap < activeCount) {
+        setCapReqApproveErrors(prev => ({ ...prev, [req.id]: `${activeCount} user${activeCount !== 1 ? 's' : ''} are currently active in this role. Cap must be at least ${activeCount}.` }));
+        return;
+      }
+      setCapReqApproveErrors(prev => { const n = { ...prev }; delete n[req.id]; return n; });
       setCapReqReviewing(req.id);
       try {
         await reviewCapRequest(req.id, { status: 'approved', approved_cap: finalCap });
         setPendingCapReqs(prev => prev.filter(r => r.id !== req.id));
         setCapReqFinalCaps(prev => { const n = { ...prev }; delete n[req.id]; return n; });
+        setCapReqActiveCounts(prev => { const n = { ...prev }; delete n[req.id]; return n; });
         getRoleCaps().then(r => { setCapsDefaultMax(r.data.default_max); setCaps(r.data.limits); }).catch(() => {});
       } catch (err) {
-        alert(err.response?.data?.detail || 'Failed to approve request.');
+        setCapReqApproveErrors(prev => ({ ...prev, [req.id]: err.response?.data?.detail || 'Failed to approve request.' }));
       } finally {
         setCapReqReviewing(null);
       }
@@ -2384,6 +2422,8 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
                 {pendingCapReqs.map(req => {
                   const isReviewing = capReqReviewing === req.id;
                   const isRejectOpen = capReqRejectOpen === req.id;
+                  const activeCount = capReqActiveCounts[req.id];
+                  const approveError = capReqApproveErrors[req.id];
                   return (
                     <div key={req.id} style={{ borderBottom: '1px solid var(--surface-border)' }}>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 110px 110px 1fr 180px', minWidth: 860, padding: '11px 16px', alignItems: 'center', transition: 'background .15s' }}
@@ -2396,8 +2436,15 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
                             by {req.requested_by_name?.trim() || req.requested_by_username} · {req.created_at?.split('T')[0]}
                           </div>
                         </div>
-                        <div style={{ fontSize: 13, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>
-                          {req.current_cap != null ? req.current_cap : <span style={{ fontSize: 11 }}>default</span>}
+                        <div>
+                          <div style={{ fontSize: 13, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>
+                            {req.current_cap != null ? req.current_cap : <span style={{ fontSize: 11 }}>default</span>}
+                          </div>
+                          {activeCount !== undefined && (
+                            <div style={{ fontSize: 11, color: activeCount > 0 ? '#b45309' : 'var(--text-color-secondary)', marginTop: 3 }}>
+                              {activeCount === null ? '' : `${activeCount} active`}
+                            </div>
+                          )}
                         </div>
                         {(() => {
                           const rawVal  = capReqFinalCaps[req.id];
@@ -2406,15 +2453,23 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
                           const dir = finalCap > baseCap ? 'up' : finalCap < baseCap ? 'down' : 'same';
                           const dirColor = dir === 'up' ? '#16a34a' : dir === 'down' ? '#dc3545' : 'var(--text-color-secondary)';
                           const dirSymbol = dir === 'up' ? '▲' : dir === 'down' ? '▼' : '=';
+                          const belowActive = activeCount !== null && activeCount !== undefined && finalCap < activeCount;
                           return (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                              <input
-                                type="number" min="0"
-                                value={rawVal !== undefined ? rawVal : req.requested_cap}
-                                onChange={e => setCapReqFinalCaps(prev => ({ ...prev, [req.id]: e.target.value }))}
-                                style={{ width: 70, padding: '5px 8px', borderRadius: 6, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', fontSize: 13, fontFamily: 'var(--mono)', fontWeight: 600, color: 'var(--text-heading)', outline: 'none', textAlign: 'center' }}
-                              />
-                              <span style={{ fontSize: 11, fontWeight: 700, color: dirColor }}>{dirSymbol}</span>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <input
+                                  type="number" min={activeCount ?? 0}
+                                  value={rawVal !== undefined ? rawVal : req.requested_cap}
+                                  onChange={e => { setCapReqFinalCaps(prev => ({ ...prev, [req.id]: e.target.value })); setCapReqApproveErrors(prev => { const n = { ...prev }; delete n[req.id]; return n; }); }}
+                                  style={{ width: 70, padding: '5px 8px', borderRadius: 6, border: `1px solid ${belowActive ? '#dc3545' : 'var(--surface-border)'}`, background: 'var(--surface-ground)', fontSize: 13, fontFamily: 'var(--mono)', fontWeight: 600, color: 'var(--text-heading)', outline: 'none', textAlign: 'center' }}
+                                />
+                                <span style={{ fontSize: 11, fontWeight: 700, color: dirColor }}>{dirSymbol}</span>
+                              </div>
+                              {activeCount !== null && activeCount !== undefined && (
+                                <span style={{ fontSize: 11, color: belowActive ? '#dc3545' : 'var(--text-color-secondary)' }}>
+                                  Min: {activeCount}
+                                </span>
+                              )}
                             </div>
                           );
                         })()}
@@ -2434,6 +2489,11 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
                           </button>
                         </div>
                       </div>
+                      {approveError && (
+                        <div style={{ padding: '7px 16px 9px', background: 'rgba(220,53,69,.05)', borderTop: '1px dashed rgba(220,53,69,.2)', fontSize: 12, color: '#dc3545' }}>
+                          ⚠ {approveError}
+                        </div>
+                      )}
                       {/* Inline reject note */}
                       {isRejectOpen && (
                         <div style={{ padding: '10px 16px 14px', background: 'rgba(220,53,69,.03)', borderTop: '1px dashed rgba(220,53,69,.2)' }}>
@@ -2608,17 +2668,27 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
                         <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)', color: 'var(--text-color)' }}>{cap.role_name ? cap.role_name.charAt(0).toUpperCase() + cap.role_name.slice(1) : '—'}</td>
                         <td style={{ padding: '12px 16px', borderLeft: '1px solid var(--surface-border)' }}>
                           {capEditId === cap.id ? (
-                            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                              <input
-                                type="number" min="0"
-                                value={capEditVal}
-                                onChange={e => setCapEditVal(e.target.value)}
-                                onKeyDown={e => { if (e.key === 'Enter') handleCapInlineSave(cap); if (e.key === 'Escape') setCapEditId(null); }}
-                                autoFocus
-                                style={{ width: 70, padding: '5px 8px', borderRadius: 6, border: '1px solid var(--surface-border)', background: 'var(--surface-card)', color: 'var(--text-color)', fontSize: 13 }}
-                              />
-                              <button onClick={() => handleCapInlineSave(cap)} style={{ padding: '4px 10px', borderRadius: 6, border: 'none', background: '#198754', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>✓</button>
-                              <button onClick={() => setCapEditId(null)} style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid var(--surface-border)', background: 'transparent', color: 'var(--text-color-secondary)', fontSize: 12, cursor: 'pointer' }}>✕</button>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                <input
+                                  type="number" min={capEditActiveCount ?? 0}
+                                  value={capEditVal}
+                                  onChange={e => { setCapEditVal(e.target.value); setCapEditError(''); }}
+                                  onKeyDown={e => { if (e.key === 'Enter') handleCapInlineSave(cap); if (e.key === 'Escape') { setCapEditId(null); setCapEditError(''); } }}
+                                  autoFocus
+                                  style={{ width: 70, padding: '5px 8px', borderRadius: 6, border: `1px solid ${capEditError ? '#dc3545' : 'var(--surface-border)'}`, background: 'var(--surface-card)', color: 'var(--text-color)', fontSize: 13 }}
+                                />
+                                <button onClick={() => handleCapInlineSave(cap)} style={{ padding: '4px 10px', borderRadius: 6, border: 'none', background: '#198754', color: '#fff', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>✓</button>
+                                <button onClick={() => { setCapEditId(null); setCapEditError(''); }} style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid var(--surface-border)', background: 'transparent', color: 'var(--text-color-secondary)', fontSize: 12, cursor: 'pointer' }}>✕</button>
+                              </div>
+                              {capEditActiveCount !== null && !capEditError && (
+                                <span style={{ fontSize: 11, color: 'var(--text-color-secondary)' }}>
+                                  Min: {capEditActiveCount} (active users)
+                                </span>
+                              )}
+                              {capEditError && (
+                                <span style={{ fontSize: 11, color: '#dc3545' }}>⚠ {capEditError}</span>
+                              )}
                             </div>
                           ) : (
                             <span style={{ fontWeight: 700, color: 'var(--text-heading)' }}>{cap.max_users}</span>

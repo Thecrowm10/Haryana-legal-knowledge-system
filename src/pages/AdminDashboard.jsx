@@ -9,7 +9,7 @@ import { getUsers, getRoles, updateUser, registerUser, getApproversByDepartment 
 import { getDepartments } from '../services/departments';
 import { getAllDocumentsAdmin, getAllDepartmentLinks } from '../services/pdf';
 import { getAuditLogs, getAuditLogActions } from '../services/audit';
-import { getRoleCaps } from '../services/roleCaps';
+import { getRoleCaps, getActiveUserCount } from '../services/roleCaps';
 import { submitCapRequest, getMyCapRequests } from '../services/capRequests';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { downloadUploadsExcelReport } from '../utils/uploadsExcelReport';
@@ -206,6 +206,19 @@ export default function AdminDashboard({ activePage }) {
   const [capReqSaving, setCapReqSaving]             = useState(false);
   const [capReqError, setCapReqError]               = useState('');
   const [capReqSuccess, setCapReqSuccess]           = useState('');
+  const [capReqActiveCount, setCapReqActiveCount]   = useState(null);
+  const [capReqActiveLoading, setCapReqActiveLoading] = useState(false);
+
+  useEffect(() => {
+    const deptId = user?.deptId;
+    if (!capReqForm.role_id || !deptId) { setCapReqActiveCount(null); return; }
+    setCapReqActiveLoading(true);
+    setCapReqActiveCount(null);
+    getActiveUserCount(deptId, capReqForm.role_id)
+      .then(res => setCapReqActiveCount(res.data.active_count ?? null))
+      .catch(() => setCapReqActiveCount(null))
+      .finally(() => setCapReqActiveLoading(false));
+  }, [capReqForm.role_id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (activePage !== 'caprequests') return;
@@ -1831,6 +1844,10 @@ export default function AdminDashboard({ activePage }) {
       if (capReqForm.requested_cap === '') { setCapReqError('Please enter the requested cap.'); return; }
       const reqCap = Number(capReqForm.requested_cap);
       if (isNaN(reqCap) || reqCap < 0) { setCapReqError('Cap must be 0 or more.'); return; }
+      if (capReqActiveCount !== null && reqCap < capReqActiveCount) {
+        setCapReqError(`${capReqActiveCount} user${capReqActiveCount !== 1 ? 's' : ''} are currently active in this role. Requested cap must be at least ${capReqActiveCount}.`);
+        return;
+      }
       setCapReqSaving(true); setCapReqError(''); setCapReqSuccess('');
       try {
         await submitCapRequest({ role_id: Number(capReqForm.role_id), requested_cap: reqCap, reason: capReqForm.reason.trim() || undefined });
@@ -1910,9 +1927,18 @@ export default function AdminDashboard({ activePage }) {
                 style={INP}
               />
               {selectedRoleId && (
-                <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 5 }}>
-                  Current cap for your department: <strong style={{ color: 'var(--text-heading)', fontFamily: 'var(--mono)' }}>{currentCap}</strong>
-                  {!existingCap && <span style={{ color: 'var(--text-color-secondary)' }}> (system default)</span>}
+                <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 5, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <span>Current cap: <strong style={{ color: 'var(--text-heading)', fontFamily: 'var(--mono)' }}>{currentCap}</strong>{!existingCap && <span> (system default)</span>}</span>
+                  <span>
+                    Active users in this role:{' '}
+                    {capReqActiveLoading
+                      ? <span style={{ fontStyle: 'italic' }}>loading…</span>
+                      : capReqActiveCount !== null
+                        ? <strong style={{ color: capReqActiveCount > 0 ? '#b45309' : 'var(--text-heading)', fontFamily: 'var(--mono)' }}>{capReqActiveCount}</strong>
+                        : '—'
+                    }
+                    {capReqActiveCount !== null && <span style={{ color: 'var(--text-color-secondary)' }}> (minimum requestable cap)</span>}
+                  </span>
                 </div>
               )}
             </div>
