@@ -24,6 +24,8 @@ const MENU_CONFIG = {
       { icon: ClipboardList, label: 'sidebar.items.misReport',      id: 'audit' },
     ]},
   ],
+  // Master Data Manager and Role/User Caps are super_admin-only — plain admin
+  // only gets the full MIS report in this group.
   admin: [
     { label: 'sidebar.groups.administration', items: [
       { icon: Users,       label: 'sidebar.items.userManagement',    id: 'users' },
@@ -31,8 +33,6 @@ const MENU_CONFIG = {
       { icon: Link2,       label: 'sidebar.items.linkedDocuments',   id: 'linkedocs' },
     ]},
     { label: 'sidebar.groups.system', items: [
-      { icon: Settings,      label: 'sidebar.items.masterDataManager', id: 'taxonomy' },
-      { icon: ShieldCheck,   label: 'sidebar.items.roleCaps',          id: 'rolecaps' },
       // System Monitor — not wired to a real API yet (all stats are hardcoded placeholders).
       // Hidden from the menu until that API exists; page code below is kept, not deleted.
       // { icon: Activity,      label: 'sidebar.items.systemMonitor',     id: 'monitor' },

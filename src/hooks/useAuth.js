@@ -107,9 +107,10 @@ export function useAuth() {
       const payload = decodeJwt(token);
       if (!payload) throw new Error('Invalid token received');
 
-      // Admin/super_admin must log in via the OTP flow, not username/password.
-      if (normalizeRole(payload.role) === 'admin' || normalizeRole(payload.role) === 'super_admin') {
-        setError('Admin accounts must sign in via Admin Access (OTP) on the portal selection screen.');
+      // Only super_admin must log in via the OTP flow; admin now uses the
+      // same username/password officer login as other department roles.
+      if (normalizeRole(payload.role) === 'super_admin') {
+        setError('Super Admin accounts must sign in via Super Admin Access (OTP) on the portal selection screen.');
         return;
       }
 
