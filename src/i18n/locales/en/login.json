@@ -102,7 +102,9 @@
     "errorSendFailed": "Could not send OTP. Please try again.",
     "errorOtp6Digits": "Enter the 6-digit OTP.",
     "errorInvalidOtp": "Invalid or expired OTP.",
-    "errorResendFailed": "Could not resend OTP. Please try again."
+    "errorResendFailed": "Could not resend OTP. Please try again.",
+    "selectDepartment": "Select Department",
+    "errorDeptRequired": "Please select a department to continue."
   },
   "changePasswordScreen": {
     "signOut": "Sign out and log in as a different user",

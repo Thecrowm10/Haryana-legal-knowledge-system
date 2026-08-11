@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
-import { Phone, ArrowLeft, ShieldCheck, RotateCcw, ShieldAlert, Lock } from 'lucide-react';
+import { Phone, ArrowLeft, ShieldCheck, RotateCcw, ShieldAlert, Lock, Building2 } from 'lucide-react';
 import haryanaLogo from '../assets/haryana-logo.png';
 import bannerBg from '../assets/banner-1-768x217.png';
 import { requestAdminOtp, verifyAdminOtp } from '../services/pdf';
@@ -18,18 +18,22 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
   const { t, i18n } = useTranslation('login');
   const orgNameHi = i18n.getFixedT('hi', 'login')('orgNamePortal');
   const orgNameEn = i18n.getFixedT('en', 'login')('orgNamePortal');
-  const [step, setStep]           = useState(1);
-  const [mobile, setMobile]       = useState('');
-  const [otp, setOtp]             = useState('');
-  const [loading, setLoading]     = useState(false);
-  const [error, setError]         = useState('');
-  const [resendMsg, setResendMsg] = useState('');
-  const [captchaStatus, setCaptchaStatus] = useState({ touched: false, valid: false });
-  const captchaRef                = useRef(null);
-  const canSubmitStep1            = !loading && mobile.replace(/\D/g, '').length === 10;
-  const canSubmitStep2            = !loading && captchaStatus.valid && otp.length === 6;
 
-  // ── Step 1: request OTP ───────────────────────────────────
+  const [step, setStep]               = useState(1); // 1 = enter mobile, 2 = select dept + OTP
+  const [mobile, setMobile]           = useState('');
+  const [departments, setDepartments] = useState([]); // [{id, name}] from /request-otp
+  const [selectedDeptId, setSelectedDeptId] = useState('');
+  const [otp, setOtp]                 = useState('');
+  const [loading, setLoading]         = useState(false);
+  const [error, setError]             = useState('');
+  const [resendMsg, setResendMsg]     = useState('');
+  const [captchaStatus, setCaptchaStatus] = useState({ touched: false, valid: false });
+  const captchaRef                    = useRef(null);
+
+  const canSubmitStep1 = !loading && mobile.replace(/\D/g, '').length === 10;
+  const canSubmitStep2 = !loading && captchaStatus.valid && otp.length === 6 && selectedDeptId !== '';
+
+  // ── Step 1: request OTP, get departments ─────────────────────
   async function handleSendOtp(e) {
     e?.preventDefault();
     const cleaned = mobile.replace(/\D/g, '');
@@ -38,8 +42,11 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
     try {
       const res = await requestAdminOtp(cleaned);
       setMobile(cleaned);
+      const depts = res.data?.departments || [];
+      setDepartments(depts);
+      // Pre-select if only one department
+      if (depts.length === 1) setSelectedDeptId(String(depts[0].id));
       setStep(2);
-      // TODO: remove autofill once real SMS delivery is wired up; backend currently echoes the OTP in the response for dev/testing.
       if (res.data?.otp) setOtp(res.data.otp);
     } catch (err) {
       const detail = err.response?.data?.detail;
@@ -49,15 +56,16 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
     }
   }
 
-  // ── Step 2: verify OTP ────────────────────────────────────
+  // ── Step 2: verify OTP with selected department ───────────────
   async function handleVerify(e) {
     e?.preventDefault();
-    if (otp.length !== 6) { setError(t('adminOtpScreen.errorOtp6Digits')); return; }
+    if (!selectedDeptId)    { setError(t('adminOtpScreen.errorDeptRequired')); return; }
+    if (otp.length !== 6)  { setError(t('adminOtpScreen.errorOtp6Digits')); return; }
     if (!captchaStatus.touched)          { setError(t('errorFillCaptcha')); return; }
     if (!captchaRef.current?.validate()) { setError(t('errorCorrectCaptcha')); return; }
     setLoading(true); setError('');
     try {
-      const res = await verifyAdminOtp(mobile, otp);
+      const res = await verifyAdminOtp(mobile, otp, Number(selectedDeptId));
       onLogin({ token: res.data.access_token });
     } catch (err) {
       const detail = err.response?.data?.detail;
@@ -73,6 +81,8 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
     try {
       const res = await requestAdminOtp(mobile);
       setResendMsg(t('adminOtpScreen.resendMsg'));
+      const depts = res.data?.departments || [];
+      if (depts.length) setDepartments(depts);
       if (res.data?.otp) setOtp(res.data.otp);
     } catch {
       setError(t('adminOtpScreen.errorResendFailed'));
@@ -97,6 +107,10 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
         input::placeholder { color:rgba(255,255,255,.3); font-size:13px; }
         .aol-otp-inp { letter-spacing:12px; font-size:24px; font-weight:700; text-align:center; }
         .aol-otp-inp::placeholder { letter-spacing:normal; font-size:14px; font-weight:400; }
+        .aol-dept-option { display:flex; align-items:center; gap:10; padding:9px 12px; border-radius:9px; cursor:pointer;
+          border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.06); transition:all .15s; margin-bottom:6px; }
+        .aol-dept-option:hover { border-color:rgba(74,222,128,.45); background:rgba(74,222,128,.08); }
+        .aol-dept-option.selected { border-color:rgba(74,222,128,.7); background:rgba(74,222,128,.12); }
 
         @media (max-width:640px) {
           .aol-masthead { top:10px !important; left:14px !important; gap:8px !important; }
@@ -117,18 +131,14 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         overflowX: 'hidden', padding: '48px 16px',
       }}>
-        <img
-          src={bannerBg}
-          alt=""
-          className="fixed-bg-img"
-          style={{ objectFit: 'cover', zIndex: 0, filter: 'blur(2px)', transform: 'scale(1.02)' }}
-        />
-        <div className="fixed-bg-img" style={{ zIndex: 1, background: 'linear-gradient(110deg, rgba(2,10,5,.82) 0%, rgba(2,10,5,.62) 45%, rgba(2,10,5,.42) 100%)' }}/>
+        <img src={bannerBg} alt="" className="fixed-bg-img"
+          style={{ objectFit: 'cover', zIndex: 0, filter: 'blur(2px)', transform: 'scale(1.02)' }} />
+        <div className="fixed-bg-img" style={{ zIndex: 1, background: 'linear-gradient(110deg, rgba(2,10,5,.82) 0%, rgba(2,10,5,.62) 45%, rgba(2,10,5,.42) 100%)' }} />
 
-        {/* Masthead — same position as the portal-selection and credentials-login screens */}
+        {/* Masthead */}
         <div className="aol-masthead" style={{ position: 'absolute', top: 14, left: 32, zIndex: 10, display: 'flex', alignItems: 'center', gap: 14, maxWidth: 'calc(100vw - 64px)' }}>
           <img src={haryanaLogo} alt="Haryana" loading="lazy" className="aol-masthead-logo" style={{ width: 100, height: 100, objectFit: 'contain', flexShrink: 0 }} />
-          <div className="aol-masthead-text" style={{ display: 'flex', flexDirection: 'column', gap: 1, whiteSpace: 'nowrap', transform: 'translateY(12px)', minWidth: 0 }}>
+          <div className="aol-masthead-text" style={{ display: 'flex', flexDirection: 'column', gap: 1, whiteSpace: 'nowrap', transform: 'translateY(12px)', minWidth: 0, textAlign: 'left' }}>
             <span className="aol-masthead-hi" style={{ fontSize: 13, fontWeight: 500, color: 'rgba(255,255,255,.62)', letterSpacing: '.01em' }}>{orgNameHi}</span>
             <span className="aol-masthead-en" style={{ fontSize: 18, fontWeight: 700, color: 'rgba(255,255,255,.9)', letterSpacing: '.01em' }}>{orgNameEn}</span>
           </div>
@@ -140,7 +150,7 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
 
         <div className="aol-card" style={{
           position: 'relative', zIndex: 2,
-          width: 'clamp(300px,27vw,385px)',
+          width: 'clamp(300px,28vw,400px)',
           background: 'rgba(255,255,255,.09)',
           backdropFilter: 'blur(30px) saturate(160%)',
           WebkitBackdropFilter: 'blur(30px) saturate(160%)',
@@ -151,6 +161,7 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
           boxShadow: '0 24px 64px rgba(0,0,0,.32), inset 0 1px 0 rgba(255,255,255,.14)',
           padding: '26px 24px 22px',
         }}>
+
           {/* ── Step 1: enter mobile ── */}
           {step === 1 && (
             <form onSubmit={handleSendOtp}>
@@ -208,20 +219,53 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
             </form>
           )}
 
-          {/* ── Step 2: verify OTP ── */}
+          {/* ── Step 2: select department + enter OTP ── */}
           {step === 2 && (
             <form onSubmit={handleVerify}>
               <div style={{ marginBottom: 14, paddingBottom: 14, borderBottom: '1px solid rgba(255,255,255,.1)' }}>
-                <button type="button" onClick={() => { setStep(1); setError(''); setOtp(''); setResendMsg(''); }}
+                <button type="button" onClick={() => { setStep(1); setError(''); setOtp(''); setResendMsg(''); setSelectedDeptId(''); setDepartments([]); }}
                   style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.4)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, padding: 0, fontFamily: 'inherit', letterSpacing: '.04em' }}>
                   <ArrowLeft size={12} /> {t('adminOtpScreen.back')}
                 </button>
               </div>
               <h2 style={{ fontSize: 21, fontWeight: 800, color: '#fff', letterSpacing: '-.02em', marginBottom: 4 }}>{t('adminOtpScreen.enterOtpTitle')}</h2>
-              <p style={{ fontSize: 12.5, color: 'rgba(255,255,255,.42)', marginBottom: 20 }}>
+              <p style={{ fontSize: 12.5, color: 'rgba(255,255,255,.42)', marginBottom: 18 }}>
                 <Trans t={t} i18nKey="adminOtpScreen.otpSentTo" values={{ masked: `${mobile.slice(0,3)}****${mobile.slice(-3)}` }} components={[<strong key="s" style={{ color: 'rgba(255,255,255,.7)' }} />]} />
               </p>
 
+              {/* Department selection */}
+              {departments.length > 0 && (
+                <div style={{ marginBottom: 18 }}>
+                  <label style={{ ...labelStyle, marginBottom: 10 }}>
+                    <Building2 size={10} color="rgba(255,255,255,.4)" /> {t('adminOtpScreen.selectDepartment')}
+                  </label>
+                  {departments.map(dept => {
+                    const isSelected = String(dept.id) === String(selectedDeptId);
+                    return (
+                      <div
+                        key={dept.id}
+                        className={`aol-dept-option${isSelected ? ' selected' : ''}`}
+                        onClick={() => { setSelectedDeptId(String(dept.id)); setError(''); }}
+                      >
+                        <div style={{
+                          width: 16, height: 16, borderRadius: '50%', flexShrink: 0,
+                          border: `2px solid ${isSelected ? '#4ade80' : 'rgba(255,255,255,.3)'}`,
+                          background: isSelected ? '#4ade80' : 'transparent',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          transition: 'all .15s',
+                        }}>
+                          {isSelected && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />}
+                        </div>
+                        <span style={{ fontSize: 13, color: isSelected ? '#fff' : 'rgba(255,255,255,.75)', fontWeight: isSelected ? 600 : 400, flex: 1 }}>
+                          {dept.name}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* OTP input */}
               <label htmlFor="aol-otp" style={labelStyle}>{t('adminOtpScreen.otpLabel')}</label>
               <input
                 id="aol-otp"
