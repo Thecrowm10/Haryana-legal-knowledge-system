@@ -80,7 +80,11 @@
     },
     "userFallback": "उपयोगकर्ता",
     "profile": "प्रोफ़ाइल",
-    "logout": "लॉगआउट"
+    "logout": "लॉगआउट",
+    "changeDepartment": "विभाग बदलें",
+    "selectDepartment": "विभाग चुनें",
+    "switchingDepartment": "बदला जा रहा है…",
+    "cancel": "रद्द करें"
   },
   "a11y": {
     "panelTitle": "सुगम्यता",

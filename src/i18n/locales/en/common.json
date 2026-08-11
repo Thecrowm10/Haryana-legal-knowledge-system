@@ -80,7 +80,11 @@
     },
     "userFallback": "User",
     "profile": "Profile",
-    "logout": "Logout"
+    "logout": "Logout",
+    "changeDepartment": "Change Department",
+    "selectDepartment": "Select Department",
+    "switchingDepartment": "Switching…",
+    "cancel": "Cancel"
   },
   "a11y": {
     "panelTitle": "Accessibility",

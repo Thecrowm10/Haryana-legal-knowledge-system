@@ -40,6 +40,8 @@ function userFromPayload(payload) {
     passwordExpired:    payload.password_expired ?? false,
     mobileVerified:     payload.mobile_verified ?? false,
     mobile:             payload.mobile_number || '',
+    deptId:             payload.department_id ?? null,
+    departments:        payload.departments   || [],
   };
 }
 
