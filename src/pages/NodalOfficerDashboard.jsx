@@ -42,9 +42,11 @@ function normalizeUser(u) {
     deptId:    u.department?.id ?? null,
     deptIds:   u.departments?.map(d => d.id) ?? [],
     deptRaw:   u.departments?.length > 0 ? u.departments.map(d => String(d.id)).join(',') : null,
-    status:    u.is_active ? 'active' : 'inactive',
-    isActive:  u.is_active,
-    lastLogin: u.last_login ? u.last_login.split('T')[0] : '—',
+    status:       u.is_active ? 'active' : 'inactive',
+    isActive:     u.is_active,
+    approverId:   u.approver_id ?? null,
+    mobileNumber: u.mobile_number ?? '',
+    lastLogin:    u.last_login ? u.last_login.split('T')[0] : '—',
   };
 }
 
@@ -225,6 +227,21 @@ export default function NodalOfficerDashboard({ activePage }) {
   const [editError, setEditError]     = useState('');
   const [togglingId, setTogglingId]   = useState(null);
   const [confirmToggleUser, setConfirmToggleUser] = useState(null);
+  const [editApprovers, setEditApprovers]         = useState([]);
+  const [editApproversLoading, setEditApproversLoading] = useState(false);
+
+  const _editIsUploader = editingUser?.role?.toLowerCase() === 'uploader';
+  useEffect(() => {
+    if (!_editIsUploader || !editForm.department_id) {
+      setEditApprovers([]);
+      return;
+    }
+    setEditApproversLoading(true);
+    getApproversByDepartment(editForm.department_id)
+      .then(res => setEditApprovers(res.data || []))
+      .catch(() => setEditApprovers([]))
+      .finally(() => setEditApproversLoading(false));
+  }, [_editIsUploader, editForm.department_id]);
 
   function openEdit(u) {
     setEditingUser(u);
@@ -234,6 +251,8 @@ export default function NodalOfficerDashboard({ activePage }) {
       email:         u.email,
       is_active:     u.isActive,
       department_id: String(u.deptId ?? ''),
+      approver_id:   u.approverId ? String(u.approverId) : '',
+      mobile_number: u.mobileNumber,
     });
     setEditError('');
   }
@@ -247,7 +266,8 @@ export default function NodalOfficerDashboard({ activePage }) {
       last_name:     editForm.last_name,
       email:         editForm.email,
       is_active:     editForm.is_active,
-      department_id: editForm.department_id || undefined,
+      mobile_number: editForm.mobile_number || undefined,
+      ...(_editIsUploader && editForm.approver_id ? { approver_id: Number(editForm.approver_id) } : {}),
     })
       .then(res => {
         setUsers(prev => prev.map(u => u.id === editingUser.id ? normalizeUser(res.data) : u));
@@ -835,10 +855,18 @@ export default function NodalOfficerDashboard({ activePage }) {
                   </div>
                 </div>
 
-                <div>
-                  <label htmlFor="nod-edit-email" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.email')}</label>
-                  <input id="nod-edit-email" style={INP_STYLE} type="email" value={editForm.email}
-                    onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} />
+                <div className="nod-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label htmlFor="nod-edit-email" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.email')}</label>
+                    <input id="nod-edit-email" style={INP_STYLE} type="email" value={editForm.email}
+                      onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} />
+                  </div>
+                  <div>
+                    <label htmlFor="nod-edit-mobile" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Mobile Number</label>
+                    <input id="nod-edit-mobile" style={INP_STYLE} type="tel" maxLength={10}
+                      value={editForm.mobile_number ?? ''}
+                      onChange={e => setEditForm(f => ({ ...f, mobile_number: e.target.value.replace(/\D/g, '') }))} />
+                  </div>
                 </div>
 
                 <div className="nod-form-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -849,14 +877,32 @@ export default function NodalOfficerDashboard({ activePage }) {
                     </div>
                   </div>
                   <div>
-                    <label htmlFor="nod-edit-department" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.department')}</label>
-                    <SelectField id="nod-edit-department" value={editForm.department_id ?? ''} onChange={e => setEditForm(f => ({ ...f, department_id: e.target.value || null }))} placeholder={t('users.editModal.selectDepartment')}>
-                      {depts.filter(d => d.is_active !== false).map(d => (
-                        <option key={d.id} value={d.id}>{d.name}</option>
-                      ))}
-                    </SelectField>
+                    <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('users.editModal.department')}</label>
+                    <div style={{ ...INP_STYLE, background: 'var(--surface-hover)', color: 'var(--text-color-secondary)', cursor: 'not-allowed' }}>
+                      {depts.find(d => String(d.id) === String(editForm.department_id))?.name ?? editingUser.dept ?? '—'}
+                    </div>
                   </div>
                 </div>
+
+                {_editIsUploader && (
+                  <div>
+                    <label htmlFor="nod-edit-approver" style={{ ...LABEL, display: 'block', marginBottom: 6 }}>Approver</label>
+                    <SelectField
+                      id="nod-edit-approver"
+                      value={editForm.approver_id ?? ''}
+                      onChange={e => setEditForm(f => ({ ...f, approver_id: e.target.value }))}
+                      placeholder={editApproversLoading ? t('users.addDrawer.loadingApprovers') : editApprovers.length === 0 ? 'No approvers in this department' : t('users.addDrawer.approverSelectPlaceholder')}
+                      disabled={editApproversLoading}
+                    >
+                      {editApprovers.map(a => (
+                        <option key={a.id} value={a.id}>{a.first_name} {a.last_name} ({a.username})</option>
+                      ))}
+                    </SelectField>
+                    {!editApproversLoading && editApprovers.length === 0 && editForm.department_id && (
+                      <div style={{ fontSize: 11.5, color: '#dc3545', marginTop: 4 }}>⚠ No active approvers found for this department.</div>
+                    )}
+                  </div>
+                )}
 
                 {/* Active status toggle */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', background: 'var(--surface-ground)', borderRadius: 10, border: '1px solid var(--surface-border)' }}>
