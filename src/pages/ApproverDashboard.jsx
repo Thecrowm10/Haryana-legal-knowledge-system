@@ -259,6 +259,9 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
       while (span.firstChild) parent.insertBefore(span.firstChild, span);
       parent.removeChild(span);
     });
+    // Merge adjacent text nodes split by the previous surroundContents calls so
+    // indexOf searches in applyDocxHighlight work correctly on subsequent highlights.
+    docxContainerRef.current.normalize();
     annotations.filter(a => a.isDocx).forEach(ann => applyDocxHighlight(docxContainerRef.current, ann));
   }, [annotations, docxHtml]);
 

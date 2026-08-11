@@ -119,6 +119,7 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
       while (span.firstChild) parent.insertBefore(span.firstChild, span);
       parent.removeChild(span);
     });
+    docxViewRef.current.normalize();
     annotations.filter(a => a.isDocx).forEach(ann => {
       if (!ann.text || !docxViewRef.current) return;
       const walker = document.createTreeWalker(docxViewRef.current, NodeFilter.SHOW_TEXT, null);
