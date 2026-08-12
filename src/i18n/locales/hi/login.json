@@ -44,6 +44,7 @@
   "errorUsernameRequired": "उपयोगकर्ता नाम आवश्यक है।",
   "errorPasswordRequired": "पासवर्ड आवश्यक है।",
   "errorFillCaptcha": "कृपया कैप्चा भरें।",
+  "errorUsernameNoEmail": "कृपया अपना उपयोगकर्ता नाम दर्ज करें, ईमेल पता नहीं।",
   "errorCorrectCaptcha": "कृपया सही कैप्चा दर्ज करें।",
   "forgotPasswordScreen": {
     "backToLogin": "लॉगिन पर वापस जाएं",

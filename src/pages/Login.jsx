@@ -48,9 +48,12 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
   const error = formError || authError;
   const canSubmit = !loading && captchaStatus.valid && username.trim() !== '' && password !== '';
 
+  const isEmail = v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+
   const handleLogin = () => {
     setFormError('');
     if (!username.trim()) { setFormError(t('errorUsernameRequired')); return; }
+    if (isEmail(username)) { setFormError(t('errorUsernameNoEmail')); return; }
     if (!password)        { setFormError(t('errorPasswordRequired')); return; }
     if (!captchaStatus.touched)          { setFormError(t('errorFillCaptcha')); return; }
     if (!captchaRef.current?.validate()) { setFormError(t('errorCorrectCaptcha')); return; }
@@ -374,7 +377,12 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
                 className="lk-inp"
                 type="text"
                 value={username}
-                onChange={e => { setUsername(e.target.value); setFormError(''); }}
+                onChange={e => {
+                  const v = e.target.value;
+                  setUsername(v);
+                  if (v.includes('@')) setFormError(t('errorUsernameNoEmail'));
+                  else setFormError('');
+                }}
                 onKeyDown={e => e.key === 'Enter' && handleLogin()}
                 placeholder={t('usernamePlaceholder')}
                 autoComplete="username"
