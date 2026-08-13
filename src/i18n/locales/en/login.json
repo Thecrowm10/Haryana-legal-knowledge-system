@@ -14,7 +14,7 @@
   "loginWithCredentials": "Login with Credentials",
   "passwordSsoRequired": "Password / SSO required",
   "adminAccessTitle": "Admin Access",
-  "adminAccessDesc": "For administrators only. Sign in with your registered mobile number.",
+  "adminAccessDesc": "Sign in with your registered mobile number.",
   "loginWithOtp": "Login with OTP",
   "mobileOtpRequired": "Mobile OTP required",
   "footerCopyright": "© 2026 Government of Haryana · HARTRON",
