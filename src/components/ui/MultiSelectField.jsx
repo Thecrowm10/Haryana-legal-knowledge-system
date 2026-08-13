@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { ChevronDown, Check, X } from 'lucide-react';
 
-export default function MultiSelectField({ id, value = [], onChange, options = [], placeholder = 'Select...', selectedLabel }) {
+export default function MultiSelectField({ id, value = [], onChange, options = [], placeholder = 'Select...', selectedLabel, disabled = false }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -21,14 +21,15 @@ export default function MultiSelectField({ id, value = [], onChange, options = [
   return (
     <div ref={ref} style={{ position: 'relative' }}>
       {/* Trigger */}
-      <button id={id} type="button" onClick={() => setOpen(o => !o)} style={{
+      <button id={id} type="button" onClick={() => !disabled && setOpen(o => !o)} disabled={disabled} style={{
         width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
         padding: '10px 12px 10px 14px', fontFamily: 'var(--font)', fontSize: 13,
-        borderRadius: 8, background: 'var(--surface-ground)',
+        borderRadius: 8, background: disabled ? 'var(--surface-border)' : 'var(--surface-ground)',
         border: `1px solid ${open ? 'var(--primary)' : 'var(--surface-border)'}`,
         boxShadow: open ? '0 0 0 3px rgba(33, 74, 171,.1)' : 'none',
-        cursor: 'pointer', outline: 'none', textAlign: 'left',
-        color: selectedOptions.length ? 'var(--text-color)' : 'var(--text-color-secondary)',
+        cursor: disabled ? 'not-allowed' : 'pointer', outline: 'none', textAlign: 'left',
+        color: disabled ? 'var(--text-color-secondary)' : (selectedOptions.length ? 'var(--text-color)' : 'var(--text-color-secondary)'),
+        opacity: disabled ? 0.7 : 1,
         transition: 'border-color .2s, box-shadow .2s',
       }}>
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -82,8 +83,8 @@ export default function MultiSelectField({ id, value = [], onChange, options = [
         </div>
       )}
 
-      {/* Selected tags */}
-      {selectedOptions.length > 0 && (
+      {/* Selected tags — hidden when disabled since the value shows in the button */}
+      {!disabled && selectedOptions.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 8 }}>
           {selectedOptions.map(o => (
             <span key={o.id} style={{
@@ -93,12 +94,14 @@ export default function MultiSelectField({ id, value = [], onChange, options = [
               fontSize: 11.5, color: 'var(--primary)', fontWeight: 600,
             }}>
               {o.name}
-              <button type="button" onMouseDown={e => { e.stopPropagation(); toggle(o.id); }} style={{
-                background: 'none', border: 'none', cursor: 'pointer',
-                color: 'var(--primary)', display: 'flex', padding: '1px',
-              }}>
-                <X size={10} />
-              </button>
+              {!disabled && (
+                <button type="button" onMouseDown={e => { e.stopPropagation(); toggle(o.id); }} style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: 'var(--primary)', display: 'flex', padding: '1px',
+                }}>
+                  <X size={10} />
+                </button>
+              )}
             </span>
           ))}
         </div>

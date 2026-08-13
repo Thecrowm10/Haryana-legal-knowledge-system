@@ -26,6 +26,9 @@ function userFromPayload(payload) {
   const firstName = payload.first_name || '';
   const lastName  = payload.last_name  || '';
   const fullName  = [firstName, lastName].filter(Boolean).join(' ');
+  // The JWT's department_id can come back as a string ("3") while departments[].id
+  // is numeric — normalize before comparing, or every lookup below silently misses.
+  const deptId = payload.department_id != null ? Number(payload.department_id) : null;
   return {
     username:           payload.username,
     role:               normalizeRole(payload.role),
@@ -34,12 +37,15 @@ function userFromPayload(payload) {
     lastName,
     fullName,
     email:              payload.email,
-    dept:               payload.departments?.[0]?.name ?? payload.department ?? '',
+    dept:               payload.departments?.find(d => d.id === deptId)?.name
+                          ?? payload.departments?.[0]?.name ?? payload.department ?? '',
     isActive:           payload.is_active,
     mustChangePassword: payload.must_change_password ?? false,
     passwordExpired:    payload.password_expired ?? false,
     mobileVerified:     payload.mobile_verified ?? false,
     mobile:             payload.mobile_number || '',
+    deptId,
+    departments:        payload.departments   || [],
   };
 }
 
@@ -101,9 +107,10 @@ export function useAuth() {
       const payload = decodeJwt(token);
       if (!payload) throw new Error('Invalid token received');
 
-      // Admin/super_admin must log in via the OTP flow, not username/password.
-      if (normalizeRole(payload.role) === 'admin' || normalizeRole(payload.role) === 'super_admin') {
-        setError('Admin accounts must sign in via Admin Access (OTP) on the portal selection screen.');
+      // Only super_admin must log in via the OTP flow; admin now uses the
+      // same username/password officer login as other department roles.
+      if (normalizeRole(payload.role) === 'super_admin') {
+        setError('Super Admin accounts must sign in via Super Admin Access (OTP) on the portal selection screen.');
         return;
       }
 

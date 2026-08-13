@@ -43,6 +43,7 @@ const BREADCRUMBS = {
   users: ['topbar.crumbs.admin', 'topbar.crumbs.userManagement'], logs: ['topbar.crumbs.admin', 'topbar.crumbs.systemLogs'],
   taxonomy: ['topbar.crumbs.admin', 'topbar.crumbs.masterDataManager'],
   rolecaps: ['topbar.crumbs.admin', 'topbar.crumbs.roleCaps'],
+  caprequests: ['topbar.crumbs.admin', 'topbar.crumbs.capRequests'],
   auditfull: ['topbar.crumbs.admin', 'topbar.crumbs.fullMisReport'],
   alluploads: ['topbar.crumbs.admin', 'topbar.crumbs.allUploads'],
   auditlog: ['topbar.crumbs.auditorLabel', 'topbar.crumbs.misReport'],
@@ -65,8 +66,10 @@ const CRUMB_TARGETS = {
 
 export default function Topbar({ user, activePage, onNavigate, onLogout, onToggleSidebar, onChangePassword, onMobileVerified }) {
   const { t } = useTranslation('common');
-  const [profileOpen, setProfileOpen]   = useState(false);
+  const [profileOpen, setProfileOpen]         = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
+
+  const isAdmin = user.role === 'admin' || user.role === 'super_admin';
   const rm = ROLE_META[user.role] || ROLE_META.citizen;
   const crumbs = BREADCRUMBS[activePage] || DEFAULT_CRUMB;
   const crumbTargets = CRUMB_TARGETS[activePage] || [];
@@ -202,14 +205,21 @@ export default function Topbar({ user, activePage, onNavigate, onLogout, onToggl
           <div style={{
             position: 'absolute', top: 'calc(100% + 8px)', right: 0,
             background: 'var(--surface-card)', border: '1px solid var(--surface-border)',
-            borderRadius: 12, boxShadow: '0 16px 40px rgba(0,0,0,.16)', width: 200,
+            borderRadius: 12, boxShadow: '0 16px 40px rgba(0,0,0,.16)',
+            width: 200,
             overflow: 'hidden', zIndex: 100,
             animation: 'fadeSlideIn .15s ease',
           }}>
+            {/* Header */}
             <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--surface-border)', background: 'var(--surface-hover)' }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{headerPrimaryText}</div>
               <div style={{ fontSize: 11, color: rm.color, fontWeight: 600, marginTop: 2 }}>{t(rm.label)}</div>
+              {isAdmin && user.dept && (
+                <div style={{ fontSize: 10.5, color: 'var(--text-color-secondary)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.dept}</div>
+              )}
             </div>
+
+            {/* Profile */}
             <div role="button" tabIndex={0} onClick={() => { setProfileOpen(false); setProfileModalOpen(true); }}
               onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setProfileOpen(false); setProfileModalOpen(true); } }}
               style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer', fontSize: 13, color: 'var(--text-color)', transition: 'background .15s' }}
@@ -217,7 +227,10 @@ export default function Topbar({ user, activePage, onNavigate, onLogout, onToggl
               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
               <User size={14} color="var(--text-color-secondary)" />{t('topbar.profile')}
             </div>
+
             <div style={{ height: 1, background: 'var(--surface-border)', margin: '4px 0' }} />
+
+            {/* Logout */}
             <div role="button" tabIndex={0} onClick={() => { setProfileOpen(false); onLogout(); }}
               onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setProfileOpen(false); onLogout(); } }}
               style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer', fontSize: 13, color: 'var(--red)', transition: 'background .15s' }}

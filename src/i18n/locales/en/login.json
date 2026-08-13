@@ -10,11 +10,11 @@
   "continueAsGuest": "Continue as Guest",
   "noLoginRequired": "No login required",
   "officialAccessTitle": "Official Access",
-  "officialAccessDesc": "For department uploaders, approvers, CS Office and auditors.",
+  "officialAccessDesc": "For department uploaders, approvers, nodal officers and administrators.",
   "loginWithCredentials": "Login with Credentials",
   "passwordSsoRequired": "Password / SSO required",
   "adminAccessTitle": "Admin Access",
-  "adminAccessDesc": "For system administrators. Sign in with your registered mobile number.",
+  "adminAccessDesc": "Sign in with your registered mobile number.",
   "loginWithOtp": "Login with OTP",
   "mobileOtpRequired": "Mobile OTP required",
   "footerCopyright": "© 2026 Government of Haryana · HARTRON",
@@ -44,6 +44,7 @@
   "errorUsernameRequired": "Username is required.",
   "errorPasswordRequired": "Password is required.",
   "errorFillCaptcha": "Please fill the captcha.",
+  "errorUsernameNoEmail": "Please enter your username, not an email address.",
   "errorCorrectCaptcha": "Please enter the correct captcha.",
   "forgotPasswordScreen": {
     "backToLogin": "Back to Login",
@@ -103,8 +104,13 @@
     "errorOtp6Digits": "Enter the 6-digit OTP.",
     "errorInvalidOtp": "Invalid or expired OTP.",
     "errorResendFailed": "Could not resend OTP. Please try again.",
+    "verifyOtp": "Verify OTP",
     "selectDepartment": "Select Department",
-    "errorDeptRequired": "Please select a department to continue."
+    "selectDeptSubtitle": "Your mobile is linked to multiple accounts. Select the department you want to log in as.",
+    "loginBtn": "Login",
+    "errorDeptRequired": "Please select a department to continue.",
+    "errorNoDepts": "No department found for this account. Please contact your administrator.",
+    "errorLoginFailed": "Login failed. Please try again."
   },
   "changePasswordScreen": {
     "signOut": "Sign out and log in as a different user",

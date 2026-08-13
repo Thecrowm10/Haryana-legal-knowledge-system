@@ -5,12 +5,14 @@ import ScreenReaderAccessModal from './ScreenReaderAccessModal';
 import ashokEmblem from '../../assets/ashok-emblem.svg';
 import digitalIndiaLogo from '../../assets/digital-india-logo.svg';
 
-// Each role's manual is a separate PDF (no combined/admin manual exists yet) —
+// Each role's manual is a separate PDF —
 // link only shows for roles that actually have one in public/docs/manuals.
 const ROLE_MANUAL_FILE = {
-  uploader:      'Uploader-User-Manual.pdf',
-  approver:      'Approver-User-Manual.pdf',
-  nodal_officer: 'Nodal-Officer-User-Manual.pdf',
+  uploader:      'Uploader_user_manual.pdf',
+  approver:      'Approver_user_manual.pdf',
+  nodal_officer: 'Nodal_user_manual.pdf',
+  admin:         'Admin_user_manual.pdf',
+  super_admin:   'Super_admin_user_manual.pdf',
 };
 
 function footerLinks(t, role) {

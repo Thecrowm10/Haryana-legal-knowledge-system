@@ -48,9 +48,12 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
   const error = formError || authError;
   const canSubmit = !loading && captchaStatus.valid && username.trim() !== '' && password !== '';
 
+  const isEmail = v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
+
   const handleLogin = () => {
     setFormError('');
     if (!username.trim()) { setFormError(t('errorUsernameRequired')); return; }
+    if (isEmail(username)) { setFormError(t('errorUsernameNoEmail')); return; }
     if (!password)        { setFormError(t('errorPasswordRequired')); return; }
     if (!captchaStatus.touched)          { setFormError(t('errorFillCaptcha')); return; }
     if (!captchaRef.current?.validate()) { setFormError(t('errorCorrectCaptcha')); return; }
@@ -239,6 +242,15 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
 
         .lk-inp { outline:none; font-family:var(--font); transition:border-color .15s,box-shadow .15s,background .15s; }
         .lk-inp:focus { border-color:rgba(74,222,128,.7) !important; box-shadow:0 0 0 3px rgba(74,222,128,.15) !important; background:rgba(255,255,255,.15) !important; }
+        .lk-inp:-webkit-autofill,
+        .lk-inp:-webkit-autofill:hover,
+        .lk-inp:-webkit-autofill:focus {
+          -webkit-text-fill-color:#fff;
+          -webkit-box-shadow:0 0 0 1000px rgba(6,20,12,.92) inset;
+          box-shadow:0 0 0 1000px rgba(6,20,12,.92) inset;
+          caret-color:#fff;
+          transition:background-color 9999s ease-in-out 0s;
+        }
 
         .lk-trigger { transition:border-color .15s,box-shadow .15s; }
         .lk-trigger.open { border-color:rgba(74,222,128,.7) !important; box-shadow:0 0 0 3px rgba(74,222,128,.15) !important; }
@@ -374,7 +386,12 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
                 className="lk-inp"
                 type="text"
                 value={username}
-                onChange={e => { setUsername(e.target.value); setFormError(''); }}
+                onChange={e => {
+                  const v = e.target.value;
+                  setUsername(v);
+                  if (v.includes('@')) setFormError(t('errorUsernameNoEmail'));
+                  else setFormError('');
+                }}
                 onKeyDown={e => e.key === 'Enter' && handleLogin()}
                 placeholder={t('usernamePlaceholder')}
                 autoComplete="username"

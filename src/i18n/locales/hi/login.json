@@ -10,11 +10,11 @@
   "continueAsGuest": "अतिथि के रूप में जारी रखें",
   "noLoginRequired": "लॉगिन आवश्यक नहीं",
   "officialAccessTitle": "आधिकारिक एक्सेस",
-  "officialAccessDesc": "विभाग अपलोडर, अनुमोदक, सीएस कार्यालय और लेखा परीक्षकों के लिए।",
+  "officialAccessDesc": "विभाग अपलोडर, अनुमोदक, नोडल अधिकारियों और प्रशासकों के लिए।",
   "loginWithCredentials": "क्रेडेंशियल से लॉगिन करें",
   "passwordSsoRequired": "पासवर्ड / एसएसओ आवश्यक",
   "adminAccessTitle": "प्रशासक एक्सेस",
-  "adminAccessDesc": "सिस्टम प्रशासकों के लिए। अपने पंजीकृत मोबाइल नंबर से साइन इन करें।",
+  "adminAccessDesc": "अपने पंजीकृत मोबाइल नंबर से साइन इन करें।",
   "loginWithOtp": "ओटीपी से लॉगिन करें",
   "mobileOtpRequired": "मोबाइल ओटीपी आवश्यक",
   "footerCopyright": "© 2026 हरियाणा सरकार · हार्ट्रॉन",
@@ -44,6 +44,7 @@
   "errorUsernameRequired": "उपयोगकर्ता नाम आवश्यक है।",
   "errorPasswordRequired": "पासवर्ड आवश्यक है।",
   "errorFillCaptcha": "कृपया कैप्चा भरें।",
+  "errorUsernameNoEmail": "कृपया अपना उपयोगकर्ता नाम दर्ज करें, ईमेल पता नहीं।",
   "errorCorrectCaptcha": "कृपया सही कैप्चा दर्ज करें।",
   "forgotPasswordScreen": {
     "backToLogin": "लॉगिन पर वापस जाएं",
@@ -103,8 +104,13 @@
     "errorOtp6Digits": "6-अंकों का ओटीपी दर्ज करें।",
     "errorInvalidOtp": "अमान्य या समाप्त ओटीपी।",
     "errorResendFailed": "ओटीपी पुनः नहीं भेजा जा सका। कृपया पुनः प्रयास करें।",
+    "verifyOtp": "ओटीपी सत्यापित करें",
     "selectDepartment": "विभाग चुनें",
-    "errorDeptRequired": "जारी रखने के लिए कृपया एक विभाग चुनें।"
+    "selectDeptSubtitle": "आपका मोबाइल नंबर कई खातों से जुड़ा है। वह विभाग चुनें जिसमें आप लॉगिन करना चाहते हैं।",
+    "loginBtn": "लॉगिन करें",
+    "errorDeptRequired": "जारी रखने के लिए कृपया एक विभाग चुनें।",
+    "errorNoDepts": "इस खाते के लिए कोई विभाग नहीं मिला। कृपया अपने प्रशासक से संपर्क करें।",
+    "errorLoginFailed": "लॉगिन विफल हुआ। कृपया पुनः प्रयास करें।"
   },
   "changePasswordScreen": {
     "signOut": "साइन आउट करें और किसी अन्य उपयोगकर्ता के रूप में लॉगिन करें",

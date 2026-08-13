@@ -3,7 +3,7 @@ import { useTranslation, Trans } from 'react-i18next';
 import { Phone, ArrowLeft, ShieldCheck, RotateCcw, ShieldAlert, Lock, Building2 } from 'lucide-react';
 import haryanaLogo from '../assets/haryana-logo.png';
 import bannerBg from '../assets/banner-1-768x217.png';
-import { requestAdminOtp, verifyAdminOtp } from '../services/pdf';
+import { requestAdminOtp, verifyAdminOtp, completeAdminLogin } from '../services/pdf';
 import Captcha from '../components/Captcha';
 import LanguageToggle from '../components/LanguageToggle';
 import AccessibilityMenu from '../components/AccessibilityMenu';
@@ -19,11 +19,12 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
   const orgNameHi = i18n.getFixedT('hi', 'login')('orgNamePortal');
   const orgNameEn = i18n.getFixedT('en', 'login')('orgNamePortal');
 
-  const [step, setStep]               = useState(1); // 1 = enter mobile, 2 = select dept + OTP
+  // step 1 = mobile input, step 2 = OTP + captcha, step 3 = department selection
+  const [step, setStep]               = useState(1);
   const [mobile, setMobile]           = useState('');
-  const [departments, setDepartments] = useState([]); // [{id, name}] from /request-otp
-  const [selectedDeptId, setSelectedDeptId] = useState('');
   const [otp, setOtp]                 = useState('');
+  const [departments, setDepartments] = useState([]); // [{id, name}] — returned after OTP verified
+  const [selectedDeptId, setSelectedDeptId] = useState('');
   const [loading, setLoading]         = useState(false);
   const [error, setError]             = useState('');
   const [resendMsg, setResendMsg]     = useState('');
@@ -31,23 +32,19 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
   const captchaRef                    = useRef(null);
 
   const canSubmitStep1 = !loading && mobile.replace(/\D/g, '').length === 10;
-  const canSubmitStep2 = !loading && captchaStatus.valid && otp.length === 6 && selectedDeptId !== '';
+  const canSubmitStep2 = !loading && captchaStatus.valid && otp.length === 6;
+  const canSubmitStep3 = !loading && selectedDeptId !== '';
 
-  // ── Step 1: request OTP, get departments ─────────────────────
+  // ── Step 1: request OTP ───────────────────────────────────────
   async function handleSendOtp(e) {
     e?.preventDefault();
     const cleaned = mobile.replace(/\D/g, '');
     if (cleaned.length < 10) { setError(t('adminOtpScreen.errorMobileInvalid')); return; }
     setLoading(true); setError(''); setResendMsg('');
     try {
-      const res = await requestAdminOtp(cleaned);
+      await requestAdminOtp(cleaned);
       setMobile(cleaned);
-      const depts = res.data?.departments || [];
-      setDepartments(depts);
-      // Pre-select if only one department
-      if (depts.length === 1) setSelectedDeptId(String(depts[0].id));
       setStep(2);
-      if (res.data?.otp) setOtp(res.data.otp);
     } catch (err) {
       const detail = err.response?.data?.detail;
       setError(typeof detail === 'string' ? detail : t('adminOtpScreen.errorSendFailed'));
@@ -56,17 +53,36 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
     }
   }
 
-  // ── Step 2: verify OTP with selected department ───────────────
-  async function handleVerify(e) {
+  // ── Step 2: verify OTP, get departments ───────────────────────
+  async function handleVerifyOtp(e) {
     e?.preventDefault();
-    if (!selectedDeptId)    { setError(t('adminOtpScreen.errorDeptRequired')); return; }
-    if (otp.length !== 6)  { setError(t('adminOtpScreen.errorOtp6Digits')); return; }
+    if (otp.length !== 6) { setError(t('adminOtpScreen.errorOtp6Digits')); return; }
     if (!captchaStatus.touched)          { setError(t('errorFillCaptcha')); return; }
     if (!captchaRef.current?.validate()) { setError(t('errorCorrectCaptcha')); return; }
     setLoading(true); setError('');
     try {
-      const res = await verifyAdminOtp(mobile, otp, Number(selectedDeptId));
-      onLogin({ token: res.data.access_token });
+      const res = await verifyAdminOtp(mobile, otp);
+      const token = res.data?.token;
+      const depts = res.data?.departments || [];
+
+      // Super Admin — JWT issued directly, no department selection needed.
+      if (token) {
+        onLogin({ token });
+        return;
+      }
+
+      if (depts.length === 0) {
+        setError(t('adminOtpScreen.errorNoDepts'));
+        return;
+      }
+      if (depts.length === 1) {
+        // Single department admin — complete login immediately without showing step 3
+        const loginRes = await completeAdminLogin(mobile, otp, depts[0].id);
+        onLogin({ token: loginRes.data.access_token });
+        return;
+      }
+      setDepartments(depts);
+      setStep(3);
     } catch (err) {
       const detail = err.response?.data?.detail;
       setError(typeof detail === 'string' ? detail : t('adminOtpScreen.errorInvalidOtp'));
@@ -76,14 +92,27 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
     }
   }
 
+  // ── Step 3: select department, complete login ─────────────────
+  async function handleCompleteLogin(e) {
+    e?.preventDefault();
+    if (!selectedDeptId) { setError(t('adminOtpScreen.errorDeptRequired')); return; }
+    setLoading(true); setError('');
+    try {
+      const res = await completeAdminLogin(mobile, otp, Number(selectedDeptId));
+      onLogin({ token: res.data.access_token });
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      setError(typeof detail === 'string' ? detail : t('adminOtpScreen.errorLoginFailed'));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function handleResend() {
     setOtp(''); setError(''); setResendMsg(''); setLoading(true);
     try {
-      const res = await requestAdminOtp(mobile);
+      await requestAdminOtp(mobile);
       setResendMsg(t('adminOtpScreen.resendMsg'));
-      const depts = res.data?.departments || [];
-      if (depts.length) setDepartments(depts);
-      if (res.data?.otp) setOtp(res.data.otp);
     } catch {
       setError(t('adminOtpScreen.errorResendFailed'));
     } finally {
@@ -107,10 +136,10 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
         input::placeholder { color:rgba(255,255,255,.3); font-size:13px; }
         .aol-otp-inp { letter-spacing:12px; font-size:24px; font-weight:700; text-align:center; }
         .aol-otp-inp::placeholder { letter-spacing:normal; font-size:14px; font-weight:400; }
-        .aol-dept-option { display:flex; align-items:center; gap:10; padding:9px 12px; border-radius:9px; cursor:pointer;
-          border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.06); transition:all .15s; margin-bottom:6px; }
-        .aol-dept-option:hover { border-color:rgba(74,222,128,.45); background:rgba(74,222,128,.08); }
-        .aol-dept-option.selected { border-color:rgba(74,222,128,.7); background:rgba(74,222,128,.12); }
+        .aol-dept-opt { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:10px; cursor:pointer;
+          border:1px solid rgba(255,255,255,.14); background:rgba(255,255,255,.06); transition:all .15s; margin-bottom:7px; }
+        .aol-dept-opt:hover { border-color:rgba(74,222,128,.45); background:rgba(74,222,128,.08); }
+        .aol-dept-opt.sel { border-color:rgba(74,222,128,.7); background:rgba(74,222,128,.12); }
 
         @media (max-width:640px) {
           .aol-masthead { top:10px !important; left:14px !important; gap:8px !important; }
@@ -181,132 +210,103 @@ export default function AdminOtpLogin({ onBack, onLogin }) {
               <p style={{ fontSize: 12.5, color: 'rgba(255,255,255,.42)', marginBottom: 20 }}>
                 {t('adminOtpScreen.subtitle')}
               </p>
-
               <label htmlFor="aol-mobile" style={labelStyle}>
                 <Phone size={10} color="rgba(255,255,255,.4)" /> {t('adminOtpScreen.mobileNumber')}
               </label>
               <input
-                id="aol-mobile"
-                className="aol-inp"
-                type="text"
-                inputMode="numeric"
-                maxLength={10}
+                id="aol-mobile" className="aol-inp" type="text" inputMode="numeric" maxLength={10}
                 value={mobile}
                 onChange={e => { setMobile(e.target.value.replace(/\D/g, '')); setError(''); }}
                 placeholder={t('adminOtpScreen.mobilePlaceholder')}
                 autoComplete="tel"
-                style={{
-                  width: '100%', padding: '11px 13px',
-                  background: 'rgba(255,255,255,.10)',
-                  border: '1px solid rgba(255,255,255,.18)',
-                  borderRadius: 11, fontSize: 13.5, color: '#fff', marginBottom: 16,
-                }}
+                style={{ width: '100%', padding: '11px 13px', background: 'rgba(255,255,255,.10)', border: '1px solid rgba(255,255,255,.18)', borderRadius: 11, fontSize: 13.5, color: '#fff', marginBottom: 16 }}
               />
-
               {error && <ErrorBox msg={error} />}
-
-              <button className="aol-btn" type="submit" disabled={!canSubmitStep1} style={{
-                width: '100%', padding: '12px',
-                background: canSubmitStep1 ? 'linear-gradient(135deg,#198754,#16a34a)' : 'rgba(255,255,255,.04)',
-                borderRadius: 11, color: canSubmitStep1 ? '#fff' : 'rgba(255,255,255,.32)', fontSize: 14, fontWeight: 700,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                border: canSubmitStep1 ? 'none' : '1.5px dashed rgba(255,255,255,.2)',
-                boxShadow: canSubmitStep1 ? '0 4px 18px rgba(25, 135, 84,.38)' : 'none',
-                cursor: canSubmitStep1 ? 'pointer' : 'not-allowed',
-              }}>
-                {loading ? <><Spin /> {t('adminOtpScreen.sendingOtp')}</> : <>{t('adminOtpScreen.sendOtp')} &nbsp;→</>}
-              </button>
+              <SubmitBtn active={canSubmitStep1} loading={loading} loadLabel={t('adminOtpScreen.sendingOtp')}>
+                {t('adminOtpScreen.sendOtp')} &nbsp;→
+              </SubmitBtn>
             </form>
           )}
 
-          {/* ── Step 2: select department + enter OTP ── */}
+          {/* ── Step 2: enter OTP + captcha ── */}
           {step === 2 && (
-            <form onSubmit={handleVerify}>
+            <form onSubmit={handleVerifyOtp}>
               <div style={{ marginBottom: 14, paddingBottom: 14, borderBottom: '1px solid rgba(255,255,255,.1)' }}>
-                <button type="button" onClick={() => { setStep(1); setError(''); setOtp(''); setResendMsg(''); setSelectedDeptId(''); setDepartments([]); }}
+                <button type="button" onClick={() => { setStep(1); setError(''); setOtp(''); setResendMsg(''); }}
                   style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.4)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, padding: 0, fontFamily: 'inherit', letterSpacing: '.04em' }}>
                   <ArrowLeft size={12} /> {t('adminOtpScreen.back')}
                 </button>
               </div>
               <h2 style={{ fontSize: 21, fontWeight: 800, color: '#fff', letterSpacing: '-.02em', marginBottom: 4 }}>{t('adminOtpScreen.enterOtpTitle')}</h2>
-              <p style={{ fontSize: 12.5, color: 'rgba(255,255,255,.42)', marginBottom: 18 }}>
+              <p style={{ fontSize: 12.5, color: 'rgba(255,255,255,.42)', marginBottom: 20 }}>
                 <Trans t={t} i18nKey="adminOtpScreen.otpSentTo" values={{ masked: `${mobile.slice(0,3)}****${mobile.slice(-3)}` }} components={[<strong key="s" style={{ color: 'rgba(255,255,255,.7)' }} />]} />
               </p>
-
-              {/* Department selection */}
-              {departments.length > 0 && (
-                <div style={{ marginBottom: 18 }}>
-                  <label style={{ ...labelStyle, marginBottom: 10 }}>
-                    <Building2 size={10} color="rgba(255,255,255,.4)" /> {t('adminOtpScreen.selectDepartment')}
-                  </label>
-                  {departments.map(dept => {
-                    const isSelected = String(dept.id) === String(selectedDeptId);
-                    return (
-                      <div
-                        key={dept.id}
-                        className={`aol-dept-option${isSelected ? ' selected' : ''}`}
-                        onClick={() => { setSelectedDeptId(String(dept.id)); setError(''); }}
-                      >
-                        <div style={{
-                          width: 16, height: 16, borderRadius: '50%', flexShrink: 0,
-                          border: `2px solid ${isSelected ? '#4ade80' : 'rgba(255,255,255,.3)'}`,
-                          background: isSelected ? '#4ade80' : 'transparent',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          transition: 'all .15s',
-                        }}>
-                          {isSelected && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />}
-                        </div>
-                        <span style={{ fontSize: 13, color: isSelected ? '#fff' : 'rgba(255,255,255,.75)', fontWeight: isSelected ? 600 : 400, flex: 1 }}>
-                          {dept.name}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* OTP input */}
               <label htmlFor="aol-otp" style={labelStyle}>{t('adminOtpScreen.otpLabel')}</label>
               <input
-                id="aol-otp"
-                className="aol-inp aol-otp-inp"
-                type="text"
-                inputMode="numeric"
-                maxLength={6}
+                id="aol-otp" className="aol-inp aol-otp-inp" type="text" inputMode="numeric" maxLength={6}
                 value={otp}
                 onChange={e => { setOtp(e.target.value.replace(/\D/g, '')); setError(''); }}
                 placeholder="------"
                 autoFocus
-                style={{
-                  width: '100%', padding: '12px 13px',
-                  background: 'rgba(255,255,255,.10)',
-                  border: '1px solid rgba(255,255,255,.18)',
-                  borderRadius: 11, color: '#fff', marginBottom: 16,
-                }}
+                style={{ width: '100%', padding: '12px 13px', background: 'rgba(255,255,255,.10)', border: '1px solid rgba(255,255,255,.18)', borderRadius: 11, color: '#fff', marginBottom: 16 }}
               />
-
               <Captcha ref={captchaRef} onStatusChange={setCaptchaStatus} style={{ marginBottom: 16 }} />
-
               {error     && <ErrorBox msg={error} />}
               {resendMsg && <div style={{ fontSize: 12, color: '#4ade80', marginBottom: 10 }}>{resendMsg}</div>}
-
-              <button className="aol-btn" type="submit" disabled={!canSubmitStep2} style={{
-                width: '100%', padding: '12px',
-                background: canSubmitStep2 ? 'linear-gradient(135deg,#198754,#16a34a)' : 'rgba(255,255,255,.04)',
-                borderRadius: 11, color: canSubmitStep2 ? '#fff' : 'rgba(255,255,255,.32)', fontSize: 14, fontWeight: 700,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                border: canSubmitStep2 ? 'none' : '1.5px dashed rgba(255,255,255,.2)',
-                boxShadow: canSubmitStep2 ? '0 4px 18px rgba(25, 135, 84,.38)' : 'none',
-                cursor: canSubmitStep2 ? 'pointer' : 'not-allowed',
-                marginBottom: 12,
-              }}>
-                {loading ? <><Spin /> {t('adminOtpScreen.verifying')}</> : canSubmitStep2 ? <><ShieldCheck size={14} /> {t('adminOtpScreen.verifyLogin')}</> : <><Lock size={13} /> {t('adminOtpScreen.verifyLogin')}</>}
-              </button>
-
+              <SubmitBtn active={canSubmitStep2} loading={loading} loadLabel={t('adminOtpScreen.verifying')} style={{ marginBottom: 12 }}>
+                <ShieldCheck size={14} /> {t('adminOtpScreen.verifyOtp')}
+              </SubmitBtn>
               <button type="button" onClick={handleResend} disabled={loading}
                 style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.35)', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'inherit', margin: '0 auto' }}>
                 <RotateCcw size={11} /> {t('adminOtpScreen.resendOtp')}
               </button>
+            </form>
+          )}
+
+          {/* ── Step 3: select department ── */}
+          {step === 3 && (
+            <form onSubmit={handleCompleteLogin}>
+              <div style={{ marginBottom: 14, paddingBottom: 14, borderBottom: '1px solid rgba(255,255,255,.1)' }}>
+                <button type="button" onClick={() => { setStep(2); setError(''); setSelectedDeptId(''); setCaptchaStatus({ touched: false, valid: false }); captchaRef.current?.reset(); }}
+                  style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.4)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5, padding: 0, fontFamily: 'inherit', letterSpacing: '.04em' }}>
+                  <ArrowLeft size={12} /> {t('adminOtpScreen.back')}
+                </button>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+                <Building2 size={20} color="#4ade80" strokeWidth={1.8} />
+                <h2 style={{ fontSize: 21, fontWeight: 800, color: '#fff', letterSpacing: '-.02em' }}>{t('adminOtpScreen.selectDepartment')}</h2>
+              </div>
+              <p style={{ fontSize: 12.5, color: 'rgba(255,255,255,.42)', marginBottom: 18 }}>
+                {t('adminOtpScreen.selectDeptSubtitle')}
+              </p>
+
+              {departments.map(dept => {
+                const isSel = String(dept.id) === String(selectedDeptId);
+                return (
+                  <div key={dept.id} className={`aol-dept-opt${isSel ? ' sel' : ''}`}
+                    onClick={() => { setSelectedDeptId(String(dept.id)); setError(''); }}>
+                    <div style={{
+                      width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
+                      border: `2px solid ${isSel ? '#4ade80' : 'rgba(255,255,255,.3)'}`,
+                      background: isSel ? '#4ade80' : 'transparent',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      transition: 'all .15s',
+                    }}>
+                      {isSel && <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#fff' }} />}
+                    </div>
+                    <span style={{ fontSize: 13.5, color: isSel ? '#fff' : 'rgba(255,255,255,.8)', fontWeight: isSel ? 600 : 400 }}>
+                      {dept.name}
+                    </span>
+                  </div>
+                );
+              })}
+
+              {error && <ErrorBox msg={error} />}
+              <div style={{ marginTop: 18 }}>
+                <SubmitBtn active={canSubmitStep3} loading={loading} loadLabel={t('adminOtpScreen.verifying')}>
+                  <ShieldCheck size={14} /> {t('adminOtpScreen.loginBtn')}
+                </SubmitBtn>
+              </div>
             </form>
           )}
         </div>
@@ -325,6 +325,23 @@ const labelStyle = {
   marginBottom: 7, letterSpacing: '.08em', textTransform: 'uppercase',
 };
 
+function SubmitBtn({ active, loading, loadLabel, children, style }) {
+  return (
+    <button className="aol-btn" type="submit" disabled={!active} style={{
+      width: '100%', padding: '12px',
+      background: active ? 'linear-gradient(135deg,#198754,#16a34a)' : 'rgba(255,255,255,.04)',
+      borderRadius: 11, color: active ? '#fff' : 'rgba(255,255,255,.32)', fontSize: 14, fontWeight: 700,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+      border: active ? 'none' : '1.5px dashed rgba(255,255,255,.2)',
+      boxShadow: active ? '0 4px 18px rgba(25,135,84,.38)' : 'none',
+      cursor: active ? 'pointer' : 'not-allowed',
+      ...style,
+    }}>
+      {loading ? <><Spin /> {loadLabel}</> : children}
+    </button>
+  );
+}
+
 function ErrorBox({ msg }) {
   return (
     <div style={{
@@ -340,10 +357,8 @@ function ErrorBox({ msg }) {
 function Spin() {
   return (
     <div style={{
-      width: 14, height: 14,
-      border: '2px solid rgba(255,255,255,.3)',
-      borderTopColor: '#fff',
-      borderRadius: '50%',
+      width: 14, height: 14, border: '2px solid rgba(255,255,255,.3)',
+      borderTopColor: '#fff', borderRadius: '50%',
       animation: 'spin .7s linear infinite',
     }} />
   );

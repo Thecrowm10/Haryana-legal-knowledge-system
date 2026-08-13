@@ -10,6 +10,7 @@ import UploaderDashboard from './pages/UploaderDashboard';
 import ApproverDashboard from './pages/ApproverDashboard';
 import CSODashboard from './pages/CSODashboard';
 import AdminDashboard from './pages/AdminDashboard';
+import SuperAdminDashboard from './pages/SuperAdminDashboard';
 import NodalOfficerDashboard from './pages/NodalOfficerDashboard';
 import AuditorDashboard from './pages/AuditorDashboard';
 import { DOCUMENTS } from './data/mockData';
@@ -115,7 +116,10 @@ export default function App() {
     if (user.passwordExpired) {
       return <><ChangePasswordScreen user={user} onPasswordChanged={changePass} onLogout={logout} reason="expired" /><CookieBanner /></>;
     }
-    return <><FirstLoginScreen user={user} onTokenReceived={loginWithToken} onLogout={logout} /><CookieBanner /></>;
+    // Super Admin authenticates via OTP — skip the mobile-verification first-login screen.
+    if (user.role !== 'super_admin') {
+      return <><FirstLoginScreen user={user} onTokenReceived={loginWithToken} onLogout={logout} /><CookieBanner /></>;
+    }
   }
   if (activePage === null) return <CookieBanner />;
 
@@ -161,8 +165,9 @@ export default function App() {
           />
         );
       case 'admin':
+        return <AdminDashboard activePage={activePage} />;
       case 'super_admin':
-        return <AdminDashboard activePage={activePage} taxonomy={taxonomy} onUpdateTaxonomy={setTaxonomy} />;
+        return <SuperAdminDashboard activePage={activePage} taxonomy={taxonomy} onUpdateTaxonomy={setTaxonomy} />;
       case 'nodal_officer':
         return <NodalOfficerDashboard activePage={activePage} />;
       case 'auditor':

@@ -43,17 +43,25 @@ function styleDataRow(row, { bold = false, fill = null } = {}) {
  * full underlying document list.
  *
  * @param {object} params
- * @param {Array}  params.docs        Documents already scoped to the caller's authorised departments.
- * @param {Array}  params.departments Selected department names to include; empty = every department present in docs.
- * @param {string} params.fileLabel   Short label used in the downloaded filename (e.g. "Admin", "Nodal").
+ * @param {Array}  params.docs         Documents already scoped to the caller's authorised departments.
+ * @param {Array}  params.departments  Selected department names to include; empty = every department present in docs.
+ * @param {Array}  params.allDeptNames Full list of department names to include in the Summary sheet even if they have zero uploads.
+ * @param {string} params.fileLabel    Short label used in the downloaded filename (e.g. "Admin", "Nodal").
  */
-export async function downloadUploadsExcelReport({ docs, departments = [], fileLabel = 'Uploads' }) {
+export async function downloadUploadsExcelReport({ docs, departments = [], allDeptNames = [], fileLabel = 'Uploads' }) {
   const selected = new Set(departments.filter(Boolean));
   const scoped = selected.size ? docs.filter(d => selected.has(d.department_name)) : docs;
 
-  const deptNames = selected.size
-    ? [...selected]
-    : [...new Set(scoped.map(d => d.department_name || 'Unassigned'))].sort((a, b) => a.localeCompare(b));
+  let deptNames;
+  if (allDeptNames.length > 0) {
+    // Use the provided full list as the base so zero-upload departments appear in the Summary.
+    const fromDocs = scoped.map(d => d.department_name || 'Unassigned');
+    deptNames = [...new Set([...allDeptNames, ...fromDocs])].sort((a, b) => a.localeCompare(b));
+  } else if (selected.size) {
+    deptNames = [...selected];
+  } else {
+    deptNames = [...new Set(scoped.map(d => d.department_name || 'Unassigned'))].sort((a, b) => a.localeCompare(b));
+  }
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Haryana Government Digital Repository';

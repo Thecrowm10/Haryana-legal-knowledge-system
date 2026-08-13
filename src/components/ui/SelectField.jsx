@@ -46,7 +46,7 @@ const PANEL = {
   animation: 'dropdownIn .15s cubic-bezier(.2,.8,.3,1)',
 };
 
-export default function SelectField({ id, value, onChange, required, placeholder, children, style = {} }) {
+export default function SelectField({ id, value, onChange, required, placeholder, children, style = {}, disabled = false }) {
   const [open, setOpen]   = useState(false);
   const ref               = useRef(null);
   const options           = parseOptions(children);
@@ -71,13 +71,17 @@ export default function SelectField({ id, value, onChange, required, placeholder
       <button
         id={id}
         type="button"
-        onClick={() => setOpen(o => !o)}
+        onClick={() => !disabled && setOpen(o => !o)}
+        disabled={disabled}
         style={{
           ...TRIGGER,
           color: selected ? 'var(--text-color)' : 'var(--text-color-secondary)',
           fontWeight: selected ? 500 : 400,
           borderColor: open ? 'var(--primary)' : 'var(--surface-border)',
           boxShadow: open ? '0 0 0 3px rgba(33, 74, 171,.1)' : 'none',
+          background: disabled ? 'var(--surface-border)' : 'var(--surface-ground)',
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          opacity: disabled ? 0.7 : 1,
         }}
       >
         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
