@@ -450,7 +450,7 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
       <div className="table-scroll-wrap" style={{ padding: '10px 14px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surface-50)', flexShrink: 0 }}>
         <Eye size={13} color="var(--primary)" style={{ flexShrink: 0 }} />
         <span style={{ fontSize: 'var(--font-size-small)', fontWeight: 700, color: 'var(--text-heading)', flex: '1 1 auto', minWidth: 40, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{docxHtml ? t('pdfViewer.documentPreview') : t('pdfViewer.originalPdf')}</span>
-        {blobUrl && !docxHtml && (
+        {blobUrl && (
           <a href={blobUrl} target="_blank" rel="noreferrer" title={t('pdfViewer.openInNewTab')}
             style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 9px', borderRadius: 5, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)', textDecoration: 'none', fontSize: 11, fontWeight: 600, fontFamily: 'var(--font)', flexShrink: 0, whiteSpace: 'nowrap' }}>
             <ExternalLink size={11} /> {t('common.open')}
@@ -1001,12 +1001,16 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, deciding })
     getPdfFile(doc.id)
       .then(res => {
         const ct = (res.headers['content-type'] || '').toLowerCase();
-        if (ct.includes('wordprocessingml') || ct.includes('officedocument')) {
-          return mammoth.convertToHtml({ arrayBuffer: res.data }).then(r => setDocxHtml(r.value));
-        }
-        const blob = new Blob([res.data], { type: 'application/pdf' });
+        const isDocx = ct.includes('wordprocessingml') || ct.includes('officedocument');
+        // Always create a blob URL so the Open button is available for every file type.
+        // Backend now serves DOCX files as PDF (mammoth+weasyprint), so this blob
+        // will be a proper PDF even for uploaded Word documents.
+        const blob = new Blob([res.data], { type: isDocx ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : 'application/pdf' });
         url = URL.createObjectURL(blob);
         setBlobUrl(url);
+        if (isDocx) {
+          return mammoth.convertToHtml({ arrayBuffer: res.data }).then(r => setDocxHtml(r.value));
+        }
       })
       .catch(() => {});
     return () => { if (url) URL.revokeObjectURL(url); };
