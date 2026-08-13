@@ -202,7 +202,7 @@ export default function AdminOtpLoginScreen({ onBack, onSuccess }) {
         </div>
 
         <p style={{ position:'absolute', bottom:14, color:'rgba(255,255,255,.12)', fontSize:11, zIndex:1 }}>
-          © 2026 Government of Haryana · HARTRON
+          © 2026 Government of Haryana 
         </p>
       </div>
     </>

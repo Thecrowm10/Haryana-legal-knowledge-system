@@ -60,7 +60,7 @@ const FOOTER_PAGES = {
     icon: Copyright, title: 'Copyright Policy', subtitle: 'Ownership and reuse of portal content',
     sections: [
       { heading: 'Ownership', body: [
-        'Legal instruments published on this portal remain the property of the Government of Haryana and the respective issuing department. The portal’s own design, interface and software are the property of the Government of Haryana / HARTRON.',
+        'Legal instruments published on this portal remain the property of the Government of Haryana and the respective issuing department. The portal’s own design, interface and software are the property of the Government of Haryana.',
       ]},
       { heading: 'Permitted reuse', body: [
         'Text of Acts, Rules, Notifications and Circulars may be reproduced for non-commercial, informational or research purposes provided the source is acknowledged as “Government of Haryana, via the Haryana Digital Repository.”',
