@@ -505,7 +505,7 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
               <span style={{ fontSize: 12, fontFamily: 'var(--mono)', color: 'rgba(255,255,255,.7)' }}>{t('pdfViewer.loadingPdf')}</span>
             </div>
           )}
-          {Array.from({ length: numPages }, (_, i) => (
+          {pdfDoc && Array.from({ length: numPages }, (_, i) => (
             <div key={i} style={{ position: 'relative', display: 'inline-block' }}>
               <canvas ref={el => { canvasRefs.current[i] = el; }}
                 style={{ display: 'block', boxShadow: '0 2px 12px rgba(0,0,0,.5)', maxWidth: '100%' }} />

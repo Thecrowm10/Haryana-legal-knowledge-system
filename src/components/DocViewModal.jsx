@@ -351,13 +351,13 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
 
           <div ref={containerRef} onScroll={handleScroll}
               style={{ flex: 1, overflow: 'auto', background: '#525659', padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center' }}>
-              {!blobUrl && (
+              {!pdfDoc && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 14 }}>
                   <div style={{ width: 36, height: 36, border: '3px solid rgba(255,255,255,.2)', borderTopColor: 'rgba(255,255,255,.8)', borderRadius: '50%', animation: 'spin .7s linear infinite' }} />
                   <span style={{ fontSize: 13, fontFamily: 'var(--mono)', color: 'rgba(255,255,255,.6)', letterSpacing: '.04em' }}>Loading document…</span>
                 </div>
               )}
-              {blobUrl && Array.from({ length: totalPages }, (_, i) => (
+              {pdfDoc && Array.from({ length: totalPages }, (_, i) => (
                 <div key={i} style={{ position: 'relative', display: 'inline-block' }}>
                   <canvas ref={el => { canvasRefs.current[i] = el; }}
                     style={{ display: 'block', borderRadius: 4, boxShadow: '0 4px 20px rgba(0,0,0,.6)', maxWidth: '100%' }} />
