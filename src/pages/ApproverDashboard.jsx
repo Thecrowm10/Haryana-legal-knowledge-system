@@ -549,32 +549,9 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
           ))}
         </div>
       ) : (
-        <div style={{ flex: 1, overflow: 'auto', background: '#d1d5db', padding: 16 }}>
-          <div style={{
-            background: 'white', borderRadius: 2, boxShadow: '0 4px 16px rgba(0,0,0,.2)',
-            padding: '40px 44px', minHeight: 480,
-            transform: `scale(${zoom / 100}) rotate(${rotation}deg)`,
-            transformOrigin: 'top center',
-            fontFamily: 'Georgia, "Times New Roman", serif',
-          }}>
-            <div style={{ textAlign: 'center', borderBottom: '2px solid #111', paddingBottom: 14, marginBottom: 20 }}>
-              <div style={{ fontSize: 10, color: '#555', letterSpacing: '.12em', textTransform: 'uppercase', marginBottom: 6 }}>{t('pdfViewer.governmentOfHaryana')}</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: '#111', lineHeight: 1.35, marginBottom: 6 }}>{doc.title}</div>
-              <div style={{ fontSize: 11, color: '#444', fontFamily: 'Arial, sans-serif' }}>{doc.dept}&nbsp;·&nbsp;{t('pdfViewer.yearLabel')}: {doc.year}&nbsp;·&nbsp;{doc.type}</div>
-            </div>
-            <div style={{ borderTop: '1px solid #bbb', marginBottom: 20 }} />
-            <div style={{ fontSize: 13, color: '#1a1a1a', lineHeight: 1.95, whiteSpace: 'pre-wrap', textAlign: 'justify' }}>
-              {pageData?.text || t('pdfViewer.documentContentNotAvailable')}
-            </div>
-            <div style={{ marginTop: 40, borderTop: '1px solid #ccc', paddingTop: 10, display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#777', fontFamily: 'Arial, sans-serif' }}>
-              {/* Version prefix hidden until proper API mapping for versions is wired up — keep for future use.
-              <span>v{doc.version || '1.0'}&nbsp;·&nbsp;{doc.legalStatus || t('documentDetails.activeStatus')}</span>
-              */}
-              <span>{doc.legalStatus || t('documentDetails.activeStatus')}</span>
-              <span>{t('pdfViewer.pageOf', { current: currentPage, total: totalPages })}</span>
-              <span>{doc.uploader || '—'}</span>
-            </div>
-          </div>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, background: '#525659' }}>
+          <div style={{ width: 28, height: 28, border: '3px solid rgba(255,255,255,.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin .7s linear infinite' }} />
+          <span style={{ fontSize: 12, fontFamily: 'var(--mono)', color: 'rgba(255,255,255,.7)' }}>{t('pdfViewer.loadingPdf')}</span>
         </div>
       )}
 
