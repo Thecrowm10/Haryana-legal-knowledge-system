@@ -3,7 +3,6 @@ import { FileText, CheckCircle, XCircle, Clock, Eye, ZoomIn, ZoomOut, RotateCw, 
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
-import mammoth from 'mammoth';
 import { getPdfFile, getPdfFull } from '../services/pdf';
 import { TYPE_SPECIFIC_FIELD_KEYS } from '../constants/docTypeFields';
 import { PART_META } from '../constants/mockActOutline';
@@ -43,7 +42,6 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
   const [totalPages, setTotalPages]   = useState(1);
   const [zoom, setZoom]               = useState(100);
   const [rotation, setRotation]       = useState(0);
-  const [docxHtml, setDocxHtml]       = useState(null);
   const [searchHighlights, setSearchHighlights] = useState({});
   // Which match page is currently being highlighted/shown (changes when user navigates matches)
   const [activeHitPage, setActiveHitPage]   = useState(initialPage);
@@ -52,7 +50,6 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
   const containerRef  = useRef(null);
   const suppressRef   = useRef(false);
   const svgRefs       = useRef([]);
-  const docxViewRef   = useRef(null);
   // Keep a current reference to scrollToPage to avoid stale closures in timeouts
   const scrollToPageRef = useRef(null);
   const annotationsJson = doc.approval?.annotations_json;
@@ -85,10 +82,6 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
     let url = null;
     getPdfFile(doc.id)
       .then(res => {
-        const ct = (res.headers['content-type'] || '').toLowerCase();
-        if (ct.includes('wordprocessingml') || ct.includes('officedocument')) {
-          return mammoth.convertToHtml({ arrayBuffer: res.data }).then(r => setDocxHtml(r.value));
-        }
         const blob = new Blob([res.data], { type: 'application/pdf' });
         url = URL.createObjectURL(blob);
         setBlobUrl(url);
@@ -106,39 +99,6 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
     return () => { cancelled = true; };
   }, [blobUrl]);
 
-  useEffect(() => {
-    if (!docxViewRef.current || !docxHtml) return;
-    docxViewRef.current.innerHTML = docxHtml;
-  }, [docxHtml]);
-
-  useEffect(() => {
-    if (!docxViewRef.current || !docxHtml) return;
-    docxViewRef.current.querySelectorAll('[data-docx-annot]').forEach(span => {
-      const parent = span.parentNode;
-      if (!parent) return;
-      while (span.firstChild) parent.insertBefore(span.firstChild, span);
-      parent.removeChild(span);
-    });
-    docxViewRef.current.normalize();
-    annotations.filter(a => a.isDocx).forEach(ann => {
-      if (!ann.text || !docxViewRef.current) return;
-      const walker = document.createTreeWalker(docxViewRef.current, NodeFilter.SHOW_TEXT, null);
-      let node;
-      while ((node = walker.nextNode())) {
-        const idx = node.textContent.indexOf(ann.text);
-        if (idx < 0) continue;
-        const range = document.createRange();
-        range.setStart(node, idx);
-        range.setEnd(node, idx + ann.text.length);
-        const span = document.createElement('span');
-        span.style.cssText = `background-color:${ann.color};border-radius:2px;padding:0 1px;`;
-        span.dataset.docxAnnot = ann.id;
-        if (ann.comment) span.title = ann.comment;
-        try { range.surroundContents(span); } catch { const f = range.extractContents(); span.appendChild(f); range.insertNode(span); }
-        return;
-      }
-    });
-  }, [annotations, docxHtml]);
 
   // Scroll to the page that contained the search hit
   useEffect(() => {
@@ -383,7 +343,7 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
                 <RotateCw size={14} />
               </button>
             )}
-            {blobUrl && !docxHtml && (
+            {blobUrl && (
               <a href={blobUrl} target="_blank" rel="noreferrer"
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 7, background: 'rgba(33, 74, 171,.25)', border: '1px solid rgba(33, 74, 171,.4)', color: '#93c5fd', textDecoration: 'none', fontSize: 11.5, fontWeight: 600, fontFamily: 'var(--font)', transition: 'background .15s' }}
                 onMouseEnter={e => e.currentTarget.style.background = 'rgba(33, 74, 171,.4)'}
@@ -393,11 +353,7 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
             )}
           </div>
 
-          {docxHtml ? (
-            <div ref={docxViewRef}
-              style={{ flex: 1, overflow: 'auto', background: 'white', padding: '40px 48px', color: '#1a1a1a', lineHeight: 1.8, fontSize: 13 }} />
-          ) : (
-            <div ref={containerRef} onScroll={handleScroll}
+          <div ref={containerRef} onScroll={handleScroll}
               style={{ flex: 1, overflow: 'auto', background: '#525659', padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center' }}>
               {!blobUrl && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 14 }}>
@@ -437,10 +393,8 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
                 </div>
               ))}
             </div>
-          )}
 
-          {!docxHtml && (
-            <div style={{ padding: '10px 20px', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, background: '#2d2f31', flexShrink: 0 }}>
+          <div style={{ padding: '10px 20px', borderTop: '1px solid rgba(255,255,255,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, background: '#2d2f31', flexShrink: 0 }}>
               <button onClick={() => scrollToPage(currentPage - 1)} disabled={currentPage === 1}
                 style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px', borderRadius: 7, border: '1px solid rgba(255,255,255,.12)', background: currentPage === 1 ? 'transparent' : 'rgba(255,255,255,.07)', color: currentPage === 1 ? 'rgba(255,255,255,.25)' : 'rgba(255,255,255,.75)', fontSize: 12, fontWeight: 600, cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', transition: 'background .15s' }}>
                 ← Prev
@@ -455,7 +409,6 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
                 Next →
               </button>
             </div>
-          )}
         </div>
 
         {/* Right: Document details */}

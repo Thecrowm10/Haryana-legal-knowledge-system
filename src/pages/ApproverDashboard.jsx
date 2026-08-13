@@ -8,7 +8,6 @@ import {
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
-import mammoth from 'mammoth';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import { useAuth } from '../hooks/useAuth';
@@ -954,7 +953,6 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, deciding })
     catch { return []; }
   });
   const [highlightMode, setHighlightMode] = useState(false);
-  const [docxHtml, setDocxHtml]           = useState(null);
   const pdfScrollRef = useRef(null);
 
   const [remarkLines, setRemarkLines] = useState(() => {
@@ -1000,17 +998,9 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, deciding })
     let url = null;
     getPdfFile(doc.id)
       .then(res => {
-        const ct = (res.headers['content-type'] || '').toLowerCase();
-        const isDocx = ct.includes('wordprocessingml') || ct.includes('officedocument');
-        // Always create a blob URL so the Open button is available for every file type.
-        // Backend now serves DOCX files as PDF (mammoth+weasyprint), so this blob
-        // will be a proper PDF even for uploaded Word documents.
-        const blob = new Blob([res.data], { type: isDocx ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : 'application/pdf' });
+        const blob = new Blob([res.data], { type: 'application/pdf' });
         url = URL.createObjectURL(blob);
         setBlobUrl(url);
-        if (isDocx) {
-          return mammoth.convertToHtml({ arrayBuffer: res.data }).then(r => setDocxHtml(r.value));
-        }
       })
       .catch(() => {});
     return () => { if (url) URL.revokeObjectURL(url); };
@@ -1034,7 +1024,6 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, deciding })
             annotations={annotations} onAnnotationsChange={setAnnotations}
             highlightMode={highlightMode} onHighlightModeChange={setHighlightMode}
             onScrollRef={pdfScrollRef}
-            docxHtml={docxHtml}
           />
         </div>
 
@@ -1265,7 +1254,6 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
   const [remarkLines, setRemarkLines]     = useState(['']);
   const [annotations, setAnnotations]     = useState([]);
   const [highlightMode, setHighlightMode] = useState(false);
-  const [docxHtml, setDocxHtml]           = useState(null);
   const pdfScrollRef                      = useRef(null);
   const [fullDoc, setFullDoc]             = useState(null);
 
@@ -1326,10 +1314,6 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
     let url = null;
     getPdfFile(lr.pdf_id)
       .then(res => {
-        const ct = (res.headers['content-type'] || '').toLowerCase();
-        if (ct.includes('wordprocessingml') || ct.includes('officedocument')) {
-          return mammoth.convertToHtml({ arrayBuffer: res.data }).then(r => setDocxHtml(r.value));
-        }
         const blob = new Blob([res.data], { type: 'application/pdf' });
         url = URL.createObjectURL(blob);
         setBlobUrl(url);
@@ -1398,7 +1382,6 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
             highlightMode={isReadOnly ? false : highlightMode}
             onHighlightModeChange={isReadOnly ? undefined : setHighlightMode}
             onScrollRef={pdfScrollRef}
-            docxHtml={docxHtml}
           />
         </div>
 
