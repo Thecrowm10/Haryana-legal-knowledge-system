@@ -305,5 +305,53 @@
       "maxRequired": "अधिकतम उपयोगकर्ता 0 या अधिक होना चाहिए।"
     },
     "deleteConfirm": "{{dept}} में {{role}} की कस्टम सीमा हटाएं? सिस्टम डिफ़ॉल्ट {{default}} लागू होगा।"
+  },
+  "capRequests": {
+    "stats": {
+      "total": "कुल अनुरोध",
+      "pending": "लंबित",
+      "approved": "स्वीकृत",
+      "rejected": "अस्वीकृत"
+    },
+    "statusPending": "लंबित",
+    "statusApproved": "स्वीकृत",
+    "statusRejected": "अस्वीकृत",
+    "newRequestTitle": "नया कैप परिवर्तन अनुरोध",
+    "newRequestSubtitle": "अपने विभाग में किसी भूमिका के लिए अनुमत अधिकतम उपयोगकर्ताओं को बढ़ाने या घटाने हेतु सुपर एडमिन से अनुरोध करें।",
+    "role": "भूमिका",
+    "selectRole": "भूमिका चुनें",
+    "requestedMaxUsers": "अनुरोधित अधिकतम उपयोगकर्ता",
+    "enterNewCap": "नई सीमा दर्ज करें",
+    "currentCap": "वर्तमान सीमा",
+    "systemDefault": "सिस्टम डिफ़ॉल्ट",
+    "activeUsersInRole": "इस भूमिका में सक्रिय उपयोगकर्ता",
+    "loadingShort": "लोड हो रहा है…",
+    "minimumRequestableCap": "न्यूनतम अनुरोध योग्य सीमा",
+    "reasonOptional": "कारण (वैकल्पिक)",
+    "reasonPlaceholder": "संक्षेप में बताएं कि आपको यह परिवर्तन क्यों चाहिए…",
+    "submitting": "सबमिट हो रहा है…",
+    "submitRequest": "अनुरोध सबमिट करें",
+    "submitSuccess": "अनुरोध सफलतापूर्वक सबमिट हो गया। सुपर एडमिन जल्द ही इसकी समीक्षा करेंगे।",
+    "errors": {
+      "roleRequired": "कृपया एक भूमिका चुनें।",
+      "capRequired": "कृपया अनुरोधित सीमा दर्ज करें।",
+      "capInvalid": "सीमा 0 या अधिक होनी चाहिए।",
+      "capBelowActive_one": "इस भूमिका में वर्तमान में {{count}} उपयोगकर्ता सक्रिय है। अनुरोधित सीमा कम से कम {{count}} होनी चाहिए।",
+      "capBelowActive_other": "इस भूमिका में वर्तमान में {{count}} उपयोगकर्ता सक्रिय हैं। अनुरोधित सीमा कम से कम {{count}} होनी चाहिए।",
+      "submitFailed": "अनुरोध सबमिट करने में विफल। कृपया पुनः प्रयास करें।"
+    },
+    "requestHistory": "अनुरोध इतिहास",
+    "loading": "लोड हो रहा है…",
+    "noRequestsYet": "अभी तक कोई अनुरोध सबमिट नहीं किया गया।",
+    "noMatch": "वर्तमान फ़िल्टर से कोई अनुरोध मेल नहीं खाता।",
+    "headers": {
+      "roleReason": "भूमिका / कारण",
+      "currentCap": "वर्तमान सीमा",
+      "requested": "अनुरोधित",
+      "status": "स्थिति",
+      "date": "दिनांक",
+      "superAdminNote": "सुपर एडमिन नोट"
+    },
+    "defaultCap": "डिफ़ॉल्ट ({{n}})"
   }
 }

@@ -305,5 +305,53 @@
       "maxRequired": "Max users must be 0 or more."
     },
     "deleteConfirm": "Remove the custom limit for {{role}} in {{dept}}? The system default of {{default}} will apply."
+  },
+  "capRequests": {
+    "stats": {
+      "total": "Total Requests",
+      "pending": "Pending",
+      "approved": "Approved",
+      "rejected": "Rejected"
+    },
+    "statusPending": "Pending",
+    "statusApproved": "Approved",
+    "statusRejected": "Rejected",
+    "newRequestTitle": "New Cap Change Request",
+    "newRequestSubtitle": "Request Super Admin to increase or decrease the maximum users allowed for a role in your department.",
+    "role": "Role",
+    "selectRole": "Select role",
+    "requestedMaxUsers": "Requested Max Users",
+    "enterNewCap": "Enter new cap",
+    "currentCap": "Current cap",
+    "systemDefault": "system default",
+    "activeUsersInRole": "Active users in this role",
+    "loadingShort": "loading…",
+    "minimumRequestableCap": "minimum requestable cap",
+    "reasonOptional": "Reason (optional)",
+    "reasonPlaceholder": "Briefly explain why you need this change…",
+    "submitting": "Submitting…",
+    "submitRequest": "Submit Request",
+    "submitSuccess": "Request submitted successfully. Super Admin will review it shortly.",
+    "errors": {
+      "roleRequired": "Please select a role.",
+      "capRequired": "Please enter the requested cap.",
+      "capInvalid": "Cap must be 0 or more.",
+      "capBelowActive_one": "{{count}} user is currently active in this role. Requested cap must be at least {{count}}.",
+      "capBelowActive_other": "{{count}} users are currently active in this role. Requested cap must be at least {{count}}.",
+      "submitFailed": "Failed to submit request. Please try again."
+    },
+    "requestHistory": "Request History",
+    "loading": "Loading…",
+    "noRequestsYet": "No requests submitted yet.",
+    "noMatch": "No requests match the current filter.",
+    "headers": {
+      "roleReason": "Role / Reason",
+      "currentCap": "Current Cap",
+      "requested": "Requested",
+      "status": "Status",
+      "date": "Date",
+      "superAdminNote": "Super Admin Note"
+    },
+    "defaultCap": "default ({{n}})"
   }
 }
