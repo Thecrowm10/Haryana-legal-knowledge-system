@@ -297,8 +297,8 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
         <div className="dvm-pane" style={{ borderRight: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#3a3d40' }}>
           <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', rowGap: 8, background: '#2d2f31', flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,.08)' }}>
             <Eye size={14} color="rgba(255,255,255,.7)" />
-            <span style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(255,255,255,.85)' }}>{docxHtml ? 'Document Preview' : 'Original PDF'}</span>
-            {searchQuery && !docxHtml && searchPages && searchPages.length > 0 && (
+            <span style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(255,255,255,.85)' }}>Original PDF</span>
+            {searchQuery && searchPages && searchPages.length > 0 && (
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(234,179,8,.15)', border: '1px solid rgba(234,179,8,.35)', borderRadius: 20, padding: '3px 4px 3px 10px' }}>
                 <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: '#fde68a', whiteSpace: 'nowrap' }}>
                   ★ Match {activeHitIdx + 1} of {searchPages.length} · p.{activeHitPage}
@@ -318,8 +318,7 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
               </div>
             )}
             <span style={{ flex: 1 }} />
-            {!docxHtml && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,.06)', borderRadius: 8, padding: '3px 6px', border: '1px solid rgba(255,255,255,.1)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,.06)', borderRadius: 8, padding: '3px 6px', border: '1px solid rgba(255,255,255,.1)' }}>
                 <button onClick={() => setZoom(z => Math.max(70, z - 10))}
                   style={{ ...iconBtn, width: 28, height: 28, background: 'transparent', border: 'none' }}
                   onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.1)'}
@@ -334,15 +333,12 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
                   <ZoomIn size={13} />
                 </button>
               </div>
-            )}
-            {!docxHtml && (
-              <button onClick={() => setRotation(r => (r + 90) % 360)}
+            <button onClick={() => setRotation(r => (r + 90) % 360)}
                 style={iconBtn}
                 onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.15)'}
                 onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,.08)'}>
                 <RotateCw size={14} />
               </button>
-            )}
             {blobUrl && (
               <a href={blobUrl} target="_blank" rel="noreferrer"
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 12px', borderRadius: 7, background: 'rgba(33, 74, 171,.25)', border: '1px solid rgba(33, 74, 171,.4)', color: '#93c5fd', textDecoration: 'none', fontSize: 11.5, fontWeight: 600, fontFamily: 'var(--font)', transition: 'background .15s' }}
