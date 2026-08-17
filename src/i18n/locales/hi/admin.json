@@ -350,7 +350,7 @@
       "requested": "अनुरोधित",
       "status": "स्थिति",
       "date": "दिनांक",
-      "superAdminNote": "सुपर एडमिन नोट"
+      "AdminNote": "एडमिन नोट"
     },
     "defaultCap": "डिफ़ॉल्ट ({{n}})"
   }

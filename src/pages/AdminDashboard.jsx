@@ -2024,7 +2024,7 @@ export default function AdminDashboard({ activePage }) {
                       <span style={{ padding: '3px 9px', borderRadius: 6, fontSize: 11.5, fontWeight: 600, color: sb.color, background: sb.bg }}>{sb.label}</span>
                     </div>
                     <div style={{ fontSize: 12, color: 'var(--text-color-secondary)' }}>{req.created_at?.split('T')[0] || '—'}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-color-secondary)' }}>{req.super_admin_note || '—'}</div>
+                    {/* <div style={{ fontSize: 12, color: 'var(--text-color-secondary)' }}>{req.super_admin_note || '—'}</div> */}
                   </div>
                 );
               })}

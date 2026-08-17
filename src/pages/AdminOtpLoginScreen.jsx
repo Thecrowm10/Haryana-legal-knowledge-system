@@ -104,7 +104,7 @@ export default function AdminOtpLoginScreen({ onBack, onSuccess }) {
           <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:20, paddingBottom:16, borderBottom:'1px solid rgba(255,255,255,.08)' }}>
             <img src={haryanaLogo} alt="Haryana Government" loading="lazy" style={{ width:38, height:38, objectFit:'contain' }} />
             <div>
-              <div style={{ fontSize:13, fontWeight:700, color:'#fff' }}>Admin / Super Admin</div>
+              <div style={{ fontSize:13, fontWeight:700, color:'#fff' }}>Admin </div>
               <div style={{ fontSize:11, color:'rgba(255,255,255,.35)' }}>Secure OTP Login</div>
             </div>
             <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:5 }}>

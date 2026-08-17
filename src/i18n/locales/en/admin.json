@@ -317,7 +317,7 @@
     "statusApproved": "Approved",
     "statusRejected": "Rejected",
     "newRequestTitle": "New Cap Change Request",
-    "newRequestSubtitle": "Request Super Admin to increase or decrease the maximum users allowed for a role in your department.",
+    "newRequestSubtitle": "Request Admin to increase or decrease the maximum users allowed for a role in your department.",
     "role": "Role",
     "selectRole": "Select role",
     "requestedMaxUsers": "Requested Max Users",
@@ -331,7 +331,7 @@
     "reasonPlaceholder": "Briefly explain why you need this change…",
     "submitting": "Submitting…",
     "submitRequest": "Submit Request",
-    "submitSuccess": "Request submitted successfully. Super Admin will review it shortly.",
+    "submitSuccess": "Request submitted successfully. Admin will review it shortly.",
     "errors": {
       "roleRequired": "Please select a role.",
       "capRequired": "Please enter the requested cap.",
@@ -350,7 +350,7 @@
       "requested": "Requested",
       "status": "Status",
       "date": "Date",
-      "superAdminNote": "Super Admin Note"
+      "AdminNote": "Admin Note"
     },
     "defaultCap": "default ({{n}})"
   }
