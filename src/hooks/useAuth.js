@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import api from '../services/api';
 import { changePassword as changePasswordApi } from '../services/pdf';
 import { encryptLoginPayload } from '../services/crypto';
@@ -63,6 +63,7 @@ export function useAuth() {
   const [user, setUser]       = useState(restoreUserFromToken);
   const [error, setError]     = useState('');
   const [loading, setLoading] = useState(false);
+  const lastRefreshRef        = useRef(0);
 
   useEffect(() => {
     const handler = () => setUser(null);
@@ -76,10 +77,33 @@ export function useAuth() {
   useEffect(() => {
     if (!user || user.role === 'citizen') return;
 
+    // Refresh the JWT when the user is active and the token has < 5 min left.
+    // Capped at one API call per minute to avoid hammering on rapid mouse events.
+    async function refreshTokenIfNeeded() {
+      const now = Date.now();
+      if (now - lastRefreshRef.current < 60_000) return;
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      const payload = decodeJwt(token);
+      if (!payload || !payload.exp) return;
+      if (payload.exp * 1000 - now > 5 * 60 * 1000) return; // more than 5 min left
+      lastRefreshRef.current = now;
+      try {
+        const res = await api.post('/auth/refresh');
+        const newToken = res.data.access_token;
+        localStorage.setItem('token', newToken);
+        const newPayload = decodeJwt(newToken);
+        if (newPayload) setUser(userFromPayload(newPayload));
+      } catch {
+        // silent — the 401 interceptor or idle timer will handle actual expiry
+      }
+    }
+
     let timer;
     const resetTimer = () => {
       clearTimeout(timer);
       timer = setTimeout(() => logout(), IDLE_TIMEOUT_MS);
+      refreshTokenIfNeeded();
     };
 
     IDLE_EVENTS.forEach(evt => window.addEventListener(evt, resetTimer));
