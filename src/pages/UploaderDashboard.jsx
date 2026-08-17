@@ -1390,8 +1390,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         resubmit:               !editFileSelected && editingDoc.status === 'rejected',
       };
       await updatePdfMetadata(editingDoc.id, payload);
-      if (!editFileSelected && editingDoc.status === 'rejected') {
-        setUploads(prev => prev.map(d => d.id === editingDoc.id ? { ...d, status: 'pending' } : d));
+       if (!editFileSelected && editingDoc.status === 'rejected') {
+        setUploads(prev => prev.map(d => d.id === editingDoc.id ? { ...d, status: 'pending', approval: null } : d));
       }
       const successMsg = editFileSelected && editingDoc.status === 'rejected'
         ? t('toasts.fileReplacedAndResubmitted')
@@ -1788,7 +1788,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   // Non-Act types must be linked to a parent Act / legal authority before the rest of the details unlock.
   const usesLegalAuthorities = ['Circular', 'Miscellaneous', 'Notification', 'Order/Gazette', 'Policy'].includes(form.type);
   const actChosen = usesLegalAuthorities ? legalAuthorities.some(a => a.act) : !!hierarchy.act;
-  const detailsLocked = !!form.type && form.type !== 'Act' && !actChosen;
+  // const detailsLocked = !!form.type && form.type !== 'Act' && !actChosen;
+  const detailsLocked = false;
   const primaryActId = usesLegalAuthorities ? (legalAuthorities.find(a => a.actId)?.actId ?? null) : (hierarchy.actId ?? null);
   const [actChildren, setActChildren] = useState(null);
   const [actChildrenLoading, setActChildrenLoading] = useState(false);
@@ -5706,7 +5707,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             {form.type !== 'Act' && (
               <div style={{ gridColumn: '1 / -1' }}>
                 <div style={{ ...LABEL, marginBottom: 6 }}>
-                  {form.type === 'Amendment' ? t('wizard.step3.parentActLabel') : t('wizard.step3.legalAuthorityLabel')} <span style={{ color: '#dc3545' }}>*</span>
+                  {form.type === 'Amendment' ? t('wizard.step3.parentActLabel') : t('wizard.step3.legalAuthorityLabel')} 
+                  {/* <span style={{ color: '#dc3545' }}>*</span> */}
                 </div>
                 <HierarchyTag hierarchy={hierarchy} onOpen={() => { setDrawerHierarchy({ ...hierarchy }); setDrawerType('hierarchy'); }} isRef={true} legalAuthorities={usesLegalAuthorities ? legalAuthorities : undefined} />
                 {detailsLocked && (

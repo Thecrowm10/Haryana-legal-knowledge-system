@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import {
   CheckCircle, XCircle, FileText, ChevronDown, Search, Clock,
   Check, X, Eye, Link, ChevronRight, ArrowRight,
-  ZoomIn, ZoomOut, RotateCw, ExternalLink, Plus, Highlighter, MessageCircle,
+  ZoomIn, ZoomOut, RotateCw, ExternalLink, Plus, Highlighter, MessageCircle, Pencil,
 } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
@@ -86,6 +86,11 @@ function ConfirmDialog({ decision, docTitle, onConfirm, onCancel }) {
             <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', lineHeight: 1.55, fontFamily: 'var(--font)', wordBreak: 'break-word' }}>
               {t(isApprove ? 'common.confirmApproveBody' : 'common.confirmRejectBody')}
             </div>
+            {isApprove && (
+              <div style={{ marginTop: 8, fontSize: 11.5, color: '#b45309', background: 'rgba(255, 193, 7,.1)', border: '1px solid rgba(255, 193, 7,.3)', borderRadius: 6, padding: '6px 10px', fontFamily: 'var(--font)' }}>
+                {t('common.confirmApproveRemarksNote')}
+              </div>
+            )}
           </div>
         </div>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
@@ -167,7 +172,7 @@ function PageNav({ currentPage, totalPages, onPageChange }) {
 // PDF Viewer Panel
 // Renders real PDFs as stacked canvases (pdfjs-dist) so scroll can be detected
 // and synced with OcrTextPanel. Mock docs use the styled layout fallback.
-function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, rotation, onRotate, blobUrl, onTotalPagesChange, annotations = [], onAnnotationsChange, highlightMode = false, onHighlightModeChange, onScrollRef, docxHtml = null }) {
+function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, rotation, onRotate, blobUrl, onTotalPagesChange, annotations = [], onAnnotationsChange, highlightMode = false, onHighlightModeChange, onScrollRef, onDeleteRef, docxHtml = null }) {
   const { t } = useTranslation('approver');
   const [zoom, setZoom]     = useState(100);
   const containerRef        = useRef(null);
@@ -427,6 +432,10 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
       }
     };
   });
+  useEffect(() => {
+    if (!onDeleteRef) return;
+    onDeleteRef.current = (id) => handleDeleteDocxAnnotation(id);
+  });
 
   function confirmAnnotation() {
     if (!pendingRect) return;
@@ -473,19 +482,21 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
           </div>
         )}
         {/* Highlight mode toggle + color palette */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 6, flexShrink: 0 }}>
-          <button
-            onClick={() => onHighlightModeChange?.(!highlightMode)}
-            title={highlightMode ? t('pdfViewer.exitHighlightMode') : docxHtml ? t('pdfViewer.selectTextToHighlight') : t('pdfViewer.drawHighlightOnPdf')}
-            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 5, border: highlightMode ? '1.5px solid #ffc107' : '1px solid var(--surface-border)', background: highlightMode ? 'rgba(255, 193, 7,.12)' : 'var(--surface-ground)', color: highlightMode ? '#b45309' : 'var(--text-color-secondary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'all .15s' }}>
-            <Highlighter size={11} />
-            {highlightMode ? t('pdfViewer.exitHighlight') : t('pdfViewer.highlight')}
-          </button>
-          {highlightMode && ['rgba(253,224,71,.55)', 'rgba(134,239,172,.55)', 'rgba(147,197,253,.55)', 'rgba(249,168,212,.55)'].map(c => (
-            <button key={c} onClick={() => setSelectedColor(c)} title={t('pdfViewer.pickColor')}
-              style={{ width: 18, height: 18, borderRadius: '50%', background: c, border: selectedColor === c ? '2.5px solid #374151' : '1px solid rgba(0,0,0,.2)', cursor: 'pointer', padding: 0, flexShrink: 0 }} />
-          ))}
-        </div>
+        {onHighlightModeChange && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 6, flexShrink: 0 }}>
+            <button
+              onClick={() => onHighlightModeChange?.(!highlightMode)}
+              title={highlightMode ? t('pdfViewer.exitHighlightMode') : docxHtml ? t('pdfViewer.selectTextToHighlight') : t('pdfViewer.drawHighlightOnPdf')}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 5, border: highlightMode ? '1.5px solid #ffc107' : '1px solid var(--surface-border)', background: highlightMode ? 'rgba(255, 193, 7,.12)' : 'var(--surface-ground)', color: highlightMode ? '#b45309' : 'var(--text-color-secondary)', fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'all .15s' }}>
+              <Highlighter size={11} />
+              {highlightMode ? t('pdfViewer.exitHighlight') : t('pdfViewer.highlight')}
+            </button>
+            {highlightMode && ['rgba(253,224,71,.55)', 'rgba(134,239,172,.55)', 'rgba(147,197,253,.55)', 'rgba(249,168,212,.55)'].map(c => (
+              <button key={c} onClick={() => setSelectedColor(c)} title={t('pdfViewer.pickColor')}
+                style={{ width: 18, height: 18, borderRadius: '50%', background: c, border: selectedColor === c ? '2.5px solid #374151' : '1px solid rgba(0,0,0,.2)', cursor: 'pointer', padding: 0, flexShrink: 0 }} />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Content area */}
@@ -639,8 +650,10 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
 // Document Details Panel
 // Shows every field the uploader filled in: metadata, description, hierarchy,
 // type-specific fields, legal authorities, relationships, amendment provisions.
-function DocumentDetailsPanel({ doc, reviewAnnotations = [], onScrollToAnnotation }) {
+function DocumentDetailsPanel({ doc, reviewAnnotations = [], onScrollToAnnotation, onDeleteAnnotation, onEditAnnotation }) {
   const { t } = useTranslation('approver');
+  const [editingId, setEditingId] = useState(null);
+  const [editDraft, setEditDraft] = useState('');
   // Always show every field — blank (not hidden) when it wasn't filled in,
   // so the full shape of what could have been entered is visible.
   const meta = [
@@ -885,28 +898,77 @@ function DocumentDetailsPanel({ doc, reviewAnnotations = [], onScrollToAnnotatio
           <div>
             <div style={{ ...LABEL, marginBottom: 8 }}>{t('documentDetails.highlights', { count: reviewAnnotations.length })}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {reviewAnnotations.map(ann => (
-                <div key={ann.id} role="button" tabIndex={0} onClick={() => onScrollToAnnotation?.(ann)}
-                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onScrollToAnnotation?.(ann); } }}
-                  style={{ display: 'flex', gap: 10, padding: '9px 12px', borderRadius: 8, background: ann.color, border: '1px solid rgba(0,0,0,.1)', alignItems: 'flex-start', cursor: 'pointer', transition: 'filter .15s' }}
-                  onMouseEnter={e => e.currentTarget.style.filter = 'brightness(.92)'}
-                  onMouseLeave={e => e.currentTarget.style.filter = 'none'}>
-                  {ann.isDocx ? (
-                    <>
-                      <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, color: 'rgba(0,0,0,.5)', flexShrink: 0, marginTop: 2 }}>T</span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        {ann.text && <div style={{ fontSize: 10.5, color: 'rgba(0,0,0,.55)', fontStyle: 'italic', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>"{ann.text.slice(0, 45)}{ann.text.length > 45 ? '…' : ''}"</div>}
-                        <div style={{ fontSize: 12, color: 'rgba(0,0,0,.75)', lineHeight: 1.4 }}>{ann.comment || <span style={{ opacity: 0.5 }}>{t('common.noComment')}</span>}</div>
+              {reviewAnnotations.map(ann => {
+                const isEditing = editingId === ann.id;
+                return (
+                  <div key={ann.id} role={isEditing ? undefined : 'button'} tabIndex={isEditing ? undefined : 0}
+                    onClick={() => !isEditing && onScrollToAnnotation?.(ann)}
+                    onKeyDown={e => { if (!isEditing && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onScrollToAnnotation?.(ann); } }}
+                    style={{ display: 'flex', gap: 10, padding: '9px 12px', borderRadius: 8, background: ann.color, border: '1px solid rgba(0,0,0,.1)', alignItems: 'flex-start', cursor: isEditing ? 'default' : 'pointer', transition: 'filter .15s' }}
+                    onMouseEnter={e => { if (!isEditing) e.currentTarget.style.filter = 'brightness(.92)'; }}
+                    onMouseLeave={e => e.currentTarget.style.filter = 'none'}>
+
+                    <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, color: 'rgba(0,0,0,.5)', flexShrink: 0, marginTop: 2 }}>
+                      {ann.isDocx ? 'T' : `P${ann.page}`}
+                    </span>
+
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      {ann.isDocx && ann.text && (
+                        <div style={{ fontSize: 10.5, color: 'rgba(0,0,0,.55)', fontStyle: 'italic', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          "{ann.text.slice(0, 45)}{ann.text.length > 45 ? '…' : ''}"
+                        </div>
+                      )}
+
+                      {isEditing ? (
+                        <div onClick={e => e.stopPropagation()} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          <textarea
+                            autoFocus
+                            rows={2}
+                            value={editDraft}
+                            onChange={e => setEditDraft(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { onEditAnnotation?.(ann.id, editDraft.trim()); setEditingId(null); }
+                              if (e.key === 'Escape') setEditingId(null);
+                            }}
+                            style={{ width: '100%', resize: 'none', borderRadius: 6, border: '1px solid rgba(0,0,0,.2)', background: 'rgba(255,255,255,.6)', fontSize: 12.5, fontFamily: 'var(--font)', padding: '6px 8px', boxSizing: 'border-box' }}
+                          />
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <button onClick={() => { onEditAnnotation?.(ann.id, editDraft.trim()); setEditingId(null); }}
+                              style={{ fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 6, border: 'none', background: 'rgba(0,0,0,.75)', color: 'white', cursor: 'pointer' }}>
+                              {t('common.save')}
+                            </button>
+                            <button onClick={() => setEditingId(null)}
+                              style={{ fontSize: 11, fontWeight: 600, padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(0,0,0,.2)', background: 'transparent', cursor: 'pointer' }}>
+                              {t('common.cancel')}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: ann.isDocx ? 12 : 12.5, color: 'rgba(0,0,0,.75)', lineHeight: ann.isDocx ? 1.4 : 1.5 }}>
+                          {ann.comment || <span style={{ opacity: 0.5 }}>{t('common.noComment')}</span>}
+                        </div>
+                      )}
+                    </div>
+
+                    {!isEditing && onEditAnnotation && onDeleteAnnotation && (
+                      <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                        <button
+                          title={t('common.edit')}
+                          onClick={e => { e.stopPropagation(); setEditingId(ann.id); setEditDraft(ann.comment || ''); }}
+                          style={{ width: 22, height: 22, borderRadius: 5, border: 'none', background: 'rgba(0,0,0,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'rgba(0,0,0,.6)' }}>
+                          <Pencil size={11} />
+                        </button>
+                        <button
+                          title={t('common.delete')}
+                          onClick={e => { e.stopPropagation(); onDeleteAnnotation?.(ann); }}
+                          style={{ width: 22, height: 22, borderRadius: 5, border: 'none', background: 'rgba(220, 53, 69,.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#dc2626' }}>
+                          <X size={12} />
+                        </button>
                       </div>
-                    </>
-                  ) : (
-                    <>
-                      <span style={{ fontSize: 10, fontFamily: 'var(--mono)', fontWeight: 700, color: 'rgba(0,0,0,.5)', flexShrink: 0, marginTop: 2 }}>P{ann.page}</span>
-                      <span style={{ fontSize: 12.5, color: 'rgba(0,0,0,.75)', lineHeight: 1.5, flex: 1 }}>{ann.comment || <span style={{ opacity: 0.5 }}>{t('common.noComment')}</span>}</span>
-                    </>
-                  )}
-                </div>
-              ))}
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -931,6 +993,7 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, deciding })
   });
   const [highlightMode, setHighlightMode] = useState(false);
   const pdfScrollRef = useRef(null);
+  const pdfDeleteRef = useRef(null);
 
   const [remarkLines, setRemarkLines] = useState(() => {
     if (!remarks) return [''];
@@ -998,9 +1061,12 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, deciding })
             currentPage={currentPage} onPageChange={setCurrentPage} totalPages={totalPages}
             rotation={rotation} onRotate={() => setRotation(r => (r + 90) % 360)}
             blobUrl={blobUrl} onTotalPagesChange={setPdfTotalPages}
-            annotations={annotations} onAnnotationsChange={setAnnotations}
-            highlightMode={highlightMode} onHighlightModeChange={setHighlightMode}
+            annotations={annotations}
+            onAnnotationsChange={doc.status === 'pending' ? setAnnotations : undefined}
+            highlightMode={doc.status === 'pending' ? highlightMode : false}
+            onHighlightModeChange={doc.status === 'pending' ? setHighlightMode : undefined}
             onScrollRef={pdfScrollRef}
+            onDeleteRef={doc.status === 'pending' ? pdfDeleteRef : { current: null }}
           />
         </div>
 
@@ -1008,8 +1074,12 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, deciding })
         <div className="ap-split-pane" style={{ overflow: 'hidden' }}>
           <DocumentDetailsPanel
             doc={{ ...doc, pages: totalPages }}
-            reviewAnnotations={annotations}
+            reviewAnnotations={doc.status === 'approved' ? [] : annotations}
             onScrollToAnnotation={(ann) => pdfScrollRef.current?.(ann)}
+            onDeleteAnnotation={doc.status === 'pending' ? (ann) => pdfDeleteRef.current?.(ann.id) : undefined}
+            onEditAnnotation={doc.status === 'pending'
+              ? (id, newComment) => setAnnotations(prev => prev.map(a => a.id === id ? { ...a, comment: newComment } : a))
+              : undefined}
           />
         </div>
       </div>
@@ -1583,7 +1653,7 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
           docTitle={lr.document_name}
           onCancel={() => setConfirmDecision(null)}
           onConfirm={() => {
-            if (confirmDecision === 'approved') onReview(lr.link_id, 'approved', buildComments(), buildAnnotationsJson());
+            if (confirmDecision === 'approved') onReview(lr.link_id, 'approved', null, buildAnnotationsJson());
             else onReview(lr.link_id, 'rejected', buildComments(), buildAnnotationsJson());
             setConfirmDecision(null);
           }}
@@ -1731,14 +1801,14 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
 
   function decide(id, decision, annotations = []) {
     const doc      = docs.find(d => d.id === id);
-    const remark   = remarks[id] || '';
+    const remark   = decision === 'rejected' ? (remarks[id] || '') : '';
     const hasToken = !!localStorage.getItem('token');
     const annotationsJson = annotations.length ? JSON.stringify(annotations) : undefined;
     setDeciding({ id, action: decision });
 
     function apply() {
       setDocs(ds => ds.map(d => d.id === id
-        ? { ...d, status: decision, ...(remark ? { remarks: remark } : {}) }
+        ? { ...d, status: decision, ...(remark ? { remarks: remark } : {}), ...(annotationsJson ? { annotationsJson } : {}) }
         : d
       ));
       if (decision === 'approved') onApprove?.(id);

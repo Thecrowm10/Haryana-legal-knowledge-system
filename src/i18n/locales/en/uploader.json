@@ -512,7 +512,7 @@
       "selectActEmpty": "No Acts found in your department yet",
       "structureHeading": "Chapter & Section Structure",
       "withChaptersOption": "Add Chapters and Sections",
-      "withChaptersDesc": "Group sections under chapters, like India Code",
+      "withChaptersDesc": "Group sections under chapters",
       "withoutChaptersOption": "Add Sections",
       "withoutChaptersDesc": "A flat list of sections, no chapter grouping",
       "chapterNumber": "Chapter {{number}}",
