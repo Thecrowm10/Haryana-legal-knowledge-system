@@ -1653,7 +1653,7 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
           docTitle={lr.document_name}
           onCancel={() => setConfirmDecision(null)}
           onConfirm={() => {
-            if (confirmDecision === 'approved') onReview(lr.link_id, 'approved', null, buildAnnotationsJson());
+            if (confirmDecision === 'approved') onReview(lr.link_id, 'approved', null, null);
             else onReview(lr.link_id, 'rejected', buildComments(), buildAnnotationsJson());
             setConfirmDecision(null);
           }}
@@ -1803,7 +1803,7 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
     const doc      = docs.find(d => d.id === id);
     const remark   = decision === 'rejected' ? (remarks[id] || '') : '';
     const hasToken = !!localStorage.getItem('token');
-    const annotationsJson = annotations.length ? JSON.stringify(annotations) : undefined;
+    const annotationsJson = decision === 'rejected' && annotations.length ? JSON.stringify(annotations) : null;
     setDeciding({ id, action: decision });
 
     function apply() {
