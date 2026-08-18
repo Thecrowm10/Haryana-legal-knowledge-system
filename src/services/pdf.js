@@ -38,4 +38,6 @@ export const getActChildren            = (pdf_id)                       => api.g
 export const getPdfFull                = (act_id)                       => publicApi.get(`/pdf/${act_id}/full`);
 export const getMyDepartmentActs       = (status, skip = 0, limit = 20)  => api.get('/pdf/my-department/acts', { params: { skip, limit, ...(status ? { status } : {}) } });
 export const getMyDepartmentDocsByType = (doc_type_id, status, skip = 0, limit = 20) => api.get('/pdf/my-department/by-type', { params: { doc_type_id, skip, limit, ...(status ? { status } : {}) } });
-export const replaceDocumentFile = (docId, file_ref, resubmit = false) => api.post(`/pdf/${docId}/replace-file`, { file_ref, resubmit });
+export const replaceDocumentFile      = (docId, file_ref, resubmit = false) => api.post(`/pdf/${docId}/replace-file`, { file_ref, resubmit });
+export const saveAnnotationDraft      = (pdf_id, comments, annotations_json) => api.post('/pdf/annotation-draft', { pdf_id, comments: comments || null, annotations_json: annotations_json || null });
+export const getAnnotationDraft       = (pdf_id) => api.get(`/pdf/${pdf_id}/annotation-draft`);

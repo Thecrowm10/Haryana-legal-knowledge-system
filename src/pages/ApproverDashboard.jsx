@@ -11,7 +11,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import { useAuth } from '../hooks/useAuth';
-import { getApproverDocuments, getPdfFile, reviewDocument, getDepartmentLinkRequests, reviewDepartmentLink } from '../services/pdf';
+import { getApproverDocuments, getPdfFile, reviewDocument, getDepartmentLinkRequests, reviewDepartmentLink, saveAnnotationDraft, getAnnotationDraft } from '../services/pdf';
 import { createNotification } from '../services/notifications';
 import { getAllActPartSubmissions, getAllActParts, reviewActPart } from '../services/act_parts';
 import { useMediaQuery } from '../hooks/useMediaQuery';
@@ -992,6 +992,8 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, deciding })
     catch { return []; }
   });
   const [highlightMode, setHighlightMode] = useState(false);
+  const [draftSavedAt, setDraftSavedAt]   = useState(null);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
   const pdfScrollRef = useRef(null);
   const pdfDeleteRef = useRef(null);
 
@@ -1002,6 +1004,10 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, deciding })
     return texts.length > 0 ? texts : [''];
   });
   const hasRemarks = remarkLines.some(l => l.trim());
+
+  const currentRemark = remarkLines.some(l => l.trim())
+    ? remarkLines.map((l, i) => `Remark ${i + 1}: ${l}`).join('\n')
+    : '';
 
   function updateRemark(idx, val) {
     const updated = remarkLines.map((r, i) => i === idx ? val : r);
@@ -1045,6 +1051,41 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, deciding })
       .catch(() => {});
     return () => { if (url) URL.revokeObjectURL(url); };
   }, [doc.id]);
+
+  // Load annotation draft when this document is opened for review
+  useEffect(() => {
+    if (!doc.id || doc.status !== 'pending') return;
+    getAnnotationDraft(doc.id)
+      .then(res => {
+        const d = res.data;
+        if (d.annotations_json) {
+          try { setAnnotations(JSON.parse(d.annotations_json)); } catch {}
+        }
+        if (d.comments) {
+          const lines = d.comments.split('\n').filter(l => l.trim());
+          const texts = lines.map(l => l.replace(/^Remark \d+:\s*/, ''));
+          const newLines = texts.length > 0 ? texts : [''];
+          setRemarkLines(newLines);
+          onRemarksChange(d.comments);
+        }
+        setDraftSavedAt(new Date(d.saved_at));
+      })
+      .catch(() => {});
+  }, [doc.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function saveDraft() {
+    if (isSavingDraft) return;
+    setIsSavingDraft(true);
+    try {
+      const res = await saveAnnotationDraft(
+        doc.id,
+        currentRemark || null,
+        annotations.length > 0 ? JSON.stringify(annotations) : null,
+      );
+      setDraftSavedAt(new Date(res.data.saved_at));
+    } catch {}
+    finally { setIsSavingDraft(false); }
+  }
 
   const docWithUrl = blobUrl ? { ...doc, fileUrl: blobUrl } : doc;
 
@@ -1131,17 +1172,36 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, deciding })
 
           {/* Add Remark + action buttons row */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <button onClick={addRemark}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                background: 'transparent', border: '1.5px dashed var(--surface-border)',
-                color: 'var(--primary)', borderRadius: 7, padding: '6px 14px',
-                fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.background = 'rgba(33, 74, 171,.05)'; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--surface-border)'; e.currentTarget.style.background = 'transparent'; }}>
-              <Plus size={13} /> {t('common.addRemark')}
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <button onClick={addRemark}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  background: 'transparent', border: '1.5px dashed var(--surface-border)',
+                  color: 'var(--primary)', borderRadius: 7, padding: '6px 14px',
+                  fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.background = 'rgba(33, 74, 171,.05)'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--surface-border)'; e.currentTarget.style.background = 'transparent'; }}>
+                <Plus size={13} /> {t('common.addRemark')}
+              </button>
+              <button onClick={saveDraft} disabled={isSavingDraft}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  background: 'rgba(100, 116, 139,.08)', border: '1px solid rgba(100, 116, 139,.25)',
+                  color: '#475569', borderRadius: 7, padding: '6px 14px',
+                  fontSize: 12.5, fontWeight: 600, cursor: isSavingDraft ? 'not-allowed' : 'pointer',
+                  fontFamily: 'var(--font)', opacity: isSavingDraft ? 0.6 : 1,
+                }}
+                onMouseEnter={e => { if (!isSavingDraft) { e.currentTarget.style.background = 'rgba(100, 116, 139,.15)'; e.currentTarget.style.borderColor = 'rgba(100, 116, 139,.4)'; }}}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(100, 116, 139,.08)'; e.currentTarget.style.borderColor = 'rgba(100, 116, 139,.25)'; }}>
+                <FileText size={13} /> {isSavingDraft ? 'Saving…' : 'Save Draft'}
+              </button>
+              {draftSavedAt && (
+                <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', fontFamily: 'var(--font)' }}>
+                  Draft saved {draftSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
+            </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={() => setConfirmDecision('rejected')} disabled={!!deciding || !hasRemarks}
                 title={!hasRemarks ? t('common.enterRemarkBeforeRejecting') : undefined}

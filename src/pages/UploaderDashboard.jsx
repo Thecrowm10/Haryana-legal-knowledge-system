@@ -1131,7 +1131,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       dept:            d.department_name || t('common.unassigned'),
       year:            d.issue_date ? new Date(d.issue_date).getFullYear() : new Date(d.created_at).getFullYear(),
       status:          d.status || 'pending',
-      workflowStatus:  d.status === 'approved' ? WORKFLOW_STATUS.PUBLISHED : d.status === 'rejected' ? WORKFLOW_STATUS.DRAFT : WORKFLOW_STATUS.PENDING,
+      workflowStatus:  d.status === 'approved' ? WORKFLOW_STATUS.PUBLISHED : (d.status === 'rejected' || d.status === 'draft') ? WORKFLOW_STATUS.DRAFT : WORKFLOW_STATUS.PENDING,
       version:         d.version_no || '1.0',
       fileName:        d.original_filename,
       fileSize:        d.file_size,
@@ -1341,8 +1341,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         } else {
           description = editForm.description; // already updated by handleEditFileSelect
         }
-        // Rejected docs are always resubmitted when file is replaced
-        const resubmit = editingDoc.status === 'rejected';
+        // Rejected and saved-draft docs are always resubmitted when file is replaced
+        const resubmit = editingDoc.status === 'rejected' || editingDoc.status === 'draft';
         const replaceRes = await replaceDocumentFile(editingDoc.id, file_ref, resubmit);
         const updatedDoc = mapApiDoc(replaceRes.data);
         // Old annotation positions don't apply to the new file — clear them immediately
@@ -1387,10 +1387,10 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         no_of_orders:           tf.noOfOrders ? parseInt(tf.noOfOrders, 10) || null : null,
         keywords:               tf.keywords || '',
         tag_ids:                [],
-        resubmit:               !editFileSelected && editingDoc.status === 'rejected',
+        resubmit:               !editFileSelected && (editingDoc.status === 'rejected' || editingDoc.status === 'draft'),
       };
       await updatePdfMetadata(editingDoc.id, payload);
-       if (!editFileSelected && editingDoc.status === 'rejected') {
+       if (!editFileSelected && (editingDoc.status === 'rejected' || editingDoc.status === 'draft')) {
         setUploads(prev => prev.map(d => d.id === editingDoc.id ? { ...d, status: 'pending', approval: null } : d));
       }
       const successMsg = editFileSelected && editingDoc.status === 'rejected'
@@ -2044,10 +2044,10 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   function removeRelation(idx) { setRelations(r => r.filter((_, i) => i !== idx)); }
 
   // Finalize upload after conflict check
-  async function finalizeUpload(newDocs, finalRelations) {
+  async function finalizeUpload(newDocs, finalRelations, { keepAsDraft = false } = {}) {
     const docsWithWorkflow = newDocs.map(d => ({ ...d, workflowStatus: WORKFLOW_STATUS.DRAFT }));
 
-    // Add to system (status = pending, workflowStatus = DRAFT)
+    // Add to system (status = pending/draft, workflowStatus = DRAFT)
     docsWithWorkflow.forEach(doc => {
       const uid = `upload-${doc.id}`;
       onAddDocument?.({ ...doc, uid }, finalRelations);
@@ -2060,14 +2060,17 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     setLegalAuthorities([{ act: '', sections: [''] }]);
     setTypeFields({});
 
-    // Move newly uploaded docs from DRAFT to PENDING (queued for approver review)
-    setTimeout(() => {
-      setUploads(u => u.map(ud =>
-        docsWithWorkflow.some(d => d.id === ud.id) ? { ...ud, workflowStatus: WORKFLOW_STATUS.PENDING } : ud
-      ));
-    }, 1800);
+    // Move newly uploaded docs from DRAFT to PENDING (queued for approver review).
+    // Saved drafts stay in DRAFT workflow state until the user submits them.
+    if (!keepAsDraft) {
+      setTimeout(() => {
+        setUploads(u => u.map(ud =>
+          docsWithWorkflow.some(d => d.id === ud.id) ? { ...ud, workflowStatus: WORKFLOW_STATUS.PENDING } : ud
+        ));
+      }, 1800);
+    }
 
-    onAuditLog?.(`Uploaded ${docsWithWorkflow.length} document(s): ${docsWithWorkflow.map(d => d.title).join(', ')}`);
+    onAuditLog?.(`${keepAsDraft ? 'Draft saved' : 'Uploaded'} ${docsWithWorkflow.length} document(s): ${docsWithWorkflow.map(d => d.title).join(', ')}`);
   }
 
   // Runs the OCR eligibility check (POST /pdf/upload-file) for any files not yet checked.
@@ -2118,9 +2121,9 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     setUploadStep('ready');
   }
 
-  // Upload file and save metadata
-  async function handleSubmit(e) {
-    e.preventDefault();
+  // Upload file and save metadata. Pass saveAsDraft=true to save as draft instead of submitting for approval.
+  async function handleSubmit(e, saveAsDraft = false) {
+    if (e) e.preventDefault();
     if (files.length === 0) return;
 
     setUploadError('');
@@ -2265,18 +2268,21 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                 : '';
               return (fileMeta[f.name]?.desc || form.desc || '') + suffix;
             })(),
+            status:                saveAsDraft ? 'draft' : 'pending',
           };
           const res2 = await uploadPdfMetadata(payload);
           apiDoc = res2.data;
-          createNotification({
-            toRole:       'approver',
-            type:         'new_upload',
-            title:        'New Document Submitted',
-            message:      `"${fileMeta[f.name]?.documentName || f.name}" uploaded by ${user?.name || user?.username || 'Uploader'} — awaiting your review`,
-            docId:        apiDoc?.id,
-            docTitle:     fileMeta[f.name]?.documentName || f.name,
-            uploaderName: user?.name || user?.username,
-          });
+          if (!saveAsDraft) {
+            createNotification({
+              toRole:       'approver',
+              type:         'new_upload',
+              title:        'New Document Submitted',
+              message:      `"${fileMeta[f.name]?.documentName || f.name}" uploaded by ${user?.name || user?.username || 'Uploader'} — awaiting your review`,
+              docId:        apiDoc?.id,
+              docTitle:     fileMeta[f.name]?.documentName || f.name,
+              uploaderName: user?.name || user?.username,
+            });
+          }
         } catch (err) {
           const detail = err.response?.data?.detail;
           const message = typeof detail === 'string' ? detail : t('toasts.saveMetadataFailed', { fileName: f.name });
@@ -2302,7 +2308,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         type:          typeObj?.name || form.type || 'Act',
         dept:          user?.dept || form.dept || 'General Administration',
         year:          form.enactmentDate ? new Date(form.enactmentDate).getFullYear() : new Date().getFullYear(),
-        status:        'pending',
+        status:        saveAsDraft ? 'draft' : 'pending',
         legalStatus:   'active',
         pages:         /\.docx?$/i.test(f.name) ? null : (numPages || 1),
         uploader:      user?.name || 'Uploader',
@@ -2332,15 +2338,28 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         ocrConfidence:  extractedText ? 95 : null,
       });
 
-      createNotification({
-        toRole:       'approver',
-        type:         'new_upload',
-        title:        'New Document Submitted',
-        message:      `"${fileMeta[f.name]?.documentName || f.name}" uploaded by ${user?.name || user?.username || 'Uploader'} — awaiting your review`,
-        docId:        apiDoc?.id ?? null,
-        docTitle:     fileMeta[f.name]?.documentName || f.name,
-        uploaderName: user?.name || user?.username,
-      });
+      if (!saveAsDraft) {
+        createNotification({
+          toRole:       'approver',
+          type:         'new_upload',
+          title:        'New Document Submitted',
+          message:      `"${fileMeta[f.name]?.documentName || f.name}" uploaded by ${user?.name || user?.username || 'Uploader'} — awaiting your review`,
+          docId:        apiDoc?.id ?? null,
+          docTitle:     fileMeta[f.name]?.documentName || f.name,
+          uploaderName: user?.name || user?.username,
+        });
+      }
+    }
+
+    // Drafts skip conflict check — they're not submitted for review yet.
+    if (saveAsDraft) {
+      setUploadStep('done');
+      setTimeout(() => { setUploadStep(null); }, 2000);
+      finalizeUpload(newDocs, relations, { keepAsDraft: true });
+      showToast('success', newDocs.length > 1
+        ? `${newDocs.length} documents saved as draft`
+        : `"${newDocs[0]?.title || 'Document'}" saved as draft`);
+      return;
     }
 
     const conflict = newDocs.find(d =>
@@ -2443,6 +2462,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     const approved  = uploads.filter(d => d.status === 'approved').length;
     const pending   = uploads.filter(d => d.status === 'pending').length;
     const rejected  = uploads.filter(d => d.status === 'rejected').length;
+    const drafts    = uploads.filter(d => d.status === 'draft').length;
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
@@ -2634,7 +2654,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px 6px 10px', borderRadius: 20, background: estatusBg, border: `1px solid ${estatusAccent}44`, flexShrink: 0 }}>
                   <EStatusIcon size={13} color={estatusAccent} />
                   <span style={{ fontSize: 11.5, fontWeight: 700, color: estatusAccent, fontFamily: 'var(--mono)', letterSpacing: '.04em' }}>
-                    {editingDoc.status === 'approved' ? 'APPROVED' : editingDoc.status === 'rejected' ? 'REJECTED' : 'PENDING'}
+                    {editingDoc.status === 'approved' ? 'APPROVED' : editingDoc.status === 'rejected' ? 'REJECTED' : editingDoc.status === 'draft' ? 'DRAFT' : 'PENDING'}
                   </span>
                 </div>
                 <button type="button" className="ud-edit-actions-btn" onClick={closeEditDoc} disabled={editSaving}
@@ -2834,7 +2854,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                         </div>
                       </div>
                     )}
-                    {(editingDoc.status === 'pending' || editingDoc.status === 'rejected') && (
+                    {(editingDoc.status === 'pending' || editingDoc.status === 'rejected' || editingDoc.status === 'draft') && (
                       <div style={{ borderTop: '1px solid var(--surface-border)', paddingTop: 16 }}>
                         <div style={{ ...LABEL, marginBottom: 8 }}>
                           {t('replaceFileModal.title')} <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-color-secondary)', textTransform: 'none', letterSpacing: 0 }}>({t('common.optional', 'optional')})</span>
@@ -2978,12 +2998,13 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         ) : (
         <>
         <div style={{ ...LABEL }}>{t('dashboard.overviewLabel')}</div>
-        <div className="ud-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
+        <div className="ud-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 16 }}>
           {[
             { label: t('stats.totalUploads'),  value: uploads.length, bg: 'rgba(33, 74, 171,.12)',  color: 'var(--primary)', icon: FileText,    filter: 'all' },
             { label: t('stats.approved'),       value: approved,        bg: 'rgba(25, 135, 84,.12)',  color: '#198754',        icon: CheckCircle, filter: 'approved' },
             { label: t('stats.pendingReview'), value: pending,         bg: 'rgba(255, 193, 7,.12)', color: '#b45309',        icon: TrendingUp,  filter: 'pending' },
             { label: t('stats.rejected'),       value: rejected,        bg: 'rgba(220, 53, 69,.12)',  color: '#dc3545',        icon: XCircle,     filter: 'rejected' },
+            { label: 'Drafts',                  value: drafts,          bg: 'rgba(100, 116, 139,.12)', color: '#64748b',       icon: FileText,    filter: 'draft' },
           ].map(s => {
             const isActive = filterStatus === s.filter;
             return (
@@ -3071,6 +3092,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
           const baseList = filterStatus === 'approved' ? uploads.filter(d => d.status === 'approved')
                          : filterStatus === 'pending'  ? uploads.filter(d => d.status === 'pending')
                          : filterStatus === 'rejected' ? uploads.filter(d => d.status === 'rejected')
+                         : filterStatus === 'draft'    ? uploads.filter(d => d.status === 'draft')
                          : uploads;
           const allFiltered = baseList
             .filter(d => !tableSearch || d.title.toLowerCase().includes(tableSearch.toLowerCase()))
@@ -3129,7 +3151,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
               {/* Active status filter chip */}
               {filterStatus && filterStatus !== 'all' && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px 5px 12px', borderRadius: 20, background: 'rgba(33, 74, 171,.08)', border: '1px solid rgba(33, 74, 171,.2)', fontSize: 12, fontWeight: 600, color: 'var(--primary)', whiteSpace: 'nowrap' }}>
-                  {{ approved: t('stats.approved'), pending: t('stats.pendingReview'), rejected: t('stats.rejected') }[filterStatus]}
+                  {{ approved: t('stats.approved'), pending: t('stats.pendingReview'), rejected: t('stats.rejected'), draft: 'Drafts' }[filterStatus]}
                   <button onClick={() => setFilterStatus('')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--primary)', display: 'flex', padding: 0, marginLeft: 2 }}><X size={11} /></button>
                 </div>
               )}
@@ -3724,7 +3746,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                           <td style={{ padding: '8px 12px', borderLeft: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)' }}>{d.dept || '—'}</td>
                           <td className="ud-editlist-version" style={{ padding: '8px 12px', borderLeft: '1px solid var(--surface-border)', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.version || '—'}</td>
                           <td style={{ padding: '8px 12px', borderLeft: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)', textTransform: 'capitalize' }}>
-                            {{ approved: t('common.statusWordApproved'), pending: t('common.statusWordPending'), rejected: t('common.statusWordRejected') }[d.status] || d.status || '—'}
+                            {{ approved: t('common.statusWordApproved'), pending: t('common.statusWordPending'), rejected: t('common.statusWordRejected'), draft: 'Draft' }[d.status] || d.status || '—'}
                           </td>
                           <td style={{ padding: '8px 12px', borderLeft: '1px solid var(--surface-border)' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -3811,7 +3833,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px 6px 10px', borderRadius: 20, background: estatusBg, border: `1px solid ${estatusAccent}44`, flexShrink: 0 }}>
                   <EStatusIcon size={13} color={estatusAccent} />
                   <span style={{ fontSize: 11.5, fontWeight: 700, color: estatusAccent, fontFamily: 'var(--mono)', letterSpacing: '.04em' }}>
-                    {editingDoc.status === 'approved' ? 'APPROVED' : editingDoc.status === 'rejected' ? 'REJECTED' : 'PENDING'}
+                    {editingDoc.status === 'approved' ? 'APPROVED' : editingDoc.status === 'rejected' ? 'REJECTED' : editingDoc.status === 'draft' ? 'DRAFT' : 'PENDING'}
                   </span>
                 </div>
                 <button type="button" className="ud-edit-actions-btn" onClick={closeEditDoc} disabled={editSaving}
@@ -4011,7 +4033,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                         </div>
                       </div>
                     )}
-                    {(editingDoc.status === 'pending' || editingDoc.status === 'rejected') && (
+                    {(editingDoc.status === 'pending' || editingDoc.status === 'rejected' || editingDoc.status === 'draft') && (
                       <div style={{ borderTop: '1px solid var(--surface-border)', paddingTop: 16 }}>
                         <div style={{ ...LABEL, marginBottom: 8 }}>
                           {t('replaceFileModal.title')} <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-color-secondary)', textTransform: 'none', letterSpacing: 0 }}>({t('common.optional', 'optional')})</span>
@@ -6269,6 +6291,19 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
               onMouseLeave={e => e.currentTarget.style.background = 'var(--surface-card)'}>
               {t('wizard.step3.clearAll')}
             </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button type="button"
+              disabled={files.length === 0 || detailsLocked || uploadStep === 'uploading' || uploadStep === 'saving' || uploadStep === 'done'}
+              onClick={() => handleSubmit(null, true)}
+              style={{
+                background: 'var(--surface-card)',
+                color: files.length > 0 && !detailsLocked && (!uploadStep || uploadStep === 'ready' || uploadStep === 'error') ? '#64748b' : '#94a3b8',
+                border: '1px solid var(--surface-border)', padding: '9px 20px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 600,
+                cursor: files.length > 0 && !detailsLocked && (!uploadStep || uploadStep === 'ready' || uploadStep === 'error') ? 'pointer' : 'not-allowed',
+                display: 'flex', alignItems: 'center', gap: 7,
+              }}>
+              <FileText size={14} /> Save as Draft
+            </button>
             <button type="submit"
               disabled={files.length === 0 || detailsLocked || uploadStep === 'uploading' || uploadStep === 'saving' || uploadStep === 'done'}
               style={{
@@ -6287,6 +6322,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
               {uploadStep === 'done'      && <><CheckCircle size={14} /> {t('wizard.step3.submitted')}</>}
               {(!uploadStep || uploadStep === 'ready' || uploadStep === 'error') && <><CheckCircle size={14} /> {t('wizard.step3.submitForApproval')}</>}
             </button>
+            </div>
           </div>
         </form>
         </Card>
@@ -6334,7 +6370,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                           <td style={{ padding: '8px 12px', borderLeft: '1px solid var(--surface-border)', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.issue_date || '—'}</td>
                           <td style={{ padding: '8px 12px', borderLeft: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)' }}>{d.department_name || '—'}</td>
                           <td style={{ padding: '8px 12px', borderLeft: '1px solid var(--surface-border)', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.version_no || '—'}</td>
-                          <td style={{ padding: '8px 12px', borderLeft: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)', textTransform: 'capitalize' }}>{{ approved: t('common.statusWordApproved'), pending: t('common.statusWordPending'), rejected: t('common.statusWordRejected') }[d.status] || d.status || '—'}</td>
+                          <td style={{ padding: '8px 12px', borderLeft: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)', textTransform: 'capitalize' }}>{{ approved: t('common.statusWordApproved'), pending: t('common.statusWordPending'), rejected: t('common.statusWordRejected'), draft: 'Draft' }[d.status] || d.status || '—'}</td>
                           <td style={{ padding: '8px 12px', borderLeft: '1px solid var(--surface-border)' }}>
                             <button type="button" onClick={() => setViewingActChildDoc(mapApiDoc(d))}
                               disabled={!d.id}
@@ -6393,7 +6429,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                         <td style={{ padding: '8px 12px', borderLeft: '1px solid var(--surface-border)', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.issue_date || '—'}</td>
                         <td style={{ padding: '8px 12px', borderLeft: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)' }}>{d.department_name || '—'}</td>
                         <td style={{ padding: '8px 12px', borderLeft: '1px solid var(--surface-border)', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.version_no || '—'}</td>
-                        <td style={{ padding: '8px 12px', borderLeft: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)', textTransform: 'capitalize' }}>{{ approved: t('common.statusWordApproved'), pending: t('common.statusWordPending'), rejected: t('common.statusWordRejected') }[d.status] || d.status || '—'}</td>
+                        <td style={{ padding: '8px 12px', borderLeft: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)', textTransform: 'capitalize' }}>{{ approved: t('common.statusWordApproved'), pending: t('common.statusWordPending'), rejected: t('common.statusWordRejected'), draft: 'Draft' }[d.status] || d.status || '—'}</td>
                         <td style={{ padding: '8px 12px', borderLeft: '1px solid var(--surface-border)' }}>
                           <button type="button" onClick={() => setViewingActChildDoc(mapApiDoc(d))}
                             disabled={!d.id}
