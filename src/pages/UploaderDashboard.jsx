@@ -1390,13 +1390,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         resubmit:               !editFileSelected && (editingDoc.status === 'rejected' || editingDoc.status === 'draft'),
       };
       await updatePdfMetadata(editingDoc.id, payload);
-<<<<<<< Updated upstream
        if (!editFileSelected && (editingDoc.status === 'rejected' || editingDoc.status === 'draft')) {
         setUploads(prev => prev.map(d => d.id === editingDoc.id ? { ...d, status: 'pending', approval: null } : d));
-=======
-      if (!editFileSelected && editingDoc.status === 'rejected') {
-        setUploads(prev => prev.map(d => d.id === editingDoc.id ? { ...d, status: 'pending' } : d));
->>>>>>> Stashed changes
       }
       const successMsg = editFileSelected && editingDoc.status === 'rejected'
         ? t('toasts.fileReplacedAndResubmitted')
