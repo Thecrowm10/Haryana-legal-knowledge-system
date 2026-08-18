@@ -992,8 +992,8 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, deciding })
     catch { return []; }
   });
   const [highlightMode, setHighlightMode] = useState(false);
-  const [draftSavedAt, setDraftSavedAt]   = useState(null);
   const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [showDraftToast, setShowDraftToast] = useState(false);
   const pdfScrollRef = useRef(null);
   const pdfDeleteRef = useRef(null);
 
@@ -1068,7 +1068,6 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, deciding })
           setRemarkLines(newLines);
           onRemarksChange(d.comments);
         }
-        setDraftSavedAt(new Date(d.saved_at));
       })
       .catch(() => {});
   }, [doc.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1077,12 +1076,13 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, deciding })
     if (isSavingDraft) return;
     setIsSavingDraft(true);
     try {
-      const res = await saveAnnotationDraft(
+      await saveAnnotationDraft(
         doc.id,
         currentRemark || null,
         annotations.length > 0 ? JSON.stringify(annotations) : null,
       );
-      setDraftSavedAt(new Date(res.data.saved_at));
+      setShowDraftToast(true);
+      setTimeout(() => setShowDraftToast(false), 3000);
     } catch {}
     finally { setIsSavingDraft(false); }
   }
@@ -1091,6 +1091,22 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, deciding })
 
   return (
     <div style={{ borderTop: '1px solid var(--surface-border)' }}>
+
+      {/* Draft-saved toast — bottom-right, auto-hides after 3s */}
+      {showDraftToast && (
+        <div style={{
+          position: 'fixed', top: 24, right: 24, zIndex: 3000,
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '12px 16px', borderRadius: 10,
+          background: 'var(--surface-card)', border: '1px solid rgba(25, 135, 84,.35)',
+          boxShadow: '0 12px 32px rgba(0,0,0,.18)',
+          fontFamily: 'var(--font)', fontSize: 13, color: 'var(--text-color)',
+          animation: 'fadeSlideIn .2s ease',
+        }}>
+          <CheckCircle size={15} color="#16a34a" />
+          Draft saved successfully
+        </div>
+      )}
 
       {/* 2-panel grid */}
       <div className="ap-split-grid" style={{ display: 'grid', gridTemplateColumns: '55% 45%', height: 520, borderBottom: '1px solid var(--surface-border)' }}>
@@ -1196,11 +1212,6 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, deciding })
                 onMouseLeave={e => { e.currentTarget.style.background = 'rgba(100, 116, 139,.08)'; e.currentTarget.style.borderColor = 'rgba(100, 116, 139,.25)'; }}>
                 <FileText size={13} /> {isSavingDraft ? 'Saving…' : 'Save Draft'}
               </button>
-              {draftSavedAt && (
-                <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', fontFamily: 'var(--font)' }}>
-                  Draft saved {draftSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
-              )}
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={() => setConfirmDecision('rejected')} disabled={!!deciding || !hasRemarks}

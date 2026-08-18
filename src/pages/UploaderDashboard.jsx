@@ -660,9 +660,9 @@ function DocViewModal({ doc, onClose }) {
     .filter(({ key }) => !TYPEEXTRA_SKIP.has(key))
     .map(({ key }) => [key, doc.typeFields?.[key] || '']);
 
-  const statusAccent = doc.status === 'approved' ? '#16a34a' : doc.status === 'rejected' ? '#dc3545' : '#ffc107';
-  const statusBg     = doc.status === 'approved' ? 'rgba(25, 135, 84,.1)'  : doc.status === 'rejected' ? 'rgba(220, 53, 69,.1)'  : 'rgba(255, 193, 7,.1)';
-  const StatusIconV  = doc.status === 'approved' ? CheckCircle : doc.status === 'rejected' ? XCircle : Clock;
+  const statusAccent = doc.status === 'approved' ? '#16a34a' : doc.status === 'rejected' ? '#dc3545' : doc.status === 'draft' ? '#64748b' : '#ffc107';
+  const statusBg     = doc.status === 'approved' ? 'rgba(25, 135, 84,.1)'  : doc.status === 'rejected' ? 'rgba(220, 53, 69,.1)'  : doc.status === 'draft' ? 'rgba(100, 116, 139,.1)' : 'rgba(255, 193, 7,.1)';
+  const StatusIconV  = doc.status === 'approved' ? CheckCircle : doc.status === 'rejected' ? XCircle : doc.status === 'draft' ? FileText : Clock;
   const typeColor    = TYPE_CARD_COLORS[doc.type] || { accent: '#94a3b8', bg: 'rgba(148,163,184,.12)', text: '#64748b' };
 
   const iconBtn = {
@@ -697,7 +697,7 @@ function DocViewModal({ doc, onClose }) {
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px 6px 10px', borderRadius: 20, background: statusBg, border: `1px solid ${statusAccent}44`, flexShrink: 0 }}>
           <StatusIconV size={13} color={statusAccent} />
           <span style={{ fontSize: 11.5, fontWeight: 700, color: statusAccent, fontFamily: 'var(--mono)', letterSpacing: '.04em' }}>
-            {doc.status === 'approved' ? t('common.statusApproved') : doc.status === 'rejected' ? t('common.statusRejected') : t('common.statusPending')}
+            {doc.status === 'approved' ? t('common.statusApproved') : doc.status === 'rejected' ? t('common.statusRejected') : doc.status === 'draft' ? 'DRAFT' : t('common.statusPending')}
           </span>
         </div>
         {/* Close */}
@@ -1315,13 +1315,19 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     setEditFormOriginal(null);
   }
 
-  async function saveEditDoc() {
+  async function saveEditDoc(submitForApproval = false) {
     if (!editingDoc || !editForm) return;
     setEditSaving(true);
     setEditError('');
     const tf = editForm.typeFields || {};
     const typeId = editingDoc.docTypeId ?? typesData.find(d => d.name === editingDoc.type)?.id ?? null;
     let description = editForm.description;
+    // Rejected docs always resubmit on save. Drafts only resubmit if the user explicitly
+    // hit "Submit for Approval" — saving a draft with the plain Save button must NOT
+    // flip it to pending.
+    const resubmit = editingDoc.status === 'rejected'
+      ? true
+      : (editingDoc.status === 'draft' ? submitForApproval : false);
     try {
       // 1. If a new file was chosen — use the pre-uploaded ref (from handleEditFileSelect),
       //    or upload now if the pre-upload hasn't finished yet.
@@ -1341,8 +1347,6 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         } else {
           description = editForm.description; // already updated by handleEditFileSelect
         }
-        // Rejected and saved-draft docs are always resubmitted when file is replaced
-        const resubmit = editingDoc.status === 'rejected' || editingDoc.status === 'draft';
         const replaceRes = await replaceDocumentFile(editingDoc.id, file_ref, resubmit);
         const updatedDoc = mapApiDoc(replaceRes.data);
         // Old annotation positions don't apply to the new file — clear them immediately
@@ -1387,17 +1391,19 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         no_of_orders:           tf.noOfOrders ? parseInt(tf.noOfOrders, 10) || null : null,
         keywords:               tf.keywords || '',
         tag_ids:                [],
-        resubmit:               !editFileSelected && (editingDoc.status === 'rejected' || editingDoc.status === 'draft'),
+        resubmit:               !editFileSelected && resubmit,
       };
       await updatePdfMetadata(editingDoc.id, payload);
-       if (!editFileSelected && (editingDoc.status === 'rejected' || editingDoc.status === 'draft')) {
+      if (!editFileSelected && resubmit) {
         setUploads(prev => prev.map(d => d.id === editingDoc.id ? { ...d, status: 'pending', approval: null } : d));
       }
       const successMsg = editFileSelected && editingDoc.status === 'rejected'
         ? t('toasts.fileReplacedAndResubmitted')
         : editFileSelected
           ? t('toasts.fileReplaced')
-          : t('editDocument.updateSuccess', { name: editForm.document_name });
+          : resubmit
+            ? t('editDocument.updateSuccess', { name: editForm.document_name })
+            : t('editDocument.draftSaved', { name: editForm.document_name, defaultValue: `"${editForm.document_name}" saved as draft` });
       showToast('success', successMsg);
       closeEditDoc();
       refreshEditList();
@@ -2660,11 +2666,26 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                   style={{ padding: '8px 18px', borderRadius: 9, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 13, fontWeight: 600, cursor: editSaving ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: editSaving ? .5 : 1, flexShrink: 0 }}>
                   {t('common.cancel')}
                 </button>
-                <button type="button" className="ud-edit-actions-btn" onClick={saveEditDoc} disabled={saveBtnDisabled}
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '8px 20px', borderRadius: 9, border: 'none', background: saveBtnDisabled ? 'rgba(33,74,171,.5)' : 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: saveBtnDisabled ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
-                  {editFileUploading ? <RotateCcw size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={14} />}
-                  {editSaving ? t('editDocument.saving') : t('editDocument.saveChanges')}
-                </button>
+                {editingDoc.status === 'draft' ? (
+                  <>
+                    <button type="button" className="ud-edit-actions-btn" onClick={() => saveEditDoc(false)} disabled={saveBtnDisabled}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '8px 20px', borderRadius: 9, border: '1px solid var(--surface-border)', background: saveBtnDisabled ? 'var(--surface-ground)' : 'var(--surface-card)', color: saveBtnDisabled ? '#94a3b8' : 'var(--text-color-secondary)', fontSize: 13, fontWeight: 700, cursor: saveBtnDisabled ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+                      {editFileUploading ? <RotateCcw size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={14} />}
+                      {editSaving ? t('editDocument.saving') : t('editDocument.saveDraft', { defaultValue: 'Save Draft' })}
+                    </button>
+                    <button type="button" className="ud-edit-actions-btn" onClick={() => saveEditDoc(true)} disabled={saveBtnDisabled}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '8px 20px', borderRadius: 9, border: 'none', background: saveBtnDisabled ? 'rgba(33,74,171,.5)' : 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: saveBtnDisabled ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+                      {editFileUploading ? <RotateCcw size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={14} />}
+                      {editSaving ? t('editDocument.saving') : t('editDocument.submitForApproval', { defaultValue: 'Submit for Approval' })}
+                    </button>
+                  </>
+                ) : (
+                  <button type="button" className="ud-edit-actions-btn" onClick={() => saveEditDoc(true)} disabled={saveBtnDisabled}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '8px 20px', borderRadius: 9, border: 'none', background: saveBtnDisabled ? 'rgba(33,74,171,.5)' : 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: saveBtnDisabled ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+                    {editFileUploading ? <RotateCcw size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={14} />}
+                    {editSaving ? t('editDocument.saving') : t('editDocument.saveChanges')}
+                  </button>
+                )}
               </div>
 
               {/* 2-panel body */}
@@ -3287,14 +3308,14 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                     const isDraft      = !doc.workflowStatus || doc.workflowStatus === WORKFLOW_STATUS.DRAFT;
                     const isPublished  = doc.workflowStatus === WORKFLOW_STATUS.PUBLISHED;
                     const isSelected   = selectedIds.has(doc.id);
-                    const statusAccent = doc.status === 'approved' ? '#16a34a' : doc.status === 'rejected' ? '#dc3545' : '#ffc107';
-                    const statusBg     = doc.status === 'approved' ? 'rgba(25, 135, 84,.07)' : doc.status === 'rejected' ? 'rgba(220, 53, 69,.07)' : 'rgba(255, 193, 7,.07)';
-                    const statusBorder = doc.status === 'approved' ? 'rgba(25, 135, 84,.25)' : doc.status === 'rejected' ? 'rgba(220, 53, 69,.25)' : 'rgba(255, 193, 7,.25)';
+                    const statusAccent = doc.status === 'approved' ? '#16a34a' : doc.status === 'rejected' ? '#dc3545' : doc.status === 'draft' ? '#64748b' : '#ffc107';
+                    const statusBg     = doc.status === 'approved' ? 'rgba(25, 135, 84,.07)' : doc.status === 'rejected' ? 'rgba(220, 53, 69,.07)' : doc.status === 'draft' ? 'rgba(100, 116, 139,.07)' : 'rgba(255, 193, 7,.07)';
+                    const statusBorder = doc.status === 'approved' ? 'rgba(25, 135, 84,.25)' : doc.status === 'rejected' ? 'rgba(220, 53, 69,.25)' : doc.status === 'draft' ? 'rgba(100, 116, 139,.25)' : 'rgba(255, 193, 7,.25)';
                     const typeColor    = TYPE_CARD_COLORS[doc.type] || { accent: '#94a3b8', bg: 'rgba(148,163,184,.1)', text: '#64748b' };
                     const approverName = doc.approval?.approver_first_name
                       ? `${doc.approval.approver_first_name} ${doc.approval.approver_last_name || ''}`.trim()
                       : doc.approval?.approver_username;
-                    const StatusIcon = doc.status === 'approved' ? CheckCircle : doc.status === 'rejected' ? XCircle : Clock;
+                    const StatusIcon = doc.status === 'approved' ? CheckCircle : doc.status === 'rejected' ? XCircle : doc.status === 'draft' ? FileText : Clock;
 
                     // Mobile: the desktop layout is a fixed 5-6 column grid row (~585px of fixed
                     // columns alone) that can't be reflowed with CSS alone, so it becomes a stacked
@@ -3325,7 +3346,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px 3px 6px', borderRadius: 20, background: statusBg, border: `1px solid ${statusBorder}`, flexShrink: 0 }}>
                               <StatusIcon size={10} color={statusAccent} />
                               <span style={{ fontSize: 9.5, fontWeight: 700, color: statusAccent, fontFamily: 'var(--mono)' }}>
-                                {doc.status === 'approved' ? t('common.statusApproved') : doc.status === 'rejected' ? t('common.statusRejected') : t('common.statusPending')}
+                                {doc.status === 'approved' ? t('common.statusApproved') : doc.status === 'rejected' ? t('common.statusRejected') : doc.status === 'draft' ? 'DRAFT' : t('common.statusPending')}
                               </span>
                             </div>
                           </div>
@@ -3412,7 +3433,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px 4px 8px', borderRadius: 20, background: statusBg, border: `1px solid ${statusBorder}`, alignSelf: 'flex-start' }}>
                             <StatusIcon size={11} color={statusAccent} />
                             <span style={{ fontSize: 10.5, fontWeight: 700, color: statusAccent, fontFamily: 'var(--mono)', letterSpacing: '.05em' }}>
-                              {doc.status === 'approved' ? t('common.statusApproved') : doc.status === 'rejected' ? t('common.statusRejected') : t('common.statusPending')}
+                              {doc.status === 'approved' ? t('common.statusApproved') : doc.status === 'rejected' ? t('common.statusRejected') : doc.status === 'draft' ? 'DRAFT' : t('common.statusPending')}
                             </span>
                           </div>
                           {approverName && (
