@@ -381,7 +381,7 @@ function isAccepted(f) {
 }
 // DBIM 6.1.1 / Table 6 upload size ceiling — the guideline's own tiers are photo-oriented
 // (banner/thumbnail/high-res), so the closest fit for a document upload is its "high-res" cap.
-const MAX_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024;
+const MAX_UPLOAD_SIZE_BYTES = 50 * 1024 * 1024;
 function isUnderSizeLimit(f) {
   return f.size <= MAX_UPLOAD_SIZE_BYTES;
 }
@@ -1390,8 +1390,13 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         resubmit:               !editFileSelected && (editingDoc.status === 'rejected' || editingDoc.status === 'draft'),
       };
       await updatePdfMetadata(editingDoc.id, payload);
+<<<<<<< Updated upstream
        if (!editFileSelected && (editingDoc.status === 'rejected' || editingDoc.status === 'draft')) {
         setUploads(prev => prev.map(d => d.id === editingDoc.id ? { ...d, status: 'pending', approval: null } : d));
+=======
+      if (!editFileSelected && editingDoc.status === 'rejected') {
+        setUploads(prev => prev.map(d => d.id === editingDoc.id ? { ...d, status: 'pending' } : d));
+>>>>>>> Stashed changes
       }
       const successMsg = editFileSelected && editingDoc.status === 'rejected'
         ? t('toasts.fileReplacedAndResubmitted')
@@ -1788,8 +1793,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   // Non-Act types must be linked to a parent Act / legal authority before the rest of the details unlock.
   const usesLegalAuthorities = ['Circular', 'Miscellaneous', 'Notification', 'Order/Gazette', 'Policy'].includes(form.type);
   const actChosen = usesLegalAuthorities ? legalAuthorities.some(a => a.act) : !!hierarchy.act;
-  // const detailsLocked = !!form.type && form.type !== 'Act' && !actChosen;
-  const detailsLocked = false;
+  const detailsLocked = !!form.type && form.type !== 'Act' && !actChosen;
   const primaryActId = usesLegalAuthorities ? (legalAuthorities.find(a => a.actId)?.actId ?? null) : (hierarchy.actId ?? null);
   const [actChildren, setActChildren] = useState(null);
   const [actChildrenLoading, setActChildrenLoading] = useState(false);
@@ -5729,8 +5733,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             {form.type !== 'Act' && (
               <div style={{ gridColumn: '1 / -1' }}>
                 <div style={{ ...LABEL, marginBottom: 6 }}>
-                  {form.type === 'Amendment' ? t('wizard.step3.parentActLabel') : t('wizard.step3.legalAuthorityLabel')} 
-                  {/* <span style={{ color: '#dc3545' }}>*</span> */}
+                  {form.type === 'Amendment' ? t('wizard.step3.parentActLabel') : t('wizard.step3.legalAuthorityLabel')} <span style={{ color: '#dc3545' }}>*</span>
                 </div>
                 <HierarchyTag hierarchy={hierarchy} onOpen={() => { setDrawerHierarchy({ ...hierarchy }); setDrawerType('hierarchy'); }} isRef={true} legalAuthorities={usesLegalAuthorities ? legalAuthorities : undefined} />
                 {detailsLocked && (
