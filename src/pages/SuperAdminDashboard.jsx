@@ -13,6 +13,8 @@ import { getAuditLogs, getAuditLogActions } from '../services/audit';
 import { getPendingCapRequests, reviewCapRequest } from '../services/capRequests';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { downloadUploadsExcelReport } from '../utils/uploadsExcelReport';
+import { downloadDailyReportExcel } from '../utils/dailyReportExcel';
+import { getDailyDepartmentReport } from '../services/pdf';
 
 const LABEL = { fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)' };
 
@@ -169,6 +171,9 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
   const [uploadsFilterDept, setUploadsFilterDept]         = useState('');
   const [viewDoc, setViewDoc]                             = useState(null);
   const [reportGenerating, setReportGenerating] = useState(false);
+  const [dailyReportDate, setDailyReportDate]     = useState(() => new Date().toISOString().split('T')[0]);
+  const [dailyReportLoading, setDailyReportLoading] = useState(false);
+  const [dailyReportError, setDailyReportError]   = useState('');
 
   useEffect(() => {
     if (activePage !== 'alluploads') return;
@@ -1865,10 +1870,78 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
       }
     }
 
+    async function handleDailyReport() {
+      if (!dailyReportDate) return;
+      setDailyReportLoading(true);
+      setDailyReportError('');
+      try {
+        const res = await getDailyDepartmentReport(dailyReportDate);
+        const rows = res.data.rows || [];
+        if (rows.length === 0) {
+          setDailyReportError('No data found for the selected date.');
+          return;
+        }
+        await downloadDailyReportExcel(dailyReportDate, rows);
+      } catch {
+        setDailyReportError('Failed to generate report. Please try again.');
+      } finally {
+        setDailyReportLoading(false);
+      }
+    }
+
     return (
       <>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
         <style>{ADM_RESPONSIVE_CSS}</style>
+
+        {/* Daily Report */}
+        <Card>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-heading)', fontFamily: 'var(--font)', marginBottom: 2 }}>
+                Daily Department Report
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-color-secondary)', fontFamily: 'var(--font)' }}>
+                Department-wise uploads, approvals and user counts for a selected date
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <input
+                type="date"
+                value={dailyReportDate}
+                max={new Date().toISOString().split('T')[0]}
+                onChange={e => { setDailyReportDate(e.target.value); setDailyReportError(''); }}
+                style={{
+                  padding: '7px 12px', background: 'var(--surface-ground)',
+                  border: '1px solid var(--surface-border)', borderRadius: 8,
+                  fontSize: 13, color: 'var(--text-color)', outline: 'none',
+                  fontFamily: 'var(--font)', cursor: 'pointer',
+                }}
+              />
+              <button
+                onClick={handleDailyReport}
+                disabled={dailyReportLoading || !dailyReportDate}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  background: (dailyReportLoading || !dailyReportDate) ? 'var(--surface-ground)' : 'var(--primary)',
+                  color: (dailyReportLoading || !dailyReportDate) ? 'var(--text-color-secondary)' : '#fff',
+                  border: 'none', borderRadius: 8, padding: '7px 16px',
+                  fontSize: 13, fontWeight: 600, cursor: (dailyReportLoading || !dailyReportDate) ? 'not-allowed' : 'pointer',
+                  fontFamily: 'var(--font)', whiteSpace: 'nowrap',
+                }}
+              >
+                {dailyReportLoading ? <Download size={13} /> : <FileSpreadsheet size={13} />}
+                {dailyReportLoading ? 'Generating…' : 'Download Daily Report'}
+              </button>
+            </div>
+          </div>
+          {dailyReportError && (
+            <div style={{ marginTop: 10, fontSize: 12.5, color: '#dc3545', fontFamily: 'var(--font)' }}>
+              {dailyReportError}
+            </div>
+          )}
+        </Card>
+
         {/* Stats */}
         <div className="adm-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
           {[
