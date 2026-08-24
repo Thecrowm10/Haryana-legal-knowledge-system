@@ -172,8 +172,12 @@
     "quickActions": {
       "linkRequestsTitle": "Link Requests",
       "linkRequestsDesc": "Review requests from other departments to link a shared document",
+      "linkRequestsPending_one": "{{count}} request pending review",
+      "linkRequestsPending_other": "{{count}} requests pending review",
       "actPartsTitle": "Act Parts Review",
-      "actPartsDesc": "Review sections, schedules, annexures, appendices and forms submitted by uploaders"
+      "actPartsDesc": "Review sections, schedules, annexures, appendices and forms submitted by uploaders",
+      "actPartsPending_one": "{{count}} document pending review",
+      "actPartsPending_other": "{{count}} documents pending review"
     },
     "overviewLabel": "Overview",
     "summary": {

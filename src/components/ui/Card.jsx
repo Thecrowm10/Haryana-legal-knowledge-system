@@ -1,4 +1,4 @@
-export default function Card({ children, style = {}, className = '', padding = '20px 22px', onClick }) {
+export default function Card({ children, style = {}, className = '', padding = '20px 22px', onClick, ...rest }) {
   return (
     <div
       onClick={onClick}
@@ -12,7 +12,7 @@ export default function Card({ children, style = {}, className = '', padding = '
         boxShadow: 'var(--card-shadow)',
         padding,
         ...style,
-      }} className={className}>
+      }} className={className} {...rest}>
       {children}
     </div>
   );

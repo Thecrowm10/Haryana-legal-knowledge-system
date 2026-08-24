@@ -1767,7 +1767,10 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
   const [apStatusFilter, setApStatusFilter] = useState(''); // '' = All, else 'pending' | 'approved' | 'rejected'
 
   useEffect(() => {
-    if (activePage !== 'actparts') return;
+    // Also fetched on the dashboard overview (not just the Act Parts Review tab itself) so the
+    // pending-count badge on its quick-action card (see dashboard.quickActions.actPartsTitle below)
+    // has real data to show — 'links' has no use for this list, so it's skipped there.
+    if (activePage === 'links') return;
     setApLoading(true);
     setApError('');
     getAllActPartSubmissions()
@@ -1775,6 +1778,7 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
       .catch(() => setApError('Failed to load act part submissions.'))
       .finally(() => setApLoading(false));
   }, [activePage]);
+  const apPendingCount = apItems.filter(i => i.status === 'pending').length;
 
   useEffect(() => {
     if (!apToast) return;
@@ -1828,7 +1832,10 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
   useEffect(() => { fetchDocs(documents); }, [activePage, documents, fetchDocs]);
 
   useEffect(() => {
-    if (activePage !== 'links') { setViewingLink(null); return; } // reset when leaving link requests
+    if (activePage !== 'links') setViewingLink(null); // reset when leaving link requests
+    // Also fetched on the dashboard overview (not just the Link Requests tab) so its quick-action
+    // card's pending-count badge/tooltip has real data — 'actparts' has no use for this list.
+    if (activePage === 'actparts') return;
     if (!localStorage.getItem('token')) return;
     setLinkLoading(true);
     // Fetch every status once so the Total/Pending/Approved/Rejected tiles can
@@ -1840,6 +1847,7 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
   }, [activePage]);
 
   const filteredLinkRequests = linkFilter ? linkRequests.filter(l => l.link_status === linkFilter) : linkRequests;
+  const lrPendingCount = linkRequests.filter(l => l.link_status === 'pending').length;
 
   async function handleReviewLink(link_id, action, comments, annotations_json) {
     const lr = linkRequests.find(l => l.link_id === link_id);
@@ -2154,6 +2162,7 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
           <div style={{ ...LABEL, marginBottom: 10 }}>{t('dashboard.quickActionsLabel')}</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 12 }}>
             <Card onClick={() => onNavigate?.('links')}
+              title={lrPendingCount > 0 ? t('dashboard.quickActions.linkRequestsPending', { count: lrPendingCount }) : undefined}
               style={{ display: 'flex', alignItems: 'center', gap: 18, cursor: 'pointer', borderLeft: '3px solid #8b5cf6', transition: 'all .15s' }}
               onMouseEnter={e => { e.currentTarget.style.background = 'rgba(139,92,246,.08)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
               onMouseLeave={e => { e.currentTarget.style.background = 'var(--surface-card)'; e.currentTarget.style.transform = 'none'; }}>
@@ -2161,12 +2170,20 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
                 <Link size={21} color="#8b5cf6" strokeWidth={1.8} />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)', lineHeight: 1.3 }}>{t('dashboard.quickActions.linkRequestsTitle')}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)', lineHeight: 1.3 }}>{t('dashboard.quickActions.linkRequestsTitle')}</div>
+                  {lrPendingCount > 0 && (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, color: '#b45309', background: 'rgba(255, 193, 7,.15)', border: '1px solid rgba(255, 193, 7,.3)', borderRadius: 20, padding: '2px 8px', fontFamily: 'var(--mono)', flexShrink: 0 }}>
+                      <Clock size={11} /> {lrPendingCount}
+                    </span>
+                  )}
+                </div>
                 <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-color-secondary)', lineHeight: 1.45, marginTop: 3 }}>{t('dashboard.quickActions.linkRequestsDesc')}</div>
               </div>
               <ArrowRight size={16} color="#8b5cf6" style={{ flexShrink: 0, opacity: .8 }} />
             </Card>
             <Card onClick={() => onNavigate?.('actparts')}
+              title={apPendingCount > 0 ? t('dashboard.quickActions.actPartsPending', { count: apPendingCount }) : undefined}
               style={{ display: 'flex', alignItems: 'center', gap: 18, cursor: 'pointer', borderLeft: '3px solid #0ea5e9', transition: 'all .15s' }}
               onMouseEnter={e => { e.currentTarget.style.background = 'rgba(14,165,233,.08)'; e.currentTarget.style.transform = 'translateY(-1px)'; }}
               onMouseLeave={e => { e.currentTarget.style.background = 'var(--surface-card)'; e.currentTarget.style.transform = 'none'; }}>
@@ -2174,7 +2191,14 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
                 <FileText size={21} color="#0ea5e9" strokeWidth={1.8} />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)', lineHeight: 1.3 }}>{t('dashboard.quickActions.actPartsTitle')}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ fontSize: 'var(--font-size-p1)', fontWeight: 700, color: 'var(--text-heading)', lineHeight: 1.3 }}>{t('dashboard.quickActions.actPartsTitle')}</div>
+                  {apPendingCount > 0 && (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, color: '#b45309', background: 'rgba(255, 193, 7,.15)', border: '1px solid rgba(255, 193, 7,.3)', borderRadius: 20, padding: '2px 8px', fontFamily: 'var(--mono)', flexShrink: 0 }}>
+                      <Clock size={11} /> {apPendingCount}
+                    </span>
+                  )}
+                </div>
                 <div style={{ fontSize: 'var(--font-size-small)', color: 'var(--text-color-secondary)', lineHeight: 1.45, marginTop: 3 }}>{t('dashboard.quickActions.actPartsDesc')}</div>
               </div>
               <ArrowRight size={16} color="#0ea5e9" style={{ flexShrink: 0, opacity: .8 }} />

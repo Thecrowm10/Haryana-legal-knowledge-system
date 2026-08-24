@@ -172,8 +172,12 @@
     "quickActions": {
       "linkRequestsTitle": "लिंक अनुरोध",
       "linkRequestsDesc": "किसी साझा दस्तावेज़ को लिंक करने के लिए अन्य विभागों के अनुरोधों की समीक्षा करें",
+      "linkRequestsPending_one": "{{count}} अनुरोध समीक्षा के लिए लंबित",
+      "linkRequestsPending_other": "{{count}} अनुरोध समीक्षा के लिए लंबित",
       "actPartsTitle": "अधिनियम भाग समीक्षा",
-      "actPartsDesc": "अपलोडर्स द्वारा सबमिट की गई धाराएं, अनुसूचियां, अनुबंध, परिशिष्ट और प्रपत्रों की समीक्षा करें"
+      "actPartsDesc": "अपलोडर्स द्वारा सबमिट की गई धाराएं, अनुसूचियां, अनुबंध, परिशिष्ट और प्रपत्रों की समीक्षा करें",
+      "actPartsPending_one": "{{count}} दस्तावेज़ समीक्षा के लिए लंबित",
+      "actPartsPending_other": "{{count}} दस्तावेज़ समीक्षा के लिए लंबित"
     },
     "overviewLabel": "अवलोकन",
     "summary": {
