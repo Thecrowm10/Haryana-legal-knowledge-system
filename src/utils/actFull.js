@@ -49,16 +49,19 @@ export function mapActPartsToOutline(actParts) {
 
 // `related_documents` (object keyed by the related document's own type, e.g.
 // `{ Amendment: [...], Circular: [...] }`, each entry a full document record)
-// → the same grouping, minus entries whose `relationship_type` is
-// `parent_act` — that's this Act's own parent, not something published
-// under it. Each item keeps every field the API sent (status, dates, gazette
-// ref, legal authority, description, summary, …) so the UI can show full
-// detail without a second fetch per related document.
+// → the same grouping, as-is. Every entry the API sends is shown — a
+// `relationship_type` of `parent_act` used to get filtered out here on the
+// assumption it always meant "this Act's own parent", but the API also uses
+// it the other way round (e.g. an Amendment naming *this* Act as its
+// parent_act, which shows up in this Act's own related_documents) — filtering
+// it unconditionally hid exactly that legitimate case. Each item keeps every
+// field the API sent (status, dates, gazette ref, legal authority,
+// description, summary, …) so the UI can show full detail without a second
+// fetch per related document.
 export function mapRelationships(relatedDocuments) {
   const groups = {};
   for (const [type, items] of Object.entries(relatedDocuments || {})) {
-    const filtered = (items || []).filter(it => it.relationship_type !== 'parent_act');
-    if (filtered.length) groups[type] = filtered;
+    if ((items || []).length) groups[type] = items;
   }
   return groups;
 }

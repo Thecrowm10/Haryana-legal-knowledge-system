@@ -131,7 +131,10 @@
     "noDocumentsFound": "No documents found.",
     "remarksButton": "Remarks",
     "replaceFileButton": "Replace File",
-    "allTypes": "All Types"
+    "allTypes": "All Types",
+    "pagePrev": "Previous",
+    "pageNext": "Next",
+    "pageIndicator": "Page {{page}} of {{total}}"
   },
   "replaceFileModal": {
     "title": "Replace Document File",

@@ -585,6 +585,106 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
           </div>
         );
 
+        // Related-type dialog and related-document viewer — pulled out to a
+        // variable (rather than left inline in the tabbed branch below) so the
+        // no-parts SimpleDocLayout branch can render them too: relatedDocsBand's
+        // pills are shown in BOTH branches, but until this fix these dialogs
+        // only existed in the tabbed branch, so clicking a pill on a document
+        // with no sections/schedules/etc. (e.g. one with only a related
+        // Amendment) set relatedDialogType but had nothing in the DOM to show it.
+        const relatedTypeDialog = relatedDialogType && (
+          <div onClick={() => setRelatedDialogType(null)}
+            style={{ position: 'fixed', inset: 0, zIndex: 2200, background: 'rgba(0,0,0,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+            <div onClick={e => e.stopPropagation()}
+              style={{ background: 'var(--surface-card)', borderRadius: 14, width: 660, maxWidth: '100%', maxHeight: '80vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 64px rgba(0,0,0,.3)' }}>
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>{relatedDialogType} · {relatedDialogItems.length}</span>
+                <button onClick={() => setRelatedDialogType(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex' }}>
+                  <X size={16} />
+                </button>
+              </div>
+              <div style={{ overflowY: 'auto' }}>
+                {relatedDialogItems.map((it, idx) => {
+                  const rowKey = it.id ?? idx;
+                  const isOpen = expandedRelated === rowKey;
+                  const fields = [
+                    ['Reference No.',  it.referenceNumber],
+                    ['Issue Date',     it.enactmentDate],
+                    ['Effective From', it.effectiveFrom],
+                    ['Gazette Ref.',   it.gazette],
+                    ['Legal Authority', it.authority],
+                    ['Short Title',    it.shortTitle],
+                  ].filter(([, v]) => v);
+                  return (
+                    <div key={rowKey} style={{ borderBottom: idx < relatedDialogItems.length - 1 ? '1px solid var(--surface-border)' : 'none' }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '13px 20px', background: isOpen ? 'var(--surface-ground)' : 'transparent' }}
+                        onMouseEnter={e => { if (!isOpen) e.currentTarget.style.background = 'var(--surface-hover)'; }}
+                        onMouseLeave={e => { if (!isOpen) e.currentTarget.style.background = 'transparent'; }}>
+                        <button type="button" onClick={() => setExpandedRelated(isOpen ? null : rowKey)}
+                          style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'flex-start', gap: 12, background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'var(--font)', padding: 0 }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-heading)' }}>{it.title}</div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 5, flexWrap: 'wrap' }}>
+                              {it.relationshipType && (
+                                <span style={{ fontSize: 9.5, fontWeight: 700, padding: '1px 7px', borderRadius: 10, fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '.03em', background: 'rgba(33, 74, 171,.08)', color: 'var(--primary)' }}>
+                                  {humanizeRelationType(it.relationshipType)}
+                                </span>
+                              )}
+                              {it.status && (
+                                <span style={{
+                                  fontSize: 9.5, fontWeight: 700, padding: '1px 7px', borderRadius: 10, fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '.03em',
+                                  background: it.status === 'approved' ? 'rgba(25,135,84,.1)' : it.status === 'rejected' ? 'rgba(220,53,69,.1)' : 'rgba(255,193,7,.1)',
+                                  color: it.status === 'approved' ? '#16a34a' : it.status === 'rejected' ? '#dc3545' : '#b45309',
+                                }}>{it.status}</span>
+                              )}
+                              {it.dept && <span style={{ fontSize: 11, color: 'var(--text-color-secondary)' }}>{it.dept}</span>}
+                              {it.year && <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>· {it.year}</span>}
+                            </div>
+                          </div>
+                          <ChevronDown size={14} color="var(--text-color-secondary)" style={{ transform: isOpen ? 'none' : 'rotate(-90deg)', transition: 'transform .15s', flexShrink: 0, marginTop: 3 }} />
+                        </button>
+                        {/* Parallel to the title/badges once expanded — not pushed down onto its own line below. */}
+                        {isOpen && it.id != null && (
+                          <button type="button" onClick={() => citizenView ? downloadPdf(it.id, it.fileName) : (setViewRelatedDoc(it), setRelatedDialogType(null))}
+                            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 13px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-card)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'background .15s', flexShrink: 0 }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'var(--surface-card)'}>
+                            {citizenView ? <><Download size={12} /> Download PDF</> : <><Eye size={12} /> View Full PDF</>}
+                          </button>
+                        )}
+                      </div>
+                      {isOpen && (
+                        <div style={{ padding: '0 20px 16px' }}>
+                          {fields.length > 0 && (
+                            <div style={{ borderRadius: 10, border: '1px solid var(--surface-border)', overflow: 'hidden', marginBottom: (it.desc || it.summary) ? 10 : 0 }}>
+                              {fields.map(([k, v], i) => (
+                                <div key={k} style={{ display: 'flex', alignItems: 'center', borderBottom: i < fields.length - 1 ? '1px solid var(--surface-border)' : 'none' }}>
+                                  <div style={{ padding: '8px 12px', width: 118, boxSizing: 'border-box', flexShrink: 0, background: 'var(--surface-50)', fontSize: 10.5, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', fontWeight: 600, borderRight: '1px solid var(--surface-border)' }}>{k}</div>
+                                  <div style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-heading)', fontWeight: 500, flex: 1, wordBreak: 'break-word' }}>{String(v)}</div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {(it.desc || it.summary) && (
+                            <div style={{ padding: '10px 12px', borderRadius: 9, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', fontSize: 12, color: 'var(--text-color)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
+                              {it.summary || it.desc}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        );
+
+        // Opens a related document's own PDF, layered above this document's reading view
+        const viewRelatedDocModal = viewRelatedDoc && (
+          <DocViewModal doc={viewRelatedDoc} onClose={() => setViewRelatedDoc(null)} zIndex={2300} citizenView={citizenView} />
+        );
+
         // No sections/schedules/annexures/appendix/forms at all — skip the
         // tabs/rail framework in favour of the simple two-column
         // summary-and-details layout, whether or not there are related
@@ -599,6 +699,8 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
             <div style={{ flex: 1, overflowY: 'auto', background: 'var(--surface-ground)' }}>
               {renderHeaderBlock(false)}
               {relatedDocsBand}
+              {relatedTypeDialog}
+              {viewRelatedDocModal}
               <SimpleDocLayout doc={doc} />
             </div>
           );
@@ -635,99 +737,8 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
         </div>
       )}
 
-      {/* Related-type dialog */}
-      {relatedDialogType && (
-        <div onClick={() => setRelatedDialogType(null)}
-          style={{ position: 'fixed', inset: 0, zIndex: 2200, background: 'rgba(0,0,0,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-          <div onClick={e => e.stopPropagation()}
-            style={{ background: 'var(--surface-card)', borderRadius: 14, width: 660, maxWidth: '100%', maxHeight: '80vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 64px rgba(0,0,0,.3)' }}>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>{relatedDialogType} · {relatedDialogItems.length}</span>
-              <button onClick={() => setRelatedDialogType(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex' }}>
-                <X size={16} />
-              </button>
-            </div>
-            <div style={{ overflowY: 'auto' }}>
-              {relatedDialogItems.map((it, idx) => {
-                const rowKey = it.id ?? idx;
-                const isOpen = expandedRelated === rowKey;
-                const fields = [
-                  ['Reference No.',  it.referenceNumber],
-                  ['Issue Date',     it.enactmentDate],
-                  ['Effective From', it.effectiveFrom],
-                  ['Gazette Ref.',   it.gazette],
-                  ['Legal Authority', it.authority],
-                  ['Short Title',    it.shortTitle],
-                ].filter(([, v]) => v);
-                return (
-                  <div key={rowKey} style={{ borderBottom: idx < relatedDialogItems.length - 1 ? '1px solid var(--surface-border)' : 'none' }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '13px 20px', background: isOpen ? 'var(--surface-ground)' : 'transparent' }}
-                      onMouseEnter={e => { if (!isOpen) e.currentTarget.style.background = 'var(--surface-hover)'; }}
-                      onMouseLeave={e => { if (!isOpen) e.currentTarget.style.background = 'transparent'; }}>
-                      <button type="button" onClick={() => setExpandedRelated(isOpen ? null : rowKey)}
-                        style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'flex-start', gap: 12, background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'var(--font)', padding: 0 }}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-heading)' }}>{it.title}</div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 5, flexWrap: 'wrap' }}>
-                            {it.relationshipType && (
-                              <span style={{ fontSize: 9.5, fontWeight: 700, padding: '1px 7px', borderRadius: 10, fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '.03em', background: 'rgba(33, 74, 171,.08)', color: 'var(--primary)' }}>
-                                {humanizeRelationType(it.relationshipType)}
-                              </span>
-                            )}
-                            {it.status && (
-                              <span style={{
-                                fontSize: 9.5, fontWeight: 700, padding: '1px 7px', borderRadius: 10, fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '.03em',
-                                background: it.status === 'approved' ? 'rgba(25,135,84,.1)' : it.status === 'rejected' ? 'rgba(220,53,69,.1)' : 'rgba(255,193,7,.1)',
-                                color: it.status === 'approved' ? '#16a34a' : it.status === 'rejected' ? '#dc3545' : '#b45309',
-                              }}>{it.status}</span>
-                            )}
-                            {it.dept && <span style={{ fontSize: 11, color: 'var(--text-color-secondary)' }}>{it.dept}</span>}
-                            {it.year && <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>· {it.year}</span>}
-                          </div>
-                        </div>
-                        <ChevronDown size={14} color="var(--text-color-secondary)" style={{ transform: isOpen ? 'none' : 'rotate(-90deg)', transition: 'transform .15s', flexShrink: 0, marginTop: 3 }} />
-                      </button>
-                      {/* Parallel to the title/badges once expanded — not pushed down onto its own line below. */}
-                      {isOpen && it.id != null && (
-                        <button type="button" onClick={() => citizenView ? downloadPdf(it.id, it.fileName) : (setViewRelatedDoc(it), setRelatedDialogType(null))}
-                          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 13px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-card)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'background .15s', flexShrink: 0 }}
-                          onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
-                          onMouseLeave={e => e.currentTarget.style.background = 'var(--surface-card)'}>
-                          {citizenView ? <><Download size={12} /> Download PDF</> : <><Eye size={12} /> View Full PDF</>}
-                        </button>
-                      )}
-                    </div>
-                    {isOpen && (
-                      <div style={{ padding: '0 20px 16px' }}>
-                        {fields.length > 0 && (
-                          <div style={{ borderRadius: 10, border: '1px solid var(--surface-border)', overflow: 'hidden', marginBottom: (it.desc || it.summary) ? 10 : 0 }}>
-                            {fields.map(([k, v], i) => (
-                              <div key={k} style={{ display: 'flex', alignItems: 'center', borderBottom: i < fields.length - 1 ? '1px solid var(--surface-border)' : 'none' }}>
-                                <div style={{ padding: '8px 12px', width: 118, boxSizing: 'border-box', flexShrink: 0, background: 'var(--surface-50)', fontSize: 10.5, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', fontWeight: 600, borderRight: '1px solid var(--surface-border)' }}>{k}</div>
-                                <div style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-heading)', fontWeight: 500, flex: 1, wordBreak: 'break-word' }}>{String(v)}</div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        {(it.desc || it.summary) && (
-                          <div style={{ padding: '10px 12px', borderRadius: 9, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', fontSize: 12, color: 'var(--text-color)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
-                            {it.summary || it.desc}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Opens a related document's own PDF, layered above this document's reading view */}
-      {viewRelatedDoc && (
-        <DocViewModal doc={viewRelatedDoc} onClose={() => setViewRelatedDoc(null)} zIndex={2300} citizenView={citizenView} />
-      )}
+      {relatedTypeDialog}
+      {viewRelatedDocModal}
 
       {/* Tabs + rail/reader body — skipped entirely once loaded if this document
           has no parts at all (only related docs, e.g.), same "don't show what

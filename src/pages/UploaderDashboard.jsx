@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import {
   Upload, FileText, CheckCircle, XCircle, X, TrendingUp, FileType, Download, Clock,
   RotateCcw, AlertCircle, Eye, GitBranch, Plus, FolderPlus,
-  Layers, ChevronRight, ChevronDown, AlertTriangle, CheckSquare, Square,
+  Layers, ChevronRight, ChevronLeft, ChevronDown, AlertTriangle, CheckSquare, Square,
   Edit3, Tag, Search, MessageSquare, MessageCircle, ZoomIn, ZoomOut, RotateCw, ExternalLink,
   Save, ArrowRight, Paperclip,
 } from 'lucide-react';
@@ -1748,6 +1748,10 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
   const [sortCol,     setSortCol]     = useState('uploadedAt');
   const [sortDir,     setSortDir]     = useState('desc');
+  const [tablePage,   setTablePage]   = useState(1);
+  const TABLE_PAGE_SIZE = 10;
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setTablePage(1); }, [tableSearch, filterType, filterStatus]);
 
   // Full reset of the upload wizard back to its starting (no type chosen) state.
   function resetUploadForm() {
@@ -1793,14 +1797,15 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const typeCompact = files.length > 0;
   // Non-Act types must be linked to a parent Act / legal authority before the rest of the details unlock.
   const usesLegalAuthorities = ['Circular', 'Miscellaneous', 'Notification', 'Order/Gazette', 'Policy'].includes(form.type);
-  const actChosen = usesLegalAuthorities ? legalAuthorities.some(a => a.act) : !!hierarchy.act;
-  // const detailsLocked = !!form.type && form.type !== 'Act' && !actChosen;
   const detailsLocked = false;
   const primaryActId = usesLegalAuthorities ? (legalAuthorities.find(a => a.actId)?.actId ?? null) : (hierarchy.actId ?? null);
   const [actChildren, setActChildren] = useState(null);
   const [actChildrenLoading, setActChildrenLoading] = useState(false);
   const [departmentActs, setDepartmentActs] = useState(null);
   const [departmentActsLoading, setDepartmentActsLoading] = useState(false);
+  const [departmentActsPage, setDepartmentActsPage] = useState(1);
+  const [departmentActsTotal, setDepartmentActsTotal] = useState(0);
+  const DEPT_ACTS_PAGE_SIZE = 10;
 
   // Auto-scroll to the next step of the upload wizard as it's revealed
   useEffect(() => {
@@ -1831,19 +1836,31 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   }, [primaryActId, form.type]);
 
   // Fetch Acts already uploaded in the current user's department, so the uploader can see what
-  // already exists before submitting a new Act (helps avoid duplicates).
+  // already exists before submitting a new Act (helps avoid duplicates). Page-by-page (not an
+  // accumulating "Load More") so a department with many Acts doesn't turn this into a giant list.
+  // The endpoint returns a top-level `total` count, so page count is exact — no need to guess
+  // "there might be more" from whether the page came back full.
   useEffect(() => {
     if (form.type !== 'Act') return;
     let cancelled = false;
     // Same documented fetch-on-mount pattern (see the dashboard effect above).
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setDepartmentActsLoading(true);
-    getMyDepartmentActs()
-      .then(res => { if (!cancelled) setDepartmentActs(res.data?.documents || res.data?.results || (Array.isArray(res.data) ? res.data : [])); })
+    getMyDepartmentActs(undefined, (departmentActsPage - 1) * DEPT_ACTS_PAGE_SIZE, DEPT_ACTS_PAGE_SIZE)
+      .then(res => {
+        if (cancelled) return;
+        const list = res.data?.documents || res.data?.results || (Array.isArray(res.data) ? res.data : []);
+        setDepartmentActs(list);
+        setDepartmentActsTotal(typeof res.data?.total === 'number' ? res.data.total : list.length);
+      })
       .catch(() => { if (!cancelled) setDepartmentActs(null); })
       .finally(() => { if (!cancelled) setDepartmentActsLoading(false); });
     return () => { cancelled = true; };
-  }, [form.type]);
+  }, [form.type, departmentActsPage]);
+
+  // Back to page 1 whenever this table is (re)entered, e.g. picking a different type and back to Act.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setDepartmentActsPage(1); }, [form.type]);
 
   // Add Documents / Sections tab: same department-Acts list, fetched independently so it
   // doesn't depend on (or get cleared by) the main Upload wizard's form.type.
@@ -2186,13 +2203,21 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       .filter(r => r.pdf_id !== null);
 
     // For Amendment: auto-include hierarchy Act as parent_act if selected from API search.
+    // For Rules & Regulations / Bye Laws: same idea but as 'issued_under' — these two types
+    // keep their Act Reference in `hierarchy.actId` rather than `legalAuthorities` (they're
+    // excluded from usesLegalAuthorities), so without this they'd never get the auto-relationship
+    // that Circular/Notification/Policy/Order-Gazette/Miscellaneous get below via authorityRels —
+    // the parent Act's related-documents list would just never show them.
     // Dedup by (pdf_id, type) — not pdf_id alone — since the same target document can
     // legitimately carry both an explicit relation (e.g. "In Continuation of") and the
-    // auto-derived parent_act relation at the same time.
+    // auto-derived relation at the same time.
     const hierarchyRel = (form.type === 'Amendment' && hierarchy.actId &&
       !explicitRels.some(r => r.pdf_id === hierarchy.actId && r.type === 'parent_act'))
       ? [{ pdf_id: hierarchy.actId, type: 'parent_act' }]
-      : [];
+      : (['Rules & Regulations', 'Bye Laws'].includes(form.type) && hierarchy.actId &&
+          !explicitRels.some(r => r.pdf_id === hierarchy.actId && r.type === 'issued_under'))
+        ? [{ pdf_id: hierarchy.actId, type: 'issued_under' }]
+        : [];
 
     // For non-Act types: legal authorities selected from API search → 'issued_under' relationship
     const authorityRels = form.type !== 'Act'
@@ -3124,6 +3149,9 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
               return sortDir === 'asc' ? (ka > kb ? 1 : -1) : (ka < kb ? 1 : -1);
             });
           const filtered = allFiltered;
+          const tableTotalPages = Math.max(1, Math.ceil(filtered.length / TABLE_PAGE_SIZE));
+          const clampedTablePage = Math.min(tablePage, tableTotalPages);
+          const pageItems = filtered.slice((clampedTablePage - 1) * TABLE_PAGE_SIZE, clampedTablePage * TABLE_PAGE_SIZE);
 
           function toggleSort(col) {
             if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -3305,7 +3333,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                       {t('table.noDocumentsFound')}
                     </div>
                   )}
-                  {filtered.map(doc => {
+                  {pageItems.map(doc => {
                     const isDraft      = !doc.workflowStatus || doc.workflowStatus === WORKFLOW_STATUS.DRAFT;
                     const isPublished  = doc.workflowStatus === WORKFLOW_STATUS.PUBLISHED;
                     const isSelected   = selectedIds.has(doc.id);
@@ -3475,6 +3503,25 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                     );
                   })}
                 </div>
+
+                {/* ── Pagination — keeps the list from dumping every upload onto one screen ── */}
+                {tableTotalPages > 1 && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', borderTop: '1px solid var(--surface-border)' }}>
+                    <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
+                      {t('table.pageIndicator', { page: clampedTablePage, total: tableTotalPages })}
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <button type="button" onClick={() => setTablePage(p => Math.max(1, p - 1))} disabled={clampedTablePage === 1}
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-card)', color: clampedTablePage === 1 ? 'var(--text-color-secondary)' : 'var(--text-heading)', fontSize: 12, fontWeight: 600, cursor: clampedTablePage === 1 ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: clampedTablePage === 1 ? .5 : 1 }}>
+                        <ChevronLeft size={13} /> {t('table.pagePrev')}
+                      </button>
+                      <button type="button" onClick={() => setTablePage(p => Math.min(tableTotalPages, p + 1))} disabled={clampedTablePage === tableTotalPages}
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-card)', color: clampedTablePage === tableTotalPages ? 'var(--text-color-secondary)' : 'var(--text-heading)', fontSize: 12, fontWeight: 600, cursor: clampedTablePage === tableTotalPages ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: clampedTablePage === tableTotalPages ? .5 : 1 }}>
+                        {t('table.pageNext')} <ChevronRight size={13} />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </>
             );
           })()}
@@ -6463,6 +6510,27 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                   </tbody>
                 </table>
                 </div>
+                {(() => {
+                  const totalPages = Math.max(1, Math.ceil(departmentActsTotal / DEPT_ACTS_PAGE_SIZE));
+                  if (totalPages <= 1) return null;
+                  return (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderTop: '1px solid var(--surface-border)' }}>
+                    <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
+                      {t('table.pageIndicator', { page: departmentActsPage, total: totalPages })}
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <button type="button" onClick={() => setDepartmentActsPage(p => Math.max(1, p - 1))} disabled={departmentActsPage === 1}
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-card)', color: departmentActsPage === 1 ? 'var(--text-color-secondary)' : 'var(--text-heading)', fontSize: 12, fontWeight: 600, cursor: departmentActsPage === 1 ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: departmentActsPage === 1 ? .5 : 1 }}>
+                        <ChevronLeft size={13} /> {t('table.pagePrev')}
+                      </button>
+                      <button type="button" onClick={() => setDepartmentActsPage(p => Math.min(totalPages, p + 1))} disabled={departmentActsPage === totalPages}
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-card)', color: departmentActsPage === totalPages ? 'var(--text-color-secondary)' : 'var(--text-heading)', fontSize: 12, fontWeight: 600, cursor: departmentActsPage === totalPages ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: departmentActsPage === totalPages ? .5 : 1 }}>
+                        {t('table.pageNext')} <ChevronRight size={13} />
+                      </button>
+                    </div>
+                  </div>
+                  );
+                })()}
               </div>
             )}
           </Card>
@@ -6483,9 +6551,12 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.25)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', zIndex: 300, animation: 'drawerFadeIn .2s ease' }}
           />
 
-          {/* Slide-in panel */}
+          {/* Slide-in panel — anchored top/right/bottom rather than height:'100vh' so it
+              still reaches the bottom of the screen on mobile browsers, where 100vh is
+              measured against the viewport with the address bar hidden and leaves a gap
+              under the panel once the (visible) address bar shrinks the real viewport. */}
           <div style={{
-            position: 'fixed', right: 0, top: 0, height: '100vh', width: 420, maxWidth: '100%',
+            position: 'fixed', right: 0, top: 0, bottom: 0, width: 420, maxWidth: '100%',
             background: 'var(--surface-card)',
             boxShadow: '-4px 0 40px rgba(0,0,0,.18)',
             zIndex: 301,
@@ -6850,11 +6921,10 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                             setRelSearch(e.target.value); setRelTarget(''); setShowRelDrop(true);
                             if (relDocType) fetchRelDocSuggestions(relDocType, e.target.value);
                           }}
-                          onFocus={() => { setShowRelDrop(true); if (relDocType && relSearch) fetchRelDocSuggestions(relDocType, relSearch); }}
-                          onBlur={() => setTimeout(() => setShowRelDrop(false), 150)}
+                          onFocus={e => { focusStyle(e); setShowRelDrop(true); if (relDocType && relSearch) fetchRelDocSuggestions(relDocType, relSearch); }}
+                          onBlur={e => { blurStyle(e); setTimeout(() => setShowRelDrop(false), 150); }}
                           placeholder={!relDocType ? t('drawer.selectTypeFirst') : t('drawer.searchDocType', { type: relDocType })}
                           style={{ ...INPUT_BASE, width: '100%', ...(!relDocType ? { background: 'var(--surface-100)', cursor: 'not-allowed', color: 'var(--text-color-secondary)' } : {}) }}
-                          onFocus={focusStyle} onBlur={blurStyle}
                         />
                         {relDocSearching && <div style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 10, color: 'var(--text-color-secondary)' }}>…</div>}
                         {relDocType && showRelDrop && relSearch.trim() && (

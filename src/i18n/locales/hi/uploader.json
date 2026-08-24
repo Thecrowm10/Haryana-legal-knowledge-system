@@ -131,7 +131,10 @@
     "noDocumentsFound": "कोई दस्तावेज़ नहीं मिला।",
     "remarksButton": "टिप्पणियाँ",
     "replaceFileButton": "फ़ाइल बदलें",
-    "allTypes": "सभी प्रकार"
+    "allTypes": "सभी प्रकार",
+    "pagePrev": "पिछला",
+    "pageNext": "आगे",
+    "pageIndicator": "पृष्ठ {{page}} / {{total}}"
   },
   "replaceFileModal": {
     "title": "दस्तावेज़ फ़ाइल बदलें",
