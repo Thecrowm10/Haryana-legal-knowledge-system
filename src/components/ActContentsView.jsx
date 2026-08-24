@@ -1,14 +1,15 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   X, ChevronDown, ChevronRight, FileText, BookOpen, AlertCircle, RefreshCw, Eye, Sparkles, Building2,
-  Search, CalendarDays, Paperclip, FileStack, ClipboardList, UnfoldVertical, FoldVertical, ArrowUp, Download,
+  Search, CalendarDays, Paperclip, FileStack, ClipboardList, UnfoldVertical, FoldVertical, ArrowUp,
 } from 'lucide-react';
 import { PART_META } from '../constants/mockActOutline';
 import { DOC_TYPE_META } from '../constants/docTypeMeta';
 import { TYPE_SPECIFIC_FIELD_KEYS } from '../constants/docTypeFields';
 import { getPdfFull } from '../services/pdf';
 import { mapActPartsToOutline, mapRelationships, humanizeRelationType } from '../utils/actFull';
-import { mapPublicDocForViewer, downloadPdf, downloadActPartFile } from '../utils/mapPublicDoc';
+import { mapPublicDocForViewer, openPdfInNewTab, openActPartFileInNewTab } from '../utils/mapPublicDoc';
 import DocViewModal from './DocViewModal';
 import CitizenTopBar from './CitizenTopBar';
 import Card from './ui/Card';
@@ -24,6 +25,11 @@ function fieldLabel(k) {
 // PART_META constant, which DocViewModal also reads) so that constant stays
 // a plain data map with no lucide-react dependency.
 const PART_ICONS = { sections: BookOpen, schedules: CalendarDays, annexures: Paperclip, appendix: FileStack, forms: ClipboardList };
+
+// PART_META's own `.label` (Sections/Schedules/…) is plain English, shared as-is with
+// DocViewModal — translating it there too is out of scope here, so this file translates
+// its OWN display of each part's name via this key map instead of touching that constant.
+const PART_LABEL_KEYS = { sections: 'partSections', schedules: 'partSchedules', annexures: 'partAnnexures', appendix: 'partAppendix', forms: 'partForms' };
 
 // Legal body text reads better in a serif face — falls back to the OS's own
 // Georgia/Times before generic serif, no extra font file to self-host.
@@ -67,24 +73,26 @@ const shimmer = {
 // Tab-aware empty state — points a citizen at whichever other tabs on this
 // same Act do have content, instead of a dead end.
 function EmptyPart({ activePart, counts, onJump }) {
+  const { t } = useTranslation('actContents');
   const meta = PART_META[activePart];
   const Icon = PART_ICONS[activePart];
+  const partLabel = t(PART_LABEL_KEYS[activePart]);
   const alternatives = Object.keys(PART_META).filter(k => k !== activePart && counts[k] > 0);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '72px 24px', textAlign: 'center' }}>
       <div style={{ width: 60, height: 60, borderRadius: '50%', background: meta.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <Icon size={26} strokeWidth={1.5} color={meta.accent} />
       </div>
-      <div style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--text-heading)' }}>No {meta.label.toLowerCase()} available</div>
+      <div style={{ fontSize: 14.5, fontWeight: 700, color: 'var(--text-heading)' }}>{t('noPartAvailable', { part: partLabel.toLowerCase() })}</div>
       <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', maxWidth: 340, lineHeight: 1.6 }}>
-        This document does not have any {meta.label.toLowerCase()} published in the repository yet.
+        {t('noPartPublished', { part: partLabel.toLowerCase() })}
       </div>
       {alternatives.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginTop: 6 }}>
           {alternatives.map(k => (
             <button key={k} type="button" onClick={() => onJump(k)}
               style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 13px', borderRadius: 20, border: `1px solid ${PART_META[k].accent}33`, background: PART_META[k].bg, color: PART_META[k].accent, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-              {PART_META[k].label} · {counts[k]}
+              {t(PART_LABEL_KEYS[k])} · {counts[k]}
             </button>
           ))}
         </div>
@@ -114,15 +122,16 @@ function LoadingPart() {
 }
 
 function ErrorPart({ onRetry }) {
+  const { t } = useTranslation('actContents');
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '70px 0', color: 'var(--text-color-secondary)' }}>
       <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(220, 53, 69,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <AlertCircle size={24} strokeWidth={1.5} color="#dc3545" />
       </div>
-      <span style={{ fontSize: 13.5 }}>Couldn't load this document's contents.</span>
+      <span style={{ fontSize: 13.5 }}>{t('loadError')}</span>
       <button type="button" onClick={onRetry}
         style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-card)', color: 'var(--primary)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-        <RefreshCw size={13} /> Retry
+        <RefreshCw size={13} /> {t('retry')}
       </button>
     </div>
   );
@@ -133,17 +142,18 @@ function ErrorPart({ onRetry }) {
 // own) instead of being crammed into one small grey line under the title.
 // Each one is its own separate pill — no shared/continued background across
 // them. Document type itself sits in the heading card above (parallel to
-// the document's name) — not repeated here too. "Download PDF" sits in the
+// the document's name) — not repeated here too. "View Document" sits in the
 // opposite corner of this same row (parallel to department/year), so
-// downloading the file doesn't need its own separate button elsewhere. When
+// opening the file doesn't need its own separate button elsewhere. When
 // there's a tabs/rail framework taking up the page (onOpenSummary passed),
 // the summary itself becomes a pill right alongside the date instead of an
 // always-visible band — that space is busier there, so it's opened on demand.
-function DocMetaBox({ dept, year, docId, fileName, onOpenSummary }) {
+function DocMetaBox({ dept, year, docId, onOpenSummary }) {
+  const { t } = useTranslation('actContents');
   if (!dept && !year && !docId) return null;
   const fields = [
-    dept && { label: 'Administering Department:', value: dept, icon: Building2, color: 'var(--primary)', bg: 'var(--primary-light)' },
-    year && { label: 'Year:', value: year, icon: CalendarDays, color: '#64748b', bg: 'rgba(100,116,139,.1)' },
+    dept && { label: t('administeringDepartment'), value: dept, icon: Building2, color: 'var(--primary)', bg: 'var(--primary-light)' },
+    year && { label: t('year'), value: year, icon: CalendarDays, color: '#64748b', bg: 'rgba(100,116,139,.1)' },
   ].filter(Boolean);
   // No background of its own — this sits directly on whatever page backdrop is
   // already behind it (so it doesn't create its own separate colour band
@@ -170,16 +180,16 @@ function DocMetaBox({ dept, year, docId, fileName, onOpenSummary }) {
               <div style={{ width: 22, height: 22, borderRadius: 6, background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <Sparkles size={12} color="var(--primary)" />
               </div>
-              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--primary)' }}>Summary</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--primary)' }}>{t('summary')}</span>
             </button>
           )}
         </div>
         {docId != null && (
-          <button type="button" onClick={() => downloadPdf(docId, fileName)}
+          <button type="button" onClick={() => openPdfInNewTab(docId)}
             style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px', borderRadius: 10, border: 'none', background: 'var(--primary)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)', boxShadow: '0 8px 20px rgba(33, 74, 171,.2)', flexShrink: 0, transition: 'opacity .15s' }}
             onMouseEnter={e => e.currentTarget.style.opacity = '.9'}
             onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
-            <Download size={14} /> Download PDF
+            <Eye size={14} /> {t('viewDocument')}
           </button>
         )}
       </div>
@@ -197,18 +207,19 @@ function DocMetaBox({ dept, year, docId, fileName, onOpenSummary }) {
 // matters here — opening the actual PDF (view, download, print, whatever
 // the citizen needs, all inside that viewer).
 function SimpleDocLayout({ doc }) {
+  const { t } = useTranslation('actContents');
   // Every field the uploader could have filled in for this document — the
   // common ones plus whichever extra fields belong to this specific document
   // type (Act Year, Sector, …) — blank ones are simply left out, never shown
   // empty. Deliberately excludes uploader identity/upload-date/internal
   // workflow fields, same as the rest of this citizen-facing view.
   const fields = [
-    ['Reference No.',   doc.referenceNumber],
-    ['Issue Date',      doc.enactmentDate],
-    ['Effective From',  doc.effectiveFrom],
-    ['Gazette Ref.',    doc.gazette],
-    ['Legal Authority', doc.authority],
-    ['Short Title',     doc.shortTitle],
+    [t('referenceNo'),   doc.referenceNumber],
+    [t('issueDate'),     doc.enactmentDate],
+    [t('effectiveFrom'), doc.effectiveFrom],
+    [t('gazetteRef'),    doc.gazette],
+    [t('legalAuthority'), doc.authority],
+    [t('shortTitle'),    doc.shortTitle],
     ...(TYPE_SPECIFIC_FIELD_KEYS[doc.type] || []).map(({ key }) => [fieldLabel(key), doc.typeFields?.[key]]),
   ].filter(([, v]) => v);
   return (
@@ -223,17 +234,17 @@ function SimpleDocLayout({ doc }) {
           <div style={{ width: 32, height: 32, borderRadius: 9, background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <Sparkles size={15} color="var(--primary)" />
           </div>
-          <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--primary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)' }}>Summary</span>
+          <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--primary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)' }}>{t('summary')}</span>
         </div>
         {doc.desc ? (
           <div style={{ fontSize: 14.5, lineHeight: 1.9, color: 'var(--text-color)', fontFamily: SERIF_STACK }}>{renderFormattedSummary(doc.desc)}</div>
         ) : (
-          <div style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>No summary available for this document yet — open the PDF to read it in full.</div>
+          <div style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>{t('noSummaryAvailable')}</div>
         )}
       </Card>
 
       <Card className="acv-simple-sidebar" padding="24px" style={{ position: 'sticky', top: 20 }}>
-        <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)', marginBottom: 14 }}>Document Details</div>
+        <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)', marginBottom: 14 }}>{t('documentDetails')}</div>
         {fields.length > 0 ? (
           <div style={{ borderRadius: 10, border: '1px solid var(--surface-border)', overflow: 'hidden', marginBottom: 20 }}>
             {fields.map(([k, v], i) => (
@@ -244,9 +255,9 @@ function SimpleDocLayout({ doc }) {
             ))}
           </div>
         ) : (
-          <div style={{ fontSize: 12, color: 'var(--text-color-secondary)' }}>No additional details on record.</div>
+          <div style={{ fontSize: 12, color: 'var(--text-color-secondary)' }}>{t('noAdditionalDetails')}</div>
         )}
-        {/* Downloading now happens from "Download PDF" in the meta row above
+        {/* Opening the PDF now happens from "View Document" in the meta row above
             (parallel to department/year) — not repeated here too. */}
       </Card>
     </div>
@@ -256,13 +267,14 @@ function SimpleDocLayout({ doc }) {
 // The single citizen-facing landing page for ANY document type (Act,
 // Notification, Circular, …), opened on a direct browse click — independent
 // of the raw PDF. Clicking an entry expands its text inline; nothing here
-// scrolls or touches the PDF viewer. The PDF stays reachable via "Download
-// PDF" in the meta row (parallel to department/year), and DocViewModal itself
+// scrolls or touches the PDF viewer. The PDF stays reachable via "View
+// Document" in the meta row (parallel to department/year), and DocViewModal itself
 // is still used separately for "show me where my search term matched". When a
 // document has no chapters/schedules/etc. and nothing relates to it, this
 // collapses to a plain details card (see SimpleDocLayout) instead of five
 // empty, disabled tabs.
 export default function ActContentsView({ doc: rawDoc, onClose, citizenView = false, onLoginAsOfficer }) {
+  const { t } = useTranslation('actContents');
   const [fullDetail, setFullDetail] = useState(null);
   const [loading, setLoading]       = useState(true);
   const [loadError, setLoadError]   = useState(false);
@@ -299,7 +311,9 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
     return merged;
   }, [rawDoc, fullDetail]);
 
-  const outline     = useMemo(() => fullDetail ? mapActPartsToOutline(fullDetail.act_parts) : EMPTY_OUTLINE, [fullDetail]);
+  // approvedOnly only for citizens — pending/rejected parts stay invisible to the public
+  // even though the API returns them regardless of review status.
+  const outline     = useMemo(() => fullDetail ? mapActPartsToOutline(fullDetail.act_parts, citizenView) : EMPTY_OUTLINE, [fullDetail, citizenView]);
   const relatedDocs = useMemo(() => fullDetail ? mapRelationships(fullDetail.related_documents) : {}, [fullDetail]);
   // Every document type except this document's own, always shown — types with
   // nothing related render disabled/greyed rather than being hidden, so a
@@ -310,9 +324,11 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
 
   // How many entries live under each part tab — drives the count badges,
   // which tabs are clickable, and the "try these instead" suggestions in
-  // the empty state.
+  // the empty state. A chapter counts as content on its own even with zero
+  // sections inside it yet (some Acts are structured as chapters only, with
+  // sections added later) — so each chapter contributes at least 1, not 0.
   const partCounts = useMemo(() => ({
-    sections:  outline.sections.chapters.reduce((n, ch) => n + ch.sections.length, 0),
+    sections:  outline.sections.chapters.reduce((n, ch) => n + Math.max(ch.sections.length, 1), 0),
     schedules: outline.schedules.length,
     annexures: outline.annexures.length,
     appendix:  outline.appendix.length,
@@ -325,7 +341,14 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
   // "Related Documents" band above them does; see hasAnyPartContent usage below.
   const hasAnyPartContent = Object.values(partCounts).some(c => c > 0);
 
-  const [activePart, setActivePart]   = useState('sections');
+  const [rawActivePart, setActivePart] = useState('sections');
+  // Derived rather than synced via an effect: lands on whichever tab actually has
+  // content instead of defaulting to (possibly empty) Sections — empty tabs are
+  // hidden below, so this keeps the initial view from opening on a dead tab, without
+  // needing a setState-in-effect correction once `fullDetail`/`partCounts` are known.
+  const activePart = partCounts[rawActivePart] > 0
+    ? rawActivePart
+    : (Object.keys(PART_META).find(k => partCounts[k] > 0) || rawActivePart);
   const [openEntries, setOpenEntries] = useState(() => new Set()); // set of `${chapterIdx}-${sectionIdx}` or flat idx strings — several can be open at once
   const [chapterFilter, setChapterFilter] = useState(''); // narrows the chapter rail only; the reader itself still renders every chapter
   const [showBackToTop, setShowBackToTop] = useState(false);
@@ -339,8 +362,13 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
 
   // Fetches the Act's full content (chapters/sections/schedules/… + related
   // documents) in one call — everything here previously came from mock data.
+  // Same documented fetch-on-mount pattern used throughout this codebase
+  // (flip loading on, fetch, flip off in finally) — react-hooks/set-state-in-effect
+  // flags any sync setState in an effect, but there's no non-effect way to kick off
+  // a fetch when `doc.id`/`retryTick` change.
   useEffect(() => {
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     setLoadError(false);
     getPdfFull(doc.id)
@@ -349,16 +377,6 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [doc.id, retryTick]);
-
-  // Once loaded, land on whichever tab actually has content instead of always
-  // defaulting to (possibly empty) Sections — empty tabs are disabled below,
-  // so this keeps the initial view from opening on a dead tab.
-  useEffect(() => {
-    if (!fullDetail || partCounts[activePart] > 0) return;
-    const firstWithData = Object.keys(PART_META).find(k => partCounts[k] > 0);
-    if (firstWithData) setActivePart(firstWithData);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fullDetail]);
 
   // `related_documents` already carries every field for each related record
   // (status, dates, gazette ref, legal authority, description, …) — no
@@ -484,7 +502,7 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
                 document, not its internal PDF filename. */}
             <h1 style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-heading)', letterSpacing: '-.01em', lineHeight: 1.3, margin: 0, overflowWrap: 'break-word' }}>{doc.title}</h1>
           </div>
-          {/* No PDF button here — "Download PDF" in the meta row below (parallel to
+          {/* No PDF button here — "View Document" in the meta row below (parallel to
               department/year) is the one place that action lives now, for both the
               tabbed/structured case and the plain-details case. */}
           {/* Hidden for citizens — the "Home" breadcrumb above already gives them a way
@@ -495,13 +513,13 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
               style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 18px', borderRadius: 9, border: '1px solid var(--surface-border)', background: 'var(--surface-card)', color: 'var(--text-color-secondary)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0, transition: 'background .15s' }}
               onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
               onMouseLeave={e => e.currentTarget.style.background = 'var(--surface-card)'}>
-              <X size={14} /> Close
+              <X size={14} /> {t('close')}
             </button>
           )}
         </Card>
       </div>
 
-      <DocMetaBox dept={doc.dept} year={doc.year} docId={doc.id} fileName={doc.fileName}
+      <DocMetaBox dept={doc.dept} year={doc.year} docId={doc.id}
         onOpenSummary={showSummaryButton && doc.desc ? () => setSummaryDialogOpen(true) : undefined} />
     </>
   );
@@ -543,10 +561,10 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
               style={{ background: 'none', border: 'none', padding: 0, fontSize: 13, fontWeight: 500, color: 'var(--text-color-secondary)', cursor: 'pointer', fontFamily: 'var(--font)', transition: 'color .15s' }}
               onMouseEnter={e => e.currentTarget.style.color = 'var(--primary)'}
               onMouseLeave={e => e.currentTarget.style.color = 'var(--text-color-secondary)'}>
-              Home
+              {t('home')}
             </button>
             <ChevronRight size={13} color="var(--text-color-secondary)" style={{ opacity: .55 }} />
-            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)' }}>Document View</span>
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)' }}>{t('documentView')}</span>
           </div>
         </div>
       )}
@@ -560,7 +578,7 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
       {(() => {
         const relatedDocsBand = hasAnyRelated && (
           <div style={{ padding: '14px 24px', flexShrink: 0 }}>
-            <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)', marginBottom: 9 }}>Related Documents</div>
+            <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)', marginBottom: 9 }}>{t('relatedDocuments')}</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {allRelatedTypes.filter(type => (relatedDocs[type] || []).length > 0).map(type => {
                 const items = relatedDocs[type] || [];
@@ -608,12 +626,12 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
                   const rowKey = it.id ?? idx;
                   const isOpen = expandedRelated === rowKey;
                   const fields = [
-                    ['Reference No.',  it.referenceNumber],
-                    ['Issue Date',     it.enactmentDate],
-                    ['Effective From', it.effectiveFrom],
-                    ['Gazette Ref.',   it.gazette],
-                    ['Legal Authority', it.authority],
-                    ['Short Title',    it.shortTitle],
+                    [t('referenceNo'),  it.referenceNumber],
+                    [t('issueDate'),     it.enactmentDate],
+                    [t('effectiveFrom'), it.effectiveFrom],
+                    [t('gazetteRef'),   it.gazette],
+                    [t('legalAuthority'), it.authority],
+                    [t('shortTitle'),    it.shortTitle],
                   ].filter(([, v]) => v);
                   return (
                     <div key={rowKey} style={{ borderBottom: idx < relatedDialogItems.length - 1 ? '1px solid var(--surface-border)' : 'none' }}>
@@ -645,11 +663,11 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
                         </button>
                         {/* Parallel to the title/badges once expanded — not pushed down onto its own line below. */}
                         {isOpen && it.id != null && (
-                          <button type="button" onClick={() => citizenView ? downloadPdf(it.id, it.fileName) : (setViewRelatedDoc(it), setRelatedDialogType(null))}
+                          <button type="button" onClick={() => citizenView ? openPdfInNewTab(it.id) : (setViewRelatedDoc(it), setRelatedDialogType(null))}
                             style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 13px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-card)', color: 'var(--primary)', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'background .15s', flexShrink: 0 }}
                             onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
                             onMouseLeave={e => e.currentTarget.style.background = 'var(--surface-card)'}>
-                            {citizenView ? <><Download size={12} /> Download PDF</> : <><Eye size={12} /> View Full PDF</>}
+                            <Eye size={12} /> {t('viewDocument')}
                           </button>
                         )}
                       </div>
@@ -724,7 +742,7 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
                 <div style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Sparkles size={15} color="var(--primary)" />
                 </div>
-                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>Summary</span>
+                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>{t('summary')}</span>
               </div>
               <button onClick={() => setSummaryDialogOpen(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex' }}>
                 <X size={16} />
@@ -766,7 +784,7 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
               onMouseEnter={e => { if (!isActive) e.currentTarget.style.color = 'var(--text-heading)'; }}
               onMouseLeave={e => { if (!isActive) e.currentTarget.style.color = 'var(--text-color-secondary)'; }}>
               <Icon size={14} strokeWidth={2} />
-              {m.label}
+              {t(PART_LABEL_KEYS[key])}
               {!loading && !loadError && (
                 <span style={{
                   fontSize: 10, fontWeight: 700, fontFamily: 'var(--mono)', padding: '1px 6px', borderRadius: 10,
@@ -787,7 +805,7 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
           <div className="acv-rail" style={{ borderRight: '1px solid var(--surface-border)', position: 'sticky', top: 0, alignSelf: 'start', maxHeight: '100vh', overflowY: 'auto', padding: '20px 16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, padding: '0 6px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)' }}>
-                <BookOpen size={12} /> Chapters
+                <BookOpen size={12} /> {t('chapters')}
               </div>
               <span style={{ fontSize: 10.5, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>
                 {activeChapter + 1} / {outline.sections.chapters.length}
@@ -797,7 +815,7 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
             {outline.sections.chapters.length > 6 && (
               <div style={{ position: 'relative', marginBottom: 12, padding: '0 6px' }}>
                 <Search size={13} color="var(--text-color-secondary)" style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
-                <input value={chapterFilter} onChange={e => setChapterFilter(e.target.value)} placeholder="Filter chapters…"
+                <input value={chapterFilter} onChange={e => setChapterFilter(e.target.value)} placeholder={t('filterChaptersPlaceholder')}
                   style={{ width: '100%', boxSizing: 'border-box', padding: '7px 10px 7px 30px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-card)', fontSize: 12, fontFamily: 'var(--font)', color: 'var(--text-color)', outline: 'none', transition: 'border-color .15s' }}
                   onFocus={e => e.currentTarget.style.borderColor = 'var(--primary)'}
                   onBlur={e => e.currentTarget.style.borderColor = 'var(--surface-border)'} />
@@ -805,7 +823,7 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
             )}
 
             {filteredChapters.length === 0 ? (
-              <div style={{ fontSize: 12, color: 'var(--text-color-secondary)', padding: '10px 6px' }}>No chapters match "{chapterFilter}".</div>
+              <div style={{ fontSize: 12, color: 'var(--text-color-secondary)', padding: '10px 6px' }}>{t('noChaptersMatch', { query: chapterFilter })}</div>
             ) : filteredChapters.map(ch => {
               const ci = ch._idx;
               const isActive = activeChapter === ci;
@@ -831,7 +849,7 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
                   <span style={{ minWidth: 0 }}>
                     <span style={{ display: 'block', fontSize: 12.5, fontWeight: 600, color: isActive ? 'var(--primary)' : 'var(--text-heading)', lineHeight: 1.4 }}>{ch.title}</span>
                     <span style={{ display: 'block', fontSize: 10.5, color: 'var(--text-color-secondary)', marginTop: 2 }}>
-                      {ch.sections.length} section{ch.sections.length !== 1 ? 's' : ''}
+                      {t('sectionsCount', { count: ch.sections.length })}
                     </span>
                   </span>
                 </button>
@@ -863,13 +881,13 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
                       style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-card)', color: 'var(--text-color-secondary)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'background .15s, color .15s' }}
                       onMouseEnter={e => { e.currentTarget.style.background = 'var(--surface-hover)'; e.currentTarget.style.color = 'var(--text-heading)'; }}
                       onMouseLeave={e => { e.currentTarget.style.background = 'var(--surface-card)'; e.currentTarget.style.color = 'var(--text-color-secondary)'; }}>
-                      <UnfoldVertical size={12} /> Expand all
+                      <UnfoldVertical size={12} /> {t('expandAll')}
                     </button>
                     <button type="button" onClick={collapseAll}
                       style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-card)', color: 'var(--text-color-secondary)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'background .15s, color .15s' }}
                       onMouseEnter={e => { e.currentTarget.style.background = 'var(--surface-hover)'; e.currentTarget.style.color = 'var(--text-heading)'; }}
                       onMouseLeave={e => { e.currentTarget.style.background = 'var(--surface-card)'; e.currentTarget.style.color = 'var(--text-color-secondary)'; }}>
-                      <FoldVertical size={12} /> Collapse all
+                      <FoldVertical size={12} /> {t('collapseAll')}
                     </button>
                   </div>
                 )}
@@ -881,7 +899,7 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
                       {ch.title && (
                         <>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-                            <span style={{ fontSize: 11, fontFamily: 'var(--mono)', fontWeight: 700, color: '#fff', background: 'var(--primary)', padding: '3px 10px', borderRadius: 20, letterSpacing: '.04em' }}>{`CHAPTER ${ci + 1}`}</span>
+                            <span style={{ fontSize: 11, fontFamily: 'var(--mono)', fontWeight: 700, color: '#fff', background: 'var(--primary)', padding: '3px 10px', borderRadius: 20, letterSpacing: '.04em' }}>{t('chapterLabel', { number: ci + 1 })}</span>
                             <div style={{ flex: 1, height: 1, background: 'var(--surface-border)' }} />
                           </div>
                           <h2 style={{ fontSize: 19, fontWeight: 800, color: 'var(--text-heading)', margin: '0 0 18px', letterSpacing: '-.01em' }}>{ch.title}</h2>
@@ -918,7 +936,7 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
                 ) : (
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-                      <h2 style={{ fontSize: 19, fontWeight: 800, color: 'var(--text-heading)', margin: 0, letterSpacing: '-.01em' }}>{PART_META[activePart].label}</h2>
+                      <h2 style={{ fontSize: 19, fontWeight: 800, color: 'var(--text-heading)', margin: 0, letterSpacing: '-.01em' }}>{t(PART_LABEL_KEYS[activePart])}</h2>
                       <span style={{ fontSize: 11, fontFamily: 'var(--mono)', fontWeight: 700, color: PART_META[activePart].accent, background: PART_META[activePart].bg, padding: '3px 10px', borderRadius: 20 }}>{flatItems.length}</span>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -935,15 +953,16 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
                               style={{ width: '100%', boxSizing: 'border-box', display: 'flex', alignItems: 'center', gap: 10, padding: '13px 14px', cursor: 'pointer', fontFamily: 'var(--font)' }}>
                               <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-heading)', flex: 1 }}>{it.title}</span>
                               {/* Schedules/annexures/appendices/forms can each carry their own
-                                  attached file, separate from the parent Act's own PDF — this
-                                  downloads that specific attachment directly. */}
+                                  attached file, separate from the parent Act's own PDF — opens it
+                                  in a new tab (browser's own PDF viewer: print/download/zoom all
+                                  built in) rather than forcing an automatic download. */}
                               {it.fileRef && (
-                                <button type="button" onClick={e => { e.stopPropagation(); downloadActPartFile(it.fileRef, it.fileName); }}
-                                  title="Download attachment"
+                                <button type="button" onClick={e => { e.stopPropagation(); openActPartFileInNewTab(it.fileRef); }}
+                                  title={t('viewAttachment')}
                                   style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-card)', color: 'var(--primary)', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0, transition: 'background .15s' }}
                                   onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
                                   onMouseLeave={e => e.currentTarget.style.background = 'var(--surface-card)'}>
-                                  <Download size={12} /> Download
+                                  <Eye size={12} /> {t('view')}
                                 </button>
                               )}
                               <ChevronDown size={14} color="var(--text-color-secondary)" style={{ transform: isOpen ? 'none' : 'rotate(-90deg)', transition: 'transform .15s', flexShrink: 0 }} />
@@ -973,7 +992,7 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
 
       {showBackToTop && (
         <button type="button" onClick={() => scrollAreaRef.current?.scrollTo({ top: 0, behavior: 'smooth' })}
-          aria-label="Back to top"
+          aria-label={t('backToTop')}
           style={{
             position: 'fixed', bottom: 28, right: 32, zIndex: 2150, width: 44, height: 44, borderRadius: '50%',
             background: 'var(--primary)', color: '#fff', border: 'none', boxShadow: '0 8px 24px rgba(0,0,0,.25)',

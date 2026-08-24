@@ -36,6 +36,12 @@ export function downloadActPartFile(fileRef, filename) {
   document.body.removeChild(a);
 }
 
+// Same idea as openPdfInNewTab() above, but for a schedule/annexure/appendix/
+// form entry's own attached file rather than the parent Act's PDF.
+export function openActPartFileInNewTab(fileRef) {
+  window.open(`/api/v1/act-parts/file/${encodeURIComponent(fileRef)}`, '_blank', 'noopener,noreferrer');
+}
+
 // Maps a public document record (from /pdf/public/search or /pdf/{id}/full)
 // into the shape DocViewModal expects — same field names the authenticated
 // dashboards read (mapApiDoc/mapDocForViewer), so every filled-in field from

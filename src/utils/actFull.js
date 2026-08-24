@@ -15,14 +15,26 @@ function mapEntry(e) {
   };
 }
 
+// A chapter/entry's own `status` mirrors the review state of the (document,
+// part_type) submission it belongs to — 'pending'/'rejected' means an
+// uploader has submitted it (or an edit to it) but it hasn't cleared review
+// yet. Citizens should only ever see approved content; internal previews
+// (DocViewModal's own outline, which calls this with approvedOnly left off)
+// still want everything, pending or not, so a reviewer can see what they're
+// approving. Items with no `status` field at all are kept either way.
+function isApproved(item) {
+  return !item.status || item.status === 'approved';
+}
+
 // `act_parts.chapters[]` (when has_chapters) or `act_parts.flat_sections[]`
 // (when the Act has no chapter grouping) → { sections: { chapters, isFlat }, schedules, annexures, appendix, forms }.
 // A flat Act is represented as a single chapter with title:null so the reader
 // can skip the "CHAPTER N" pill/rail for it while reusing the same render path.
-export function mapActPartsToOutline(actParts) {
+export function mapActPartsToOutline(actParts, approvedOnly = false) {
+  const keep = approvedOnly ? isApproved : () => true;
   let chapters = [];
   if (actParts?.has_chapters && actParts.chapters?.length) {
-    chapters = actParts.chapters.map(ch => ({
+    chapters = actParts.chapters.filter(keep).map(ch => ({
       title: ch.chapter_title || ch.chapter_number || '',
       sections: (ch.sections || []).map(s => ({
         title: s.section_title || s.section_number || '',
@@ -32,7 +44,7 @@ export function mapActPartsToOutline(actParts) {
   } else if (actParts?.flat_sections?.length) {
     chapters = [{
       title: null,
-      sections: actParts.flat_sections.map(s => ({
+      sections: actParts.flat_sections.filter(keep).map(s => ({
         title: s.section_title || s.section_number || '',
         content: s.section_content || '',
       })),
@@ -40,10 +52,10 @@ export function mapActPartsToOutline(actParts) {
   }
   return {
     sections:  { chapters, isFlat: chapters.length === 1 && chapters[0].title === null },
-    schedules: (actParts?.schedules  || []).map(mapEntry),
-    annexures: (actParts?.annexures  || []).map(mapEntry),
-    appendix:  (actParts?.appendices || []).map(mapEntry),
-    forms:     (actParts?.forms      || []).map(mapEntry),
+    schedules: (actParts?.schedules  || []).filter(keep).map(mapEntry),
+    annexures: (actParts?.annexures  || []).filter(keep).map(mapEntry),
+    appendix:  (actParts?.appendices || []).filter(keep).map(mapEntry),
+    forms:     (actParts?.forms      || []).filter(keep).map(mapEntry),
   };
 }
 

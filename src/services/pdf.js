@@ -17,6 +17,9 @@ export const fullTextSearch       = (q, skip = 0, limit = 50, document_type_id) 
 // Public citizen document browse/filter — no token required (unlike getAllDocumentsAdmin below,
 // which hits an admin-gated endpoint and 401s for anonymous citizens).
 export const publicSearchDocuments = (params = {}) => publicApi.get('/pdf/public/search', { params });
+// Citizen browse-all listing — filterable by department/type, paginated. No token required.
+export const getCitizenDocuments = (department_id, document_type_id, skip = 0, limit = 10) =>
+  publicApi.get('/citizen/documents', { params: { skip, limit, ...(department_id ? { department_id } : {}), ...(document_type_id ? { document_type_id } : {}) } });
 // AI/semantic search — natural-language question in, ranked matching documents (+ an
 // AI-synthesised answer where available) out. No token required.
 export const publicSemanticSearch  = (q, top_k = 5) => publicApi.get('/pdf/public/semantic-search', { params: { q, top_k } });

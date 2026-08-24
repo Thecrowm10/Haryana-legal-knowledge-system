@@ -6,6 +6,8 @@ import loginEn from './locales/en/login.json';
 import loginHi from './locales/hi/login.json';
 import citizenEn from './locales/en/citizen.json';
 import citizenHi from './locales/hi/citizen.json';
+import actContentsEn from './locales/en/actContents.json';
+import actContentsHi from './locales/hi/actContents.json';
 import uploaderEn from './locales/en/uploader.json';
 import uploaderHi from './locales/hi/uploader.json';
 import approverEn from './locales/en/approver.json';
@@ -33,10 +35,10 @@ i18n.use(initReactI18next).init({
   lng: loadStoredLanguage(),
   fallbackLng: 'en',
   defaultNS: 'common',
-  ns: ['common', 'login', 'citizen', 'uploader', 'approver', 'nodal', 'admin', 'cso', 'auditor'],
+  ns: ['common', 'login', 'citizen', 'actContents', 'uploader', 'approver', 'nodal', 'admin', 'cso', 'auditor'],
   resources: {
-    en: { common: commonEn, login: loginEn, citizen: citizenEn, uploader: uploaderEn, approver: approverEn, nodal: nodalEn, admin: adminEn, cso: csoEn, auditor: auditorEn },
-    hi: { common: commonHi, login: loginHi, citizen: citizenHi, uploader: uploaderHi, approver: approverHi, nodal: nodalHi, admin: adminHi, cso: csoHi, auditor: auditorHi },
+    en: { common: commonEn, login: loginEn, citizen: citizenEn, actContents: actContentsEn, uploader: uploaderEn, approver: approverEn, nodal: nodalEn, admin: adminEn, cso: csoEn, auditor: auditorEn },
+    hi: { common: commonHi, login: loginHi, citizen: citizenHi, actContents: actContentsHi, uploader: uploaderHi, approver: approverHi, nodal: nodalHi, admin: adminHi, cso: csoHi, auditor: auditorHi },
   },
   interpolation: { escapeValue: false },
   returnEmptyString: false,

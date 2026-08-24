@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Search, FileText, X, BookOpen, Bookmark, BookmarkCheck,
-  ChevronRight, ChevronDown, AlertCircle, Building2, Layers, User, Sparkles,
+  ChevronRight, ChevronDown, ChevronLeft, AlertCircle, Layers, User, Sparkles,
+  FileEdit, Bell, RefreshCw, Shield, Gavel, Building2, MoreHorizontal,
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import DocViewModal from '../components/DocViewModal';
@@ -13,20 +14,26 @@ import LanguageToggle from '../components/LanguageToggle';
 import Footer from '../components/layout/Footer';
 import haryanaLogo from '../assets/haryana-logo.png';
 import bannerBg from '../assets/banner-1-768x217.png';
-import { publicSearchDocuments, publicSemanticSearch } from '../services/pdf';
+import { publicSearchDocuments, publicSemanticSearch, getCitizenDocuments } from '../services/pdf';
 import { getDocumentTypes } from '../services/departments';
 import { DOC_TYPE_META } from '../constants/docTypeMeta';
 import { cleanFilename, mapPublicDocForViewer } from '../utils/mapPublicDoc';
 
-const QUICK_SEARCHES = [
-  'right to information', 'land revenue', 'municipal corporation',
-  'panchayati raj', 'right to service', 'shops establishments',
-  'property tax', 'building regulations', 'labour welfare',
-];
+// Displayed above the search results — capitalizes the first letter and adds a trailing "?"
+// only when the user didn't already end their own query with one.
+function formatAsQuestion(q) {
+  if (!q) return q;
+  const trimmed = q.trim();
+  const capitalized = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+  return capitalized.endsWith('?') ? capitalized : `${capitalized}?`;
+}
 
-const LABEL = {
-  fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)',
-  letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)',
+// One icon per document type for the browse-table's type strip below — mirrors DOC_TYPE_META's
+// colour keys so a type reads the same way (icon + colour) everywhere in the citizen-facing UI.
+const TYPE_ICON_MAP = {
+  'Act': BookOpen, 'Amendment': FileEdit, 'Notification': Bell, 'Circular': RefreshCw,
+  'Policy': Shield, 'Rules & Regulations': Gavel, 'Order/Gazette': FileText,
+  'Bye Laws': Building2, 'Miscellaneous': MoreHorizontal,
 };
 
 const TOP_BAR_HEIGHT = 60;
@@ -103,71 +110,6 @@ function HighlightedSnippet({ text, query }) {
   );
 }
 
-// One card per document — the public search endpoint returns full document
-// records (not per-page text hits), so there's no grouping or page-chip
-// navigation needed here anymore; each result opens straight to the viewer.
-function DocumentResultCard({ doc, query, onView }) {
-  const { t } = useTranslation('citizen');
-  const name = doc.document_name || cleanFilename(doc.original_filename);
-  const meta = doc.document_type_name ? DOC_TYPE_META[doc.document_type_name] : null;
-  const year = doc.issue_date ? new Date(doc.issue_date).getFullYear() : (doc.created_at ? new Date(doc.created_at).getFullYear() : null);
-
-  return (
-    <div
-      onClick={onView}
-      style={{ background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 12, padding: '16px 18px', cursor: 'pointer', transition: 'box-shadow .2s, border-color .2s' }}
-      onMouseEnter={e => { e.currentTarget.style.boxShadow = 'var(--card-shadow)'; e.currentTarget.style.borderColor = 'rgba(33, 74, 171,.25)'; }}
-      onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = 'var(--surface-border)'; }}
-    >
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
-        <div style={{ width: 36, height: 36, borderRadius: 9, background: meta?.bg || 'rgba(33, 74, 171,.08)', border: `1px solid ${meta?.border || 'rgba(33, 74, 171,.15)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <FileText size={16} color={meta?.color || 'var(--primary)'} strokeWidth={1.5} />
-        </div>
-
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)', lineHeight: 1.35, marginBottom: 6 }}>
-            <HighlightedSnippet text={name} query={query} />
-          </div>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            {doc.document_type_name && (
-              <span style={{ fontSize: 9.5, fontWeight: 700, padding: '2px 8px', borderRadius: 5, fontFamily: 'var(--mono)', letterSpacing: '.04em', textTransform: 'uppercase', background: meta?.bg || 'rgba(100,116,139,.08)', color: meta?.color || '#64748b', border: `1px solid ${meta?.border || 'rgba(100,116,139,.25)'}` }}>
-                {doc.document_type_name}
-              </span>
-            )}
-            {doc.department_name && (
-              <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)' }}>{doc.department_name}</span>
-            )}
-            {year && (
-              <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{year}</span>
-            )}
-            {doc._pages?.length > 0 && (
-              <span style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--primary)', background: 'var(--primary-light)', padding: '2px 8px', borderRadius: 20 }}>
-                {t('matchedPagesSuffix', { count: doc._pages.length })} · p.{doc._bestPage}
-              </span>
-            )}
-          </div>
-
-          {doc.description && (
-            <div style={{ marginTop: 8, fontSize: 12.5, lineHeight: 1.6, color: 'var(--text-color)', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-              <HighlightedSnippet text={doc.description} query={query} />
-            </div>
-          )}
-        </div>
-
-        <button
-          onClick={e => { e.stopPropagation(); onView(); }}
-          style={{ background: 'var(--primary)', color: 'white', border: 'none', padding: '8px 18px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, transition: 'opacity .15s' }}
-          onMouseEnter={e => e.currentTarget.style.opacity = '.85'}
-          onMouseLeave={e => e.currentTarget.style.opacity = '1'}
-        >
-          <BookOpen size={13} /> {t('view')}
-        </button>
-      </div>
-    </div>
-  );
-}
-
 export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAsOfficer }) {
   const { t } = useTranslation('citizen');
   const { t: tLogin, i18n } = useTranslation('login');
@@ -175,8 +117,8 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
   const orgNameEn = i18n.getFixedT('en', 'login')('orgNamePortal');
   const [loginMenuOpen, setLoginMenuOpen] = useState(false);
   const [query, setQuery]           = useState('');
+  const [confirmedQuery, setConfirmedQuery] = useState(''); // the term actually searched — shown below the search bar, which clears itself once a search runs
   const [results, setResults]       = useState([]);
-  const [total, setTotal]           = useState(0);
   const [answer, setAnswer]         = useState(null); // AI answer text from the Search button's semantic search
   const [loading, setLoading]       = useState(false);
   const [searched, setSearched]     = useState(false);
@@ -191,13 +133,26 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
   const [recentLoading, setRecentLoading] = useState(false);
   const [scrolled, setScrolled]     = useState(false);
   const [searchBarHeight, setSearchBarHeight] = useState(0);
+  const [searchRect, setSearchRect] = useState(null); // live bounding rect of the undocked search bar, for portaling its suggestions dropdown
   const [docTypes, setDocTypes]     = useState([]); // [{ id, name }] — live list; falls back to DOC_TYPE_META names if the endpoint needs auth
   const [docTypeId, setDocTypeId]   = useState(''); // selected filter — '' means search across all types
-  const [statsPublished, setStatsPublished] = useState(0);
-  const [statsDepts, setStatsDepts]         = useState(0);
   const inputRef = useRef(null);
   const rootRef = useRef(null);
   const searchBoxRef = useRef(null);
+  const typePillRef = useRef(null);
+  const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
+  const [typePillRect, setTypePillRect] = useState(null); // live rect of the type-select trigger, for its portaled glass dropdown
+  const [browseTypeDropdownOpen, setBrowseTypeDropdownOpen] = useState(false); // mobile/tablet-only stand-in for the type strip below
+
+  // ── Browse-all-documents table (idle-state, replaces the old stat tiles) ──
+  const [departments, setDepartments] = useState([]); // [{ id, name }] for the browse table's department dropdown
+  const [browseTypeId, setBrowseTypeId] = useState(''); // selected type-count chip — '' means all types
+  const [browseDeptId, setBrowseDeptId] = useState(''); // selected department in the browse table's dropdown — '' means all departments
+  const [browsePage, setBrowsePage]   = useState(1);
+  const [browseDocs, setBrowseDocs]   = useState([]);
+  const [browseTotal, setBrowseTotal] = useState(0);
+  const [browseLoading, setBrowseLoading] = useState(false);
+  const BROWSE_PAGE_SIZE = 10;
 
   // Document types for the search filter dropdown
   useEffect(() => {
@@ -206,19 +161,53 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
 
   const typeOptions = docTypes.length > 0 ? docTypes : Object.keys(DOC_TYPE_META).map(name => ({ id: '', name }));
 
-  // Fetch recently published docs + derive stats in one call
+  // Departments for the browse table's dropdown — NOT via getDepartments() (that endpoint
+  // 401s for anonymous citizens, same as UploaderDashboard treats it as auth-only). Every
+  // document from the confirmed-public /citizen/documents already carries its own
+  // department_id + department_name, so a small unfiltered sample gives us real {id, name}
+  // pairs without needing a dedicated public departments endpoint.
+  useEffect(() => {
+    getCitizenDocuments(undefined, undefined, 0, 100)
+      .then(res => {
+        const seen = new Map();
+        (res.data?.documents || []).forEach(d => {
+          if (d.department_id != null && d.department_name && !seen.has(d.department_id)) seen.set(d.department_id, d.department_name);
+        });
+        setDepartments([...seen.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name)));
+      })
+      .catch(err => console.error('Failed to derive department list for browse filter:', err));
+  }, []);
+
+  // Fetch recently published docs — unchanged, still feeds the "Recently Published" panel only.
   useEffect(() => {
     setRecentLoading(true);
-    publicSearchDocuments({ skip: 0, limit: 200 })
-      .then(res => {
-        const docs = res.data.documents || [];
-        setRecentDocs(docs.slice(0, 8));
-        if (res.data.total != null) setStatsPublished(res.data.total);
-        setStatsDepts(new Set(docs.map(d => d.department_name).filter(Boolean)).size);
-      })
+    publicSearchDocuments({ skip: 0, limit: 5 })
+      .then(res => setRecentDocs(res.data.documents || []))
       .catch(() => {})
       .finally(() => setRecentLoading(false));
   }, []);
+
+  // The browse table itself — refetches on every filter/page change, server-side (skip/limit),
+  // rather than paging through a client-side cache — mirrors the Uploader dashboard's Acts table.
+  useEffect(() => {
+    let cancelled = false;
+    // Same documented fetch-on-mount pattern (see the effect above).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setBrowseLoading(true);
+    getCitizenDocuments(browseDeptId || undefined, browseTypeId || undefined, (browsePage - 1) * BROWSE_PAGE_SIZE, BROWSE_PAGE_SIZE)
+      .then(res => {
+        if (cancelled) return;
+        setBrowseDocs(res.data?.documents || []);
+        setBrowseTotal(res.data?.total ?? 0);
+      })
+      .catch(() => { if (!cancelled) { setBrowseDocs([]); setBrowseTotal(0); } })
+      .finally(() => { if (!cancelled) setBrowseLoading(false); });
+    return () => { cancelled = true; };
+  }, [browseDeptId, browseTypeId, browsePage]);
+
+  // Back to page 1 whenever a filter changes, so Next/Previous always starts from a fresh page 1.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setBrowsePage(1); }, [browseDeptId, browseTypeId]);
 
   // The compact top bar takes over the exact moment the hero's own search box
   // scrolls behind it, and hands back the moment it scrolls back into view —
@@ -232,6 +221,11 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
     let ticking = false;
     const check = () => {
       setScrolled(target.getBoundingClientRect().top < TOP_BAR_HEIGHT);
+      // Kept fresh here (not just on open) so the portaled suggestions panel below
+      // tracks the search bar's real position while the page is still scrolling
+      // and hasn't crossed the docking threshold yet.
+      if (searchBoxRef.current) setSearchRect(searchBoxRef.current.getBoundingClientRect());
+      if (typePillRef.current) setTypePillRect(typePillRef.current.getBoundingClientRect());
       ticking = false;
     };
     const onScroll = () => {
@@ -239,7 +233,8 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
     };
     check();
     scrollEl.addEventListener('scroll', onScroll, { passive: true });
-    return () => scrollEl.removeEventListener('scroll', onScroll);
+    window.addEventListener('resize', onScroll);
+    return () => { scrollEl.removeEventListener('scroll', onScroll); window.removeEventListener('resize', onScroll); };
   }, []);
 
   // Live suggestions — same public search endpoint as the Search button, just
@@ -266,7 +261,8 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
   async function doSearch(q = query) {
     const trimmed = (q || '').trim();
     if (trimmed.length < 5) return; // matches the semantic-search endpoint's minLength on `q`
-    setQuery(trimmed);
+    setConfirmedQuery(trimmed);
+    setQuery(''); // the question already shows below the bar once results are in — no need to leave it sitting in the input too
     setShowSugg(false);
     setLoading(true);
     setSearched(false);
@@ -276,7 +272,6 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
       const res = await publicSemanticSearch(trimmed);
       const grouped = groupSemanticSources(res.data.sources || []);
       setResults(grouped);
-      setTotal(grouped.length);
       setAnswer(res.data.answer || null);
       onAuditLog?.(`Searched: "${trimmed}"`);
     } catch {
@@ -288,7 +283,7 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
   }
 
   function clearSearch() {
-    setQuery(''); setResults([]); setTotal(0); setAnswer(null);
+    setQuery(''); setConfirmedQuery(''); setResults([]); setAnswer(null);
     setSearched(false); setError(null); setViewDoc(null);
   }
 
@@ -324,11 +319,7 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
     onAuditLog?.(`Viewed: ${doc.document_name || doc.original_filename}`);
   }
 
-  const isBookmarked = bookmarks.includes(query.trim());
-
-  const publishedCount = statsPublished;
-  const deptCount      = statsDepts;
-  const typeCount      = docTypes.length;
+  const isBookmarked = bookmarks.includes(confirmedQuery);
 
   return (
     <div ref={rootRef} style={{ minHeight: '100%', display: 'flex', flexDirection: 'column', animation: 'fadeSlideIn .3s ease', overflowX: 'hidden' }}>
@@ -343,6 +334,20 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
           box-shadow: 0 0 0 3px rgba(33, 74, 171,.16) !important;
         }
         .cd-search-bar :focus-visible { outline: none !important; }
+        /* Thin, subtle scrollbar for the glass type-dropdown — the default OS scrollbar is a
+           thick flat-grey bar that clashes with the frosted/rounded look. */
+        .cd-type-dropdown-scroll { scrollbar-width: thin; scrollbar-color: rgba(100,116,139,.4) transparent; }
+        .cd-type-dropdown-scroll::-webkit-scrollbar { width: 6px; }
+        .cd-type-dropdown-scroll::-webkit-scrollbar-track { background: transparent; }
+        .cd-type-dropdown-scroll::-webkit-scrollbar-thumb { background: rgba(100,116,139,.4); border-radius: 10px; }
+        .cd-type-dropdown-scroll::-webkit-scrollbar-thumb:hover { background: rgba(100,116,139,.6); }
+        @media (max-width: 1024px) {
+          /* The type strip's cells shrink to always fit one row, but that means
+             tiny icons/labels on tablet and phone widths — a dropdown reads better
+             there than a squeezed 10-cell strip. */
+          .cd-type-strip { display: none !important; }
+          .cd-type-dropdown-mobile { display: block !important; }
+        }
         @media (max-width: 640px) {
           .cd-topbar { padding: 0 16px !important; gap: 8px !important; }
           .cd-actions { gap: 6px !important; }
@@ -355,10 +360,8 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
           .cd-hero { padding: ${TOP_BAR_HEIGHT}px 16px 32px !important; }
           .cd-search-btn { padding: 0 14px !important; font-size: 12px !important; }
           .cd-stats-outer { padding: 0 16px !important; }
-          .cd-stats-grid { grid-template-columns: 1fr !important; }
-          .cd-stat-item { padding: 16px 18px !important; border-right: none !important; }
-          .cd-stat-item:not(:last-child) { border-bottom: 1px solid var(--surface-border); }
           .cd-content { padding: 20px 16px 32px !important; }
+          .cd-browse-grid { grid-template-columns: 1fr !important; }
           .cd-masthead { top: 10px !important; left: 14px !important; gap: 8px !important; }
           .cd-masthead-logo { width: 44px !important; height: 44px !important; }
           .cd-masthead-text { transform: none !important; }
@@ -368,9 +371,6 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
         @media (max-width: 380px) {
           .cd-masthead-logo { width: 36px !important; height: 36px !important; }
           .cd-masthead-en { font-size: 11.5px !important; max-width: 120px; }
-        }
-        @media (min-width: 641px) {
-          .cd-stat-item:not(:last-child) { border-right: 1px solid var(--surface-border); }
         }
       `}</style>
 
@@ -466,7 +466,7 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
       </div>
 
       {/* Hero — full-bleed banner photo, same asset as the login screen */}
-      <div className="cd-hero" style={{ position: 'relative', overflow: 'hidden', minHeight: '80vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: `${TOP_BAR_HEIGHT}px 32px 40px`, textAlign: 'center' }}>
+      <div className="cd-hero" style={{ position: 'relative', overflow: 'hidden', minHeight: '75vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: `${TOP_BAR_HEIGHT}px 32px 36px`, textAlign: 'center' }}>
         <img src={bannerBg} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0, filter: 'blur(2px)', transform: 'scale(1.02)' }} />
         <div style={{ position: 'absolute', inset: 0, zIndex: 1, background: 'linear-gradient(110deg, rgba(2,10,5,.82) 0%, rgba(2,10,5,.62) 45%, rgba(2,10,5,.42) 100%)' }} />
 
@@ -505,8 +505,79 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
             <div id="citizen-search" style={{ height: scrolled ? searchBarHeight : 0, scrollMarginTop: TOP_BAR_HEIGHT + 16 }} />
 
             {(() => {
+              const suggestionsOpen = showSugg && query.trim().length >= 2;
+
+              // Suggestion rows only — the positioning wrapper differs by case (see below),
+              // so it's applied by each caller rather than baked in here.
+              const suggestionsRows = suggestLoading ? (
+                <div style={{ padding: '16px', fontSize: 12.5, color: 'var(--text-color-secondary)', textAlign: 'center' }}>{t('loading')}</div>
+              ) : liveSuggestions.length === 0 ? (
+                <div style={{ padding: '16px', fontSize: 12.5, color: 'var(--text-color-secondary)', textAlign: 'center' }}>{t('noResultsFound')}</div>
+              ) : (
+                liveSuggestions.map((doc, i, arr) => {
+                  const meta = doc.document_type_name ? DOC_TYPE_META[doc.document_type_name] : null;
+                  return (
+                    <div key={doc.id} onMouseDown={() => { setShowSugg(false); openDoc(doc); }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer', borderBottom: i < arr.length - 1 ? '1px solid var(--surface-border)' : 'none', transition: 'background .12s' }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                      <FileText size={14} color={meta?.color || 'var(--primary)'} style={{ flexShrink: 0 }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-color)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <HighlightedSnippet text={doc.document_name || cleanFilename(doc.original_filename)} query={query} />
+                        </div>
+                        {(doc.document_type_name || doc.department_name) && (
+                          <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {[doc.document_type_name, doc.department_name].filter(Boolean).join(' · ')}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              );
+
+              // Glass dropdown for the type-select button above — always portaled (see the
+              // comment by the trigger button for why), positioned off typePillRect.
+              const typeDropdownList = (
+                <div className="cd-type-dropdown-scroll" style={{
+                  background: 'rgba(255,255,255,.7)', backdropFilter: 'blur(24px) saturate(180%)', WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+                  border: '1px solid rgba(255,255,255,.7)', borderRadius: 12,
+                  boxShadow: '0 16px 40px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.7)',
+                  padding: 6, maxHeight: 320, overflowY: 'auto',
+                }}>
+                  <div onMouseDown={() => { setDocTypeId(''); setTypeDropdownOpen(false); }}
+                    style={{ padding: '9px 12px', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'var(--font)', background: !docTypeId ? 'rgba(33, 74, 171,.12)' : 'transparent', color: !docTypeId ? 'var(--primary)' : 'var(--text-color)' }}
+                    onMouseEnter={e => { if (docTypeId) e.currentTarget.style.background = 'rgba(255,255,255,.5)'; }}
+                    onMouseLeave={e => { if (docTypeId) e.currentTarget.style.background = 'transparent'; }}>
+                    {t('allTypes')}
+                  </div>
+                  {typeOptions.map(dt => {
+                    const isActive = String(docTypeId) === String(dt.id);
+                    return (
+                      <div key={dt.id || dt.name} onMouseDown={() => { setDocTypeId(dt.id); setTypeDropdownOpen(false); }}
+                        style={{ padding: '9px 12px', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'var(--font)', background: isActive ? 'rgba(33, 74, 171,.12)' : 'transparent', color: isActive ? 'var(--primary)' : 'var(--text-color)' }}
+                        onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'rgba(255,255,255,.5)'; }}
+                        onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}>
+                        {dt.name}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+              const typeDropdownPortal = typeDropdownOpen && typePillRect && createPortal(
+                <div style={{ position: 'fixed', top: typePillRect.bottom + 6, right: window.innerWidth - typePillRect.right, minWidth: 180, zIndex: 210 }}>
+                  {typeDropdownList}
+                </div>,
+                document.body
+              );
+
               const inner = (
                 <div style={{ position: 'relative', width: '100%' }}>
+                  {/* One seamless bar: icon, input, clear, type-select and the Search button all
+                      live inside this single bordered/shadowed container — nothing has its own
+                      separate border or background, so there's exactly one outline no matter
+                      which part is focused or clicked (see .cd-search-bar:focus-within below). */}
                   <div className="cd-search-bar" style={{
                     display: 'flex', alignItems: 'center', width: '100%', background: '#fff', border: '1.5px solid transparent',
                     borderRadius: scrolled ? 10 : 12, overflow: 'hidden',
@@ -540,34 +611,31 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
                     )}
                     <div className="cd-type-pill" style={{
                       position: 'relative', alignSelf: 'stretch', display: 'flex', alignItems: 'center',
-                      margin: scrolled ? '5px 5px 5px 0' : '9px 9px 9px 0',
-                      background: 'rgba(148,163,184,.12)',
-                      backdropFilter: 'blur(10px) saturate(180%)', WebkitBackdropFilter: 'blur(10px) saturate(180%)',
-                      border: '1px solid rgba(255,255,255,.7)',
-                      boxShadow: 'inset 0 1px 1px rgba(255,255,255,.8), 0 1px 2px rgba(15,23,42,.05)',
-                      borderRadius: scrolled ? 8 : 10,
-                      flexShrink: 0,
+                      borderLeft: '1px solid var(--surface-border)', flexShrink: 0,
                     }}>
                       <Layers size={scrolled ? 12 : 14} color="var(--text-color-secondary)"
-                        style={{ marginLeft: scrolled ? 8 : 11, flexShrink: 0, pointerEvents: 'none' }} />
-                      <select
-                        value={docTypeId}
-                        onChange={e => setDocTypeId(e.target.value)}
+                        style={{ marginLeft: scrolled ? 10 : 14, flexShrink: 0, pointerEvents: 'none' }} />
+                      {/* A real <select>'s own popup list can't be styled (browsers render it
+                          natively) — this is a custom button + glass dropdown instead. It also
+                          MUST be portaled (not just for the undocked case, unlike the
+                          suggestions dropdown above): cd-search-bar itself has overflow:hidden,
+                          which would clip an absolutely-positioned list inside this pill no
+                          matter what the scrolled state is. */}
+                      <button type="button" ref={typePillRef}
+                        onClick={() => setTypeDropdownOpen(o => !o)}
+                        onBlur={() => setTimeout(() => setTypeDropdownOpen(false), 150)}
                         title={t('allTypes')}
                         style={{
                           alignSelf: 'stretch', border: 'none', outline: 'none', background: 'transparent', cursor: 'pointer',
-                          appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none',
                           fontFamily: 'var(--font)', color: docTypeId ? 'var(--text-heading)' : 'var(--text-color-secondary)',
-                          fontSize: scrolled ? 11.5 : 13, fontWeight: 600,
+                          fontSize: scrolled ? 11.5 : 13, fontWeight: 600, textAlign: 'left',
                           padding: scrolled ? '0 22px 0 6px' : '0 28px 0 8px', maxWidth: scrolled ? 100 : 160,
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                         }}>
-                      <option value="">{t('allTypes')}</option>
-                      {typeOptions.map(dt => (
-                        <option key={dt.id || dt.name} value={dt.id}>{dt.name}</option>
-                      ))}
-                      </select>
+                        {docTypeId ? (typeOptions.find(dt => String(dt.id) === String(docTypeId))?.name || t('allTypes')) : t('allTypes')}
+                      </button>
                       <ChevronDown size={scrolled ? 11 : 13} color="var(--text-color-secondary)"
-                        style={{ position: 'absolute', right: scrolled ? 7 : 9, pointerEvents: 'none' }} />
+                        style={{ position: 'absolute', right: scrolled ? 7 : 9, pointerEvents: 'none', transform: typeDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
                     </div>
                     <button
                       className="cd-search-btn"
@@ -583,37 +651,12 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
                     </button>
                   </div>
 
-                  {/* Live autocomplete — same /pdf/public/search endpoint as the Search button, just
-                      debounced; each row is a real document and opens straight into the viewer. */}
-                  {showSugg && query.trim().length >= 2 && (
+                  {/* Docked case only: the whole box (including this) already lives in a
+                      document.body portal (see below), so position:absolute here is safe —
+                      it can't get trapped behind anything the way the undocked case can. */}
+                  {scrolled && suggestionsOpen && (
                     <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, background: '#fff', border: '1px solid var(--surface-border)', borderRadius: 10, boxShadow: 'var(--card-shadow)', zIndex: 100, overflow: 'hidden', textAlign: 'left', maxHeight: 360, overflowY: 'auto' }}>
-                      {suggestLoading ? (
-                        <div style={{ padding: '16px', fontSize: 12.5, color: 'var(--text-color-secondary)', textAlign: 'center' }}>{t('loading')}</div>
-                      ) : liveSuggestions.length === 0 ? (
-                        <div style={{ padding: '16px', fontSize: 12.5, color: 'var(--text-color-secondary)', textAlign: 'center' }}>{t('noResultsFound')}</div>
-                      ) : (
-                        liveSuggestions.map((doc, i, arr) => {
-                          const meta = doc.document_type_name ? DOC_TYPE_META[doc.document_type_name] : null;
-                          return (
-                            <div key={doc.id} onMouseDown={() => { setShowSugg(false); openDoc(doc); }}
-                              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer', borderBottom: i < arr.length - 1 ? '1px solid var(--surface-border)' : 'none', transition: 'background .12s' }}
-                              onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
-                              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                              <FileText size={14} color={meta?.color || 'var(--primary)'} style={{ flexShrink: 0 }} />
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-color)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  <HighlightedSnippet text={doc.document_name || cleanFilename(doc.original_filename)} query={query} />
-                                </div>
-                                {(doc.document_type_name || doc.department_name) && (
-                                  <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                    {[doc.document_type_name, doc.department_name].filter(Boolean).join(' · ')}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
+                      {suggestionsRows}
                     </div>
                   )}
                 </div>
@@ -623,30 +666,55 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
               // overflow:hidden (a position:fixed descendant still gets clipped by any
               // overflow:hidden ancestor's paint bounds, regardless of its containing block).
               if (scrolled) {
-                return createPortal(
-                  <div ref={searchBoxRef} className="cd-docked-search" style={{
-                    position: 'fixed', top: 0, height: TOP_BAR_HEIGHT, display: 'flex', alignItems: 'center',
-                    left: '50%', transform: 'translateX(-50%)',
-                    width: 'calc(100% - 64px)', maxWidth: 640, zIndex: 55,
-                    transition: `max-width ${TOP_BAR_EASE}, width ${TOP_BAR_EASE}`,
-                  }}>
-                    {inner}
-                  </div>,
-                  document.body
+                return (
+                  <>
+                    {createPortal(
+                      <div ref={searchBoxRef} className="cd-docked-search" style={{
+                        position: 'fixed', top: 0, height: TOP_BAR_HEIGHT, display: 'flex', alignItems: 'center',
+                        left: '50%', transform: 'translateX(-50%)',
+                        width: 'calc(100% - 64px)', maxWidth: 640, zIndex: 55,
+                        transition: `max-width ${TOP_BAR_EASE}, width ${TOP_BAR_EASE}`,
+                      }}>
+                        {inner}
+                      </div>,
+                      document.body
+                    )}
+                    {typeDropdownPortal}
+                  </>
                 );
               }
               return (
-                <div ref={searchBoxRef} style={{ position: 'relative', width: '100%', maxWidth: 700 }}>
-                  {inner}
-                </div>
+                <>
+                  <div ref={searchBoxRef} style={{ position: 'relative', width: '100%', maxWidth: 700 }}>
+                    {inner}
+                  </div>
+                  {typeDropdownPortal}
+                  {/* Undocked case: the search bar itself still renders inline inside the hero
+                      (position stays exactly where it's always been), but its suggestions
+                      dropdown is portaled to <body> and given position:fixed here — the hero's
+                      overflow:hidden + the type-strip's z-index below it otherwise trap an
+                      absolutely-positioned dropdown behind the strip, no matter how high its
+                      own z-index is set (a positioned ancestor's stacking context always wins
+                      over a descendant's z-index once something else outranks the ancestor). */}
+                  {suggestionsOpen && searchRect && createPortal(
+                    <div style={{
+                      position: 'fixed', top: searchRect.bottom + 6, left: searchRect.left, width: searchRect.width,
+                      background: '#fff', border: '1px solid var(--surface-border)', borderRadius: 10, boxShadow: 'var(--card-shadow)',
+                      zIndex: 200, overflow: 'hidden', textAlign: 'left', maxHeight: 360, overflowY: 'auto',
+                    }}>
+                      {suggestionsRows}
+                    </div>,
+                    document.body
+                  )}
+                </>
               );
             })()}
 
             {/* Save / Clear — only relevant once a search has actually run */}
             {searched && (
               <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 12 }}>
-                {query && (
-                  <button onClick={() => toggleBookmark(query.trim())}
+                {confirmedQuery && (
+                  <button onClick={() => toggleBookmark(confirmedQuery)}
                     title={isBookmarked ? t('removeBookmark') : t('saveThisSearch')}
                     style={{ background: isBookmarked ? 'rgba(74,222,128,.15)' : 'rgba(255,255,255,.08)', border: `1px solid ${isBookmarked ? 'rgba(74,222,128,.35)' : 'rgba(255,255,255,.18)'}`, color: isBookmarked ? '#4ade80' : 'rgba(255,255,255,.7)', padding: '7px 14px', borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 500, fontFamily: 'var(--font)', transition: 'all .2s' }}>
                     {isBookmarked ? <BookmarkCheck size={13} /> : <Bookmark size={13} />}
@@ -660,50 +728,149 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
               </div>
             )}
 
-            {/* Quick search chips — only shown before searching, to keep results uncluttered */}
-            {!searched && (
-              <div style={{ marginTop: 18, display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
-                {QUICK_SEARCHES.slice(0, 6).map(s => (
-                  <button key={s} onClick={() => doSearch(s)}
-                    style={{ background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.18)', color: 'rgba(255,255,255,.75)', padding: '7px 17px', borderRadius: 20, fontSize: 13.5, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'all .15s' }}
-                    onMouseEnter={e => { e.currentTarget.style.borderColor = '#4ade80'; e.currentTarget.style.color = '#4ade80'; }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,.18)'; e.currentTarget.style.color = 'rgba(255,255,255,.75)'; }}>
-                    {s}
-                  </button>
+            {/* Saved searches — sit in the hero where the quick-search chips used to, only
+                before a search has run; each chip has its own remove (X) so bookmarks can be
+                cleared right from here without opening anything else. */}
+            {!searched && bookmarks.length > 0 && (
+              <div style={{ marginTop: 18, display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', alignItems: 'center' }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,.55)', textTransform: 'uppercase', letterSpacing: '.07em', fontFamily: 'var(--mono)' }}>{t('savedLabel')}</span>
+                {bookmarks.map(bm => (
+                  <span key={bm} style={{ display: 'flex', alignItems: 'center', gap: 2, background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.18)', borderRadius: 20, padding: '4px 4px 4px 14px' }}>
+                    <button onClick={() => doSearch(bm)}
+                      style={{ background: 'transparent', border: 'none', color: 'rgba(255,255,255,.85)', fontSize: 13, cursor: 'pointer', fontFamily: 'var(--font)', padding: 0 }}>
+                      {bm}
+                    </button>
+                    <button onClick={() => toggleBookmark(bm)} title={t('removeBookmark')}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 20, height: 20, borderRadius: '50%', background: 'transparent', border: 'none', color: 'rgba(255,255,255,.6)', cursor: 'pointer', transition: 'background .15s, color .15s' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,.18)'; e.currentTarget.style.color = '#fff'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,.6)'; }}>
+                      <X size={11} />
+                    </button>
+                  </span>
                 ))}
               </div>
             )}
+
           </div>
         </div>
       </div>
 
-      {/* Stats strip — floats up over the hero's bottom edge, like a landing panel */}
-      <div className="cd-stats-outer" style={{ padding: '0 32px', marginTop: -32, position: 'relative', zIndex: 3 }}>
-        <div className="cd-stats-grid" style={{
-          maxWidth: 860, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
-          background: 'var(--surface-card)', borderRadius: 14, boxShadow: '0 12px 32px rgba(0,0,0,.12)',
-          border: '1px solid var(--surface-border)', overflow: 'hidden',
-        }}>
-          {[
-            { label: t('statPublishedDocuments'), value: publishedCount, icon: FileText },
-            { label: t('statDepartments'),        value: deptCount,      icon: Building2 },
-            { label: t('statDocumentTypes'),      value: typeCount,      icon: Layers },
-          ].map(s => (
-            <div key={s.label} className="cd-stat-item" style={{ padding: '22px 26px', display: 'flex', alignItems: 'center', gap: 16 }}>
-              <div style={{ width: 46, height: 46, borderRadius: 11, background: 'rgba(33, 74, 171,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <s.icon size={20} color="var(--primary)" strokeWidth={1.8} />
-              </div>
-              <div>
-                <div style={{ fontSize: 25, fontWeight: 800, color: 'var(--text-heading)', fontFamily: 'var(--mono)', lineHeight: 1 }}>{s.value}</div>
-                <div style={{ ...LABEL, fontSize: 11.5, marginTop: 3 }}>{s.label}</div>
-              </div>
+      {/* Document-type strip — floats up over the hero's bottom edge, like the old stat tiles
+          did (same overlap position: half on the image, half on the white background below).
+          Once a search has run, this same floating slot shows the question instead of the
+          type chips — the two-column layout below it stays the same shape either way. */}
+      {!loading && (
+        <div className="cd-stats-outer" style={{ padding: '0 32px', marginTop: -32, position: 'relative', zIndex: 3 }}>
+          {searched ? (
+            <div style={{
+              maxWidth: 1400, margin: '0 auto', background: 'var(--surface-card)', borderRadius: 14,
+              boxShadow: '0 12px 32px rgba(0,0,0,.12)', border: '1px solid var(--surface-border)',
+              padding: '20px 28px', textAlign: 'center',
+            }}>
+              <div style={{ fontSize: 19, fontWeight: 700, color: 'var(--text-heading)' }}>{formatAsQuestion(confirmedQuery)}</div>
             </div>
-          ))}
-        </div>
-      </div>
+          ) : (
+          <>
+          <div className="cd-type-strip" style={{
+            display: 'flex', overflow: 'hidden', maxWidth: 1400, margin: '0 auto',
+            background: 'var(--surface-card)', borderRadius: 14, boxShadow: '0 12px 32px rgba(0,0,0,.12)',
+            border: '1px solid var(--surface-border)',
+          }}>
+            {/* Icon-on-top, name-below (not side-by-side) so every cell is narrower — that's
+                what keeps the whole strip fitting on one row without a horizontal scroller.
+                Counts live on the browse table's own header below, not here. */}
+            {[{ id: '', name: t('allTypes') }, ...typeOptions.filter(dt => dt.id)].map((dt, idx, arr) => {
+              const isAll = dt.id === '';
+              const meta = isAll ? { color: 'var(--primary)', bg: 'var(--primary-light)' } : (DOC_TYPE_META[dt.name] || { color: '#64748b', bg: 'rgba(100,116,139,.1)' });
+              const isActive = browseTypeId === dt.id;
+              const Icon = isAll ? Layers : (TYPE_ICON_MAP[dt.name] || FileText);
+              return (
+                <button key={dt.id || 'all'} onClick={() => setBrowseTypeId(isActive ? '' : dt.id)}
+                  style={{
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, minWidth: 0, overflow: 'hidden',
+                    flex: isActive ? '1.2 1 0' : '1 1 0', padding: isActive ? '14px 8px' : '12px 6px',
+                    border: 'none', borderRight: idx < arr.length - 1 ? '1px solid var(--surface-border)' : 'none',
+                    background: isActive ? meta.bg : 'transparent', cursor: 'pointer', fontFamily: 'var(--font)', transition: 'all .15s',
+                  }}
+                  onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'var(--surface-hover)'; }}
+                  onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}>
+                  <div style={{
+                    width: isActive ? 36 : 30, height: isActive ? 36 : 30, borderRadius: isActive ? 10 : 8, background: meta.bg,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all .15s',
+                  }}>
+                    <Icon size={isActive ? 17 : 14} color={meta.color} strokeWidth={1.8} />
+                  </div>
+                  <span style={{
+                    fontSize: isActive ? 12 : 10.5, fontWeight: 700, fontFamily: 'var(--font)', textAlign: 'center',
+                    color: isActive ? meta.color : 'var(--text-color)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%',
+                  }}>{dt.name}</span>
+                </button>
+              );
+            })}
+          </div>
 
-      {/* Content area */}
-      <div className="cd-content" style={{ flex: 1, padding: '28px 32px 40px', maxWidth: 860, margin: '0 auto', width: '100%' }}>
+          {/* Mobile/tablet stand-in for the strip above — display:none by default,
+              swapped in by the @media (max-width: 1024px) rule further up. */}
+          {(() => {
+            const allOpt = { id: '', name: t('allTypes') };
+            const mobileOptions = [allOpt, ...typeOptions.filter(dt => dt.id)];
+            const active = mobileOptions.find(dt => dt.id === browseTypeId) || allOpt;
+            const activeIsAll = active.id === '';
+            const activeMeta = activeIsAll ? { color: 'var(--primary)', bg: 'var(--primary-light)' } : (DOC_TYPE_META[active.name] || { color: '#64748b', bg: 'rgba(100,116,139,.1)' });
+            const ActiveIcon = activeIsAll ? Layers : (TYPE_ICON_MAP[active.name] || FileText);
+            return (
+              <div className="cd-type-dropdown-mobile" style={{ display: 'none', position: 'relative', maxWidth: 1400, margin: '0 auto' }}>
+                <button type="button" onClick={() => setBrowseTypeDropdownOpen(o => !o)}
+                  onBlur={() => setTimeout(() => setBrowseTypeDropdownOpen(false), 150)}
+                  style={{
+                    width: '100%', boxSizing: 'border-box', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+                    padding: '14px 18px', background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 14,
+                    boxShadow: '0 12px 32px rgba(0,0,0,.12)', cursor: 'pointer', fontFamily: 'var(--font)',
+                  }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 30, height: 30, borderRadius: 8, background: activeMeta.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <ActiveIcon size={14} color={activeMeta.color} strokeWidth={1.8} />
+                    </div>
+                    <span style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-heading)' }}>{active.name}</span>
+                  </span>
+                  <ChevronDown size={15} color="var(--text-color-secondary)" style={{ transform: browseTypeDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform .15s', flexShrink: 0 }} />
+                </button>
+                {browseTypeDropdownOpen && (
+                  <div className="cd-type-dropdown-scroll" style={{
+                    position: 'absolute', top: 'calc(100% + 8px)', left: 0, right: 0, zIndex: 20,
+                    background: 'rgba(255,255,255,.7)', backdropFilter: 'blur(24px) saturate(180%)', WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+                    border: '1px solid rgba(255,255,255,.7)', borderRadius: 14,
+                    boxShadow: '0 16px 40px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.7)',
+                    padding: 6, maxHeight: 320, overflowY: 'auto',
+                  }}>
+                    {mobileOptions.map(dt => {
+                      const isAll = dt.id === '';
+                      const meta = isAll ? { color: 'var(--primary)', bg: 'var(--primary-light)' } : (DOC_TYPE_META[dt.name] || { color: '#64748b', bg: 'rgba(100,116,139,.1)' });
+                      const isActive = browseTypeId === dt.id;
+                      const Icon = isAll ? Layers : (TYPE_ICON_MAP[dt.name] || FileText);
+                      return (
+                        <div key={dt.id || 'all'} onMouseDown={() => { setBrowseTypeId(dt.id); setBrowseTypeDropdownOpen(false); }}
+                          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 9, cursor: 'pointer', background: isActive ? meta.bg : 'transparent' }}
+                          onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'rgba(255,255,255,.5)'; }}
+                          onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}>
+                          <Icon size={14} color={meta.color} strokeWidth={1.8} style={{ flexShrink: 0 }} />
+                          <span style={{ fontSize: 13, fontWeight: 700, fontFamily: 'var(--font)', color: isActive ? meta.color : 'var(--text-color)' }}>{dt.name}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+          </>
+          )}
+        </div>
+      )}
+
+      {/* Content area — same 70/30 width regardless of state now, since search results
+          reuse the browse table's two-column shape instead of a narrower single column. */}
+      <div className="cd-content" style={{ flex: 1, padding: '28px 32px 40px', maxWidth: 1400, margin: '0 auto', width: '100%' }}>
 
         {/* Loading */}
         {loading && (
@@ -726,111 +893,203 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
           </Card>
         )}
 
-        {/* Results */}
+        {/* Results — same 70/30 shape as the idle browse table: the AI answer takes the
+            "All Documents" slot on the left, and the matched documents (already relevance-
+            ordered by groupSemanticSources) take the "Recently Published" slot on the right. */}
         {!loading && searched && !error && (
-          <>
-            {answer && (
-              <Card style={{ marginBottom: 16, borderLeft: '3px solid var(--primary)' }}>
-                <div style={{ display: 'flex', gap: 12 }}>
-                  <div style={{ width: 34, height: 34, borderRadius: 9, background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                    <Sparkles size={16} color="var(--primary)" />
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6, fontFamily: 'var(--mono)' }}>
-                      {t('aiAnswerLabel')}
-                    </div>
-                    <div style={{ fontSize: 14, lineHeight: 1.65, color: 'var(--text-color)', whiteSpace: 'pre-line' }}>
-                      {answer}
-                    </div>
-                    <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 10 }}>
-                      {t('aiAnswerDisclaimer')}
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            )}
-
-            <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', marginBottom: 14, fontFamily: 'var(--mono)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span>
-                <strong style={{ color: 'var(--primary)' }}>{results.length}</strong> {t('documentsSuffix', { count: results.length })}
-                {total > results.length && <> · <strong style={{ color: 'var(--primary)' }}>{total}</strong> {t('totalMatchesSuffix', { count: total })}</>}
-                {query && <> {t('forQuery')} <em style={{ color: 'var(--text-heading)', fontStyle: 'normal' }}>"{query}"</em></>}
-              </span>
-            </div>
-
-            {results.length === 0 ? (
-              <Card style={{ textAlign: 'center', padding: '72px 0' }}>
-                <Search size={44} color="var(--surface-200)" style={{ margin: '0 auto 14px', display: 'block' }} />
-                <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-color-secondary)', marginBottom: 6 }}>{t('noResultsFound')}</div>
-                <div style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>{t('tryDifferentKeywords')}</div>
-              </Card>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {results.map(doc => (
-                  <DocumentResultCard
-                    key={doc.id}
-                    doc={doc}
-                    query={query}
-                    onView={() => openDoc(doc)}
-                  />
-                ))}
+          <div className="cd-browse-grid" style={{ display: 'grid', gridTemplateColumns: '70fr 30fr', gap: 20, alignItems: 'start' }}>
+            <Card padding="0">
+              <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Sparkles size={16} color="var(--primary)" />
+                <span style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>{t('aiAnswerLabel')}</span>
               </div>
-            )}
+              <div style={{ padding: '20px 22px' }}>
+                {answer ? (
+                  <div style={{ fontSize: 14, lineHeight: 1.65, color: 'var(--text-color)', whiteSpace: 'pre-line' }}>
+                    {answer}
+                  </div>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '40px 0' }}>
+                    <Search size={40} color="var(--surface-200)" style={{ margin: '0 auto 12px', display: 'block' }} />
+                    <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text-color-secondary)', marginBottom: 6 }}>{t('noResultsFound')}</div>
+                    <div style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>{t('tryDifferentKeywords')}</div>
+                  </div>
+                )}
+              </div>
+            </Card>
+
+            <Card>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                <span style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>{t('matchedDocuments')}</span>
+                <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '2px 9px', borderRadius: 20 }}>
+                  {results.length}
+                </span>
+              </div>
+              {results.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-color-secondary)', fontSize: 13 }}>{t('noDocumentsFound')}</div>
+              ) : (
+                <div>
+                  {results.map((doc, i) => {
+                    const meta = doc.document_type_name ? DOC_TYPE_META[doc.document_type_name] : null;
+                    // relevance_score is a 0–1 similarity straight from the semantic-search
+                    // API — shown as a plain percentage, just colour-coded by tier so a
+                    // citizen can tell "strong match" apart from "barely came up" at a glance.
+                    const pct = doc._bestScore != null ? Math.round(doc._bestScore * 100) : null;
+                    const tier = pct == null ? null : pct >= 70
+                      ? { color: '#16a34a', bg: 'rgba(25, 135, 84,.1)' }
+                      : pct >= 40
+                        ? { color: '#b45309', bg: 'rgba(255, 193, 7,.12)' }
+                        : { color: '#64748b', bg: 'rgba(100,116,139,.1)' };
+                    return (
+                      <div key={doc.id}
+                        style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 6px', borderBottom: i < results.length - 1 ? '1px solid var(--surface-border)' : 'none', cursor: 'pointer', borderRadius: 6, transition: 'background .12s' }}
+                        onClick={() => openDoc(doc)}
+                        onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                        <FileText size={14} color="var(--text-color-secondary)" style={{ flexShrink: 0 }} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {doc.document_name || cleanFilename(doc.original_filename)}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3, flexWrap: 'wrap' }}>
+                            <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {doc.department_name}
+                            </div>
+                            {tier && (
+                              <span style={{ fontSize: 9.5, fontWeight: 700, padding: '1px 7px', borderRadius: 20, fontFamily: 'var(--mono)', flexShrink: 0, background: tier.bg, color: tier.color }}>
+                                {pct}% {t('relevanceMatch')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        {meta && (
+                          <span style={{ fontSize: 9.5, fontWeight: 700, padding: '2px 8px', borderRadius: 5, fontFamily: 'var(--mono)', letterSpacing: '.04em', textTransform: 'uppercase', flexShrink: 0, background: meta.bg, color: meta.color, border: `1px solid ${meta.border}` }}>
+                            {doc.document_type_name}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </Card>
+          </div>
+        )}
+
+        {/* Idle state — 70/30 split: the browse table (all documents, filterable by the type
+            strip that floats above, between the hero and here) on the left, Recently
+            Published unchanged on the right. */}
+        {!loading && !searched && (
+          <>
+            <div className="cd-browse-grid" style={{ display: 'grid', gridTemplateColumns: '70fr 30fr', gap: 20, alignItems: 'start' }}>
+              {/* Left — browse-all-documents table, filterable by the chips above + this dropdown */}
+              <Card padding="0">
+                <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>{t('allDocuments')}</span>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '2px 9px', borderRadius: 20 }}>
+                      {t('documentCount', { count: browseTotal })}
+                    </span>
+                  </div>
+                  <select value={browseDeptId} onChange={e => setBrowseDeptId(e.target.value)}
+                    style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', fontSize: 12.5, fontFamily: 'var(--font)', color: 'var(--text-color)', cursor: 'pointer' }}>
+                    <option value="">{t('allDepartments')}</option>
+                    {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </select>
+                </div>
+                {browseLoading ? (
+                  <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-color-secondary)', fontSize: 13 }}>{t('loading')}</div>
+                ) : browseDocs.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-color-secondary)', fontSize: 13 }}>{t('noDocumentsFound')}</div>
+                ) : (
+                  <div>
+                    {browseDocs.map((doc, i) => {
+                      const meta = doc.document_type_name ? DOC_TYPE_META[doc.document_type_name] : null;
+                      return (
+                        <div key={doc.id}
+                          style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 20px', borderBottom: i < browseDocs.length - 1 ? '1px solid var(--surface-border)' : 'none', cursor: 'pointer', transition: 'background .12s' }}
+                          onClick={() => openDoc(doc)}
+                          onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                          <FileText size={14} color="var(--text-color-secondary)" style={{ flexShrink: 0 }} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {doc.document_name || doc.original_filename}
+                            </div>
+                            <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 1 }}>
+                              {[doc.department_name, doc.issue_date].filter(Boolean).join(' · ')}
+                            </div>
+                          </div>
+                          {meta && (
+                            <span style={{ fontSize: 9.5, fontWeight: 700, padding: '2px 8px', borderRadius: 5, fontFamily: 'var(--mono)', letterSpacing: '.04em', textTransform: 'uppercase', flexShrink: 0, background: meta.bg, color: meta.color, border: `1px solid ${meta.border}` }}>
+                              {doc.document_type_name}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {browseTotal > BROWSE_PAGE_SIZE && (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 20px', borderTop: '1px solid var(--surface-border)' }}>
+                    <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
+                      {t('pageIndicator', { page: browsePage, total: Math.ceil(browseTotal / BROWSE_PAGE_SIZE) })}
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <button type="button" onClick={() => setBrowsePage(p => Math.max(1, p - 1))} disabled={browsePage === 1}
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-card)', color: browsePage === 1 ? 'var(--text-color-secondary)' : 'var(--text-heading)', fontSize: 12, fontWeight: 600, cursor: browsePage === 1 ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: browsePage === 1 ? .5 : 1 }}>
+                        <ChevronLeft size={13} /> {t('pagePrev')}
+                      </button>
+                      <button type="button" onClick={() => setBrowsePage(p => Math.min(Math.ceil(browseTotal / BROWSE_PAGE_SIZE), p + 1))} disabled={browsePage >= Math.ceil(browseTotal / BROWSE_PAGE_SIZE)}
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-card)', color: browsePage >= Math.ceil(browseTotal / BROWSE_PAGE_SIZE) ? 'var(--text-color-secondary)' : 'var(--text-heading)', fontSize: 12, fontWeight: 600, cursor: browsePage >= Math.ceil(browseTotal / BROWSE_PAGE_SIZE) ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: browsePage >= Math.ceil(browseTotal / BROWSE_PAGE_SIZE) ? .5 : 1 }}>
+                        {t('pageNext')} <ChevronRight size={13} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </Card>
+
+              {/* Right — Recently Published, unchanged */}
+              <Card>
+                <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)', marginBottom: 14 }}>{t('recentlyPublished')}</div>
+                {recentLoading ? (
+                  <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-color-secondary)', fontSize: 13 }}>{t('loading')}</div>
+                ) : recentDocs.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-color-secondary)', fontSize: 13 }}>{t('noDocumentsFound')}</div>
+                ) : (
+                  <div>
+                    {recentDocs.map((doc, i) => {
+                      const meta = doc.document_type_name ? DOC_TYPE_META[doc.document_type_name] : null;
+                      return (
+                        <div key={doc.id}
+                          style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 6px', borderBottom: i < recentDocs.length - 1 ? '1px solid var(--surface-border)' : 'none', cursor: 'pointer', borderRadius: 6, transition: 'background .12s' }}
+                          onClick={() => openDoc(doc)}
+                          onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                          <FileText size={14} color="var(--text-color-secondary)" style={{ flexShrink: 0 }} />
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {doc.document_name || doc.original_filename}
+                            </div>
+                            <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 1 }}>
+                              {[doc.department_name, doc.document_type_name].filter(Boolean).join(' · ')}
+                            </div>
+                          </div>
+                          {meta && (
+                            <span style={{ fontSize: 9.5, fontWeight: 700, padding: '2px 8px', borderRadius: 5, fontFamily: 'var(--mono)', letterSpacing: '.04em', textTransform: 'uppercase', flexShrink: 0, background: meta.bg, color: meta.color, border: `1px solid ${meta.border}` }}>
+                              {doc.document_type_name}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </Card>
+            </div>
           </>
         )}
 
-        {/* Idle state — Recently Published */}
-        {!loading && !searched && (
-          <Card>
-            <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)', marginBottom: 14 }}>{t('recentlyPublished')}</div>
-            {recentLoading ? (
-              <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-color-secondary)', fontSize: 13 }}>{t('loading')}</div>
-            ) : recentDocs.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-color-secondary)', fontSize: 13 }}>{t('noDocumentsFound')}</div>
-            ) : (
-              <div>
-                {recentDocs.map((doc, i) => {
-                  const meta = doc.document_type_name ? DOC_TYPE_META[doc.document_type_name] : null;
-                  return (
-                    <div key={doc.id}
-                      style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 6px', borderBottom: i < recentDocs.length - 1 ? '1px solid var(--surface-border)' : 'none', cursor: 'pointer', borderRadius: 6, transition: 'background .12s' }}
-                      onClick={() => openDoc(doc)}
-                      onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                      <FileText size={14} color="var(--text-color-secondary)" style={{ flexShrink: 0 }} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {doc.document_name || doc.original_filename}
-                        </div>
-                        <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 1 }}>
-                          {[doc.department_name, doc.document_type_name].filter(Boolean).join(' · ')}
-                        </div>
-                      </div>
-                      {meta && (
-                        <span style={{ fontSize: 9.5, fontWeight: 700, padding: '2px 8px', borderRadius: 5, fontFamily: 'var(--mono)', letterSpacing: '.04em', textTransform: 'uppercase', flexShrink: 0, background: meta.bg, color: meta.color, border: `1px solid ${meta.border}` }}>
-                          {doc.document_type_name}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </Card>
-        )}
-
-        {/* Saved searches quick-access — only when idle and there's something saved */}
-        {!loading && !searched && bookmarks.length > 0 && (
-          <div style={{ marginTop: 16, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
-            <span style={{ ...LABEL }}>{t('savedLabel')}</span>
-            {bookmarks.map(bm => (
-              <button key={bm} onClick={() => doSearch(bm)}
-                style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', color: 'var(--text-color)', padding: '5px 12px', borderRadius: 20, fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font)' }}>
-                <BookmarkCheck size={11} color="var(--primary)" /> {bm} <ChevronRight size={11} />
-              </button>
-            ))}
-          </div>
-        )}
       </div>
 
       <Footer />
