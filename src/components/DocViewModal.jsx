@@ -35,7 +35,13 @@ function parseDisplayRemarks(str) {
   });
 }
 
-export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuery = null, searchPages = null, zIndex = 2000 }) {
+// `citizenView` drops the right-hand "Document Details" panel (uploader,
+// approval status, reviewer remarks/annotations — internal review workflow
+// info a citizen has no use for, and metadata the citizen-facing landing
+// page already showed) so this becomes a plain, full-width PDF viewer. Every
+// other caller (Approver/Uploader/Officer dashboards, DocViewModal's own
+// "Browse Sections & Schedules") keeps the full panel by leaving it unset.
+export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuery = null, searchPages = null, zIndex = 2000, citizenView = false }) {
   const [blobUrl, setBlobUrl]         = useState(null);
   const [pdfDoc, setPdfDoc]           = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -276,12 +282,14 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
             */}
           </div>
         </div>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px 6px 10px', borderRadius: 20, background: statusBg, border: `1px solid ${statusAccent}44`, flexShrink: 0 }}>
-          <StatusIconV size={13} color={statusAccent} />
-          <span style={{ fontSize: 11.5, fontWeight: 700, color: statusAccent, fontFamily: 'var(--mono)', letterSpacing: '.04em' }}>
-            {doc.status === 'approved' ? 'APPROVED' : doc.status === 'rejected' ? 'REJECTED' : 'PENDING'}
-          </span>
-        </div>
+        {!citizenView && (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px 6px 10px', borderRadius: 20, background: statusBg, border: `1px solid ${statusAccent}44`, flexShrink: 0 }}>
+            <StatusIconV size={13} color={statusAccent} />
+            <span style={{ fontSize: 11.5, fontWeight: 700, color: statusAccent, fontFamily: 'var(--mono)', letterSpacing: '.04em' }}>
+              {doc.status === 'approved' ? 'APPROVED' : doc.status === 'rejected' ? 'REJECTED' : 'PENDING'}
+            </span>
+          </div>
+        )}
         <button onClick={onClose}
           style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 18px', borderRadius: 9, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0, transition: 'background .15s' }}
           onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
@@ -290,11 +298,11 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
         </button>
       </div>
 
-      {/* 2-panel body */}
-      <div className="dvm-grid" style={{ flex: 1, display: 'grid', gridTemplateColumns: '57% 43%', overflow: 'hidden' }}>
+      {/* 2-panel body — citizenView drops the right panel entirely, so the PDF just takes the full width */}
+      <div className="dvm-grid" style={{ flex: 1, display: 'grid', gridTemplateColumns: citizenView ? '1fr' : '57% 43%', overflow: 'hidden' }}>
 
         {/* Left: PDF viewer */}
-        <div className="dvm-pane" style={{ borderRight: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#3a3d40' }}>
+        <div className="dvm-pane" style={{ borderRight: citizenView ? 'none' : '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#3a3d40' }}>
           <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', rowGap: 8, background: '#2d2f31', flexShrink: 0, borderBottom: '1px solid rgba(255,255,255,.08)' }}>
             <Eye size={14} color="rgba(255,255,255,.7)" />
             <span style={{ fontSize: 12.5, fontWeight: 600, color: 'rgba(255,255,255,.85)' }}>Original PDF</span>
@@ -407,7 +415,8 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
             </div>
         </div>
 
-        {/* Right: Document details */}
+        {/* Right: Document details — skipped entirely for citizenView */}
+        {!citizenView && (
         <div className="dvm-pane" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--surface-card)' }}>
           <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, background: 'var(--surface-50)', flexShrink: 0 }}>
             <div style={{ width: 30, height: 30, borderRadius: 8, background: 'rgba(33, 74, 171,.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -608,6 +617,7 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
             )}
           </div>
         </div>
+        )}
       </div>
     </div>
   );

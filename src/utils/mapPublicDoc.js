@@ -3,6 +3,39 @@ export function cleanFilename(filename) {
   return filename.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ');
 }
 
+// Opens the raw PDF straight in a new browser tab — the browser's own native
+// PDF viewer (search, print, download, thumbnails all built in) rather than
+// our custom in-app DocViewModal. Same endpoint DocViewModal itself fetches
+// bytes from; hitting it directly needs no auth header for a citizen guest
+// (no token is ever attached for that role), so a plain navigation works.
+export function openPdfInNewTab(id) {
+  window.open(`/api/v1/pdf/${id}/file`, '_blank', 'noopener,noreferrer');
+}
+
+// Triggers an actual file download (browser's save dialog / downloads folder)
+// rather than opening the PDF for viewing — a temporary same-origin <a download>
+// is enough for the browser to save it instead of navigating to it.
+export function downloadPdf(id, filename) {
+  const a = document.createElement('a');
+  a.href = `/api/v1/pdf/${id}/file`;
+  a.download = filename || `document-${id}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+// Downloads a schedule/annexure/appendix/form entry's own attached file
+// (separate from the parent Act's own PDF) by its file_ref, using the same
+// <a download> technique as downloadPdf() above.
+export function downloadActPartFile(fileRef, filename) {
+  const a = document.createElement('a');
+  a.href = `/api/v1/act-parts/file/${encodeURIComponent(fileRef)}`;
+  a.download = filename || fileRef;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
 // Maps a public document record (from /pdf/public/search or /pdf/{id}/full)
 // into the shape DocViewModal expects — same field names the authenticated
 // dashboards read (mapApiDoc/mapDocForViewer), so every filled-in field from

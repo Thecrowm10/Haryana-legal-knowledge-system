@@ -3,8 +3,16 @@
 // names (chapter_title/section_content/entry_number/etc.) so the UI code
 // doesn't need to know the API's naming.
 
+// Schedules/annexures/appendices/forms can each carry their own uploaded
+// attachment (separate from the parent Act's own PDF) — file_ref is what
+// downloadActPartFile() needs to fetch it; null when this entry has none.
 function mapEntry(e) {
-  return { title: e.title || e.entry_number || '', content: e.description || '' };
+  return {
+    title: e.title || e.entry_number || '',
+    content: e.description || '',
+    fileRef: e.file_ref || null,
+    fileName: e.original_filename || null,
+  };
 }
 
 // `act_parts.chapters[]` (when has_chapters) or `act_parts.flat_sections[]`

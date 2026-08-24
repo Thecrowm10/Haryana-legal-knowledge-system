@@ -302,22 +302,25 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
 
   function openDoc(doc) {
     const mapped = mapPublicDocForViewer(doc);
-    // Semantic search results carry which page(s) matched — jump straight to the
-    // best one and let DocViewModal's existing "Match X of Y · p.N" nav step
-    // through the rest, same mechanism it already supports for any doc.
-    if (doc._pages) {
-      mapped._initialPage = doc._bestPage || doc._pages[0];
-      mapped._searchQuery = query;
-      mapped._searchPages = doc._pages;
-      setViewDoc(mapped);
-    } else if (mapped.type === 'Act') {
-      // A direct browse click (not "show me where my search term matched")
-      // on an Act lands on the reading view first, not the raw PDF — the PDF
-      // stays one click away via that view's "View Original PDF" action.
-      setViewActLanding(mapped);
-    } else {
-      setViewDoc(mapped);
-    }
+    // Semantic search results carry which page(s) matched — this used to jump
+    // straight to the raw PDF (best-matching page pre-highlighted, using
+    // DocViewModal's "Match X of Y · p.N" nav) instead of the details/contents
+    // view. Left here commented out rather than deleted, in case that
+    // highlighted-jump behaviour is wanted back later.
+    // if (doc._pages) {
+    //   mapped._initialPage = doc._bestPage || doc._pages[0];
+    //   mapped._searchQuery = query;
+    //   mapped._searchPages = doc._pages;
+    //   setViewDoc(mapped);
+    // } else {
+    // Every citizen click — a search result's "View" or a direct browse —
+    // lands on the details/contents view first, never straight into the raw
+    // PDF, so search results show "saari info" (summary, document details,
+    // related docs, sections) the same way direct browsing already does. The
+    // PDF itself stays one click away via that view's "View Original PDF"/
+    // "Download PDF" action (or its own CTA when there's nothing else to show).
+    setViewActLanding(mapped);
+    // }
     onAuditLog?.(`Viewed: ${doc.document_name || doc.original_filename}`);
   }
 
@@ -330,6 +333,16 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
   return (
     <div ref={rootRef} style={{ minHeight: '100%', display: 'flex', flexDirection: 'column', animation: 'fadeSlideIn .3s ease', overflowX: 'hidden' }}>
       <style>{`
+        /* One unified highlight around the whole search bar when any part of it
+           (input, type dropdown, or a button inside it) has focus — not each
+           sub-control drawing its own separate default outline, which read as
+           several mismatched borders instead of one. */
+        .cd-search-bar { transition: border-color .15s, box-shadow .15s; }
+        .cd-search-bar:focus-within {
+          border-color: var(--primary) !important;
+          box-shadow: 0 0 0 3px rgba(33, 74, 171,.16) !important;
+        }
+        .cd-search-bar :focus-visible { outline: none !important; }
         @media (max-width: 640px) {
           .cd-topbar { padding: 0 16px !important; gap: 8px !important; }
           .cd-actions { gap: 6px !important; }
@@ -361,10 +374,10 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
         }
       `}</style>
 
-      {viewDoc && <DocViewModal doc={viewDoc} onClose={() => setViewDoc(null)} initialPage={viewDoc._initialPage || 1} searchQuery={viewDoc._searchQuery || null} searchPages={viewDoc._searchPages || null} />}
+      {viewDoc && <DocViewModal doc={viewDoc} onClose={() => setViewDoc(null)} initialPage={viewDoc._initialPage || 1} searchQuery={viewDoc._searchQuery || null} searchPages={viewDoc._searchPages || null} citizenView />}
       {viewActLanding && (
-        <ActContentsView doc={viewActLanding} onClose={() => setViewActLanding(null)}
-          onViewPdf={() => { setViewDoc(viewActLanding); setViewActLanding(null); }} />
+        <ActContentsView doc={viewActLanding} onClose={() => setViewActLanding(null)} citizenView
+          onLoginAsOfficer={onLoginAsOfficer} />
       )}
 
       {/* Top bar — transparent/blended into the hero image at rest, solidifies on scroll.
@@ -494,14 +507,12 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
             {(() => {
               const inner = (
                 <div style={{ position: 'relative', width: '100%' }}>
-                  <div style={{
+                  <div className="cd-search-bar" style={{
                     display: 'flex', alignItems: 'center', width: '100%', background: '#fff', border: '1.5px solid transparent',
                     borderRadius: scrolled ? 10 : 12, overflow: 'hidden',
                     boxShadow: scrolled ? '0 8px 28px rgba(0,0,0,.16)' : '0 12px 40px rgba(0,0,0,.35)',
                     transition: `border-radius ${TOP_BAR_EASE}, box-shadow ${TOP_BAR_EASE}`,
-                  }}
-                    onFocusCapture={e => e.currentTarget.style.borderColor = 'var(--primary)'}
-                    onBlurCapture={e => e.currentTarget.style.borderColor = 'transparent'}>
+                  }}>
                     <span style={{
                       padding: scrolled ? '0 10px' : '0 14px', display: 'flex', alignItems: 'center',
                       color: 'var(--text-color-secondary)', flexShrink: 0,
