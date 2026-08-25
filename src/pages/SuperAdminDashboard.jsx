@@ -162,6 +162,7 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
 
   // All Uploads state
   const [allDocs, setAllDocs]           = useState([]);
+  const [allDocCounts, setAllDocCounts] = useState({ count_total: 0, count_pending: 0, count_approved: 0, count_rejected: 0 });
   const [allDocsLoading, setAllDocsLoading] = useState(false);
   const [allDocsError, setAllDocsError] = useState('');
   const [uploadsSearch, setUploadsSearch] = useState('');
@@ -185,6 +186,12 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
     ])
       .then(([docsRes, deptsRes]) => {
         setAllDocs(docsRes.data.documents || []);
+        setAllDocCounts({
+          count_total:    docsRes.data.count_total    ?? 0,
+          count_pending:  docsRes.data.count_pending  ?? 0,
+          count_approved: docsRes.data.count_approved ?? 0,
+          count_rejected: docsRes.data.count_rejected ?? 0,
+        });
         setDepts(deptsRes.data);
       })
       .catch(() => setAllDocsError(t('uploads.failedToLoad')))
@@ -1804,10 +1811,10 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
 
   // All Uploads
   if (activePage === 'alluploads') {
-    const totalDocs    = allDocs.length;
-    const approvedDocs = allDocs.filter(d => d.status === 'approved').length;
-    const pendingDocs  = allDocs.filter(d => d.status === 'pending').length;
-    const rejectedDocs = allDocs.filter(d => d.status === 'rejected').length;
+    const totalDocs    = allDocCounts.count_total;
+    const approvedDocs = allDocCounts.count_approved;
+    const pendingDocs  = allDocCounts.count_pending;
+    const rejectedDocs = allDocCounts.count_rejected;
 
     // unique uploaders
     const uploaderOptions = [];

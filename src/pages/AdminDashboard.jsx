@@ -129,6 +129,7 @@ export default function AdminDashboard({ activePage }) {
 
   // All Uploads state
   const [allDocs, setAllDocs]           = useState([]);
+  const [allDocCounts, setAllDocCounts] = useState({ count_total: 0, count_pending: 0, count_approved: 0, count_rejected: 0 });
   const [allDocsLoading, setAllDocsLoading] = useState(false);
   const [allDocsError, setAllDocsError] = useState('');
   const [uploadsSearch, setUploadsSearch] = useState('');
@@ -149,6 +150,12 @@ export default function AdminDashboard({ activePage }) {
       .then(([docsRes, deptsRes]) => {
         const docs = docsRes.data.documents || [];
         setAllDocs(user?.dept ? docs.filter(d => d.department_name === user.dept) : docs);
+        setAllDocCounts({
+          count_total:    docsRes.data.count_total    ?? 0,
+          count_pending:  docsRes.data.count_pending  ?? 0,
+          count_approved: docsRes.data.count_approved ?? 0,
+          count_rejected: docsRes.data.count_rejected ?? 0,
+        });
         setDepts(deptsRes.data);
       })
       .catch(() => setAllDocsError(t('uploads.failedToLoad')))
@@ -1290,10 +1297,11 @@ export default function AdminDashboard({ activePage }) {
 
   // All Uploads
   if (activePage === 'alluploads') {
-    const totalDocs    = allDocs.length;
-    const approvedDocs = allDocs.filter(d => d.status === 'approved').length;
-    const pendingDocs  = allDocs.filter(d => d.status === 'pending').length;
-    const rejectedDocs = allDocs.filter(d => d.status === 'rejected').length;
+    // When filtering by department use client-side counts (dept scope); otherwise use API totals
+    const totalDocs    = user?.dept ? allDocs.length                                       : allDocCounts.count_total;
+    const approvedDocs = user?.dept ? allDocs.filter(d => d.status === 'approved').length  : allDocCounts.count_approved;
+    const pendingDocs  = user?.dept ? allDocs.filter(d => d.status === 'pending').length   : allDocCounts.count_pending;
+    const rejectedDocs = user?.dept ? allDocs.filter(d => d.status === 'rejected').length  : allDocCounts.count_rejected;
 
     // unique uploaders
     const uploaderOptions = [];
