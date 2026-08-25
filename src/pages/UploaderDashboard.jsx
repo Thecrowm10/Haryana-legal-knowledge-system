@@ -1106,6 +1106,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   }, [showTypeChanger]);
 
   const [uploads, setUploads] = useState([]);
+  const [docCounts, setDocCounts] = useState({ total: 0, pending: 0, approved: 0, rejected: 0, draft: 0 });
   const [myDocsLoading, setMyDocsLoading] = useState(false);
   const [myDocsError,   setMyDocsError]   = useState('');
   const [remarksModal,  setRemarksModal]  = useState(null);
@@ -1201,6 +1202,13 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     Promise.all([getMyDocuments(), getLinkedDocuments().catch(() => ({ data: [] }))])
       .then(([myRes, linkedRes]) => {
         setUploads((myRes.data.documents || []).map(mapApiDoc));
+        setDocCounts({
+          total:    myRes.data.count_total    ?? (myRes.data.documents || []).length,
+          pending:  myRes.data.count_pending  ?? 0,
+          approved: myRes.data.count_approved ?? 0,
+          rejected: myRes.data.count_rejected ?? 0,
+          draft:    myRes.data.count_draft    ?? 0,
+        });
         setLinkedDocs(Array.isArray(linkedRes.data) ? linkedRes.data : []);
       })
       .catch(err => {
@@ -2490,10 +2498,10 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
 
   // Dashboard — single landing page: quick actions + stats + My Uploads table
   if (activePage === 'dashboard') {
-    const approved  = uploads.filter(d => d.status === 'approved').length;
-    const pending   = uploads.filter(d => d.status === 'pending').length;
-    const rejected  = uploads.filter(d => d.status === 'rejected').length;
-    const drafts    = uploads.filter(d => d.status === 'draft').length;
+    const approved  = docCounts.approved;
+    const pending   = docCounts.pending;
+    const rejected  = docCounts.rejected;
+    const drafts    = docCounts.draft;
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
@@ -3027,7 +3035,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderRadius: 10, background: 'rgba(220, 53, 69,.08)', border: '1px solid rgba(220, 53, 69,.2)', color: '#dc2626' }}>
             <AlertCircle size={15} style={{ flexShrink: 0 }} />
             <span style={{ fontSize: 13 }}>{myDocsError}</span>
-            <button onClick={() => { setMyDocsError(''); setMyDocsLoading(true); getMyDocuments().then(r => setUploads((r.data.documents||[]).map(mapApiDoc))).catch(e => setMyDocsError(e.response?.data?.detail || t('toasts.failedToLoadDocuments'))).finally(() => setMyDocsLoading(false)); }}
+            <button onClick={() => { setMyDocsError(''); setMyDocsLoading(true); getMyDocuments().then(r => { setUploads((r.data.documents||[]).map(mapApiDoc)); setDocCounts({ total: r.data.count_total ?? (r.data.documents||[]).length, pending: r.data.count_pending ?? 0, approved: r.data.count_approved ?? 0, rejected: r.data.count_rejected ?? 0, draft: r.data.count_draft ?? 0 }); }).catch(e => setMyDocsError(e.response?.data?.detail || t('toasts.failedToLoadDocuments'))).finally(() => setMyDocsLoading(false)); }}
               style={{ marginLeft: 'auto', padding: '5px 14px', borderRadius: 7, border: '1px solid rgba(220, 53, 69,.3)', background: 'transparent', color: '#dc2626', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
               {t('common.retry')}
             </button>
@@ -3046,7 +3054,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         <div style={{ ...LABEL }}>{t('dashboard.overviewLabel')}</div>
         <div className="ud-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 16 }}>
           {[
-            { label: t('stats.totalUploads'),  value: uploads.length, bg: 'rgba(33, 74, 171,.12)',  color: 'var(--primary)', icon: FileText,    filter: 'all' },
+            { label: t('stats.totalUploads'),  value: docCounts.total, bg: 'rgba(33, 74, 171,.12)',  color: 'var(--primary)', icon: FileText,    filter: 'all' },
             { label: t('stats.approved'),       value: approved,        bg: 'rgba(25, 135, 84,.12)',  color: '#198754',        icon: CheckCircle, filter: 'approved' },
             { label: t('stats.pendingReview'), value: pending,         bg: 'rgba(255, 193, 7,.12)', color: '#b45309',        icon: TrendingUp,  filter: 'pending' },
             { label: t('stats.rejected'),       value: rejected,        bg: 'rgba(220, 53, 69,.12)',  color: '#dc3545',        icon: XCircle,     filter: 'rejected' },

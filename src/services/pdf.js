@@ -11,7 +11,7 @@ export const switchAdminDepartment = (department_id) => api.post('/admin/auth/sw
 export const uploadPdfFile     = (formData) => api.post('/pdf/upload-file', formData);
 export const uploadPdfMetadata = (data)     => api.post('/pdf/upload', data);
 export const updatePdfMetadata = (id, data) => api.put(`/pdf/${id}`, data);
-export const getMyDocuments    = ()         => api.get('/pdf/my-documents');
+export const getMyDocuments    = (status = null, skip = 0, limit = 500) => api.get('/pdf/my-documents', { params: { skip, limit, ...(status ? { status } : {}) } });
 export const searchDocuments      = (document_type, q, limit = 20) => api.get('/pdf/search-documents', { params: { document_type, q, limit } });
 export const fullTextSearch       = (q, skip = 0, limit = 50, document_type_id) => publicApi.get('/pdf/search', { params: { q, skip, limit, ...(document_type_id ? { document_type_id } : {}) } });
 // Public citizen document browse/filter — no token required (unlike getAllDocumentsAdmin below,
