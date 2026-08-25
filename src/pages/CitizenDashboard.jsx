@@ -937,6 +937,7 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
                 <div>
                   {results.map((doc, i) => {
                     const meta = doc.document_type_name ? DOC_TYPE_META[doc.document_type_name] : null;
+                    const TypeIcon = doc.document_type_name ? (TYPE_ICON_MAP[doc.document_type_name] || FileText) : FileText;
                     // relevance_score is a 0–1 similarity straight from the semantic-search
                     // API — shown as a plain percentage, just colour-coded by tier so a
                     // citizen can tell "strong match" apart from "barely came up" at a glance.
@@ -952,9 +953,9 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
                         onClick={() => openDoc(doc)}
                         onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
                         onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                        <FileText size={14} color="var(--text-color-secondary)" style={{ flexShrink: 0 }} />
+                        <TypeIcon size={14} color={meta?.color || 'var(--text-color-secondary)'} style={{ flexShrink: 0 }} />
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)', lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {doc.document_name || cleanFilename(doc.original_filename)}
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3, flexWrap: 'wrap' }}>
@@ -1011,13 +1012,14 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
                   <div>
                     {browseDocs.map((doc, i) => {
                       const meta = doc.document_type_name ? DOC_TYPE_META[doc.document_type_name] : null;
+                      const TypeIcon = doc.document_type_name ? (TYPE_ICON_MAP[doc.document_type_name] || FileText) : FileText;
                       return (
                         <div key={doc.id}
                           style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 20px', borderBottom: i < browseDocs.length - 1 ? '1px solid var(--surface-border)' : 'none', cursor: 'pointer', transition: 'background .12s' }}
                           onClick={() => openDoc(doc)}
                           onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
                           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                          <FileText size={14} color="var(--text-color-secondary)" style={{ flexShrink: 0 }} />
+                          <TypeIcon size={14} color={meta?.color || 'var(--text-color-secondary)'} style={{ flexShrink: 0 }} />
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)', lineHeight: 1.3, minHeight: '2.6em', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                               {doc.document_name || doc.original_filename}
@@ -1054,13 +1056,14 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
                   <div>
                     {recentDocs.map((doc, i) => {
                       const meta = doc.document_type_name ? DOC_TYPE_META[doc.document_type_name] : null;
+                      const TypeIcon = doc.document_type_name ? (TYPE_ICON_MAP[doc.document_type_name] || FileText) : FileText;
                       return (
                         <div key={doc.id}
                           style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 6px', borderBottom: i < recentDocs.length - 1 ? '1px solid var(--surface-border)' : 'none', cursor: 'pointer', borderRadius: 6, transition: 'background .12s' }}
                           onClick={() => openDoc(doc)}
                           onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
                           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                          <FileText size={14} color="var(--text-color-secondary)" style={{ flexShrink: 0 }} />
+                          <TypeIcon size={14} color={meta?.color || 'var(--text-color-secondary)'} style={{ flexShrink: 0 }} />
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)', lineHeight: 1.3, minHeight: '2.6em', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                               {doc.document_name || doc.original_filename}

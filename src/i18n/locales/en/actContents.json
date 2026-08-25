@@ -35,5 +35,7 @@
   "partSchedules": "Schedules",
   "partAnnexures": "Annexures",
   "partAppendix": "Appendix",
-  "partForms": "Forms"
+  "partForms": "Forms",
+  "actParts": "Act Parts",
+  "summaryAndDetails": "Summary & Document Details"
 }

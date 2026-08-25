@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import {
   X, ChevronDown, ChevronRight, FileText, BookOpen, AlertCircle, RefreshCw, Eye, Sparkles, Building2,
   Search, CalendarDays, Paperclip, FileStack, ClipboardList, UnfoldVertical, FoldVertical, ArrowUp,
+  FileEdit, Bell, Shield, Gavel, MoreHorizontal, Landmark, Layers, User,
 } from 'lucide-react';
 import { PART_META } from '../constants/mockActOutline';
 import { DOC_TYPE_META } from '../constants/docTypeMeta';
@@ -11,10 +12,20 @@ import { getPdfFull } from '../services/pdf';
 import { mapActPartsToOutline, mapRelationships, humanizeRelationType } from '../utils/actFull';
 import { mapPublicDocForViewer, openPdfInNewTab, openActPartFileInNewTab } from '../utils/mapPublicDoc';
 import DocViewModal from './DocViewModal';
-import CitizenTopBar from './CitizenTopBar';
 import Card from './ui/Card';
+import LanguageToggle from './LanguageToggle';
+import AccessibilityMenu from './AccessibilityMenu';
+import haryanaLogo from '../assets/haryana-logo.png';
 
 const EMPTY_OUTLINE = { sections: { chapters: [], isFlat: false }, schedules: [], annexures: [], appendix: [], forms: [] };
+
+// One icon per document type — mirrors CitizenDashboard's TYPE_ICON_MAP so a type
+// reads the same way (icon + colour) everywhere in the citizen-facing UI.
+const TYPE_ICON_MAP = {
+  'Act': BookOpen, 'Amendment': FileEdit, 'Notification': Bell, 'Circular': RefreshCw,
+  'Policy': Shield, 'Rules & Regulations': Gavel, 'Order/Gazette': FileText,
+  'Bye Laws': Building2, 'Miscellaneous': MoreHorizontal,
+};
 
 // camelCase typeFields key → Title Case label, e.g. 'noOfRules' → 'No Of Rules'
 function fieldLabel(k) {
@@ -34,6 +45,24 @@ const PART_LABEL_KEYS = { sections: 'partSections', schedules: 'partSchedules', 
 // Legal body text reads better in a serif face — falls back to the OS's own
 // Georgia/Times before generic serif, no extra font file to self-host.
 const SERIF_STACK = "'Noto Serif', Georgia, 'Times New Roman', serif";
+
+// Fixed topbar height + easing — same values CitizenDashboard's own topbar uses,
+// so the two feel like the same piece of chrome.
+const ACV_TOP_BAR_HEIGHT = 60;
+const ACV_TOP_BAR_EASE = '.4s cubic-bezier(.22,1,.36,1)';
+
+// Icon-button styles for the topbar's language/accessibility/login controls —
+// "dark" while unscrolled (icons sit on the blue gradient/transparent topbar),
+// "light" once scrolled (topbar has solidified to a white bar), same two
+// variants CitizenDashboard's own topbar switches between.
+const acvTopBarIconStyle = {
+  display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: '50%', cursor: 'pointer',
+  background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.18)', color: 'rgba(255,255,255,.85)',
+};
+const acvTopBarIconStyleLight = {
+  display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: '50%', cursor: 'pointer',
+  background: 'var(--surface-hover)', border: '1px solid var(--surface-border)', color: 'var(--text-color)',
+};
 
 // Summaries come out of the backend as lightweight markdown — **bold**
 // headings, numbered sub-items, "* label: value" bullets — but often as one
@@ -137,66 +166,6 @@ function ErrorPart({ onRetry }) {
   );
 }
 
-// Department + year, pulled out of the compact top bar into their own
-// clearly-labelled fields (icon, label, value — each field legible on its
-// own) instead of being crammed into one small grey line under the title.
-// Each one is its own separate pill — no shared/continued background across
-// them. Document type itself sits in the heading card above (parallel to
-// the document's name) — not repeated here too. "View Document" sits in the
-// opposite corner of this same row (parallel to department/year), so
-// opening the file doesn't need its own separate button elsewhere. When
-// there's a tabs/rail framework taking up the page (onOpenSummary passed),
-// the summary itself becomes a pill right alongside the date instead of an
-// always-visible band — that space is busier there, so it's opened on demand.
-function DocMetaBox({ dept, year, docId, onOpenSummary }) {
-  const { t } = useTranslation('actContents');
-  if (!dept && !year && !docId) return null;
-  const fields = [
-    dept && { label: t('administeringDepartment'), value: dept, icon: Building2, color: 'var(--primary)', bg: 'var(--primary-light)' },
-    year && { label: t('year'), value: year, icon: CalendarDays, color: '#64748b', bg: 'rgba(100,116,139,.1)' },
-  ].filter(Boolean);
-  // No background of its own — this sits directly on whatever page backdrop is
-  // already behind it (so it doesn't create its own separate colour band
-  // between the heading card above and the content below); each field is its
-  // own white chip so it still stands out against that backdrop.
-  return (
-    <div style={{ padding: '14px 24px', flexShrink: 0 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-          {fields.map(f => (
-            <div key={f.label} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '10px 18px', borderRadius: 10, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', boxShadow: 'var(--card-shadow)', flexShrink: 0 }}>
-              <div style={{ width: 22, height: 22, borderRadius: 6, background: f.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <f.icon size={12} color={f.color} />
-              </div>
-              <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)' }}>{f.label}</span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)' }}>{f.value}</span>
-            </div>
-          ))}
-          {onOpenSummary && (
-            <button type="button" onClick={onOpenSummary}
-              style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '10px 18px', borderRadius: 10, background: 'var(--surface-card)', border: '1px solid var(--surface-border)', boxShadow: 'var(--card-shadow)', cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0, transition: 'background .15s' }}
-              onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'var(--surface-card)'}>
-              <div style={{ width: 22, height: 22, borderRadius: 6, background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Sparkles size={12} color="var(--primary)" />
-              </div>
-              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--primary)' }}>{t('summary')}</span>
-            </button>
-          )}
-        </div>
-        {docId != null && (
-          <button type="button" onClick={() => openPdfInNewTab(docId)}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 18px', borderRadius: 10, border: 'none', background: 'var(--primary)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)', boxShadow: '0 8px 20px rgba(33, 74, 171,.2)', flexShrink: 0, transition: 'opacity .15s' }}
-            onMouseEnter={e => e.currentTarget.style.opacity = '.9'}
-            onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
-            <Eye size={14} /> {t('viewDocument')}
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
 // Fallback for a document with no chapters/schedules/etc. AND no related
 // documents at all — a plain Notification/Circular with nothing structured
 // under it. Two columns rather than the tabs/rail framework, which would
@@ -223,7 +192,7 @@ function SimpleDocLayout({ doc }) {
     ...(TYPE_SPECIFIC_FIELD_KEYS[doc.type] || []).map(({ key }) => [fieldLabel(key), doc.typeFields?.[key]]),
   ].filter(([, v]) => v);
   return (
-    <div className="acv-simple-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 28, alignItems: 'start', maxWidth: 1520, margin: '0 auto', padding: '36px 40px' }}>
+    <div className="acv-simple-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 55fr) minmax(0, 45fr)', gap: 28, alignItems: 'start', maxWidth: 1520, margin: '0 auto', padding: '36px 40px' }}>
       {/* Two equally-weighted cards, side by side — summary is its own panel,
           not just loose text next to the details card. Uses the shared Card
           component (same shadow/radius/border every other card in the app
@@ -237,7 +206,7 @@ function SimpleDocLayout({ doc }) {
           <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--primary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)' }}>{t('summary')}</span>
         </div>
         {doc.desc ? (
-          <div style={{ fontSize: 14.5, lineHeight: 1.9, color: 'var(--text-color)', fontFamily: SERIF_STACK }}>{renderFormattedSummary(doc.desc)}</div>
+          <div style={{ fontSize: 14.5, lineHeight: 1.9, color: 'var(--text-color)', fontFamily: SERIF_STACK, overflowWrap: 'break-word', wordBreak: 'break-word' }}>{renderFormattedSummary(doc.desc)}</div>
         ) : (
           <div style={{ fontSize: 13, color: 'var(--text-color-secondary)' }}>{t('noSummaryAvailable')}</div>
         )}
@@ -249,7 +218,7 @@ function SimpleDocLayout({ doc }) {
           <div style={{ borderRadius: 10, border: '1px solid var(--surface-border)', overflow: 'hidden', marginBottom: 20 }}>
             {fields.map(([k, v], i) => (
               <div key={k} style={{ display: 'flex', alignItems: 'stretch', borderBottom: i < fields.length - 1 ? '1px solid var(--surface-border)' : 'none' }}>
-                <div style={{ padding: '9px 10px', width: 100, boxSizing: 'border-box', flexShrink: 0, background: 'var(--surface-50)', fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', fontWeight: 600, borderRight: '1px solid var(--surface-border)' }}>{k}</div>
+                <div style={{ padding: '9px 10px', width: 100, boxSizing: 'border-box', flexShrink: 0, background: 'var(--surface-50)', fontSize: 10, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', fontWeight: 600, borderRight: '1px solid var(--surface-border)', wordBreak: 'break-word' }}>{k}</div>
                 <div style={{ padding: '9px 10px', fontSize: 12, color: 'var(--text-heading)', fontWeight: 500, flex: 1, wordBreak: 'break-word' }}>{String(v)}</div>
               </div>
             ))}
@@ -275,6 +244,15 @@ function SimpleDocLayout({ doc }) {
 // empty, disabled tabs.
 export default function ActContentsView({ doc: rawDoc, onClose, citizenView = false, onLoginAsOfficer }) {
   const { t } = useTranslation('actContents');
+  const { t: tc, i18n } = useTranslation('citizen');
+  const orgNameHi = i18n.getFixedT('hi', 'login')('orgNamePortal');
+  const orgNameEn = i18n.getFixedT('en', 'login')('orgNamePortal');
+  const [loginMenuOpen, setLoginMenuOpen] = useState(false);
+  // Mirrors CitizenDashboard's own topbar/masthead scroll behaviour: past a small
+  // scroll threshold, the fixed topbar solidifies (condensed brand fades in, icons
+  // switch from light to dark) and the big in-hero masthead fades out.
+  const [scrolled, setScrolled] = useState(false);
+  const handleHeroScroll = e => setScrolled(e.currentTarget.scrollTop > 40);
   const [fullDetail, setFullDetail] = useState(null);
   const [loading, setLoading]       = useState(true);
   const [loadError, setLoadError]   = useState(false);
@@ -341,6 +319,12 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
   // "Related Documents" band above them does; see hasAnyPartContent usage below.
   const hasAnyPartContent = Object.values(partCounts).some(c => c > 0);
 
+  // Top-level switch (only shown when there's actually a parts framework to switch
+  // away from — see the !hasAnyPartContent early return above) between the tabs/rail
+  // below and the same summary-and-details layout SimpleDocLayout shows for documents
+  // with no parts at all, so a document that DOES have parts can still jump straight
+  // to its summary/details without leaving this view.
+  const [viewMode, setViewMode] = useState('parts');
   const [rawActivePart, setActivePart] = useState('sections');
   // Derived rather than synced via an effect: lands on whichever tab actually has
   // content instead of defaulting to (possibly empty) Sections — empty tabs are
@@ -353,7 +337,6 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
   const [chapterFilter, setChapterFilter] = useState(''); // narrows the chapter rail only; the reader itself still renders every chapter
   const [showBackToTop, setShowBackToTop] = useState(false);
   const [relatedDialogType, setRelatedDialogType]   = useState(null);
-  const [summaryDialogOpen, setSummaryDialogOpen]   = useState(false); // structured docs (sections/schedules/related) show Summary as an on-demand dialog instead of an always-visible band, since that space is busier there
   const [expandedRelated, setExpandedRelated]       = useState(null); // which related-doc row is expanded in the dialog
   const [viewRelatedDoc, setViewRelatedDoc] = useState(null); // related doc currently open in its own PDF viewer
   const [activeChapter, setActiveChapter] = useState(0);
@@ -468,60 +451,128 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
   // with the rest of the content below it instead of staying pinned like a
   // toolbar; when there IS a tabs/rail framework, it stays fixed above that
   // framework the way a page header normally would.
-  const headerTypeMeta = DOC_TYPE_META[doc.type] || { color: 'var(--primary)', bg: 'var(--primary-light)' };
+  const HeaderTypeIcon = TYPE_ICON_MAP[doc.type] || FileText;
 
-  // `showSummaryButton` is true only for the tabbed/structured case — the
-  // simple-layout case already shows the summary as its own always-visible
-  // card, so it doesn't also need this on-demand pill.
-  function renderHeaderBlock(showSummaryButton) {
+  // A colored hero band (same gradient family as CitizenDashboard's own banner)
+  // instead of a flat white card — carries the icon/title/type badge and, right
+  // below it, the department/year/"View Document" meta row as glass pills on the
+  // same gradient, so this reads as one deliberate header rather than a plain
+  // row on the page background. Full-bleed (no side padding of its own) since
+  // this whole view is already a full-screen dialog.
+  function renderHeaderBlock() {
   return (
-    <>
-      {/* Wrapped as an actual card (border, shadow, left accent stripe) instead of
-          a bare row directly on the page background — matches the "quick action"
-          card pattern elsewhere in the app (icon box + heading), so the document's
-          own name reads as a defined, substantial heading rather than floating in
-          empty space. */}
-      <div style={{ padding: '18px 24px 6px', flexShrink: 0 }}>
-        <Card style={{ position: 'relative', display: 'flex', alignItems: 'flex-start', gap: 16, borderLeft: '3px solid var(--primary)', padding: '18px 22px' }}>
-          {/* Document type — pinned to the card's top-right corner, level with the
-              title (parallel to it) rather than crowding the title text itself. */}
-          {doc.type && (
-            <span style={{ position: 'absolute', top: 16, right: 20, fontSize: 11, fontWeight: 700, padding: '3px 11px', borderRadius: 20, fontFamily: 'var(--mono)', textTransform: 'uppercase', letterSpacing: '.03em', background: headerTypeMeta.bg, color: headerTypeMeta.color }}>
+    <div style={{
+      position: 'relative', minHeight: citizenView ? '50vh' : undefined, boxSizing: 'border-box',
+      // Extra bottom padding when there's a related-documents card — it floats up
+      // over this hero's bottom edge (see relatedDocsBand's negative marginTop), so
+      // the hero needs a bit more blue behind/around it to still look balanced
+      // instead of the card eating right into the hero's own breathing room.
+      padding: hasAnyRelated ? '32px 40px 64px' : '32px 40px', flexShrink: 0, overflow: 'hidden',
+      display: 'flex', flexDirection: 'column', justifyContent: 'center',
+      background: 'linear-gradient(120deg, var(--primary-dark) 0%, var(--primary) 58%, #2f5fce 100%)',
+    }}>
+      <div aria-hidden="true" style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none',
+        background: 'radial-gradient(circle at 88% -20%, rgba(255,255,255,.12), transparent 42%), radial-gradient(circle at 4% 130%, rgba(255,255,255,.08), transparent 38%)',
+      }} />
+
+      {/* Masthead — logo + org name only (no action icons — those live in the fixed
+          topbar below, same split CitizenDashboard uses). Same 100px logo size as
+          the dashboard's own hero masthead, absolutely positioned below the fixed
+          topbar's height so it doesn't sit underneath it, and fades out on scroll
+          exactly like the dashboard's masthead does. */}
+      {citizenView ? (
+        <div className="acv-masthead-row"
+          style={{
+            position: 'absolute', top: 14, left: 32, zIndex: 3,
+            display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 'calc(100% - 64px)', textAlign: 'left',
+            opacity: scrolled ? 0 : 1, pointerEvents: scrolled ? 'none' : 'auto', transition: `opacity ${ACV_TOP_BAR_EASE}`,
+          }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <img src={haryanaLogo} alt="Haryana" loading="lazy" className="acv-masthead-logo"
+              style={{ width: 100, height: 100, objectFit: 'contain', flexShrink: 0 }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 1, whiteSpace: 'nowrap', minWidth: 0, transform: 'translateY(12px)' }}>
+              <span className="acv-masthead-hi" style={{ fontSize: 13, fontWeight: 500, color: 'rgba(255,255,255,.62)', letterSpacing: '.01em' }}>{orgNameHi}</span>
+              <span className="acv-masthead-en" style={{ fontSize: 18, fontWeight: 700, color: 'rgba(255,255,255,.9)', letterSpacing: '.01em' }}>{orgNameEn}</span>
+            </div>
+          </div>
+
+          {/* Breadcrumb — its own light pill right under the logo, so it visibly
+              reads as a clickable "back to home" affordance rather than blending
+              into the plain gradient. */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 6, width: 'fit-content',
+            padding: '7px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600,
+            background: 'rgba(255,255,255,.14)', border: '1px solid rgba(255,255,255,.22)',
+          }}>
+            <button type="button" onClick={onClose}
+              style={{ background: 'none', border: 'none', padding: 0, color: 'rgba(255,255,255,.75)', cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 12, fontWeight: 600, transition: 'color .15s' }}
+              onMouseEnter={e => e.currentTarget.style.color = '#fff'}
+              onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,.75)'}>
+              {t('home')}
+            </button>
+            <ChevronRight size={11} color="rgba(255,255,255,.5)" />
+            <span style={{ color: '#fff' }}>{t('documentView')}</span>
+          </div>
+        </div>
+      ) : (
+        <div style={{ position: 'absolute', top: 24, right: 32, zIndex: 3 }}>
+          <button onClick={onClose}
+            style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 16px', borderRadius: 9, border: '1px solid rgba(255,255,255,.25)', background: 'rgba(255,255,255,.08)', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', transition: 'background .15s' }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.18)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,.08)'}>
+            <X size={14} /> {t('close')}
+          </button>
+        </div>
+      )}
+
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-start', gap: 18, marginTop: citizenView ? 168 : 0 }}>
+        <div style={{ width: 56, height: 56, borderRadius: 14, background: 'rgba(255,255,255,.14)', border: '1px solid rgba(255,255,255,.24)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <HeaderTypeIcon size={26} color="#fff" strokeWidth={1.7} />
+        </div>
+        {/* Document type — pinned to the row's top-right corner, level with the
+            title rather than stacked above it. */}
+        {doc.type && (
+          <span style={{ position: 'absolute', top: 2, right: 0, fontSize: 11, fontWeight: 800, letterSpacing: '.08em', padding: '3px 12px', borderRadius: 20, background: 'rgba(255,255,255,.16)', border: '1px solid rgba(255,255,255,.26)', color: '#fff', fontFamily: 'var(--mono)', textTransform: 'uppercase', flexShrink: 0 }}>
             {doc.type}
           </span>
-          )}
-          <div style={{ width: 48, height: 48, borderRadius: 12, background: 'rgba(33, 74, 171,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <FileText size={21} color="var(--primary)" strokeWidth={1.8} />
-          </div>
-          <div style={{ flex: 1, minWidth: 0, paddingTop: 2, paddingRight: doc.type ? 100 : 0 }}>
-            {/* This IS the document's own name — the actual page heading, sized and
-                weighted to read as one, and wrapping onto a second line rather than
-                truncating so a long title still shows in full. Department/year live
-                in their own clearly-labelled box below (DocMetaBox). The raw upload
-                filename isn't shown at all — this title is what identifies the
-                document, not its internal PDF filename. */}
-            <h1 style={{ fontSize: 20, fontWeight: 800, color: 'var(--text-heading)', letterSpacing: '-.01em', lineHeight: 1.3, margin: 0, overflowWrap: 'break-word' }}>{doc.title}</h1>
-          </div>
-          {/* No PDF button here — "View Document" in the meta row below (parallel to
-              department/year) is the one place that action lives now, for both the
-              tabbed/structured case and the plain-details case. */}
-          {/* Hidden for citizens — the "Home" breadcrumb above already gives them a way
-              back; kept for internal roles (opened via DocViewModal's "Browse Sections &
-              Schedules"), which have no breadcrumb and no other way to close this. */}
-          {!citizenView && (
-            <button onClick={onClose}
-              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 18px', borderRadius: 9, border: '1px solid var(--surface-border)', background: 'var(--surface-card)', color: 'var(--text-color-secondary)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', flexShrink: 0, transition: 'background .15s' }}
-              onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'var(--surface-card)'}>
-              <X size={14} /> {t('close')}
-            </button>
-          )}
-        </Card>
+        )}
+        <div style={{ flex: 1, minWidth: 0, paddingRight: doc.type ? 90 : 0 }}>
+          {/* This IS the document's own name — the actual page heading. The raw
+              upload filename isn't shown at all — this title is what identifies
+              the document, not its internal PDF filename. */}
+          <h1 style={{ fontFamily: SERIF_STACK, fontSize: 28, fontWeight: 700, color: '#fff', lineHeight: 1.3, margin: 0, overflowWrap: 'break-word', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', textOverflow: 'ellipsis' }}>{doc.title}</h1>
+        </div>
       </div>
 
-      <DocMetaBox dept={doc.dept} year={doc.year} docId={doc.id}
-        onOpenSummary={showSummaryButton && doc.desc ? () => setSummaryDialogOpen(true) : undefined} />
-    </>
+      {(doc.dept || doc.year || doc.id != null) && (
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 12, marginTop: 22, flexWrap: 'wrap' }}>
+          {doc.dept && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 16px', borderRadius: 10, background: 'rgba(255,255,255,.14)', border: '1px solid rgba(255,255,255,.24)', color: '#fff', fontSize: 13, flexShrink: 0 }}>
+              <Landmark size={14} />
+              <span style={{ opacity: .75 }}>{t('administeringDepartment')}</span>
+              <span style={{ fontWeight: 700 }}>{doc.dept}</span>
+            </div>
+          )}
+          {doc.year && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 16px', borderRadius: 10, background: 'rgba(255,255,255,.14)', border: '1px solid rgba(255,255,255,.24)', color: '#fff', fontSize: 13, flexShrink: 0 }}>
+              <CalendarDays size={14} />
+              <span style={{ opacity: .75 }}>{t('year')}</span>
+              <span style={{ fontWeight: 700 }}>{doc.year}</span>
+            </div>
+          )}
+          <div style={{ flex: 1 }} />
+          {doc.id != null && (
+            <button type="button" onClick={() => openPdfInNewTab(doc.id)}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 10, border: 'none', background: '#fff', color: 'var(--primary)', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font)', boxShadow: '0 8px 20px rgba(0,0,0,.18)', flexShrink: 0, transition: 'opacity .15s' }}
+              onMouseEnter={e => e.currentTarget.style.opacity = '.9'}
+              onMouseLeave={e => e.currentTarget.style.opacity = '1'}>
+              <Eye size={14} /> {t('viewDocument')}
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   );
   }
 
@@ -537,34 +588,83 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
           .acv-simple-grid { grid-template-columns: 1fr !important; padding: 24px 20px !important; }
           .acv-simple-sidebar { position: static !important; }
         }
+        @media (max-width: 640px) {
+          .acv-masthead-row { gap: 10px !important; }
+          .acv-masthead-logo { width: 56px !important; height: 56px !important; }
+          .acv-masthead-hi { display: none !important; }
+          .acv-masthead-en { font-size: 14px !important; }
+          .acv-masthead-actions { gap: 6px !important; }
+          .acv-skip { display: none !important; }
+        }
       `}</style>
 
-      {/* Citizen branding/language/accessibility/login bar — same one CitizenDashboard
-          shows, so it stays available no matter where in the citizen flow someone is */}
-      {citizenView && <CitizenTopBar onLoginAsOfficer={onLoginAsOfficer} />}
-
-      {/* Breadcrumb "bowl" — same seamless concave-corner style Topbar.jsx uses for
-          Uploader/Approver's own breadcrumb, so this reads as the same pattern
-          rather than a one-off design. "Home" gives citizens an explicit way back
-          to the dashboard (this whole view is a full-screen overlay, not a
-          browser-navigable route), and names this page so it's clear what's open. */}
+      {/* Fixed topbar — same piece of chrome as CitizenDashboard's own: transparent
+          over the gradient at rest, solidifies to a white bar once scrolled (its
+          condensed brand fading in as the big masthead above fades out). Holds the
+          skip-link/language/accessibility/login controls always, regardless of
+          scroll state — only their icon colour switches. */}
       {citizenView && (
-        <div style={{ position: 'relative', margin: '0 4rem', flexShrink: 0 }}>
-          <div aria-hidden="true" style={{ position: 'absolute', top: 0, left: -22, width: 22, height: 22, background: 'radial-gradient(circle at 0 100%, transparent 22px, var(--surface-card) 22px)' }} />
-          <div aria-hidden="true" style={{ position: 'absolute', top: 0, right: -22, width: 22, height: 22, background: 'radial-gradient(circle at 100% 100%, transparent 22px, var(--surface-card) 22px)' }} />
+        <div className="acv-topbar" style={{
+          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 2110,
+          height: ACV_TOP_BAR_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
+          padding: '0 32px',
+          background: scrolled ? 'linear-gradient(180deg, #ffffff 0%, #f5f7f9 100%)' : 'transparent',
+          borderBottom: scrolled ? '1px solid var(--surface-border)' : '1px solid transparent',
+          boxShadow: scrolled ? '0 6px 24px rgba(15,23,42,.10)' : 'none',
+          transition: `background ${ACV_TOP_BAR_EASE}, box-shadow ${ACV_TOP_BAR_EASE}, border-color ${ACV_TOP_BAR_EASE}`,
+        }}>
           <div style={{
-            padding: '10px 22px', borderRadius: '0 0 28px 28px', background: 'var(--surface-card)',
-            border: '1px solid var(--surface-border)', borderTop: 'none', boxShadow: 'var(--card-shadow)',
-            display: 'flex', alignItems: 'center', gap: 4,
+            flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8,
+            opacity: scrolled ? 1 : 0, transform: scrolled ? 'translateY(0)' : 'translateY(-8px)',
+            transition: `opacity ${ACV_TOP_BAR_EASE}, transform ${ACV_TOP_BAR_EASE}`,
           }}>
-            <button type="button" onClick={onClose}
-              style={{ background: 'none', border: 'none', padding: 0, fontSize: 13, fontWeight: 500, color: 'var(--text-color-secondary)', cursor: 'pointer', fontFamily: 'var(--font)', transition: 'color .15s' }}
-              onMouseEnter={e => e.currentTarget.style.color = 'var(--primary)'}
-              onMouseLeave={e => e.currentTarget.style.color = 'var(--text-color-secondary)'}>
-              {t('home')}
-            </button>
-            <ChevronRight size={13} color="var(--text-color-secondary)" style={{ opacity: .55 }} />
-            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)' }}>{t('documentView')}</span>
+            <img src={haryanaLogo} alt="Haryana Government" loading="lazy" style={{ width: 26, height: 26, objectFit: 'contain' }} />
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-heading)', lineHeight: 1.15 }}>{tc('brandSubtitle')}</div>
+              <div style={{ fontSize: 10, color: 'var(--text-color-secondary)', lineHeight: 1.15 }}>{tc('brandTitle')}</div>
+            </div>
+          </div>
+
+          <div className="acv-masthead-actions" style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <a href="#acv-main-content" className="acv-skip"
+              style={{ color: scrolled ? 'var(--text-color)' : 'rgba(255,255,255,.8)', fontSize: 12, fontFamily: 'var(--font)', textDecoration: 'none', padding: '5px 8px', margin: '-5px -8px', borderRadius: 6, background: 'transparent', transition: `color ${ACV_TOP_BAR_EASE}, background .15s` }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(120,128,140,.2)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              {tc('skipToMainContent')}
+            </a>
+            <span aria-hidden="true" style={{ width: 1, height: 16, background: scrolled ? 'var(--surface-border)' : 'rgba(255,255,255,.2)', transition: `background ${ACV_TOP_BAR_EASE}` }} />
+            <LanguageToggle iconOnly buttonStyle={scrolled ? acvTopBarIconStyleLight : acvTopBarIconStyle} />
+            <AccessibilityMenu iconButtonStyle={scrolled ? acvTopBarIconStyleLight : acvTopBarIconStyle} />
+
+            <div style={{ position: 'relative' }}>
+              <button type="button" onClick={() => setLoginMenuOpen(o => !o)}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(120,128,140,.3)'}
+                onMouseLeave={e => e.currentTarget.style.background = (scrolled ? acvTopBarIconStyleLight : acvTopBarIconStyle).background}
+                aria-label={tc('profileLogin')} aria-expanded={loginMenuOpen} title={tc('profileLogin')}
+                style={{ transition: 'background .15s', ...(scrolled ? acvTopBarIconStyleLight : acvTopBarIconStyle) }}>
+                <User size={16} />
+              </button>
+
+              {loginMenuOpen && (
+                <>
+                  <div onClick={() => setLoginMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 2155 }} />
+                  <div style={{
+                    position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 2160, width: 200,
+                    background: 'var(--surface-card)', color: 'var(--text-color)',
+                    border: '1px solid var(--surface-border)', borderRadius: 12,
+                    boxShadow: '0 16px 40px rgba(0,0,0,.3)', overflow: 'hidden',
+                    animation: 'fadeSlideIn .15s ease',
+                  }}>
+                    <button type="button" onClick={() => { setLoginMenuOpen(false); onLoginAsOfficer?.(); }}
+                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: 'var(--text-color)', fontFamily: 'var(--font)', transition: 'background .12s' }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                      <User size={14} color="var(--primary)" /> {tc('loginAsOfficer')}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -577,12 +677,18 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
           nothing are left out entirely rather than shown disabled. */}
       {(() => {
         const relatedDocsBand = hasAnyRelated && (
-          <div style={{ padding: '14px 24px', flexShrink: 0 }}>
-            <div style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)', marginBottom: 9 }}>{t('relatedDocuments')}</div>
+          <div style={{ padding: '0 40px 22px', marginTop: -32, position: 'relative', zIndex: 3, flexShrink: 0 }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 14, padding: '14px 22px',
+              background: 'var(--surface-card)', border: '1px solid var(--surface-border)', borderRadius: 14,
+              boxShadow: '0 12px 32px rgba(22,47,106,.14)',
+            }}>
+            <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)', flexShrink: 0 }}>{t('relatedDocuments')}</span>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {allRelatedTypes.filter(type => (relatedDocs[type] || []).length > 0).map(type => {
                 const items = relatedDocs[type] || [];
                 const meta = DOC_TYPE_META[type] || { color: '#64748b', bg: 'rgba(100,116,139,.1)', border: 'rgba(100,116,139,.25)' };
+                const PillIcon = TYPE_ICON_MAP[type] || FileText;
                 return (
                   <button key={type} type="button"
                     onClick={() => (setRelatedDialogType(type), setExpandedRelated(null))}
@@ -594,11 +700,12 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
                       fontSize: 12, fontWeight: 700, cursor: 'pointer',
                       fontFamily: 'var(--font)', transition: 'box-shadow .15s',
                     }}>
-                    <FileText size={11} style={{ flexShrink: 0 }} />
+                    <PillIcon size={11} style={{ flexShrink: 0 }} />
                     {type} · {items.length}
                   </button>
                 );
               })}
+            </div>
             </div>
           </div>
         );
@@ -714,8 +821,11 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
         // that page is already busier with tabs/rail/related-doc pills).
         if (!loading && !loadError && !hasAnyPartContent) {
           return (
-            <div style={{ flex: 1, overflowY: 'auto', background: 'var(--surface-ground)' }}>
-              {renderHeaderBlock(false)}
+            <div onScroll={handleHeroScroll} style={{ flex: 1, overflowY: 'auto', scrollBehavior: 'smooth', background: 'var(--surface-ground)' }}>
+              {renderHeaderBlock()}
+              {/* "Skip to main content" target — jumps straight past the hero to
+                  where the document's own content actually starts. */}
+              <div id="acv-main-content" style={{ scrollMarginTop: ACV_TOP_BAR_HEIGHT + 12 }} />
               {relatedDocsBand}
               {relatedTypeDialog}
               {viewRelatedDocModal}
@@ -724,44 +834,56 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
           );
         }
         return (
-      <div ref={scrollAreaRef} onScroll={e => setShowBackToTop(e.currentTarget.scrollTop > 480)}
-        style={{ flex: 1, overflowY: 'auto', background: 'var(--surface-ground)' }}>
-      {renderHeaderBlock(true)}
+      <div ref={scrollAreaRef} onScroll={e => { setShowBackToTop(e.currentTarget.scrollTop > 480); handleHeroScroll(e); }}
+        style={{ flex: 1, overflowY: 'auto', scrollBehavior: 'smooth', background: 'var(--surface-ground)' }}>
+      {renderHeaderBlock()}
+      {/* "Skip to main content" target — jumps straight past the hero to where
+          the document's own content actually starts. */}
+      <div id="acv-main-content" style={{ scrollMarginTop: ACV_TOP_BAR_HEIGHT + 12 }} />
       {relatedDocsBand}
-
-      {/* Summary dialog — opened from the "Summary" pill next to the date, for the
-          tabbed/structured case where an always-visible band would compete with
-          tabs/rail/related-doc pills for space. */}
-      {summaryDialogOpen && (
-        <div onClick={() => setSummaryDialogOpen(false)}
-          style={{ position: 'fixed', inset: 0, zIndex: 2200, background: 'rgba(0,0,0,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-          <div onClick={e => e.stopPropagation()}
-            style={{ background: 'var(--surface-card)', borderRadius: 14, width: 640, maxWidth: '100%', maxHeight: '80vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 64px rgba(0,0,0,.3)' }}>
-            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Sparkles size={15} color="var(--primary)" />
-                </div>
-                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>{t('summary')}</span>
-              </div>
-              <button onClick={() => setSummaryDialogOpen(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex' }}>
-                <X size={16} />
-              </button>
-            </div>
-            <div style={{ padding: '20px 22px', overflowY: 'auto', fontSize: 13.5, lineHeight: 1.75, color: 'var(--text-color)' }}>
-              {renderFormattedSummary(doc.desc)}
-            </div>
-          </div>
-        </div>
-      )}
 
       {relatedTypeDialog}
       {viewRelatedDocModal}
 
+      {/* Act Parts / Summary & Document Details — a compact centered capsule
+          (not a full-width bar) so the two options read as one deliberate
+          switch, matching the mock design, rather than two oversized buttons
+          stretched across the whole page. */}
+      <div style={{ display: 'flex', justifyContent: 'center', padding: `${hasAnyRelated ? 4 : 20}px 24px 14px`, flexShrink: 0 }}>
+        <div style={{
+          width: '100%', maxWidth: 560, display: 'flex', gap: 6, padding: 6, borderRadius: 12,
+          background: 'var(--surface-card)', border: '1px solid var(--surface-border)', boxShadow: 'var(--card-shadow)',
+        }}>
+          {[
+            { key: 'parts', label: t('actParts'), icon: Layers },
+            { key: 'details', label: t('summaryAndDetails'), icon: Sparkles },
+          ].map(opt => {
+            const isActive = viewMode === opt.key;
+            const OptIcon = opt.icon;
+            return (
+              <button key={opt.key} type="button" onClick={() => setViewMode(opt.key)}
+                style={{
+                  flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  padding: '10px 14px', borderRadius: 9, cursor: 'pointer', fontFamily: 'var(--font)', border: 'none',
+                  fontSize: 13, fontWeight: 700, transition: 'background .15s, color .15s',
+                  background: isActive ? 'var(--primary-light)' : 'transparent',
+                  color: isActive ? 'var(--primary)' : 'var(--text-color-secondary)',
+                }}
+                onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'var(--surface-hover)'; }}
+                onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}>
+                <OptIcon size={15} /> {opt.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {viewMode === 'details' && !loading && !loadError && <SimpleDocLayout doc={doc} />}
+
       {/* Tabs + rail/reader body — skipped entirely once loaded if this document
           has no parts at all (only related docs, e.g.), same "don't show what
           isn't there" rule as the related-document pills above. */}
-      {(loading || loadError || hasAnyPartContent) && (
+      {viewMode === 'parts' && (loading || loadError || hasAnyPartContent) && (
       <>
       {/* Part tabs — only ones with actual content render at all once loaded
           (while still loading/on error, counts aren't known yet, so all 5 show
