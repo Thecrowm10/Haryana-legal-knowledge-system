@@ -1740,6 +1740,7 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
   const isMobile = useMediaQuery('(max-width: 640px)');
   const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
   const [docs, setDocs]           = useState([]);
+  const [docCounts, setDocCounts] = useState({ count_total: 0, count_pending: 0, count_approved: 0, count_rejected: 0 });
   const [loading, setLoading]     = useState(false);
   const [apiError, setApiError]   = useState('');
   const [remarks, setRemarks]     = useState({});
@@ -1824,7 +1825,15 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
     setLoading(true);
     setApiError('');
     getApproverDocuments()
-      .then(res => setDocs((res.data.documents || []).map(mapApiDoc)))
+      .then(res => {
+        setDocs((res.data.documents || []).map(mapApiDoc));
+        setDocCounts({
+          count_total:    res.data.count_total    ?? 0,
+          count_pending:  res.data.count_pending  ?? 0,
+          count_approved: res.data.count_approved ?? 0,
+          count_rejected: res.data.count_rejected ?? 0,
+        });
+      })
       .catch(err => setApiError(err.response?.data?.detail || t('dashboard.failedToLoadDocuments')))
       .finally(() => setLoading(false));
   }, [t]);
@@ -2234,10 +2243,10 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
           <div style={{ ...LABEL, marginBottom: 10 }}>{t('dashboard.overviewLabel')}</div>
           <div className="ap-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
           {[
-            { icon: Clock,       label: t('dashboard.summary.pending'),  value: pending.length,                                       bg: 'rgba(255, 193, 7,.12)', color: '#b45309', key: 'pending'  },
-            { icon: CheckCircle, label: t('dashboard.summary.approved'), value: reviewed.filter(d => d.status === 'approved').length, bg: 'rgba(25, 135, 84,.12)',  color: '#198754', key: 'approved' },
-            { icon: XCircle,     label: t('dashboard.summary.rejected'), value: reviewed.filter(d => d.status === 'rejected').length, bg: 'rgba(220, 53, 69,.12)',  color: '#dc3545', key: 'rejected' },
-            { icon: FileText,    label: t('dashboard.summary.total'),    value: docs.length,                                          bg: 'rgba(33, 74, 171,.12)',  color: 'var(--primary)', key: 'all' },
+            { icon: Clock,       label: t('dashboard.summary.pending'),  value: docCounts.count_pending,  bg: 'rgba(255, 193, 7,.12)', color: '#b45309', key: 'pending'  },
+            { icon: CheckCircle, label: t('dashboard.summary.approved'), value: docCounts.count_approved, bg: 'rgba(25, 135, 84,.12)',  color: '#198754', key: 'approved' },
+            { icon: XCircle,     label: t('dashboard.summary.rejected'), value: docCounts.count_rejected, bg: 'rgba(220, 53, 69,.12)',  color: '#dc3545', key: 'rejected' },
+            { icon: FileText,    label: t('dashboard.summary.total'),    value: docCounts.count_total,    bg: 'rgba(33, 74, 171,.12)',  color: 'var(--primary)', key: 'all' },
           ].map(s => {
             const isActive = cardFilter === s.key;
             return (
