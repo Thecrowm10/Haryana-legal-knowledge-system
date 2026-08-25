@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import {
   Upload, FileText, CheckCircle, XCircle, X, TrendingUp, FileType, Download, Clock,
   RotateCcw, AlertCircle, Eye, GitBranch, Plus, FolderPlus,
-  Layers, ChevronRight, ChevronLeft, ChevronDown, AlertTriangle, CheckSquare, Square,
+  Layers, ChevronRight, ChevronDown, AlertTriangle, CheckSquare, Square,
   Edit3, Tag, Search, MessageSquare, MessageCircle, ZoomIn, ZoomOut, RotateCw, ExternalLink,
   Save, ArrowRight, Paperclip,
 } from 'lucide-react';
@@ -13,6 +13,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 import mammoth from 'mammoth';
 import Card from '../components/ui/Card';
 import SelectField from '../components/ui/SelectField';
+import Pagination from '../components/ui/Pagination';
 import { useAuth } from '../hooks/useAuth';
 import { getDepartments, getDocumentTypes } from '../services/departments';
 import { uploadPdfFile, uploadPdfMetadata, updatePdfMetadata, getMyDocuments, searchDocuments, getPdfFile, checkDuplicateDocument, linkDocumentToDepartment, getLinkedDocuments, getActChildren, getMyDepartmentActs, replaceDocumentFile } from '../services/pdf';
@@ -1223,6 +1224,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const [editList, setEditList]             = useState([]);
   const [editListLoading, setEditListLoading] = useState(false);
   const [editListError, setEditListError]   = useState('');
+  const [editListPage, setEditListPage]     = useState(1); // client-side pagination over editList — only 10 shown at a time
+  const EDIT_LIST_PAGE_SIZE = 10;
   const [viewingEditDoc, setViewingEditDoc] = useState(null); // doc open in DocViewModal (read-only "View")
   const [editingDoc, setEditingDoc]     = useState(null);
   const [editForm, setEditForm]         = useState(null);
@@ -1279,6 +1282,9 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     // eslint-disable-next-line react-hooks/set-state-in-effect
     return refreshEditList();
   }, [activePage, editType, refreshEditList]);
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setEditListPage(1); }, [editType]);
 
   function openEditDoc(doc) {
     setEditingDoc(doc);
@@ -3514,20 +3520,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
 
                 {/* ── Pagination — keeps the list from dumping every upload onto one screen ── */}
                 {tableTotalPages > 1 && (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 20px', borderTop: '1px solid var(--surface-border)' }}>
-                    <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
-                      {t('table.pageIndicator', { page: clampedTablePage, total: tableTotalPages })}
-                    </span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <button type="button" onClick={() => setTablePage(p => Math.max(1, p - 1))} disabled={clampedTablePage === 1}
-                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-card)', color: clampedTablePage === 1 ? 'var(--text-color-secondary)' : 'var(--text-heading)', fontSize: 12, fontWeight: 600, cursor: clampedTablePage === 1 ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: clampedTablePage === 1 ? .5 : 1 }}>
-                        <ChevronLeft size={13} /> {t('table.pagePrev')}
-                      </button>
-                      <button type="button" onClick={() => setTablePage(p => Math.min(tableTotalPages, p + 1))} disabled={clampedTablePage === tableTotalPages}
-                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-card)', color: clampedTablePage === tableTotalPages ? 'var(--text-color-secondary)' : 'var(--text-heading)', fontSize: 12, fontWeight: 600, cursor: clampedTablePage === tableTotalPages ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: clampedTablePage === tableTotalPages ? .5 : 1 }}>
-                        {t('table.pageNext')} <ChevronRight size={13} />
-                      </button>
-                    </div>
+                  <div style={{ padding: '12px 20px', borderTop: '1px solid var(--surface-border)' }}>
+                    <Pagination page={clampedTablePage} totalPages={tableTotalPages} onChange={setTablePage} />
                   </div>
                 )}
               </>
@@ -3790,7 +3784,11 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             )}
             {editListLoading ? (
               <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', padding: '10px 0' }}>{t('common.loading')}</div>
-            ) : (
+            ) : (() => {
+              const editListTotalPages = Math.max(1, Math.ceil(editList.length / EDIT_LIST_PAGE_SIZE));
+              const clampedEditListPage = Math.min(editListPage, editListTotalPages);
+              const pageItems = editList.slice((clampedEditListPage - 1) * EDIT_LIST_PAGE_SIZE, clampedEditListPage * EDIT_LIST_PAGE_SIZE);
+              return (
               <div style={{ border: '1px solid var(--surface-border)', borderRadius: 10, overflow: 'hidden' }}>
                 <div className="table-scroll-wrap">
                 <table className="ud-editlist-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
@@ -3806,13 +3804,13 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                     </tr>
                   </thead>
                   <tbody>
-                    {editList.length === 0 ? (
+                    {pageItems.length === 0 ? (
                       <tr>
                         <td colSpan={7} style={{ padding: '16px 12px', textAlign: 'center', color: 'var(--text-color-secondary)' }}>
                           {t('editDocument.noDocsOfType', { type: DOC_TYPE_KEY[editType] ? t(`docTypes.${DOC_TYPE_KEY[editType]}`) : editType })}
                         </td>
                       </tr>
-                    ) : editList.map(d => {
+                    ) : pageItems.map(d => {
                       const editable = d.status !== 'approved';
                       return (
                         <tr key={d.id} style={{ borderTop: '1px solid var(--surface-border)' }}>
@@ -3850,8 +3848,14 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                   </tbody>
                 </table>
                 </div>
+                {editListTotalPages > 1 && (
+                  <div style={{ padding: '10px 12px', borderTop: '1px solid var(--surface-border)' }}>
+                    <Pagination page={clampedEditListPage} totalPages={editListTotalPages} onChange={setEditListPage} />
+                  </div>
+                )}
               </div>
-            )}
+              );
+            })()}
           </Card>
           </>
         )}
@@ -4569,7 +4573,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             <div style={{ padding: '14px 22px', borderTop: '1px solid var(--surface-border)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ ...LABEL, fontSize: 10.5, color: 'var(--text-heading)', flexShrink: 0 }}>{t('wizard.step3.parentActLabel')}</div>
-                <select value={subDocAct} onChange={e => {
+                <SelectField value={subDocAct} onChange={e => {
                     const v = e.target.value;
                     setSubDocActByTab(prev => ({ ...prev, [subDocTab]: v }));
                     if (subDocTab === 'sections') { setSecHasChapters(null); setSecChapters([]); setSecFlatSections([]); setSectionsBaseline(sectionsSignature(null, [], [])); }
@@ -4579,13 +4583,12 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                     if (v) loadActPartApprovals(v);
                   }}
                   disabled={subDocActsLoading}
-                  style={{ ...INPUT_BASE, flex: 1, cursor: 'pointer', appearance: 'none', fontSize: 12.5 }}
-                  onFocus={focusStyle} onBlur={blurStyle}>
-                  <option value="">{subDocActsLoading ? t('addDocuments.sections.selectActLoading') : t('addDocuments.sections.selectActPlaceholder')}</option>
+                  placeholder={subDocActsLoading ? t('addDocuments.sections.selectActLoading') : t('addDocuments.sections.selectActPlaceholder')}
+                  style={{ flex: 1 }}>
                   {(subDocActsList || []).map(act => (
                     <option key={act.id} value={act.id}>{act.document_name}</option>
                   ))}
-                </select>
+                </SelectField>
               </div>
               {!subDocActsLoading && subDocActsList?.length === 0 && (
                 <div style={{ fontSize: 11.5, color: '#d97706', marginTop: 8 }}>{t('addDocuments.sections.selectActEmpty')}</div>
@@ -6522,20 +6525,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                   const totalPages = Math.max(1, Math.ceil(departmentActsTotal / DEPT_ACTS_PAGE_SIZE));
                   if (totalPages <= 1) return null;
                   return (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', borderTop: '1px solid var(--surface-border)' }}>
-                    <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
-                      {t('table.pageIndicator', { page: departmentActsPage, total: totalPages })}
-                    </span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <button type="button" onClick={() => setDepartmentActsPage(p => Math.max(1, p - 1))} disabled={departmentActsPage === 1}
-                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-card)', color: departmentActsPage === 1 ? 'var(--text-color-secondary)' : 'var(--text-heading)', fontSize: 12, fontWeight: 600, cursor: departmentActsPage === 1 ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: departmentActsPage === 1 ? .5 : 1 }}>
-                        <ChevronLeft size={13} /> {t('table.pagePrev')}
-                      </button>
-                      <button type="button" onClick={() => setDepartmentActsPage(p => Math.min(totalPages, p + 1))} disabled={departmentActsPage === totalPages}
-                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-card)', color: departmentActsPage === totalPages ? 'var(--text-color-secondary)' : 'var(--text-heading)', fontSize: 12, fontWeight: 600, cursor: departmentActsPage === totalPages ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: departmentActsPage === totalPages ? .5 : 1 }}>
-                        {t('table.pageNext')} <ChevronRight size={13} />
-                      </button>
-                    </div>
+                  <div style={{ padding: '10px 12px', borderTop: '1px solid var(--surface-border)' }}>
+                    <Pagination page={departmentActsPage} totalPages={totalPages} onChange={setDepartmentActsPage} />
                   </div>
                   );
                 })()}

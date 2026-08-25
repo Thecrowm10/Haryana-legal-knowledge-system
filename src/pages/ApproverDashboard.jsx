@@ -9,6 +9,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 import Card from '../components/ui/Card';
+import Pagination from '../components/ui/Pagination';
 import Badge from '../components/ui/Badge';
 import { useAuth } from '../hooks/useAuth';
 import { getApproverDocuments, getPdfFile, reviewDocument, getDepartmentLinkRequests, reviewDepartmentLink, saveAnnotationDraft, getAnnotationDraft } from '../services/pdf';
@@ -1755,6 +1756,10 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
   const [filter, setFilter]       = useState('');
   const [searchQ, setSearchQ]     = useState('');
   const [cardFilter, setCardFilter] = useState('pending'); // 'pending' | 'approved' | 'rejected' | 'all' — always one of these on the merged dashboard
+  const [docsPage, setDocsPage]   = useState(1); // client-side pagination over the document-card list — only 10 shown at a time
+  const DOCS_PAGE_SIZE = 10;
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setDocsPage(1); }, [cardFilter, filter, searchQ]);
   const tableRef  = useRef(null);
   const expandedRef = useRef(null);
 
@@ -1766,6 +1771,10 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
   const [apDetailLoading, setApDetailLoading] = useState(false);
   const [apToast, setApToast]           = useState(null); // { type, msg }
   const [apStatusFilter, setApStatusFilter] = useState(''); // '' = All, else 'pending' | 'approved' | 'rejected'
+  const [apPage, setApPage]             = useState(1); // client-side pagination over apFiltered — only 10 shown at a time
+  const AP_PAGE_SIZE = 10;
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setApPage(1); }, [apStatusFilter]);
 
   useEffect(() => {
     // Also fetched on the dashboard overview (not just the Act Parts Review tab itself) so the
@@ -1946,6 +1955,9 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
   });
 
   const list = allFiltered;
+  const docsTotalPages = Math.max(1, Math.ceil(list.length / DOCS_PAGE_SIZE));
+  const clampedDocsPage = Math.min(docsPage, docsTotalPages);
+  const pageList = list.slice((clampedDocsPage - 1) * DOCS_PAGE_SIZE, clampedDocsPage * DOCS_PAGE_SIZE);
 
   const allTypes = Object.keys(TYPE_COLORS);
 
@@ -2384,7 +2396,7 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
 
       {/* Document cards */}
       {!['links', 'actparts'].includes(activePage) && <div ref={tableRef} style={{ scrollMarginTop: 16 }} />}
-      {!['links', 'actparts'].includes(activePage) && list.map(doc => {
+      {!['links', 'actparts'].includes(activePage) && pageList.map(doc => {
         const isOpen = expanded === doc.id;
         return (
           <div key={doc.id} ref={isOpen ? expandedRef : null}>
@@ -2470,6 +2482,12 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
         );
       })}
 
+      {!['links', 'actparts'].includes(activePage) && docsTotalPages > 1 && (
+        <Card style={{ padding: '10px 18px' }}>
+          <Pagination page={clampedDocsPage} totalPages={docsTotalPages} onChange={setDocsPage} />
+        </Card>
+      )}
+
       {/* ── Act Parts Review tab ──────────────────────────────────────────── */}
       {activePage === 'actparts' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -2549,6 +2567,10 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
 
             if (apLoading || apError || apFiltered.length === 0) return null;
 
+            const apTotalPages = Math.max(1, Math.ceil(apFiltered.length / AP_PAGE_SIZE));
+            const apClampedPage = Math.min(apPage, apTotalPages);
+            const apPageItems = apFiltered.slice((apClampedPage - 1) * AP_PAGE_SIZE, apClampedPage * AP_PAGE_SIZE);
+
             return (
               <Card style={{ overflow: 'hidden' }}>
                 <div className="table-scroll-wrap">
@@ -2560,7 +2582,7 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
                   <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)'}}>{t('actParts.headers.actions')}</div>
                 </div>
 
-                {apFiltered.map(item => {
+                {apPageItems.map(item => {
                   const TAB_LABELS = { sections: t('actParts.tabLabels.sections'), schedule: t('actParts.tabLabels.schedule'), annexure: t('actParts.tabLabels.annexure'), appendix: t('actParts.tabLabels.appendix'), forms: t('actParts.tabLabels.forms') };
                   const sc = AP_STATUS_SC[item.status] || AP_STATUS_SC.pending;
                   const isPending = item.status === 'pending';
@@ -2602,6 +2624,11 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
                   );
                 })}
                 </div>
+                {apTotalPages > 1 && (
+                  <div style={{ padding: '10px 18px', borderTop: '1px solid var(--surface-border)' }}>
+                    <Pagination page={apClampedPage} totalPages={apTotalPages} onChange={setApPage} />
+                  </div>
+                )}
               </Card>
             );
           })()}

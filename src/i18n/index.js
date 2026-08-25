@@ -20,6 +20,8 @@ import csoEn from './locales/en/cso.json';
 import csoHi from './locales/hi/cso.json';
 import auditorEn from './locales/en/auditor.json';
 import auditorHi from './locales/hi/auditor.json';
+import paginationEn from './locales/en/pagination.json';
+import paginationHi from './locales/hi/pagination.json';
 
 const STORAGE_KEY = 'hlks-lang';
 
@@ -35,10 +37,10 @@ i18n.use(initReactI18next).init({
   lng: loadStoredLanguage(),
   fallbackLng: 'en',
   defaultNS: 'common',
-  ns: ['common', 'login', 'citizen', 'actContents', 'uploader', 'approver', 'nodal', 'admin', 'cso', 'auditor'],
+  ns: ['common', 'login', 'citizen', 'actContents', 'uploader', 'approver', 'nodal', 'admin', 'cso', 'auditor', 'pagination'],
   resources: {
-    en: { common: commonEn, login: loginEn, citizen: citizenEn, actContents: actContentsEn, uploader: uploaderEn, approver: approverEn, nodal: nodalEn, admin: adminEn, cso: csoEn, auditor: auditorEn },
-    hi: { common: commonHi, login: loginHi, citizen: citizenHi, actContents: actContentsHi, uploader: uploaderHi, approver: approverHi, nodal: nodalHi, admin: adminHi, cso: csoHi, auditor: auditorHi },
+    en: { common: commonEn, login: loginEn, citizen: citizenEn, actContents: actContentsEn, uploader: uploaderEn, approver: approverEn, nodal: nodalEn, admin: adminEn, cso: csoEn, auditor: auditorEn, pagination: paginationEn },
+    hi: { common: commonHi, login: loginHi, citizen: citizenHi, actContents: actContentsHi, uploader: uploaderHi, approver: approverHi, nodal: nodalHi, admin: adminHi, cso: csoHi, auditor: auditorHi, pagination: paginationHi },
   },
   interpolation: { escapeValue: false },
   returnEmptyString: false,

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
 import { Users, CheckCircle, XCircle, Plus, Edit2, X, Eye, EyeOff, Download, FileSpreadsheet, Layers, FileText, Clock, Search, Link2, Activity } from 'lucide-react';
 import Card from '../components/ui/Card';
+import Pagination from '../components/ui/Pagination';
 import Badge from '../components/ui/Badge';
 import SelectField from '../components/ui/SelectField';
 import MultiSelectField from '../components/ui/MultiSelectField';
@@ -136,6 +137,10 @@ export default function NodalOfficerDashboard({ activePage }) {
   const [reportDeptIds, setReportDeptIds]     = useState([]);
   const [reportGenerating, setReportGenerating] = useState(false);
   const reportPanelRef = useRef(null);
+  const [uploadsPage, setUploadsPage] = useState(1); // client-side pagination over filteredDocs — only 10 shown at a time
+  const UPLOADS_PAGE_SIZE = 10;
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setUploadsPage(1); }, [uploadsSearch, uploadsFilterStatus, uploadsFilterUploader, uploadsFilterApprover]);
 
   useEffect(() => {
     if (!showReportPanel) return;
@@ -448,6 +453,10 @@ export default function NodalOfficerDashboard({ activePage }) {
 
   const [roleFilter, setRoleFilter] = useState('');
   const [usersStatusFilter, setUsersStatusFilter] = useState('');
+  const [usersPage, setUsersPage] = useState(1); // client-side pagination over filteredUsers — only 10 shown at a time
+  const USERS_PAGE_SIZE = 10;
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setUsersPage(1); }, [roleFilter, usersStatusFilter]);
 
   // ── Act Parts (view-only) state ─────────────────────────────────────────
   const [actPartsItems, setActPartsItems]     = useState([]);
@@ -456,6 +465,10 @@ export default function NodalOfficerDashboard({ activePage }) {
   const [actPartsViewing, setActPartsViewing] = useState(null); // { item, partsData }
   const [actPartsDetailLoading, setActPartsDetailLoading] = useState(false);
   const [actPartsStatusFilter, setActPartsStatusFilter]   = useState('');
+  const [actPartsPage, setActPartsPage] = useState(1); // client-side pagination over `filtered` — only 10 shown at a time
+  const ACT_PARTS_PAGE_SIZE = 10;
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setActPartsPage(1); }, [actPartsStatusFilter]);
 
   useEffect(() => {
     if (activePage !== 'nodalactparts') return;
@@ -487,6 +500,10 @@ export default function NodalOfficerDashboard({ activePage }) {
     const filteredUsers = users
       .filter(u => !roleFilter || String(u.roleId) === String(roleFilter))
       .filter(u => !usersStatusFilter || u.status === usersStatusFilter);
+
+    const usersTotalPages = Math.max(1, Math.ceil(filteredUsers.length / USERS_PAGE_SIZE));
+    const clampedUsersPage = Math.min(usersPage, usersTotalPages);
+    const pageUsers = filteredUsers.slice((clampedUsersPage - 1) * USERS_PAGE_SIZE, clampedUsersPage * USERS_PAGE_SIZE);
 
     const INP_STYLE = {
       width: '100%', padding: '9px 12px',
@@ -554,7 +571,7 @@ export default function NodalOfficerDashboard({ activePage }) {
           {!usersLoading && !usersError && filteredUsers.length > 0 && (
             isMobile ? (
               <div>
-                {filteredUsers.map(u => (
+                {pageUsers.map(u => (
                   <div key={u.id} style={{ padding: '12px 16px', borderBottom: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
                       <div style={{ minWidth: 0 }}>
@@ -599,7 +616,7 @@ export default function NodalOfficerDashboard({ activePage }) {
               </tr>
             </thead>
             <tbody>
-              {filteredUsers.map(u => (
+              {pageUsers.map(u => (
                 <tr key={u.id} style={{ borderBottom: '1px solid var(--surface-border)', transition: 'background .15s' }}
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
@@ -638,6 +655,11 @@ export default function NodalOfficerDashboard({ activePage }) {
           </table>
           </div>
             )
+          )}
+          {!usersLoading && !usersError && usersTotalPages > 1 && (
+            <div style={{ padding: '12px 18px', borderTop: '1px solid var(--surface-border)' }}>
+              <Pagination page={clampedUsersPage} totalPages={usersTotalPages} onChange={setUsersPage} />
+            </div>
           )}
         </Card>
 
@@ -1042,6 +1064,10 @@ export default function NodalOfficerDashboard({ activePage }) {
       return true;
     });
 
+    const uploadsTotalPages = Math.max(1, Math.ceil(filteredDocs.length / UPLOADS_PAGE_SIZE));
+    const clampedUploadsPage = Math.min(uploadsPage, uploadsTotalPages);
+    const pageDocs = filteredDocs.slice((clampedUploadsPage - 1) * UPLOADS_PAGE_SIZE, clampedUploadsPage * UPLOADS_PAGE_SIZE);
+
     const SC = {
       approved: { color: '#16a34a', bg: 'rgba(25, 135, 84,.1)',  label: t('uploads.stats.approved') },
       pending:  { color: '#b45309', bg: 'rgba(255, 193, 7,.1)', label: t('uploads.stats.pending')  },
@@ -1190,7 +1216,7 @@ export default function NodalOfficerDashboard({ activePage }) {
               </div>
             ) : isMobile ? (
               <div>
-                {filteredDocs.map(doc => {
+                {pageDocs.map(doc => {
                   const sc = SC[doc.status] || SC.pending;
                   const uploaderName = [doc.uploader_first_name, doc.uploader_last_name].filter(Boolean).join(' ') || doc.uploader_username || '—';
                   const uploadedDate = doc.created_at ? doc.created_at.split('T')[0] : '—';
@@ -1241,7 +1267,7 @@ export default function NodalOfficerDashboard({ activePage }) {
                 <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>{t('uploads.headers.actions')}</div>
               </div>
 
-              {filteredDocs.map(doc => {
+              {pageDocs.map(doc => {
                 const sc = SC[doc.status] || SC.pending;
                 const uploaderName = [doc.uploader_first_name, doc.uploader_last_name].filter(Boolean).join(' ') || doc.uploader_username || '—';
                 const approverName = doc.latest_approval
@@ -1325,6 +1351,11 @@ export default function NodalOfficerDashboard({ activePage }) {
               })}
             </div>
             )
+          )}
+          {!allDocsLoading && !allDocsError && uploadsTotalPages > 1 && (
+            <div style={{ padding: '12px 18px', borderTop: '1px solid var(--surface-border)' }}>
+              <Pagination page={clampedUploadsPage} totalPages={uploadsTotalPages} onChange={setUploadsPage} />
+            </div>
           )}
         </Card>
       </div>
@@ -1487,18 +1518,8 @@ export default function NodalOfficerDashboard({ activePage }) {
           {!auditLoading && auditTotal > NODAL_AUDIT_PAGE_SIZE && (() => {
             const totalPages = Math.max(1, Math.ceil(auditTotal / NODAL_AUDIT_PAGE_SIZE));
             return (
-              <div style={{ padding: '12px 18px', borderTop: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ ...LABEL }}>{t('audit.pageOf', { page: auditPage + 1, total: totalPages })}</span>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button onClick={() => setAuditPage(p => Math.max(0, p - 1))} disabled={auditPage === 0}
-                    style={{ padding: '6px 14px', border: '1px solid var(--surface-border)', borderRadius: 7, fontSize: 12.5, background: 'var(--surface-ground)', color: auditPage === 0 ? 'var(--text-color-secondary)' : 'var(--text-color)', cursor: auditPage === 0 ? 'default' : 'pointer', opacity: auditPage === 0 ? 0.5 : 1 }}>
-                    {t('audit.previous')}
-                  </button>
-                  <button onClick={() => setAuditPage(p => Math.min(totalPages - 1, p + 1))} disabled={auditPage >= totalPages - 1}
-                    style={{ padding: '6px 14px', border: '1px solid var(--surface-border)', borderRadius: 7, fontSize: 12.5, background: 'var(--surface-ground)', color: auditPage >= totalPages - 1 ? 'var(--text-color-secondary)' : 'var(--text-color)', cursor: auditPage >= totalPages - 1 ? 'default' : 'pointer', opacity: auditPage >= totalPages - 1 ? 0.5 : 1 }}>
-                    {t('audit.next')}
-                  </button>
-                </div>
+              <div style={{ padding: '12px 18px', borderTop: '1px solid var(--surface-border)' }}>
+                <Pagination page={auditPage + 1} totalPages={totalPages} onChange={p => setAuditPage(p - 1)} />
               </div>
             );
           })()}
@@ -1746,6 +1767,9 @@ export default function NodalOfficerDashboard({ activePage }) {
     const filtered = actPartsStatusFilter
       ? actPartsItems.filter(i => i.status === actPartsStatusFilter)
       : actPartsItems;
+    const actPartsTotalPages = Math.max(1, Math.ceil(filtered.length / ACT_PARTS_PAGE_SIZE));
+    const clampedActPartsPage = Math.min(actPartsPage, actPartsTotalPages);
+    const pageFiltered = filtered.slice((clampedActPartsPage - 1) * ACT_PARTS_PAGE_SIZE, clampedActPartsPage * ACT_PARTS_PAGE_SIZE);
     const actPartsCounts = {
       pending:  actPartsItems.filter(i => i.status === 'pending').length,
       approved: actPartsItems.filter(i => i.status === 'approved').length,
@@ -1803,7 +1827,7 @@ export default function NodalOfficerDashboard({ activePage }) {
           <Card style={{ overflow: 'hidden' }}>
           {isMobile ? (
             <div>
-              {filtered.map(item => {
+              {pageFiltered.map(item => {
                 const sc = STATUS_SC[item.status] || STATUS_SC.pending;
                 return (
                   <div key={`${item.pdf_document_id}-${item.part_type}`} style={{ padding: '12px 16px', borderBottom: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -1844,7 +1868,7 @@ export default function NodalOfficerDashboard({ activePage }) {
               <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>{t('actParts.headers.view')}</div>
             </div>
 
-            {filtered.map(item => {
+            {pageFiltered.map(item => {
               const sc = STATUS_SC[item.status] || STATUS_SC.pending;
               return (
                 <div key={`${item.pdf_document_id}-${item.part_type}`}
@@ -1883,6 +1907,11 @@ export default function NodalOfficerDashboard({ activePage }) {
                 </div>
               );
             })}
+            </div>
+          )}
+          {actPartsTotalPages > 1 && (
+            <div style={{ padding: '10px 18px', borderTop: '1px solid var(--surface-border)' }}>
+              <Pagination page={clampedActPartsPage} totalPages={actPartsTotalPages} onChange={setActPartsPage} />
             </div>
           )}
           </Card>

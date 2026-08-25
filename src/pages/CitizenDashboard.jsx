@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Search, FileText, X, BookOpen, Bookmark, BookmarkCheck,
-  ChevronRight, ChevronDown, ChevronLeft, AlertCircle, Layers, User, Sparkles,
+  ChevronDown, AlertCircle, Layers, User, Sparkles,
   FileEdit, Bell, RefreshCw, Shield, Gavel, Building2, MoreHorizontal,
 } from 'lucide-react';
 import Card from '../components/ui/Card';
@@ -12,10 +12,11 @@ import ActContentsView from '../components/ActContentsView';
 import AccessibilityMenu from '../components/AccessibilityMenu';
 import LanguageToggle from '../components/LanguageToggle';
 import Footer from '../components/layout/Footer';
+import Pagination from '../components/ui/Pagination';
 import haryanaLogo from '../assets/haryana-logo.png';
 import bannerBg from '../assets/banner-1-768x217.png';
 import { publicSearchDocuments, publicSemanticSearch, getCitizenDocuments } from '../services/pdf';
-import { getDocumentTypes } from '../services/departments';
+import { getDocumentTypes, getCitizenDepartments } from '../services/departments';
 import { DOC_TYPE_META } from '../constants/docTypeMeta';
 import { cleanFilename, mapPublicDocForViewer } from '../utils/mapPublicDoc';
 
@@ -161,28 +162,33 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
 
   const typeOptions = docTypes.length > 0 ? docTypes : Object.keys(DOC_TYPE_META).map(name => ({ id: '', name }));
 
-  // Departments for the browse table's dropdown — NOT via getDepartments() (that endpoint
-  // 401s for anonymous citizens, same as UploaderDashboard treats it as auth-only). Every
-  // document from the confirmed-public /citizen/documents already carries its own
-  // department_id + department_name, so a small unfiltered sample gives us real {id, name}
-  // pairs without needing a dedicated public departments endpoint.
+  // Departments for the browse table's dropdown — via the dedicated public
+  // /citizen/departments endpoint (no token required), not getDepartments()
+  // (that one 401s for anonymous citizens). Lists every active department,
+  // not just ones with documents already uploaded, which is the correct
+  // "browse by department" list for a filter.
   useEffect(() => {
-    getCitizenDocuments(undefined, undefined, 0, 100)
+    getCitizenDepartments()
       .then(res => {
-        const seen = new Map();
-        (res.data?.documents || []).forEach(d => {
-          if (d.department_id != null && d.department_name && !seen.has(d.department_id)) seen.set(d.department_id, d.department_name);
-        });
-        setDepartments([...seen.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name)));
+        setDepartments((res.data || []).filter(d => d.is_active).map(d => ({ id: d.id, name: d.name })));
       })
-      .catch(err => console.error('Failed to derive department list for browse filter:', err));
+      .catch(err => console.error('Failed to load department list for browse filter:', err));
   }, []);
 
-  // Fetch recently published docs — unchanged, still feeds the "Recently Published" panel only.
+  // Fetch recently published docs — feeds the "Recently Published" panel only.
+  // /pdf/public/search has no sort param and its default order isn't by recency
+  // (it comes back roughly alphabetical by document_name), so "recent" is done
+  // here: pull a larger page, sort by created_at (the upload timestamp) desc,
+  // then keep only the newest 5.
   useEffect(() => {
     setRecentLoading(true);
-    publicSearchDocuments({ skip: 0, limit: 5 })
-      .then(res => setRecentDocs(res.data.documents || []))
+    publicSearchDocuments({ skip: 0, limit: 100 })
+      .then(res => {
+        const docs = [...(res.data.documents || [])]
+          .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+          .slice(0, 5);
+        setRecentDocs(docs);
+      })
       .catch(() => {})
       .finally(() => setRecentLoading(false));
   }, []);
@@ -897,7 +903,7 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
             "All Documents" slot on the left, and the matched documents (already relevance-
             ordered by groupSemanticSources) take the "Recently Published" slot on the right. */}
         {!loading && searched && !error && (
-          <div className="cd-browse-grid" style={{ display: 'grid', gridTemplateColumns: '70fr 30fr', gap: 20, alignItems: 'start' }}>
+          <div className="cd-browse-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 70fr) minmax(0, 30fr)', gap: 20, alignItems: 'start' }}>
             <Card padding="0">
               <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
                 <Sparkles size={16} color="var(--primary)" />
@@ -981,7 +987,7 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
             Published unchanged on the right. */}
         {!loading && !searched && (
           <>
-            <div className="cd-browse-grid" style={{ display: 'grid', gridTemplateColumns: '70fr 30fr', gap: 20, alignItems: 'start' }}>
+            <div className="cd-browse-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 70fr) minmax(0, 30fr)', gap: 20, alignItems: 'start' }}>
               {/* Left — browse-all-documents table, filterable by the chips above + this dropdown */}
               <Card padding="0">
                 <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
@@ -1013,10 +1019,10 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
                           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                           <FileText size={14} color="var(--text-color-secondary)" style={{ flexShrink: 0 }} />
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)', lineHeight: 1.3, minHeight: '2.6em', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                               {doc.document_name || doc.original_filename}
                             </div>
-                            <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 1 }}>
+                            <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {[doc.department_name, doc.issue_date].filter(Boolean).join(' · ')}
                             </div>
                           </div>
@@ -1031,20 +1037,8 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
                   </div>
                 )}
                 {browseTotal > BROWSE_PAGE_SIZE && (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 20px', borderTop: '1px solid var(--surface-border)' }}>
-                    <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)' }}>
-                      {t('pageIndicator', { page: browsePage, total: Math.ceil(browseTotal / BROWSE_PAGE_SIZE) })}
-                    </span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <button type="button" onClick={() => setBrowsePage(p => Math.max(1, p - 1))} disabled={browsePage === 1}
-                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-card)', color: browsePage === 1 ? 'var(--text-color-secondary)' : 'var(--text-heading)', fontSize: 12, fontWeight: 600, cursor: browsePage === 1 ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: browsePage === 1 ? .5 : 1 }}>
-                        <ChevronLeft size={13} /> {t('pagePrev')}
-                      </button>
-                      <button type="button" onClick={() => setBrowsePage(p => Math.min(Math.ceil(browseTotal / BROWSE_PAGE_SIZE), p + 1))} disabled={browsePage >= Math.ceil(browseTotal / BROWSE_PAGE_SIZE)}
-                        style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-card)', color: browsePage >= Math.ceil(browseTotal / BROWSE_PAGE_SIZE) ? 'var(--text-color-secondary)' : 'var(--text-heading)', fontSize: 12, fontWeight: 600, cursor: browsePage >= Math.ceil(browseTotal / BROWSE_PAGE_SIZE) ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: browsePage >= Math.ceil(browseTotal / BROWSE_PAGE_SIZE) ? .5 : 1 }}>
-                        {t('pageNext')} <ChevronRight size={13} />
-                      </button>
-                    </div>
+                  <div style={{ padding: '10px 20px', borderTop: '1px solid var(--surface-border)' }}>
+                    <Pagination page={browsePage} totalPages={Math.ceil(browseTotal / BROWSE_PAGE_SIZE)} onChange={setBrowsePage} />
                   </div>
                 )}
               </Card>
@@ -1068,10 +1062,10 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
                           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                           <FileText size={14} color="var(--text-color-secondary)" style={{ flexShrink: 0 }} />
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-heading)', lineHeight: 1.3, minHeight: '2.6em', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                               {doc.document_name || doc.original_filename}
                             </div>
-                            <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 1 }}>
+                            <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {[doc.department_name, doc.document_type_name].filter(Boolean).join(' · ')}
                             </div>
                           </div>
