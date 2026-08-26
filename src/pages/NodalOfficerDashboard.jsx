@@ -117,17 +117,31 @@ export default function NodalOfficerDashboard({ activePage }) {
     Promise.all([getUsers(skip, 10, usersStatusFilter || null), getRoles()])
       .then(([usersRes, rolesRes]) => {
         setUsers((usersRes.data.users || []).map(normalizeUser));
-        setUserCounts({
-          total:          usersRes.data.total          ?? 0,
-          count_active:   usersRes.data.count_active   ?? 0,
-          count_inactive: usersRes.data.count_inactive ?? 0,
-        });
         setUsersTotal(usersRes.data.pagination_total ?? usersRes.data.total ?? 0);
         setRoles(rolesRes.data);
       })
       .catch(() => setUsersError(t('users.failedToLoadUsers')))
       .finally(() => setUsersLoading(false));
   }, [activePage, t, usersPage, usersStatusFilter]);
+
+  // Stat-card counts (Total/Active/Inactive) — fetched unfiltered and kept separate
+  // from the paginated/filtered list above. The list endpoint's total/count_active/
+  // count_inactive fields are scoped to whatever status filter was sent (e.g.
+  // filtering by "inactive" comes back with count_active: 0), so reusing that
+  // response here made the OTHER two stat cards drop to 0 the moment a filter was
+  // applied instead of always showing the true overall counts.
+  useEffect(() => {
+    if (activePage !== 'nodalusers') return;
+    getUsers(0, 1, null)
+      .then(res => {
+        setUserCounts({
+          total:          res.data.total          ?? 0,
+          count_active:   res.data.count_active   ?? 0,
+          count_inactive: res.data.count_inactive ?? 0,
+        });
+      })
+      .catch(() => {});
+  }, [activePage]);
 
   // Nodal officer's authorised departments — drives both the user management selectors and the uploads dept filter.
   const [depts, setDepts] = useState([]);
@@ -1867,7 +1881,7 @@ export default function NodalOfficerDashboard({ activePage }) {
             </div>
           ) : (
             <div className="table-scroll-wrap">
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 150px 140px 140px 100px', minWidth: 800, background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 150px 140px 140px 100px', minWidth: 800, background: 'var(--surface-50)', borderBottom: '1px solid var(--surface-border)' }}>
               <div style={{ ...LABEL, padding: '10px 18px' }}>{t('actParts.headers.actTab')}</div>
               <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>{t('actParts.headers.submittedBy')}</div>
               <div style={{ ...LABEL, padding: '10px 16px', borderLeft: '1px solid var(--surface-border)' }}>{t('actParts.headers.submittedAt')}</div>
@@ -1879,11 +1893,11 @@ export default function NodalOfficerDashboard({ activePage }) {
               const sc = STATUS_SC[item.status] || STATUS_SC.pending;
               return (
                 <div key={`${item.pdf_document_id}-${item.part_type}`}
-                  style={{ display: 'grid', gridTemplateColumns: '1fr 150px 140px 140px 100px', minWidth: 800, borderBottom: '1px solid var(--surface-border)', alignItems: 'center', minHeight: 58, transition: 'background .15s' }}
+                  style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 150px 140px 140px 100px', minWidth: 800, borderBottom: '1px solid var(--surface-border)', alignItems: 'center', minHeight: 58, transition: 'background .15s' }}
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                  <div style={{ padding: '10px 18px' }}>
-                    <div style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 2 }}>{item.act_name || t('actParts.detail.actFallback', { id: item.pdf_document_id })}</div>
+                  <div style={{ padding: '10px 18px', minWidth: 0 }}>
+                    <div title={item.act_name || undefined} style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-heading)', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.act_name || t('actParts.detail.actFallback', { id: item.pdf_document_id })}</div>
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                       <span style={{ fontSize: 10.5, fontWeight: 700, background: 'rgba(33, 74, 171,.1)', color: '#214aab', borderRadius: 4, padding: '1px 7px' }}>
                         {TAB_LABELS[item.part_type] || item.part_type}

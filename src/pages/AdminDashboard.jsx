@@ -121,17 +121,31 @@ export default function AdminDashboard({ activePage }) {
       .then(([usersRes, rolesRes]) => {
         const normalized = (usersRes.data.users || []).map(normalizeUser);
         setUsers(normalized);
-        setUserCounts({
-          total:          usersRes.data.total          ?? 0,
-          count_active:   usersRes.data.count_active   ?? 0,
-          count_inactive: usersRes.data.count_inactive ?? 0,
-        });
         setUsersTotal(usersRes.data.pagination_total ?? usersRes.data.total ?? 0);
         setRoles(rolesRes.data);
       })
       .catch(() => setUsersError(t('users.failedToLoadUsers')))
       .finally(() => setUsersLoading(false));
   }, [activePage, t, usersPage, statusFilter]);
+
+  // Stat-card counts (Total/Active/Inactive) — fetched unfiltered and kept separate
+  // from the paginated/filtered list above. The list endpoint's total/count_active/
+  // count_inactive fields are scoped to whatever status filter was sent (e.g.
+  // filtering by "inactive" comes back with count_active: 0), so reusing that
+  // response here made the OTHER two stat cards drop to 0 the moment a filter was
+  // applied instead of always showing the true overall counts.
+  useEffect(() => {
+    if (activePage !== 'users') return;
+    getUsers(0, 1, null)
+      .then(res => {
+        setUserCounts({
+          total:          res.data.total          ?? 0,
+          count_active:   res.data.count_active   ?? 0,
+          count_inactive: res.data.count_inactive ?? 0,
+        });
+      })
+      .catch(() => {});
+  }, [activePage]);
 
   // Departments state — full list for add/edit selectors
   const [depts, setDepts]               = useState([]);
