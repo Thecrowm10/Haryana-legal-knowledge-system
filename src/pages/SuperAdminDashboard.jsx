@@ -102,24 +102,39 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
   const { t } = useTranslation('admin');
   const isMobile = useMediaQuery('(max-width: 640px)');
   const [users, setUsers]               = useState([]);
+  const [userCounts, setUserCounts]     = useState({ total: 0, count_active: 0, count_inactive: 0 });
+  const [usersTotal, setUsersTotal]     = useState(0);
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersError, setUsersError]     = useState('');
   const [roles, setRoles]               = useState([]);
   const [editState, setEditState]       = useState(null); // { category, index, value }
   const [addState, setAddState]         = useState(null); // { category, value }
 
+  // Declared here so the fetch useEffect below can reference them without TDZ errors
+  const [statusFilter, setStatusFilter] = useState(null); // null | 'active' | 'inactive'
+  const [deptFilter, setDeptFilter]     = useState('');   // '' | dept id string
+  const [usersPage, setUsersPage]       = useState(1);
+  const USERS_PAGE_SIZE = 10;
+
   useEffect(() => {
     if (activePage !== 'users') return;
     setUsersLoading(true);
     setUsersError('');
-    Promise.all([getUsers(), getRoles()])
+    const skip = (usersPage - 1) * 10;
+    Promise.all([getUsers(skip, 10, statusFilter, deptFilter || null), getRoles()])
       .then(([usersRes, rolesRes]) => {
-        setUsers(usersRes.data.map(normalizeUser));
+        setUsers((usersRes.data.users || []).map(normalizeUser));
+        setUserCounts({
+          total:          usersRes.data.total          ?? 0,
+          count_active:   usersRes.data.count_active   ?? 0,
+          count_inactive: usersRes.data.count_inactive ?? 0,
+        });
+        setUsersTotal(usersRes.data.pagination_total ?? usersRes.data.total ?? 0);
         setRoles(rolesRes.data);
       })
       .catch(() => setUsersError(t('users.failedToLoadUsers')))
       .finally(() => setUsersLoading(false));
-  }, [activePage, t]);
+  }, [activePage, t, usersPage, statusFilter, deptFilter]);
 
   // Departments state — full list for add/edit selectors
   const [depts, setDepts]               = useState([]);
@@ -736,23 +751,19 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
   }
 
   // User Management
-  const [statusFilter, setStatusFilter] = useState(null); // null | 'active' | 'inactive'
-  const [deptFilter, setDeptFilter]     = useState('');   // '' | dept id string
-  const [usersPage, setUsersPage]       = useState(1); // client-side pagination over filteredUsers — only 10 shown at a time
-  const USERS_PAGE_SIZE = 10;
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setUsersPage(1); }, [statusFilter, deptFilter]);
 
   if (activePage === 'users') {
-    const active   = users.filter(u => u.status === 'active').length;
-    const inactive = users.filter(u => u.status === 'inactive').length;
+    const active   = userCounts.count_active;
+    const inactive = userCounts.count_inactive;
 
-    const filteredUsers = users
-      .filter(u => !statusFilter || u.status === statusFilter)
-      .filter(u => !deptFilter   || u.deptIds.includes(Number(deptFilter)) || u.deptId === Number(deptFilter));
+    // status and dept filters applied server-side
+    const filteredUsers = users;
 
-    const usersTotalPages = Math.max(1, Math.ceil(filteredUsers.length / USERS_PAGE_SIZE));
+    const usersTotalPages = Math.max(1, Math.ceil(usersTotal / USERS_PAGE_SIZE));
     const clampedUsersPage = Math.min(usersPage, usersTotalPages);
-    const pageUsers = filteredUsers.slice((clampedUsersPage - 1) * USERS_PAGE_SIZE, clampedUsersPage * USERS_PAGE_SIZE);
+    const pageUsers = filteredUsers; // API already returns the current page
 
     const INP_STYLE = {
       width: '100%', padding: '9px 12px',
@@ -768,7 +779,7 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
         <style>{ADM_RESPONSIVE_CSS}</style>
         <div className="adm-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
           {[
-            { label: t('users.stats.totalUsers'), value: users.length, color: 'var(--primary)',  bg: 'rgba(33, 74, 171,.12)',  icon: Users,       key: null },
+            { label: t('users.stats.totalUsers'), value: userCounts.total, color: 'var(--primary)',  bg: 'rgba(33, 74, 171,.12)',  icon: Users,       key: null },
             { label: t('users.stats.active'),      value: active,       color: '#198754',         bg: 'rgba(25, 135, 84,.12)',  icon: CheckCircle, key: 'active' },
             { label: t('users.stats.inactive'),    value: inactive,     color: '#b45309',         bg: 'rgba(255, 193, 7,.12)', icon: XCircle,     key: 'inactive' },
           ].map(s => {
