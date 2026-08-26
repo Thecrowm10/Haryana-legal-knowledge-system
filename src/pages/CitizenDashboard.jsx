@@ -341,6 +341,9 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
           box-shadow: 0 0 0 3px rgba(33, 74, 171,.16) !important;
         }
         .cd-search-bar :focus-visible { outline: none !important; }
+        /* Desktop/laptop: a plain static placeholder, one copy, no marquee — the 2nd
+           copy (needed only for the mobile running-loop below) stays hidden here. */
+        .cd-search-placeholder-dup { display: none; }
         @keyframes cd-marquee {
           0% { transform: translateX(0); }
           100% { transform: translateX(-50%); }
@@ -374,6 +377,7 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
           .cd-docked-search .cd-search-icon { display: none !important; }
           .cd-docked-search .cd-search-input-row { padding-left: 12px; }
           .cd-docked-search .cd-search-placeholder-run-track { animation: cd-marquee 10s linear infinite; }
+          .cd-docked-search .cd-search-placeholder-dup { display: inline-block; }
           .cd-docked-search .cd-type-pill-label { display: none !important; }
           .cd-docked-search .cd-type-pill { padding-right: 4px; }
           .cd-docked-search .cd-search-btn-text { display: none !important; }
@@ -389,6 +393,7 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
           .cd-search-undocked .cd-search-icon { display: none !important; }
           .cd-search-undocked .cd-search-input-row { padding-left: 14px; }
           .cd-search-undocked .cd-search-placeholder-run-track { animation: cd-marquee 10s linear infinite; }
+          .cd-search-undocked .cd-search-placeholder-dup { display: inline-block; }
           /* Detached from the search bar's own white/shadowed background — the
              bar itself goes transparent and the input row carries its own
              white card, so the pill row below reads as a separate element. */
@@ -688,8 +693,11 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
                             overflow: 'hidden', pointerEvents: 'none',
                           }}>
                             <div className="cd-search-placeholder-run-track" style={{ display: 'flex', width: 'max-content' }}>
+                              {/* The 2nd copy only exists to feed the mobile marquee loop (see
+                                  the CSS rules below) — desktop keeps a single static copy, like
+                                  a normal placeholder, via .cd-search-placeholder-dup { display:none }. */}
                               {[0, 1].map(copy => (
-                                <span key={copy} className="cd-search-placeholder-run-text" style={{
+                                <span key={copy} className={copy === 1 ? 'cd-search-placeholder-run-text cd-search-placeholder-dup' : 'cd-search-placeholder-run-text'} style={{
                                   whiteSpace: 'nowrap', color: 'var(--text-color-secondary)',
                                   fontFamily: 'var(--font)', fontSize: scrolled ? 13 : 16, paddingRight: '2.5em',
                                 }}>
