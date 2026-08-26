@@ -37,5 +37,7 @@
   "partAppendix": "Appendix",
   "partForms": "Forms",
   "actParts": "Act Parts",
-  "summaryAndDetails": "Summary & Document Details"
+  "summaryAndDetails": "Summary & Document Details",
+  "viewFullTitle": "Click to view full title",
+  "documentTitle": "Document Title"
 }

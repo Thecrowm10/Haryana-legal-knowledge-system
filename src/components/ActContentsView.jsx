@@ -248,6 +248,7 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
   const orgNameHi = i18n.getFixedT('hi', 'login')('orgNamePortal');
   const orgNameEn = i18n.getFixedT('en', 'login')('orgNamePortal');
   const [loginMenuOpen, setLoginMenuOpen] = useState(false);
+  const [showFullTitle, setShowFullTitle] = useState(false); // dialog with the untruncated title — the hero's own <h1> clamps to 2 lines
   // Mirrors CitizenDashboard's own topbar/masthead scroll behaviour: past a small
   // scroll threshold, the fixed topbar solidifies (condensed brand fades in, icons
   // switch from light to dark) and the big in-hero masthead fades out.
@@ -461,6 +462,7 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
   // this whole view is already a full-screen dialog.
   function renderHeaderBlock() {
   return (
+    <>
     <div style={{
       position: 'relative', minHeight: citizenView ? '50vh' : undefined, boxSizing: 'border-box',
       // Extra bottom padding when there's a related-documents card — it floats up
@@ -526,32 +528,40 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
         </div>
       )}
 
-      <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-start', gap: 18, marginTop: citizenView ? 168 : 0 }}>
+      <div className="acv-hero-title-row" style={{ position: 'relative', display: 'flex', alignItems: 'flex-start', gap: 18, marginTop: citizenView ? 168 : 0 }}>
         <div style={{ width: 56, height: 56, borderRadius: 14, background: 'rgba(255,255,255,.14)', border: '1px solid rgba(255,255,255,.24)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <HeaderTypeIcon size={26} color="#fff" strokeWidth={1.7} />
         </div>
         {/* Document type — pinned to the row's top-right corner, level with the
             title rather than stacked above it. */}
         {doc.type && (
-          <span style={{ position: 'absolute', top: 2, right: 0, fontSize: 11, fontWeight: 800, letterSpacing: '.08em', padding: '3px 12px', borderRadius: 20, background: 'rgba(255,255,255,.16)', border: '1px solid rgba(255,255,255,.26)', color: '#fff', fontFamily: 'var(--mono)', textTransform: 'uppercase', flexShrink: 0 }}>
+          <span className="acv-hero-type-badge" style={{ position: 'absolute', top: 2, right: 0, maxWidth: 200, fontSize: 11, fontWeight: 800, letterSpacing: '.08em', padding: '3px 12px', borderRadius: 20, background: 'rgba(255,255,255,.16)', border: '1px solid rgba(255,255,255,.26)', color: '#fff', fontFamily: 'var(--mono)', textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {doc.type}
           </span>
         )}
-        <div style={{ flex: 1, minWidth: 0, paddingRight: doc.type ? 90 : 0 }}>
+        <div className="acv-hero-title-wrap" style={{ flex: 1, minWidth: 0, paddingRight: doc.type ? 220 : 0 }}>
           {/* This IS the document's own name — the actual page heading. The raw
               upload filename isn't shown at all — this title is what identifies
-              the document, not its internal PDF filename. */}
-          <h1 style={{ fontFamily: SERIF_STACK, fontSize: 28, fontWeight: 700, color: '#fff', lineHeight: 1.3, margin: 0, overflowWrap: 'break-word', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', textOverflow: 'ellipsis' }}>{doc.title}</h1>
+              the document, not its internal PDF filename. Clamped to 2 lines, so
+              it's clickable to reveal the untruncated title in a dialog when it
+              doesn't fully fit (mainly a mobile/long-title thing). */}
+          {/* Full name, unclamped, on desktop/laptop widths — there's room for it.
+              Only clamped to 2 lines (see the mobile media query above) once the
+              screen is actually too narrow to afford showing it all; the click
+              handler that opens the full-title dialog still applies there. */}
+          <h1 className="acv-hero-title" onClick={() => setShowFullTitle(true)}
+            title={t('viewFullTitle')}
+            style={{ fontFamily: SERIF_STACK, fontSize: 28, fontWeight: 700, color: '#fff', lineHeight: 1.3, margin: 0, overflowWrap: 'break-word', cursor: 'pointer' }}>{doc.title}</h1>
         </div>
       </div>
 
       {(doc.dept || doc.year || doc.id != null) && (
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 12, marginTop: 22, flexWrap: 'wrap' }}>
           {doc.dept && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 16px', borderRadius: 10, background: 'rgba(255,255,255,.14)', border: '1px solid rgba(255,255,255,.24)', color: '#fff', fontSize: 13, flexShrink: 0 }}>
-              <Landmark size={14} />
-              <span style={{ opacity: .75 }}>{t('administeringDepartment')}</span>
-              <span style={{ fontWeight: 700 }}>{doc.dept}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 16px', borderRadius: 10, background: 'rgba(255,255,255,.14)', border: '1px solid rgba(255,255,255,.24)', color: '#fff', fontSize: 13, minWidth: 0, maxWidth: '100%', boxSizing: 'border-box' }}>
+              <Landmark size={14} style={{ flexShrink: 0 }} />
+              <span style={{ opacity: .75, flexShrink: 0 }}>{t('administeringDepartment')}</span>
+              <span style={{ fontWeight: 700, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.dept}</span>
             </div>
           )}
           {doc.year && (
@@ -573,6 +583,25 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
         </div>
       )}
     </div>
+
+    {showFullTitle && (
+      <div onClick={() => setShowFullTitle(false)}
+        style={{ position: 'fixed', inset: 0, zIndex: 2200, background: 'rgba(0,0,0,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+        <div onClick={e => e.stopPropagation()}
+          style={{ background: 'var(--surface-card)', borderRadius: 14, width: 520, maxWidth: '100%', boxShadow: '0 24px 64px rgba(0,0,0,.3)' }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-heading)' }}>{t('documentTitle')}</span>
+            <button onClick={() => setShowFullTitle(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex' }}>
+              <X size={16} />
+            </button>
+          </div>
+          <div style={{ padding: '20px 22px', fontSize: 16, fontWeight: 700, lineHeight: 1.5, color: 'var(--text-heading)', fontFamily: SERIF_STACK }}>
+            {doc.title}
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
   }
 
@@ -595,6 +624,19 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
           .acv-masthead-en { font-size: 14px !important; }
           .acv-masthead-actions { gap: 6px !important; }
           .acv-skip { display: none !important; }
+          /* The desktop 168px clearance assumes the full-size 100px masthead logo —
+             on mobile the logo/breadcrumb footprint above is much shorter, so that
+             much space left a big empty gap of plain blue. */
+          .acv-hero-title-row { margin-top: 110px !important; }
+          .acv-hero-title {
+            font-size: 21px !important;
+            display: -webkit-box !important; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+            overflow: hidden !important; text-overflow: ellipsis;
+          }
+          /* Smaller badge + a matching (smaller) reserved paddingRight on the title,
+             so the two still never overlap on a narrow screen. */
+          .acv-hero-type-badge { max-width: 100px !important; font-size: 9px !important; padding: 2px 8px !important; }
+          .acv-hero-title-wrap { padding-right: 116px !important; }
         }
       `}</style>
 

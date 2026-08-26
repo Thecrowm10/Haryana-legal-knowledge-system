@@ -149,6 +149,7 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
   const [departments, setDepartments] = useState([]); // [{ id, name }] for the browse table's department dropdown
   const [browseTypeId, setBrowseTypeId] = useState(''); // selected type-count chip — '' means all types
   const [browseDeptId, setBrowseDeptId] = useState(''); // selected department in the browse table's dropdown — '' means all departments
+  const [browseDeptDropdownOpen, setBrowseDeptDropdownOpen] = useState(false);
   const [browsePage, setBrowsePage]   = useState(1);
   const [browseDocs, setBrowseDocs]   = useState([]);
   const [browseTotal, setBrowseTotal] = useState(0);
@@ -340,6 +341,10 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
           box-shadow: 0 0 0 3px rgba(33, 74, 171,.16) !important;
         }
         .cd-search-bar :focus-visible { outline: none !important; }
+        @keyframes cd-marquee {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
         /* Thin, subtle scrollbar for the glass type-dropdown — the default OS scrollbar is a
            thick flat-grey bar that clashes with the frosted/rounded look. */
         .cd-type-dropdown-scroll { scrollbar-width: thin; scrollbar-color: rgba(100,116,139,.4) transparent; }
@@ -363,11 +368,62 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
             left: 54px !important; right: 118px !important;
             transform: none !important; width: auto !important; max-width: none !important;
           }
+          /* The docked top-bar copy is too narrow for icon + placeholder + "All Types"
+             text + "SEARCH" text all at once — drop to icon-only for the type select
+             and Search button, and drop the redundant leading search icon. */
+          .cd-docked-search .cd-search-icon { display: none !important; }
+          .cd-docked-search .cd-search-input-row { padding-left: 12px; }
+          .cd-docked-search .cd-search-placeholder-run-track { animation: cd-marquee 10s linear infinite; }
+          .cd-docked-search .cd-type-pill-label { display: none !important; }
+          .cd-docked-search .cd-type-pill { padding-right: 4px; }
+          .cd-docked-search .cd-search-btn-text { display: none !important; }
+          .cd-docked-search .cd-search-btn-icon { display: inline-flex !important; }
           .cd-hero { padding: ${TOP_BAR_HEIGHT}px 16px 32px !important; }
+          /* Stack the search bar into two lines on mobile: text field on top,
+             type dropdown + Search button on their own line underneath — the
+             single-line layout squeezed the type label and button too tight.
+             Scoped to the undocked (hero) bar only — the docked/scrolled copy
+             lives in a fixed TOP_BAR_HEIGHT-tall bar that can't grow to fit
+             two rows, so it keeps the single-line layout. */
+          /* No icon, and a scrolling ("running") placeholder in its place. */
+          .cd-search-undocked .cd-search-icon { display: none !important; }
+          .cd-search-undocked .cd-search-input-row { padding-left: 14px; }
+          .cd-search-undocked .cd-search-placeholder-run-track { animation: cd-marquee 10s linear infinite; }
+          /* Detached from the search bar's own white/shadowed background — the
+             bar itself goes transparent and the input row carries its own
+             white card, so the pill row below reads as a separate element. */
+          .cd-search-undocked .cd-search-bar {
+            flex-direction: column; align-items: stretch !important;
+            background: transparent !important; box-shadow: none !important; border: none !important; overflow: visible !important;
+            gap: 10px;
+          }
+          .cd-search-undocked .cd-search-input-row {
+            width: 100%; background: #fff; border-radius: 12px; box-shadow: 0 8px 28px rgba(0,0,0,.16);
+          }
+          .cd-search-undocked .cd-search-actions-row {
+            width: 100%; border-top: none; background: transparent; padding: 0; gap: 10px;
+          }
+          /* Pill-shaped, separated buttons instead of the flush single-bar look. */
+          .cd-search-undocked .cd-type-pill {
+            flex: 1; flex-shrink: 1 !important; border: 1px solid var(--surface-border) !important; border-radius: 999px !important;
+            background: #fff !important; justify-content: center !important; padding-right: 8px; min-height: 46px;
+            box-shadow: 0 4px 14px rgba(0,0,0,.10);
+          }
+          .cd-search-undocked .cd-search-btn {
+            border-radius: 999px !important; flex: 1; flex-shrink: 1 !important; min-height: 46px;
+            box-shadow: 0 4px 14px rgba(0,0,0,.18);
+          }
           .cd-search-btn { padding: 0 14px !important; font-size: 12px !important; }
           .cd-stats-outer { padding: 0 16px !important; }
           .cd-content { padding: 20px 16px 32px !important; }
-          .cd-browse-grid { grid-template-columns: 1fr !important; }
+          /* minmax(0, 1fr), not bare 1fr — bare 1fr is shorthand for minmax(auto, 1fr),
+             so the track still grows to fit its widest non-shrinking child (a table row,
+             the pagination bar) instead of clamping to the space actually available. That
+             silently overflowed into <main>'s own scroll area (see the comment on Layout.jsx
+             scrolling <main>, not the window) and read as the table getting cut off on
+             narrow phones (iPhone SE, Pixel 7a) since there's no visible scrollbar to hint
+             at the hidden overflow. */
+          .cd-browse-grid { grid-template-columns: minmax(0, 1fr) !important; }
           .cd-masthead { top: 10px !important; left: 14px !important; gap: 8px !important; }
           .cd-masthead-logo { width: 44px !important; height: 44px !important; }
           .cd-masthead-text { transform: none !important; }
@@ -571,8 +627,13 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
                   })}
                 </div>
               );
+              const typeDropdownWidth = Math.max(180, typePillRect?.width || 0);
               const typeDropdownPortal = typeDropdownOpen && typePillRect && createPortal(
-                <div style={{ position: 'fixed', top: typePillRect.bottom + 6, right: window.innerWidth - typePillRect.right, minWidth: 180, zIndex: 210 }}>
+                <div style={{
+                  position: 'fixed', top: typePillRect.bottom + 6,
+                  left: Math.min(typePillRect.left, window.innerWidth - typeDropdownWidth - 12),
+                  width: typeDropdownWidth, maxWidth: 'calc(100vw - 24px)', zIndex: 210,
+                }}>
                   {typeDropdownList}
                 </div>,
                 document.body
@@ -585,76 +646,113 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
                       separate border or background, so there's exactly one outline no matter
                       which part is focused or clicked (see .cd-search-bar:focus-within below). */}
                   <div className="cd-search-bar" style={{
-                    display: 'flex', alignItems: 'center', width: '100%', background: '#fff', border: '1.5px solid transparent',
+                    display: 'flex', alignItems: 'stretch', width: '100%', background: '#fff', border: '1.5px solid transparent',
                     borderRadius: scrolled ? 10 : 12, overflow: 'hidden',
                     boxShadow: scrolled ? '0 8px 28px rgba(0,0,0,.16)' : '0 12px 40px rgba(0,0,0,.35)',
                     transition: `border-radius ${TOP_BAR_EASE}, box-shadow ${TOP_BAR_EASE}`,
                   }}>
-                    <span style={{
-                      padding: scrolled ? '0 10px' : '0 14px', display: 'flex', alignItems: 'center',
-                      color: 'var(--text-color-secondary)', flexShrink: 0,
-                    }}>
-                      <Search size={scrolled ? 14 : 18} />
-                    </span>
-                    <input
-                      ref={inputRef}
-                      value={query}
-                      onChange={e => { setQuery(e.target.value); setShowSugg(true); }}
-                      onKeyDown={e => { if (e.key === 'Enter') doSearch(); if (e.key === 'Escape') setShowSugg(false); }}
-                      onFocus={() => setShowSugg(true)}
-                      onBlur={() => setTimeout(() => setShowSugg(false), 150)}
-                      placeholder={t('searchPlaceholder')}
-                      style={{
-                        flex: 1, minWidth: 0, padding: scrolled ? '9px 0' : '18px 0', background: 'transparent', border: 'none', outline: 'none',
-                        fontFamily: 'var(--font)', fontSize: scrolled ? 13 : 16, color: 'var(--text-color)',
-                      }}
-                    />
-                    {query && (
-                      <button onClick={() => { setQuery(''); setShowSugg(false); inputRef.current?.focus(); }}
-                        style={{ alignSelf: 'stretch', background: 'transparent', border: 'none', cursor: 'pointer', padding: '0 8px', color: 'var(--text-color-secondary)', display: 'flex', alignItems: 'center' }}>
-                        <X size={14} />
-                      </button>
-                    )}
-                    <div className="cd-type-pill" style={{
-                      position: 'relative', alignSelf: 'stretch', display: 'flex', alignItems: 'center',
-                      borderLeft: '1px solid var(--surface-border)', flexShrink: 0,
-                    }}>
-                      <Layers size={scrolled ? 12 : 14} color="var(--text-color-secondary)"
-                        style={{ marginLeft: scrolled ? 10 : 14, flexShrink: 0, pointerEvents: 'none' }} />
-                      {/* A real <select>'s own popup list can't be styled (browsers render it
-                          natively) — this is a custom button + glass dropdown instead. It also
-                          MUST be portaled (not just for the undocked case, unlike the
-                          suggestions dropdown above): cd-search-bar itself has overflow:hidden,
-                          which would clip an absolutely-positioned list inside this pill no
-                          matter what the scrolled state is. */}
-                      <button type="button" ref={typePillRef}
-                        onClick={() => setTypeDropdownOpen(o => !o)}
-                        onBlur={() => setTimeout(() => setTypeDropdownOpen(false), 150)}
-                        title={t('allTypes')}
-                        style={{
-                          alignSelf: 'stretch', border: 'none', outline: 'none', background: 'transparent', cursor: 'pointer',
-                          fontFamily: 'var(--font)', color: docTypeId ? 'var(--text-heading)' : 'var(--text-color-secondary)',
-                          fontSize: scrolled ? 11.5 : 13, fontWeight: 600, textAlign: 'left',
-                          padding: scrolled ? '0 22px 0 6px' : '0 28px 0 8px', maxWidth: scrolled ? 100 : 160,
-                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        }}>
-                        {docTypeId ? (typeOptions.find(dt => String(dt.id) === String(docTypeId))?.name || t('allTypes')) : t('allTypes')}
-                      </button>
-                      <ChevronDown size={scrolled ? 11 : 13} color="var(--text-color-secondary)"
-                        style={{ position: 'absolute', right: scrolled ? 7 : 9, pointerEvents: 'none', transform: typeDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+                    {/* Input row (icon + text field + clear) and actions row (type dropdown +
+                        Search button) are separate flex items so the mobile media query below
+                        can stack them into two lines without touching this JSX. */}
+                    <div className="cd-search-input-row" style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
+                      <span className="cd-search-icon" style={{
+                        padding: scrolled ? '0 10px' : '0 14px', display: 'flex', alignItems: 'center',
+                        color: 'var(--text-color-secondary)', flexShrink: 0,
+                      }}>
+                        <Search size={scrolled ? 14 : 18} />
+                      </span>
+                      <div style={{ position: 'relative', flex: 1, minWidth: 0, display: 'flex', alignItems: 'center' }}>
+                        <input
+                          ref={inputRef}
+                          value={query}
+                          onChange={e => { setQuery(e.target.value); setShowSugg(true); }}
+                          onKeyDown={e => { if (e.key === 'Enter') doSearch(); if (e.key === 'Escape') setShowSugg(false); }}
+                          onFocus={() => setShowSugg(true)}
+                          onBlur={() => setTimeout(() => setShowSugg(false), 150)}
+                          aria-label={t('searchPlaceholder')}
+                          style={{
+                            flex: 1, minWidth: 0, padding: scrolled ? '9px 0' : '18px 0', background: 'transparent', border: 'none', outline: 'none',
+                            fontFamily: 'var(--font)', fontSize: scrolled ? 13 : 16, color: 'var(--text-color)',
+                          }}
+                        />
+                        {/* Decorative stand-in for the native placeholder — on mobile the
+                            .cd-search-placeholder-run-track rule below sets it scrolling ("running")
+                            since a real ::placeholder can't be animated. Two back-to-back copies of
+                            the text, looped 0% -> -50%, so the moment one copy scrolls off, the next
+                            is already right behind it (just a small gap) instead of the bar sitting
+                            empty while a single copy treks all the way across. Hidden once there's a
+                            query (the real input text takes over) and inert so clicks reach the input. */}
+                        {!query && (
+                          <div className="cd-search-placeholder" aria-hidden="true" style={{
+                            position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
+                            overflow: 'hidden', pointerEvents: 'none',
+                          }}>
+                            <div className="cd-search-placeholder-run-track" style={{ display: 'flex', width: 'max-content' }}>
+                              {[0, 1].map(copy => (
+                                <span key={copy} className="cd-search-placeholder-run-text" style={{
+                                  whiteSpace: 'nowrap', color: 'var(--text-color-secondary)',
+                                  fontFamily: 'var(--font)', fontSize: scrolled ? 13 : 16, paddingRight: '2.5em',
+                                }}>
+                                  {t('searchPlaceholder')}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      {query && (
+                        <button onClick={() => { setQuery(''); setShowSugg(false); inputRef.current?.focus(); }}
+                          style={{ alignSelf: 'stretch', background: 'transparent', border: 'none', cursor: 'pointer', padding: '0 8px', color: 'var(--text-color-secondary)', display: 'flex', alignItems: 'center' }}>
+                          <X size={14} />
+                        </button>
+                      )}
                     </div>
-                    <button
-                      className="cd-search-btn"
-                      onClick={() => doSearch()}
-                      style={{
-                        alignSelf: 'stretch', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        background: 'var(--primary)', color: 'white', border: 'none',
-                        padding: scrolled ? '0 16px' : '0 32px', fontFamily: 'var(--font)', fontSize: scrolled ? 11.5 : 14,
-                        fontWeight: 700, cursor: 'pointer', letterSpacing: '.04em', textTransform: 'uppercase', flexShrink: 0,
-                      }}
-                    >
-                      {t('searchButton')}
-                    </button>
+                    <div className="cd-search-actions-row" style={{ display: 'flex', alignItems: 'stretch', flexShrink: 0 }}>
+                      <div className="cd-type-pill" style={{
+                        position: 'relative', alignSelf: 'stretch', display: 'flex', alignItems: 'center',
+                        borderLeft: '1px solid var(--surface-border)', flexShrink: 0,
+                      }}>
+                        <Layers size={scrolled ? 12 : 14} color="var(--text-color-secondary)"
+                          style={{ marginLeft: scrolled ? 10 : 14, flexShrink: 0, pointerEvents: 'none' }} />
+                        {/* A real <select>'s own popup list can't be styled (browsers render it
+                            natively) — this is a custom button + glass dropdown instead. It also
+                            MUST be portaled (not just for the undocked case, unlike the
+                            suggestions dropdown above): cd-search-bar itself has overflow:hidden,
+                            which would clip an absolutely-positioned list inside this pill no
+                            matter what the scrolled state is. */}
+                        <button type="button" ref={typePillRef}
+                          onClick={() => setTypeDropdownOpen(o => !o)}
+                          onBlur={() => setTimeout(() => setTypeDropdownOpen(false), 150)}
+                          title={t('allTypes')}
+                          style={{
+                            alignSelf: 'stretch', border: 'none', outline: 'none', background: 'transparent', cursor: 'pointer',
+                            fontFamily: 'var(--font)', color: docTypeId ? 'var(--text-heading)' : 'var(--text-color-secondary)',
+                            fontSize: scrolled ? 11.5 : 13, fontWeight: 600, textAlign: 'left',
+                            padding: scrolled ? '0 22px 0 6px' : '0 28px 0 8px', maxWidth: scrolled ? 100 : 160,
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          }}>
+                          <span className="cd-type-pill-label">
+                            {docTypeId ? (typeOptions.find(dt => String(dt.id) === String(docTypeId))?.name || t('allTypes')) : t('allTypes')}
+                          </span>
+                        </button>
+                        <ChevronDown size={scrolled ? 11 : 13} color="var(--text-color-secondary)"
+                          style={{ position: 'absolute', right: scrolled ? 7 : 9, pointerEvents: 'none', transform: typeDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+                      </div>
+                      <button
+                        className="cd-search-btn"
+                        onClick={() => doSearch()}
+                        title={t('searchButton')}
+                        style={{
+                          alignSelf: 'stretch', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                          background: 'var(--primary)', color: 'white', border: 'none',
+                          padding: scrolled ? '0 16px' : '0 32px', fontFamily: 'var(--font)', fontSize: scrolled ? 11.5 : 14,
+                          fontWeight: 700, cursor: 'pointer', letterSpacing: '.04em', textTransform: 'uppercase', flexShrink: 0,
+                        }}
+                      >
+                        <Search className="cd-search-btn-icon" size={scrolled ? 14 : 16} style={{ display: 'none', flexShrink: 0 }} />
+                        <span className="cd-search-btn-text">{t('searchButton')}</span>
+                      </button>
+                    </div>
                   </div>
 
                   {/* Docked case only: the whole box (including this) already lives in a
@@ -691,7 +789,7 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
               }
               return (
                 <>
-                  <div ref={searchBoxRef} style={{ position: 'relative', width: '100%', maxWidth: 700 }}>
+                  <div ref={searchBoxRef} className="cd-search-undocked" style={{ position: 'relative', width: '100%', maxWidth: 700 }}>
                     {inner}
                   </div>
                   {typeDropdownPortal}
@@ -991,18 +1089,63 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
             <div className="cd-browse-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 70fr) minmax(0, 30fr)', gap: 20, alignItems: 'start' }}>
               {/* Left — browse-all-documents table, filterable by the chips above + this dropdown */}
               <Card padding="0">
-                <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+                <div style={{ position: 'relative', padding: '16px 20px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <span style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>{t('allDocuments')}</span>
                     <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '2px 9px', borderRadius: 20 }}>
                       {t('documentCount', { count: browseTotal })}
                     </span>
                   </div>
-                  <select value={browseDeptId} onChange={e => setBrowseDeptId(e.target.value)}
-                    style={{ padding: '7px 10px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', fontSize: 12.5, fontFamily: 'var(--font)', color: 'var(--text-color)', cursor: 'pointer' }}>
-                    <option value="">{t('allDepartments')}</option>
-                    {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                  </select>
+                  {/* Custom dropdown, not a native <select> — with 70+ departments, the
+                      native popup dumps every option into one unscrollable list; this
+                      caps the visible list to ~10 rows and scrolls the rest. */}
+                  <div>
+                    <button type="button" onClick={() => setBrowseDeptDropdownOpen(o => !o)}
+                      onBlur={() => setTimeout(() => setBrowseDeptDropdownOpen(false), 150)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', fontSize: 12.5, fontFamily: 'var(--font)', color: 'var(--text-color)', cursor: 'pointer' }}>
+                      <span style={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {browseDeptId ? (departments.find(d => String(d.id) === String(browseDeptId))?.name || t('allDepartments')) : t('allDepartments')}
+                      </span>
+                      <ChevronDown size={13} color="var(--text-color-secondary)" style={{ flexShrink: 0, transform: browseDeptDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
+                    </button>
+                    {browseDeptDropdownOpen && (
+                      <div className="cd-type-dropdown-scroll" style={{
+                        // Anchored to the RIGHT edge of the whole header row (position:relative
+                        // moved up to that row), not to the button itself — the button can sit on
+                        // the row's right side (space-between, one line) or wrap down to its own
+                        // line starting at the row's left edge, depending on viewport width and
+                        // language. Anchoring to the button meant whichever edge it happened to
+                        // hug, the panel ran off the OPPOSITE side of narrow viewports (iPhone SE,
+                        // Pixel 7a) with no visible scrollbar to hint at the clipped content. The
+                        // row itself always spans the full (already viewport-safe) card width, so
+                        // right:0 here is safe regardless of where the button lands.
+                        position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 20,
+                        width: 'max(220px, 100%)', maxWidth: 'calc(100vw - 32px)',
+                        background: 'rgba(255,255,255,.7)', backdropFilter: 'blur(24px) saturate(180%)', WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+                        border: '1px solid rgba(255,255,255,.7)', borderRadius: 12,
+                        boxShadow: '0 16px 40px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.7)',
+                        padding: 6, maxHeight: 360, overflowY: 'auto',
+                      }}>
+                        <div onMouseDown={() => { setBrowseDeptId(''); setBrowseDeptDropdownOpen(false); }}
+                          style={{ padding: '9px 12px', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'var(--font)', background: !browseDeptId ? 'rgba(33, 74, 171,.12)' : 'transparent', color: !browseDeptId ? 'var(--primary)' : 'var(--text-color)' }}
+                          onMouseEnter={e => { if (browseDeptId) e.currentTarget.style.background = 'rgba(255,255,255,.5)'; }}
+                          onMouseLeave={e => { if (browseDeptId) e.currentTarget.style.background = 'transparent'; }}>
+                          {t('allDepartments')}
+                        </div>
+                        {departments.map(d => {
+                          const isActive = String(browseDeptId) === String(d.id);
+                          return (
+                            <div key={d.id} onMouseDown={() => { setBrowseDeptId(d.id); setBrowseDeptDropdownOpen(false); }}
+                              style={{ padding: '9px 12px', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 600, fontFamily: 'var(--font)', background: isActive ? 'rgba(33, 74, 171,.12)' : 'transparent', color: isActive ? 'var(--primary)' : 'var(--text-color)' }}
+                              onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'rgba(255,255,255,.5)'; }}
+                              onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}>
+                              {d.name}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 {browseLoading ? (
                   <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-color-secondary)', fontSize: 13 }}>{t('loading')}</div>
