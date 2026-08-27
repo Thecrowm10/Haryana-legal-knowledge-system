@@ -13,6 +13,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 import mammoth from 'mammoth';
 import Card from '../components/ui/Card';
 import SelectField from '../components/ui/SelectField';
+import DateField from '../components/ui/DateField';
 import Pagination from '../components/ui/Pagination';
 import { useAuth } from '../hooks/useAuth';
 import { getDepartments, getDocumentTypes } from '../services/departments';
@@ -2842,16 +2843,16 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                     <div className="ud-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                       <div>
                         <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')}</div>
-                        <input type="date" value={editForm.issue_date || ''} onChange={e => setEditForm(f => ({ ...f, issue_date: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                        <DateField value={editForm.issue_date || ''} onChange={e => setEditForm(f => ({ ...f, issue_date: e.target.value }))} style={INPUT_BASE} />
                       </div>
                       <div>
                         <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.effectiveFrom')}</div>
-                        <input type="date" value={editForm.effective_from || ''} onChange={e => setEditForm(f => ({ ...f, effective_from: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                        <DateField value={editForm.effective_from || ''} onChange={e => setEditForm(f => ({ ...f, effective_from: e.target.value }))} style={INPUT_BASE} />
                       </div>
                     </div>
                     <div>
                       <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.lastUpdatedOn')}</div>
-                      <input type="date" value={editForm.last_updated_on || ''} onChange={e => setEditForm(f => ({ ...f, last_updated_on: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                      <DateField value={editForm.last_updated_on || ''} onChange={e => setEditForm(f => ({ ...f, last_updated_on: e.target.value }))} style={INPUT_BASE} />
                     </div>
                     <div>
                       <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.gazetteReference')}</div>
@@ -4041,16 +4042,16 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                     <div className="ud-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                       <div>
                         <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')}</div>
-                        <input type="date" value={editForm.issue_date || ''} onChange={e => setEditForm(f => ({ ...f, issue_date: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                        <DateField value={editForm.issue_date || ''} onChange={e => setEditForm(f => ({ ...f, issue_date: e.target.value }))} style={INPUT_BASE} />
                       </div>
                       <div>
                         <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.effectiveFrom')}</div>
-                        <input type="date" value={editForm.effective_from || ''} onChange={e => setEditForm(f => ({ ...f, effective_from: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                        <DateField value={editForm.effective_from || ''} onChange={e => setEditForm(f => ({ ...f, effective_from: e.target.value }))} style={INPUT_BASE} />
                       </div>
                     </div>
                     <div>
                       <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.lastUpdatedOn')}</div>
-                      <input type="date" value={editForm.last_updated_on || ''} onChange={e => setEditForm(f => ({ ...f, last_updated_on: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                      <DateField value={editForm.last_updated_on || ''} onChange={e => setEditForm(f => ({ ...f, last_updated_on: e.target.value }))} style={INPUT_BASE} />
                     </div>
                     <div>
                       <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.gazetteReference')}</div>
@@ -5880,13 +5881,13 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#dc3545' }}>*</span></div>
-                <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
-                  style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                <DateField value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
+                  style={INPUT_BASE} />
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.effectiveFrom')}</div>
-                <input type="date" value={typeFields.commencementDate || ''} onChange={e => setTypeFields(f => ({ ...f, commencementDate: e.target.value }))}
-                  style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                <DateField value={typeFields.commencementDate || ''} onChange={e => setTypeFields(f => ({ ...f, commencementDate: e.target.value }))}
+                  style={INPUT_BASE} />
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.gazetteReference')}</div>
@@ -5959,13 +5960,13 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#dc3545' }}>*</span></div>
-                <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
-                  style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                <DateField value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
+                  style={INPUT_BASE} />
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.effectiveFrom')}</div>
-                <input type="date" value={typeFields.commencementDate || ''} onChange={e => setTypeFields(f => ({ ...f, commencementDate: e.target.value }))}
-                  style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                <DateField value={typeFields.commencementDate || ''} onChange={e => setTypeFields(f => ({ ...f, commencementDate: e.target.value }))}
+                  style={INPUT_BASE} />
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.gazetteReference')}</div>
@@ -5999,13 +6000,13 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#dc3545' }}>*</span></div>
-                <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
-                  style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                <DateField value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
+                  style={INPUT_BASE} />
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.validUntil')}</div>
-                <input type="date" value={typeFields.validity || ''} onChange={e => setTypeFields(f => ({ ...f, validity: e.target.value }))}
-                  placeholder={t('wizard.placeholders.validUntil')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                <DateField value={typeFields.validity || ''} onChange={e => setTypeFields(f => ({ ...f, validity: e.target.value }))}
+                  placeholder={t('wizard.placeholders.validUntil')} style={INPUT_BASE} />
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.department')}</div>
@@ -6034,13 +6035,13 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#dc3545' }}>*</span></div>
-                <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
-                  style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                <DateField value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
+                  style={INPUT_BASE} />
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.validUntil')}</div>
-                <input type="date" value={typeFields.validity || ''} onChange={e => setTypeFields(f => ({ ...f, validity: e.target.value }))}
-                  placeholder={t('wizard.placeholders.validUntil')} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                <DateField value={typeFields.validity || ''} onChange={e => setTypeFields(f => ({ ...f, validity: e.target.value }))}
+                  placeholder={t('wizard.placeholders.validUntil')} style={INPUT_BASE} />
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.department')}</div>
@@ -6069,13 +6070,13 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#dc3545' }}>*</span></div>
-                <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
-                  style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                <DateField value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
+                  style={INPUT_BASE} />
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.effectiveFrom')}</div>
-                <input type="date" value={typeFields.commencementDate || ''} onChange={e => setTypeFields(f => ({ ...f, commencementDate: e.target.value }))}
-                  style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                <DateField value={typeFields.commencementDate || ''} onChange={e => setTypeFields(f => ({ ...f, commencementDate: e.target.value }))}
+                  style={INPUT_BASE} />
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.gazetteReference')}</div>
@@ -6109,13 +6110,13 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#dc3545' }}>*</span></div>
-                <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
-                  style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                <DateField value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
+                  style={INPUT_BASE} />
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.effectiveFrom')}</div>
-                <input type="date" value={typeFields.commencementDate || ''} onChange={e => setTypeFields(f => ({ ...f, commencementDate: e.target.value }))}
-                  style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                <DateField value={typeFields.commencementDate || ''} onChange={e => setTypeFields(f => ({ ...f, commencementDate: e.target.value }))}
+                  style={INPUT_BASE} />
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.gazetteReference')}</div>
@@ -6149,13 +6150,13 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#dc3545' }}>*</span></div>
-                <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
-                  style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                <DateField value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
+                  style={INPUT_BASE} />
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.effectiveFrom')}</div>
-                <input type="date" value={typeFields.effectiveFrom || ''} onChange={e => setTypeFields(f => ({ ...f, effectiveFrom: e.target.value }))}
-                  style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                <DateField value={typeFields.effectiveFrom || ''} onChange={e => setTypeFields(f => ({ ...f, effectiveFrom: e.target.value }))}
+                  style={INPUT_BASE} />
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.policy.sector')}</div>
@@ -6169,8 +6170,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>{t('wizard.fields.policy.reviewDate')}</div>
-                <input type="date" value={typeFields.reviewDate || ''} onChange={e => setTypeFields(f => ({ ...f, reviewDate: e.target.value }))}
-                  style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                <DateField value={typeFields.reviewDate || ''} onChange={e => setTypeFields(f => ({ ...f, reviewDate: e.target.value }))}
+                  style={INPUT_BASE} />
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.department')}</div>
@@ -6199,13 +6200,13 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#dc3545' }}>*</span></div>
-                <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
-                  style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                <DateField value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
+                  style={INPUT_BASE} />
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.effectiveFrom')}</div>
-                <input type="date" value={typeFields.effectiveFrom || ''} onChange={e => setTypeFields(f => ({ ...f, effectiveFrom: e.target.value }))}
-                  style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                <DateField value={typeFields.effectiveFrom || ''} onChange={e => setTypeFields(f => ({ ...f, effectiveFrom: e.target.value }))}
+                  style={INPUT_BASE} />
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.gazetteReference')}</div>
@@ -6244,13 +6245,13 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#dc3545' }}>*</span></div>
-                <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
-                  style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                <DateField value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
+                  style={INPUT_BASE} />
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.effectiveFrom')}</div>
-                <input type="date" value={typeFields.effectiveFrom || ''} onChange={e => setTypeFields(f => ({ ...f, effectiveFrom: e.target.value }))}
-                  style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                <DateField value={typeFields.effectiveFrom || ''} onChange={e => setTypeFields(f => ({ ...f, effectiveFrom: e.target.value }))}
+                  style={INPUT_BASE} />
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.gazetteReference')}</div>
@@ -6284,8 +6285,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             {!['Act', 'Amendment', 'Circular', 'Notification', 'Order/Gazette', 'Policy', 'Rules & Regulations', 'Bye Laws', 'Miscellaneous'].includes(form.type) && (<>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#dc3545' }}>*</span></div>
-                <input type="date" value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
-                  style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                <DateField value={form.enactmentDate} onChange={e => fmt('enactmentDate', e.target.value)} required
+                  style={INPUT_BASE} />
               </div>
               <div>
                 <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.department')}</div>
@@ -6316,8 +6317,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             {/* Universal — Last Updated On (optional, applies to all document types) */}
             <div>
               <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.lastUpdatedOn')}</div>
-              <input type="date" value={form.lastUpdatedOn || ''} onChange={e => fmt('lastUpdatedOn', e.target.value)}
-                style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+              <DateField value={form.lastUpdatedOn || ''} onChange={e => fmt('lastUpdatedOn', e.target.value)}
+                style={INPUT_BASE} />
             </div>
 
             {/* Per-file description — shown last, one per file */}

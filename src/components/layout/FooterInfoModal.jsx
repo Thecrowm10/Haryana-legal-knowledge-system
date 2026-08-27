@@ -127,7 +127,7 @@ const FOOTER_PAGES = {
     icon: Map, title: 'Sitemap', subtitle: 'How this portal is organised', type: 'sitemap',
     groups: [
       { heading: 'Public Access (no login)', items: ['Search Acts, Rules, Notifications & Circulars', 'Filter by department, year, type and legal status', 'Bookmark searches for later', 'View document pointer (exact page / section / paragraph) and download PDF'] },
-      { heading: 'Departmental Portal (login required)', items: ['Uploader — upload documents and tag metadata & relationships', 'Approver — review and approve or reject uploaded documents', 'CS Office — analytics, knowledge graph and audit log', 'Admin — user management, taxonomy and system monitoring', 'Auditor — audit logs, query history and compliance reports'] },
+      { heading: 'Departmental Portal (login required)', items: ['Uploader — upload documents and tag metadata & relationships', 'Approver — review and approve or reject uploaded documents', 'Admin — user management, taxonomy and system monitoring', 'Nodal Officer — user management, upload oversight and act parts review'] },
     ],
   },
   'related-links': {

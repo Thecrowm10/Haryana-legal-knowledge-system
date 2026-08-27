@@ -5,6 +5,7 @@ import Card from '../components/ui/Card';
 import Pagination from '../components/ui/Pagination';
 import Badge from '../components/ui/Badge';
 import SelectField from '../components/ui/SelectField';
+import DateField from '../components/ui/DateField';
 import DocViewModal from '../components/DocViewModal';
 import { getUsers, getRoles, updateUser, registerUser, getApproversByDepartment } from '../services/users';
 import { getDepartments } from '../services/departments';
@@ -1237,10 +1238,10 @@ export default function AdminDashboard({ activePage }) {
             </SelectField>
 
             {/* Date from */}
-            <input type="date" value={auditFromDate} onChange={e => { setAuditFromDate(e.target.value); setAuditPage(0); }}
+            <DateField value={auditFromDate} onChange={e => { setAuditFromDate(e.target.value); setAuditPage(0); }}
               style={{ height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, padding: '0 10px', background: 'var(--surface-ground)', color: 'var(--text-color)' }} />
             <span style={{ fontSize: 11, color: 'var(--text-color-secondary)' }}>{t('audit.to')}</span>
-            <input type="date" value={auditToDate} onChange={e => { setAuditToDate(e.target.value); setAuditPage(0); }}
+            <DateField value={auditToDate} onChange={e => { setAuditToDate(e.target.value); setAuditPage(0); }}
               style={{ height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, padding: '0 10px', background: 'var(--surface-ground)', color: 'var(--text-color)' }} />
 
             {/* Clear */}

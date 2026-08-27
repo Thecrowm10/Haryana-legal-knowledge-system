@@ -5,6 +5,7 @@ import Card from '../components/ui/Card';
 import Pagination from '../components/ui/Pagination';
 import Badge from '../components/ui/Badge';
 import SelectField from '../components/ui/SelectField';
+import DateField from '../components/ui/DateField';
 import DocViewModal from '../components/DocViewModal';
 import { getUsers, getRoles, updateUser, registerUser, getApproversByDepartment } from '../services/users';
 import { getDepartments, createDepartment, toggleDepartment, getDocumentTypes, createDocumentType, toggleDocumentType } from '../services/departments';
@@ -1754,10 +1755,10 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
             </SelectField>
 
             {/* Date from */}
-            <input type="date" value={auditFromDate} onChange={e => { setAuditFromDate(e.target.value); setAuditPage(0); }}
+            <DateField value={auditFromDate} onChange={e => { setAuditFromDate(e.target.value); setAuditPage(0); }}
               style={{ height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, padding: '0 10px', background: 'var(--surface-ground)', color: 'var(--text-color)' }} />
             <span style={{ fontSize: 11, color: 'var(--text-color-secondary)' }}>{t('audit.to')}</span>
-            <input type="date" value={auditToDate} onChange={e => { setAuditToDate(e.target.value); setAuditPage(0); }}
+            <DateField value={auditToDate} onChange={e => { setAuditToDate(e.target.value); setAuditPage(0); }}
               style={{ height: 34, border: '1px solid var(--surface-border)', borderRadius: 8, fontSize: 12.5, padding: '0 10px', background: 'var(--surface-ground)', color: 'var(--text-color)' }} />
 
             {/* Clear */}
@@ -1949,8 +1950,7 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <input
-                type="date"
+              <DateField
                 value={dailyReportDate}
                 max={new Date().toISOString().split('T')[0]}
                 onChange={e => { setDailyReportDate(e.target.value); setDailyReportError(''); }}
