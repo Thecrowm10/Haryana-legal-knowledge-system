@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   X, ShieldCheck, FileText, Link2, Copyright, HelpCircle, MessageSquare,
-  Phone, Map, Globe2, Accessibility, AlertTriangle, Landmark, Send, CheckCircle2,
+  Phone, Map, Globe2, Accessibility, AlertTriangle, Landmark, Send, CheckCircle2, PlayCircle,
 } from 'lucide-react';
 
 // Every footer link (except Screen Reader Access, which reuses the existing
@@ -151,11 +151,14 @@ const FOOTER_PAGES = {
   feedback: {
     icon: MessageSquare, title: 'Feedback', subtitle: 'Tell us what’s working and what isn’t', type: 'feedback',
   },
+  'user-manual': {
+    icon: FileText, title: 'User Manual', subtitle: 'Choose a format to open', type: 'manual-choice',
+  },
 };
 
 const LABEL = { fontSize: 10.5, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.07em', textTransform: 'uppercase', fontFamily: 'var(--mono)' };
 
-export default function FooterInfoModal({ pageKey, onClose }) {
+export default function FooterInfoModal({ pageKey, onClose, pdfUrl, videoUrl }) {
   const page = FOOTER_PAGES[pageKey];
   if (!page) return null;
   const Icon = page.icon;
@@ -188,6 +191,7 @@ export default function FooterInfoModal({ pageKey, onClose }) {
           {page.type === 'sitemap' && <SitemapBody groups={page.groups} />}
           {page.type === 'list' && <ListBody note={page.note} items={page.items} />}
           {page.type === 'feedback' && <FeedbackBody />}
+          {page.type === 'manual-choice' && <ManualChoiceBody pdfUrl={pdfUrl} videoUrl={videoUrl} onClose={onClose} />}
           {(!page.type || page.type === 'text') && <TextBody sections={page.sections} />}
         </div>
       </div>
@@ -311,5 +315,25 @@ function FeedbackBody() {
         <Send size={13} /> Submit
       </button>
     </form>
+  );
+}
+
+function ManualChoiceBody({ pdfUrl, videoUrl, onClose }) {
+  return (
+    <div style={{ display: 'flex', gap: 12 }}>
+      <button type="button"
+        disabled={!pdfUrl}
+        onClick={() => { window.open(pdfUrl, '_blank', 'noopener,noreferrer'); onClose(); }}
+        style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '20px 12px', borderRadius: 10, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', cursor: pdfUrl ? 'pointer' : 'not-allowed', fontFamily: 'var(--font)', opacity: pdfUrl ? 1 : 0.5 }}>
+        <FileText size={22} color="var(--primary)" />
+        <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-heading)' }}>PDF Manual</span>
+      </button>
+      <button type="button"
+        onClick={() => { window.open(videoUrl, '_blank', 'noopener,noreferrer'); onClose(); }}
+        style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '20px 12px', borderRadius: 10, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', cursor: 'pointer', fontFamily: 'var(--font)' }}>
+        <PlayCircle size={22} color="var(--primary)" />
+        <span style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-heading)' }}>Video Manual</span>
+      </button>
+    </div>
   );
 }

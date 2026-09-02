@@ -15,7 +15,9 @@ const ROLE_MANUAL_FILE = {
   super_admin:   'Super_admin_user_manual.pdf',
 };
 
-function footerLinks(t, role) {
+const MANUAL_VIDEO_FILE = 'User_Manual.mp4';
+
+  function footerLinks(t, role) {
   const helpLinks = [
     { label: t('footer.links.faqs'),               pageKey: 'faqs'            },
     { label: t('footer.links.screenReaderAccess'), pageKey: 'screen-reader'   },
@@ -25,7 +27,8 @@ function footerLinks(t, role) {
   ];
   const manualFile = ROLE_MANUAL_FILE[role];
   if (manualFile) {
-    helpLinks.push({ label: t('footer.links.userManual'), href: `/docs/manuals/${manualFile}` });
+    // href nahi — click pe PDF/Video choice dialog khulega
+    helpLinks.push({ label: t('footer.links.userManual'), pageKey: 'user-manual' });
   }
 
   return [
@@ -66,6 +69,8 @@ export default function Footer({ role }) {
   const FOOTER_LINKS = footerLinks(t, role);
   const [openPage, setOpenPage] = useState(null); // pageKey | null
   const [showScreenReader, setShowScreenReader] = useState(false);
+  const manualPdfUrl = ROLE_MANUAL_FILE[role] ? `/docs/manuals/${ROLE_MANUAL_FILE[role]}` : null;
+  const manualVideoUrl = `/docs/Video Manual/${encodeURIComponent(MANUAL_VIDEO_FILE)}`;
 
   function openLink(pageKey) {
     if (pageKey === 'screen-reader') setShowScreenReader(true);
@@ -212,7 +217,14 @@ export default function Footer({ role }) {
         </div>
       </div>
 
-      {openPage && <FooterInfoModal pageKey={openPage} onClose={() => setOpenPage(null)} />}
+      {openPage && (
+        <FooterInfoModal
+          pageKey={openPage}
+          onClose={() => setOpenPage(null)}
+          pdfUrl={manualPdfUrl}
+          videoUrl={manualVideoUrl}
+        />
+      )}
       {showScreenReader && <ScreenReaderAccessModal onClose={() => setShowScreenReader(false)} />}
     </footer>
   );
