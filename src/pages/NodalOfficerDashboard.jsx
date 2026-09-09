@@ -10,7 +10,7 @@ import DateField from '../components/ui/DateField';
 import DocViewModal from '../components/DocViewModal';
 import { getUsers, getRoles, updateUser, registerUser, getApproversByDepartment } from '../services/users';
 import { getMyDepartments } from '../services/departments';
-import { getAllDocumentsAdmin, getAllDepartmentLinks } from '../services/pdf';
+import { getAllDocumentsAdmin, getMyDepartmentDocuments, getAllDepartmentLinks } from '../services/pdf';
 import { getAuditLogs, getAuditLogActions } from '../services/audit';
 import { getAllActPartSubmissions, getAllActParts } from '../services/act_parts';
 import { useMediaQuery } from '../hooks/useMediaQuery';
@@ -25,6 +25,13 @@ const EMAIL_FORMAT_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const NON_ASSIGNABLE_BY_NODAL = new Set(['admin', 'super_admin', 'nodal_officer', 'citizen']);
 function normalizeRoleName(name) {
   return name?.trim().toLowerCase().replace(/\s+/g, '_');
+}
+// Department-scoping (All Uploads / Linked Documents) matches by name, not id — /pdf/all
+// doesn't expose a department_id per document. Normalize both sides so a stray leading/
+// trailing space or case difference between the department master list and the name
+// snapshotted onto older documents doesn't silently drop that department's documents.
+function normDeptName(name) {
+  return (name || '').trim().toLowerCase();
 }
 function assignableRoles(roles) {
   return roles.filter(r => !NON_ASSIGNABLE_BY_NODAL.has(normalizeRoleName(r.name)));
@@ -183,11 +190,10 @@ export default function NodalOfficerDashboard({ activePage }) {
     if (activePage !== 'nodaluploads') return;
     setAllDocsLoading(true);
     setAllDocsError('');
-    Promise.all([getAllDocumentsAdmin(), getMyDepartments()])
-      .then(([docsRes, deptsRes]) => {
-        setAllDocs(docsRes.data.documents || []);
-        setDepts(deptsRes.data);
-      })
+    // Scoped server-side to this officer's own department(s) by the token — no client-side
+    // department-name filtering needed (see deptScopedDocs below, now just an alias).
+    getMyDepartmentDocuments()
+      .then(res => setAllDocs(res.data.documents || []))
       .catch(() => setAllDocsError(t('uploads.failedToLoad')))
       .finally(() => setAllDocsLoading(false));
   }, [activePage, t]);
@@ -1036,13 +1042,9 @@ export default function NodalOfficerDashboard({ activePage }) {
 
   // ── All Uploads (department-scoped) ─────────────────────────────────────
   if (activePage === 'nodaluploads') {
-    // Authorised department names set — only docs belonging to these are shown.
-    const authorisedDeptNames = new Set(depts.map(d => d.name));
-
-    // Base list: filter to authorised departments only
-    const deptScopedDocs = allDocs.filter(d =>
-      !authorisedDeptNames.size || authorisedDeptNames.has(d.department_name)
-    );
+    // /pdf/my-department/all already scopes this to the officer's own department(s)
+    // server-side (via the auth token) — no client-side name-matching filter needed.
+    const deptScopedDocs = allDocs;
 
     const totalDocs    = deptScopedDocs.length;
     const approvedDocs = deptScopedDocs.filter(d => d.status === 'approved').length;
@@ -1552,13 +1554,13 @@ export default function NodalOfficerDashboard({ activePage }) {
 
   // ── Linked Documents (department-scoped) ────────────────────────────────
   if (activePage === 'nodallinkedocs') {
-    const authorisedDeptNames = new Set(depts.map(d => d.name));
+    const authorisedDeptNames = new Set(depts.map(d => normDeptName(d.name)));
 
     // Scope links to departments the nodal officer manages
     const scopedLinks = authorisedDeptNames.size
       ? nodalLinks.filter(l =>
-          authorisedDeptNames.has(l.linked_department_name) ||
-          authorisedDeptNames.has(l.original_department_name)
+          authorisedDeptNames.has(normDeptName(l.linked_department_name)) ||
+          authorisedDeptNames.has(normDeptName(l.original_department_name))
         )
       : nodalLinks;
 

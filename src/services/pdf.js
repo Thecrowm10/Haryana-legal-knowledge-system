@@ -30,6 +30,9 @@ export const getApproverDocuments = (status, skip = 0, limit = 100) => api.get('
 export const reviewDocument       = (pdf_id, action, comments, annotations_json) => api.post('/pdf/review', { pdf_id, action, ...(comments ? { comments } : {}), ...(annotations_json ? { annotations_json } : {}) });
 export const getPdfFile           = (id)                              => api.get(`/pdf/${id}/file`, { responseType: 'arraybuffer' });
 export const getAllDocumentsAdmin  = (status, skip = 0, limit = 500)  => publicApi.get('/pdf/all', { params: { skip, limit, ...(status ? { status } : {}) } });
+// Nodal Officer's own department(s) only — scoped server-side from the token, unlike
+// getAllDocumentsAdmin above (which returns every document system-wide with no auth).
+export const getMyDepartmentDocuments = (status, skip = 0, limit = 500) => api.get('/pdf/my-department/all', { params: { skip, limit, ...(status ? { status } : {}) } });
 export const checkDuplicateDocument    = (document_name, document_type_id) => api.get('/pdf/check-duplicate', { params: { document_name, document_type_id } });
 export const linkDocumentToDepartment  = (pdf_id)                       => api.post('/pdf/link-department', { pdf_id });
 export const getLinkedDocuments        = (link_status)                  => api.get('/pdf/linked-documents', { params: link_status ? { link_status } : {} });
