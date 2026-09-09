@@ -235,9 +235,13 @@
     "shortTitle": "संक्षिप्त शीर्षक",
     "typeSpecificFields": "प्रकार-विशिष्ट फ़ील्ड",
     "saveChanges": "परिवर्तन सहेजें",
+    "saveDraft": "ड्राफ़्ट सहेजें",
+    "submitForApproval": "स्वीकृति हेतु भेजें",
     "saving": "सहेजा जा रहा है…",
     "updateSuccess": "\"{{name}}\" सफलतापूर्वक अपडेट किया गया",
-    "updateFailed": "दस्तावेज़ अपडेट करने में विफल"
+    "updateFailed": "दस्तावेज़ अपडेट करने में विफल",
+    "draftSaved": "\"{{name}}\" ड्राफ़्ट के रूप में सहेजा गया",
+    "missingRequiredFields": "स्वीकृति हेतु भेजने से पहले कृपया ये आवश्यक फ़ील्ड भरें: {{fields}}"
   },
   "wizard": {
     "fileTooLargeToast": "{{name}} {{size}} अपलोड सीमा से अधिक है।",

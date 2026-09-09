@@ -235,9 +235,13 @@
     "shortTitle": "Short Title",
     "typeSpecificFields": "Type-Specific Fields",
     "saveChanges": "Save Changes",
+    "saveDraft": "Save Draft",
+    "submitForApproval": "Submit for Approval",
     "saving": "Saving…",
     "updateSuccess": "\"{{name}}\" updated successfully",
-    "updateFailed": "Failed to update document"
+    "updateFailed": "Failed to update document",
+    "draftSaved": "\"{{name}}\" saved as draft",
+    "missingRequiredFields": "Please fill in the required fields before submitting for approval: {{fields}}"
   },
   "wizard": {
     "fileTooLargeToast": "{{name}} exceeds the {{size}} upload limit.",

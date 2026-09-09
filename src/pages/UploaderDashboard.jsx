@@ -139,6 +139,29 @@ const TYPE_FIELDS = {
   'Miscellaneous': [], // handled inline
 };
 
+// Fields a document must have filled before it can move out of Draft into Pending review —
+// mirrors the required (*) fields the upload wizard marks per type. Drafts stay exempt from
+// this everywhere (Save Draft never checks it); it's enforced only on Submit for Approval,
+// in the edit form, so a draft saved with missing fields can't be resubmitted incomplete.
+const EDIT_REQUIRED_FIELDS_BY_TYPE = {
+  'Act':                   ['document_name', 'issue_date', 'reference_number', 'short_title'],
+  'Amendment':             ['document_name', 'issue_date', 'reference_number'],
+  'Circular':              ['document_name', 'issue_date', 'reference_number'],
+  'Notification':          ['document_name', 'issue_date', 'reference_number'],
+  'Order/Gazette':         ['document_name', 'issue_date', 'reference_number'],
+  'Policy':                ['document_name', 'issue_date', 'reference_number'],
+  'Rules & Regulations':   ['document_name', 'issue_date', 'reference_number'],
+  'Bye Laws':              ['document_name', 'issue_date', 'reference_number'],
+  'Miscellaneous':         ['document_name', 'issue_date'], // reference number is intentionally optional for Misc, same as the wizard
+};
+const EDIT_REQUIRED_FIELDS_DEFAULT = ['document_name', 'issue_date'];
+const EDIT_REQUIRED_FIELD_LABEL_KEYS = {
+  document_name:    'editDocument.documentName',
+  issue_date:       'common.issueDate',
+  reference_number: 'common.referenceNo',
+  short_title:      'editDocument.shortTitle',
+};
+
 // Mobile reflow — overrides the inline desktop styles via className + !important, same
 // technique as CitizenDashboard's <style> block. Mounted once per top-level return (the
 // component has three) since modals/sections are reused across all of them.
@@ -1232,6 +1255,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const [editForm, setEditForm]         = useState(null);
   const [editSaving, setEditSaving]     = useState(false);
   const [editError, setEditError]       = useState('');
+  const [editMissingFields, setEditMissingFields] = useState([]); // field keys still missing after a failed Submit for Approval — drives the red-border highlight
   const [editFileSelected, setEditFileSelected]   = useState(null);
   const [editFileUploading, setEditFileUploading] = useState(false);
   const editFileInputRef = useRef(null);
@@ -1305,14 +1329,29 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     setEditForm(initialForm);
     setEditFormOriginal(initialForm);
     setEditError('');
+    setEditMissingFields([]);
     setEditFileSelected(null);
     setEditDescPreview(false);
+  }
+
+  // Red-border override for a field currently flagged missing by the last failed
+  // Submit for Approval attempt.
+  function missingFieldStyle(key) {
+    return editMissingFields.includes(key)
+      ? { borderColor: '#dc3545', boxShadow: '0 0 0 3px rgba(220,53,69,.1)' }
+      : {};
+  }
+  // Clears a field's missing-highlight as soon as the user fills it in, rather than
+  // making them re-click Submit for Approval to see it clear.
+  function clearMissingField(key) {
+    setEditMissingFields(prev => prev.includes(key) ? prev.filter(k => k !== key) : prev);
   }
 
   function closeEditDoc() {
     setEditingDoc(null);
     setEditForm(null);
     setEditError('');
+    setEditMissingFields([]);
     setEditFileSelected(null);
     setEditFileRef(null);
     setEditBlobUrl(null);
@@ -1332,8 +1371,28 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
 
   async function saveEditDoc(submitForApproval = false) {
     if (!editingDoc || !editForm) return;
-    setEditSaving(true);
     setEditError('');
+
+    // Drafts can be saved incomplete, but resubmitting one for review must meet the same
+    // required fields the upload wizard marks for this document type — otherwise a draft
+    // could skip required-field validation entirely by going through Edit instead of Upload.
+    if (submitForApproval) {
+      const required = EDIT_REQUIRED_FIELDS_BY_TYPE[editingDoc.type] || EDIT_REQUIRED_FIELDS_DEFAULT;
+      const missingKeys = required.filter(key => !(editForm[key] || '').toString().trim());
+      if (missingKeys.length > 0) {
+        const missingLabels = missingKeys.map(key => t(EDIT_REQUIRED_FIELD_LABEL_KEYS[key]));
+        const message = t('editDocument.missingRequiredFields', {
+          fields: missingLabels.join(', '),
+          defaultValue: `Please fill in the required fields before submitting for approval: ${missingLabels.join(', ')}`,
+        });
+        setEditMissingFields(missingKeys);
+        showToast('error', message);
+        return;
+      }
+      setEditMissingFields([]);
+    }
+
+    setEditSaving(true);
     const tf = editForm.typeFields || {};
     const typeId = editingDoc.docTypeId ?? typesData.find(d => d.name === editingDoc.type)?.id ?? null;
     let description = editForm.description;
@@ -2841,16 +2900,16 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                     )}
                     <div>
                       <div style={{ ...LABEL, marginBottom: 6 }}>{t('editDocument.documentName')} <span style={{ color: '#dc3545' }}>*</span></div>
-                      <input value={editForm.document_name} onChange={e => setEditForm(f => ({ ...f, document_name: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                      <input value={editForm.document_name} onChange={e => { setEditForm(f => ({ ...f, document_name: e.target.value })); clearMissingField('document_name'); }} style={{ ...INPUT_BASE, ...missingFieldStyle('document_name') }} onFocus={focusStyle} onBlur={blurStyle} />
                     </div>
                     <div>
-                      <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.referenceNo')}</div>
-                      <input value={editForm.reference_number} onChange={e => setEditForm(f => ({ ...f, reference_number: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                      <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.referenceNo')} {editingDoc.type !== 'Miscellaneous' && <span style={{ color: '#dc3545' }}>*</span>}</div>
+                      <input value={editForm.reference_number} onChange={e => { setEditForm(f => ({ ...f, reference_number: e.target.value })); clearMissingField('reference_number'); }} style={{ ...INPUT_BASE, ...missingFieldStyle('reference_number') }} onFocus={focusStyle} onBlur={blurStyle} />
                     </div>
                     <div className="ud-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                       <div>
-                        <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')}</div>
-                        <DateField value={editForm.issue_date || ''} onChange={e => setEditForm(f => ({ ...f, issue_date: e.target.value }))} style={INPUT_BASE} />
+                        <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#dc3545' }}>*</span></div>
+                        <DateField value={editForm.issue_date || ''} onChange={e => { setEditForm(f => ({ ...f, issue_date: e.target.value })); clearMissingField('issue_date'); }} style={{ ...INPUT_BASE, ...missingFieldStyle('issue_date') }} />
                       </div>
                       <div>
                         <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.effectiveFrom')}</div>
@@ -2873,8 +2932,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                     )}
                     <div className="ud-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                       <div>
-                        <div style={{ ...LABEL, marginBottom: 6 }}>{t('editDocument.shortTitle')}</div>
-                        <input value={editForm.short_title} onChange={e => setEditForm(f => ({ ...f, short_title: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                        <div style={{ ...LABEL, marginBottom: 6 }}>{t('editDocument.shortTitle')} {editingDoc.type === 'Act' && <span style={{ color: '#dc3545' }}>*</span>}</div>
+                        <input value={editForm.short_title} onChange={e => { setEditForm(f => ({ ...f, short_title: e.target.value })); clearMissingField('short_title'); }} style={{ ...INPUT_BASE, ...missingFieldStyle('short_title') }} onFocus={focusStyle} onBlur={blurStyle} />
                       </div>
                       <div>
                         <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.version')}</div>
@@ -4058,16 +4117,16 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                     )}
                     <div>
                       <div style={{ ...LABEL, marginBottom: 6 }}>{t('editDocument.documentName')} <span style={{ color: '#dc3545' }}>*</span></div>
-                      <input value={editForm.document_name} onChange={e => setEditForm(f => ({ ...f, document_name: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                      <input value={editForm.document_name} onChange={e => { setEditForm(f => ({ ...f, document_name: e.target.value })); clearMissingField('document_name'); }} style={{ ...INPUT_BASE, ...missingFieldStyle('document_name') }} onFocus={focusStyle} onBlur={blurStyle} />
                     </div>
                     <div>
-                      <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.referenceNo')}</div>
-                      <input value={editForm.reference_number} onChange={e => setEditForm(f => ({ ...f, reference_number: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                      <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.referenceNo')} {editingDoc.type !== 'Miscellaneous' && <span style={{ color: '#dc3545' }}>*</span>}</div>
+                      <input value={editForm.reference_number} onChange={e => { setEditForm(f => ({ ...f, reference_number: e.target.value })); clearMissingField('reference_number'); }} style={{ ...INPUT_BASE, ...missingFieldStyle('reference_number') }} onFocus={focusStyle} onBlur={blurStyle} />
                     </div>
                     <div className="ud-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                       <div>
-                        <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')}</div>
-                        <DateField value={editForm.issue_date || ''} onChange={e => setEditForm(f => ({ ...f, issue_date: e.target.value }))} style={INPUT_BASE} />
+                        <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.issueDate')} <span style={{ color: '#dc3545' }}>*</span></div>
+                        <DateField value={editForm.issue_date || ''} onChange={e => { setEditForm(f => ({ ...f, issue_date: e.target.value })); clearMissingField('issue_date'); }} style={{ ...INPUT_BASE, ...missingFieldStyle('issue_date') }} />
                       </div>
                       <div>
                         <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.effectiveFrom')}</div>
@@ -4090,8 +4149,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                     )}
                     <div className="ud-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                       <div>
-                        <div style={{ ...LABEL, marginBottom: 6 }}>{t('editDocument.shortTitle')}</div>
-                        <input value={editForm.short_title} onChange={e => setEditForm(f => ({ ...f, short_title: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
+                        <div style={{ ...LABEL, marginBottom: 6 }}>{t('editDocument.shortTitle')} {editingDoc.type === 'Act' && <span style={{ color: '#dc3545' }}>*</span>}</div>
+                        <input value={editForm.short_title} onChange={e => { setEditForm(f => ({ ...f, short_title: e.target.value })); clearMissingField('short_title'); }} style={{ ...INPUT_BASE, ...missingFieldStyle('short_title') }} onFocus={focusStyle} onBlur={blurStyle} />
                       </div>
                       <div>
                         <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.version')}</div>
