@@ -2187,7 +2187,11 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     // effective_from: different typeFields key per type
     const effectiveFrom = typeFields.commencementDate || typeFields.effectiveFrom || null;
 
-    // legal_authority: join legalAuthorities entries that have an act set
+    // legal_authority: join legalAuthorities entries that have an act set. Types excluded from
+    // usesLegalAuthorities (Amendment, Rules & Regulations, Bye Laws) keep their Act Reference in
+    // `hierarchy.act`/`hierarchy.actId` instead — Amendment was missing from this fallback, so its
+    // "Act Reference" selection never made it into legal_authority even though the parent_act
+    // relationship below was (correctly) still being saved.
     const legalAuthStr = legalAuthorities
       .filter(a => a.act)
       .map(a => {
@@ -2195,7 +2199,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         return sections.length > 0 ? `${a.act} (${sections.join(', ')})` : a.act;
       })
       .join('; ')
-      || ((form.type === 'Rules & Regulations' || form.type === 'Bye Laws') && hierarchy.act
+      || (['Rules & Regulations', 'Bye Laws', 'Amendment'].includes(form.type) && hierarchy.act
             ? (hierarchy.section ? `${hierarchy.act} (${hierarchy.section})` : hierarchy.act)
             : '');
 
@@ -2659,6 +2663,9 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
           const EStatusIcon = editingDoc.status === 'approved' ? CheckCircle : editingDoc.status === 'rejected' ? XCircle : Clock;
           const hasEditChanges = editFileSelected !== null || JSON.stringify(editForm) !== JSON.stringify(editFormOriginal);
           const saveBtnDisabled = editSaving || editFileUploading || !(editForm?.document_name || '').trim() || !hasEditChanges;
+          // Submitting a draft as-is (no field changes) is a valid action — it only flips
+          // status, so it must not require hasEditChanges like Save Draft/Save Changes do.
+          const submitBtnDisabled = editSaving || editFileUploading || !(editForm?.document_name || '').trim();
           const eIconBtn = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.15)', borderRadius: 7, width: 32, height: 32, cursor: 'pointer', color: 'rgba(255,255,255,.85)' };
           return (
             <div style={{ position: 'fixed', inset: 0, zIndex: 1500, display: 'flex', flexDirection: 'column', background: 'var(--surface-card)' }}>
@@ -2714,8 +2721,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                       {editFileUploading ? <RotateCcw size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={14} />}
                       {editSaving ? t('editDocument.saving') : t('editDocument.saveDraft', { defaultValue: 'Save Draft' })}
                     </button>
-                    <button type="button" className="ud-edit-actions-btn" onClick={() => saveEditDoc(true)} disabled={saveBtnDisabled}
-                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '8px 20px', borderRadius: 9, border: 'none', background: saveBtnDisabled ? 'rgba(33,74,171,.5)' : 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: saveBtnDisabled ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+                    <button type="button" className="ud-edit-actions-btn" onClick={() => saveEditDoc(true)} disabled={submitBtnDisabled}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '8px 20px', borderRadius: 9, border: 'none', background: submitBtnDisabled ? 'rgba(33,74,171,.5)' : 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: submitBtnDisabled ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
                       {editFileUploading ? <RotateCcw size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={14} />}
                       {editSaving ? t('editDocument.saving') : t('editDocument.submitForApproval', { defaultValue: 'Submit for Approval' })}
                     </button>
@@ -3873,6 +3880,9 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
           const EStatusIcon = editingDoc.status === 'approved' ? CheckCircle : editingDoc.status === 'rejected' ? XCircle : Clock;
           const hasEditChanges = editFileSelected !== null || JSON.stringify(editForm) !== JSON.stringify(editFormOriginal);
           const saveBtnDisabled = editSaving || editFileUploading || !(editForm?.document_name || '').trim() || !hasEditChanges;
+          // Submitting a draft as-is (no field changes) is a valid action — it only flips
+          // status, so it must not require hasEditChanges like Save Draft/Save Changes do.
+          const submitBtnDisabled = editSaving || editFileUploading || !(editForm?.document_name || '').trim();
           const eIconBtn = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.15)', borderRadius: 7, width: 32, height: 32, cursor: 'pointer', color: 'rgba(255,255,255,.85)' };
           return (
             <div style={{ position: 'fixed', inset: 0, zIndex: 1500, display: 'flex', flexDirection: 'column', background: 'var(--surface-card)' }}>
@@ -3921,11 +3931,26 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                   style={{ padding: '8px 18px', borderRadius: 9, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 13, fontWeight: 600, cursor: editSaving ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', opacity: editSaving ? .5 : 1, flexShrink: 0 }}>
                   {t('common.cancel')}
                 </button>
-                <button type="button" className="ud-edit-actions-btn" onClick={saveEditDoc} disabled={saveBtnDisabled}
-                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '8px 20px', borderRadius: 9, border: 'none', background: saveBtnDisabled ? 'rgba(33,74,171,.5)' : 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: saveBtnDisabled ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
-                  {editFileUploading ? <RotateCcw size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={14} />}
-                  {editSaving ? t('editDocument.saving') : t('editDocument.saveChanges')}
-                </button>
+                {editingDoc.status === 'draft' ? (
+                  <>
+                    <button type="button" className="ud-edit-actions-btn" onClick={() => saveEditDoc(false)} disabled={saveBtnDisabled}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '8px 20px', borderRadius: 9, border: '1px solid var(--surface-border)', background: saveBtnDisabled ? 'var(--surface-ground)' : 'var(--surface-card)', color: saveBtnDisabled ? '#94a3b8' : 'var(--text-color-secondary)', fontSize: 13, fontWeight: 700, cursor: saveBtnDisabled ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+                      {editFileUploading ? <RotateCcw size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={14} />}
+                      {editSaving ? t('editDocument.saving') : t('editDocument.saveDraft', { defaultValue: 'Save Draft' })}
+                    </button>
+                    <button type="button" className="ud-edit-actions-btn" onClick={() => saveEditDoc(true)} disabled={submitBtnDisabled}
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '8px 20px', borderRadius: 9, border: 'none', background: submitBtnDisabled ? 'rgba(33,74,171,.5)' : 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: submitBtnDisabled ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+                      {editFileUploading ? <RotateCcw size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={14} />}
+                      {editSaving ? t('editDocument.saving') : t('editDocument.submitForApproval', { defaultValue: 'Submit for Approval' })}
+                    </button>
+                  </>
+                ) : (
+                  <button type="button" className="ud-edit-actions-btn" onClick={() => saveEditDoc(true)} disabled={saveBtnDisabled}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, padding: '8px 20px', borderRadius: 9, border: 'none', background: saveBtnDisabled ? 'rgba(33,74,171,.5)' : 'var(--primary)', color: 'white', fontSize: 13, fontWeight: 700, cursor: saveBtnDisabled ? 'not-allowed' : 'pointer', fontFamily: 'var(--font)', flexShrink: 0 }}>
+                    {editFileUploading ? <RotateCcw size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={14} />}
+                    {editSaving ? t('editDocument.saving') : t('editDocument.saveChanges')}
+                  </button>
+                )}
               </div>
 
               {/* 2-panel body */}

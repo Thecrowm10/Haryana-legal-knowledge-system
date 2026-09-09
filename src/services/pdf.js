@@ -20,6 +20,9 @@ export const publicSearchDocuments = (params = {}) => publicApi.get('/pdf/public
 // Citizen browse-all listing — filterable by department/type, paginated. No token required.
 export const getCitizenDocuments = (department_id, document_type_id, skip = 0, limit = 10) =>
   publicApi.get('/citizen/documents', { params: { skip, limit, ...(department_id ? { department_id } : {}), ...(document_type_id ? { document_type_id } : {}) } });
+// Top 5 most recently approved documents, server-sorted — feeds the citizen dashboard's
+// "Recently Published" panel. No token required.
+export const getRecentDocuments = () => publicApi.get('/citizen/recent-documents');
 // AI/semantic search — natural-language question in, ranked matching documents (+ an
 // AI-synthesised answer where available) out. No token required.
 export const publicSemanticSearch  = (q, top_k = 5) => publicApi.get('/pdf/public/semantic-search', { params: { q, top_k } });

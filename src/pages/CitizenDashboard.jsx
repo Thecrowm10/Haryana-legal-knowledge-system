@@ -15,7 +15,7 @@ import Footer from '../components/layout/Footer';
 import Pagination from '../components/ui/Pagination';
 import haryanaLogo from '../assets/haryana-logo.png';
 import bannerBg from '../assets/banner-1-768x217.png';
-import { publicSearchDocuments, publicSemanticSearch, getCitizenDocuments } from '../services/pdf';
+import { publicSearchDocuments, publicSemanticSearch, getCitizenDocuments, getRecentDocuments } from '../services/pdf';
 import { getDocumentTypes, getCitizenDepartments } from '../services/departments';
 import { DOC_TYPE_META } from '../constants/docTypeMeta';
 import { cleanFilename, mapPublicDocForViewer } from '../utils/mapPublicDoc';
@@ -111,7 +111,7 @@ function HighlightedSnippet({ text, query }) {
   );
 }
 
-export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAsOfficer }) {
+export default function CitizenDashboard({ onAuditLog, onLoginAsOfficer }) {
   const { t } = useTranslation('citizen');
   const { t: tLogin, i18n } = useTranslation('login');
   const orgNameHi = i18n.getFixedT('hi', 'login')('orgNamePortal');
@@ -177,19 +177,14 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
   }, []);
 
   // Fetch recently published docs — feeds the "Recently Published" panel only.
-  // /pdf/public/search has no sort param and its default order isn't by recency
-  // (it comes back roughly alphabetical by document_name), so "recent" is done
-  // here: pull a larger page, sort by created_at (the upload timestamp) desc,
-  // then keep only the newest 5.
+  // Server-sorted and already capped to 5, unlike /pdf/public/search (no sort
+  // param, comes back roughly alphabetical by document_name).
   useEffect(() => {
+    // Fetch-on-mount pattern — see the browse-table effect below for why this is safe.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRecentLoading(true);
-    publicSearchDocuments({ skip: 0, limit: 100 })
-      .then(res => {
-        const docs = [...(res.data.documents || [])]
-          .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-          .slice(0, 5);
-        setRecentDocs(docs);
-      })
+    getRecentDocuments()
+      .then(res => setRecentDocs(Array.isArray(res.data) ? res.data : []))
       .catch(() => {})
       .finally(() => setRecentLoading(false));
   }, []);
@@ -248,6 +243,8 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
   // debounced and capped small so it reads as autocomplete while typing.
   useEffect(() => {
     const q = query.trim();
+    // Fetch-on-mount pattern — see the browse-table effect below for why this is safe.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (q.length < 2) { setLiveSuggestions([]); setSuggestLoading(false); return; }
     setSuggestLoading(true);
     const timer = setTimeout(() => {
@@ -1220,7 +1217,7 @@ export default function CitizenDashboard({ onAuditLog, documents = [], onLoginAs
                               {doc.document_name || doc.original_filename}
                             </div>
                             <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              {[doc.department_name, doc.document_type_name].filter(Boolean).join(' · ')}
+                              {doc.department_name}
                             </div>
                           </div>
                           {meta && (

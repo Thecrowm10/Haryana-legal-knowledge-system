@@ -586,12 +586,8 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
                   {annotations.map(ann => (
                     <div key={ann.id}
                       onClick={() => {
-                        if (ann.isDocx) {
-                          const span = docxViewRef.current?.querySelector(`[data-docx-annot="${ann.id}"]`);
-                          if (span) span.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        } else {
-                          scrollToAnnotation(ann);
-                        }
+                        // DOCX rendering was removed; legacy isDocx annotations have no view to scroll into.
+                        if (!ann.isDocx) scrollToAnnotation(ann);
                       }}
                       style={{ display: 'flex', gap: 10, padding: '9px 12px', borderRadius: 8, background: ann.color, border: '1px solid rgba(0,0,0,.1)', alignItems: 'flex-start', cursor: 'pointer', transition: 'filter .15s' }}
                       onMouseEnter={e => e.currentTarget.style.filter = 'brightness(.92)'}

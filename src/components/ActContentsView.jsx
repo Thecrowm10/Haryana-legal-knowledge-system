@@ -189,7 +189,7 @@ function SimpleDocLayout({ doc }) {
     [t('gazetteRef'),    doc.gazette],
     [t('legalAuthority'), doc.authority],
     [t('shortTitle'),    doc.shortTitle],
-    ...(TYPE_SPECIFIC_FIELD_KEYS[doc.type] || []).map(({ key }) => [fieldLabel(key), doc.typeFields?.[key]]),
+    ...(TYPE_SPECIFIC_FIELD_KEYS[doc.type] || []).map(({ key }) => [t(key, { defaultValue: fieldLabel(key) }), doc.typeFields?.[key]]),
   ].filter(([, v]) => v);
   return (
     <div className="acv-simple-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 55fr) minmax(0, 45fr)', gap: 28, alignItems: 'start', maxWidth: 1520, margin: '0 auto', padding: '36px 40px' }}>

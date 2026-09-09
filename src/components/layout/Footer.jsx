@@ -27,7 +27,6 @@ const MANUAL_VIDEO_FILE = 'User_Manual.mp4';
   ];
   const manualFile = ROLE_MANUAL_FILE[role];
   if (manualFile) {
-    // href nahi — click pe PDF/Video choice dialog khulega
     helpLinks.push({ label: t('footer.links.userManual'), pageKey: 'user-manual' });
   }
 
