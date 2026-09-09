@@ -69,7 +69,7 @@ export default function Footer({ role }) {
   const [openPage, setOpenPage] = useState(null); // pageKey | null
   const [showScreenReader, setShowScreenReader] = useState(false);
   const manualPdfUrl = ROLE_MANUAL_FILE[role] ? `/docs/manuals/${ROLE_MANUAL_FILE[role]}` : null;
-  const manualVideoUrl = `/docs/Video Manual/${encodeURIComponent(MANUAL_VIDEO_FILE)}`;
+  const manualVideoUrl = `/docs/video-manual/${encodeURIComponent(MANUAL_VIDEO_FILE)}`;
 
   function openLink(pageKey) {
     if (pageKey === 'screen-reader') setShowScreenReader(true);
