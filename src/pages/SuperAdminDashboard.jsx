@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
-import { Users, Trash2, Edit2, Plus, CheckCircle, XCircle, Building2, X, Eye, EyeOff, Check, Download, FileSpreadsheet, Layers, FileText, Clock, Search, Link2 } from 'lucide-react';
+import { Users, Trash2, Edit2, Plus, CheckCircle, XCircle, Building2, X, Eye, EyeOff, Check, Download, FileSpreadsheet, Layers, FileText, Clock, Search, Link2, Paperclip } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Pagination from '../components/ui/Pagination';
 import Badge from '../components/ui/Badge';
@@ -12,7 +12,7 @@ import { getDepartments, createDepartment, toggleDepartment, getDocumentTypes, c
 import { getRoleCaps, upsertRoleCap, deleteRoleCap, getActiveUserCount } from '../services/roleCaps';
 import { getAllDocumentsAdmin, getAllDepartmentLinks } from '../services/pdf';
 import { getAuditLogs, getAuditLogActions } from '../services/audit';
-import { getPendingCapRequests, reviewCapRequest } from '../services/capRequests';
+import { getPendingCapRequests, reviewCapRequest, getCapRequestAttachment } from '../services/capRequests';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { downloadUploadsExcelReport } from '../utils/uploadsExcelReport';
 import { downloadDailyReportExcel } from '../utils/dailyReportExcel';
@@ -2499,6 +2499,18 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
       }
     }
 
+    async function handleViewCapReqAttachment(reqId) {
+      try {
+        const res = await getCapRequestAttachment(reqId);
+        const blob = new Blob([res.data], { type: res.headers?.['content-type'] || 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      } catch {
+        alert('Failed to load the attachment.');
+      }
+    }
+
     async function handleCapReqReject(req) {
       setCapReqReviewing(req.id);
       try {
@@ -2596,6 +2608,11 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
                         })()}
                         <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)' }}>{req.reason || '—'}</div>
                         <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+                          <button
+                            onClick={() => handleViewCapReqAttachment(req.id)}
+                            style={{ padding: '6px 12px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                            <Paperclip size={12} /> File
+                          </button>
                           <button
                             onClick={() => handleCapReqApprove(req)}
                             disabled={isReviewing}

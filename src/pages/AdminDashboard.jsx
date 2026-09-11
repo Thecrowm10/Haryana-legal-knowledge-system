@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
-import { Users, Edit2, Plus, CheckCircle, XCircle, X, Eye, EyeOff, Download, FileSpreadsheet, Layers, FileText, Clock, Search, Link2, ShieldCheck } from 'lucide-react';
+import { Users, Edit2, Plus, CheckCircle, XCircle, X, Eye, EyeOff, Download, FileSpreadsheet, Layers, FileText, Clock, Search, Link2, ShieldCheck, Paperclip } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Pagination from '../components/ui/Pagination';
 import Badge from '../components/ui/Badge';
@@ -12,7 +12,7 @@ import { getDepartments } from '../services/departments';
 import { getAllDocumentsAdmin, getAllDepartmentLinks } from '../services/pdf';
 import { getAuditLogs, getAuditLogActions } from '../services/audit';
 import { getRoleCaps, getActiveUserCount } from '../services/roleCaps';
-import { submitCapRequest, getMyCapRequests } from '../services/capRequests';
+import { submitCapRequest, getMyCapRequests, getCapRequestAttachment } from '../services/capRequests';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { downloadUploadsExcelReport } from '../utils/uploadsExcelReport';
 import { useAuth } from '../hooks/useAuth';
@@ -243,7 +243,7 @@ export default function AdminDashboard({ activePage }) {
   const [capReqHistory, setCapReqHistory]           = useState([]);
   const [capReqHistoryLoading, setCapReqHistoryLoading] = useState(false);
   const [capReqCaps, setCapReqCaps]                 = useState({ limits: [], default_max: 5 });
-  const [capReqForm, setCapReqForm]                 = useState({ role_id: '', requested_cap: '', reason: '' });
+  const [capReqForm, setCapReqForm]                 = useState({ role_id: '', requested_cap: '', reason: '', file: null });
   const [capReqSaving, setCapReqSaving]             = useState(false);
   const [capReqError, setCapReqError]               = useState('');
   const [capReqSuccess, setCapReqSuccess]           = useState('');
@@ -1896,10 +1896,16 @@ export default function AdminDashboard({ activePage }) {
         setCapReqError(t('capRequests.errors.capBelowActive', { count: capReqActiveCount }));
         return;
       }
+      if (!capReqForm.file) { setCapReqError(t('capRequests.errors.attachmentRequired')); return; }
       setCapReqSaving(true); setCapReqError(''); setCapReqSuccess('');
       try {
-        await submitCapRequest({ role_id: Number(capReqForm.role_id), requested_cap: reqCap, reason: capReqForm.reason.trim() || undefined });
-        setCapReqForm({ role_id: '', requested_cap: '', reason: '' });
+        const fd = new FormData();
+        fd.append('role_id', String(Number(capReqForm.role_id)));
+        fd.append('requested_cap', String(reqCap));
+        if (capReqForm.reason.trim()) fd.append('reason', capReqForm.reason.trim());
+        fd.append('file', capReqForm.file);
+        await submitCapRequest(fd);
+        setCapReqForm({ role_id: '', requested_cap: '', reason: '', file: null });
         setCapReqSuccess(t('capRequests.submitSuccess'));
         const res = await getMyCapRequests();
         setCapReqHistory(res.data || []);
@@ -1908,6 +1914,18 @@ export default function AdminDashboard({ activePage }) {
         setCapReqError(typeof detail === 'string' ? detail : t('capRequests.errors.submitFailed'));
       } finally {
         setCapReqSaving(false);
+      }
+    }
+
+    async function handleViewCapReqAttachment(reqId) {
+      try {
+        const res = await getCapRequestAttachment(reqId);
+        const blob = new Blob([res.data], { type: res.headers?.['content-type'] || 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      } catch {
+        alert(t('capRequests.errors.attachmentLoadFailed'));
       }
     }
 
@@ -2010,6 +2028,18 @@ export default function AdminDashboard({ activePage }) {
               style={{ ...INP, resize: 'vertical' }}
             />
           </div>
+          <div style={{ marginTop: 12 }}>
+            <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('capRequests.attachment')} <span style={{ color: '#dc3545' }}>*</span></label>
+            <input
+              type="file"
+              accept="application/pdf,image/*"
+              onChange={e => { setCapReqForm(f => ({ ...f, file: e.target.files?.[0] || null })); setCapReqError(''); setCapReqSuccess(''); }}
+              style={INP}
+            />
+            <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 5 }}>
+              {capReqForm.file ? capReqForm.file.name : t('capRequests.attachmentHint')}
+            </div>
+          </div>
           {capReqError && (
             <div style={{ marginTop: 10, padding: '8px 12px', background: 'rgba(220,53,69,.08)', border: '1px solid rgba(220,53,69,.25)', borderRadius: 8, fontSize: 12.5, color: '#dc3545' }}>
               ⚠ {capReqError}
@@ -2047,8 +2077,8 @@ export default function AdminDashboard({ activePage }) {
             </div>
           ) : (
             <div style={{ overflowX: 'auto' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px 120px 110px 100px 1fr', minWidth: 780, padding: '9px 16px', background: 'var(--surface-ground)', borderBottom: '1px solid var(--surface-border)' }}>
-                {[t('capRequests.headers.roleReason'), t('capRequests.headers.currentCap'), t('capRequests.headers.requested'), t('capRequests.headers.status'), t('capRequests.headers.date'), t('capRequests.headers.superAdminNote')].map(h => (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px 120px 110px 100px 110px 1fr', minWidth: 900, padding: '9px 16px', background: 'var(--surface-ground)', borderBottom: '1px solid var(--surface-border)' }}>
+                {[t('capRequests.headers.roleReason'), t('capRequests.headers.currentCap'), t('capRequests.headers.requested'), t('capRequests.headers.status'), t('capRequests.headers.date'), t('capRequests.headers.attachment'), t('capRequests.headers.superAdminNote')].map(h => (
                   <div key={h} style={{ ...LABEL }}>{h}</div>
                 ))}
               </div>
@@ -2056,7 +2086,7 @@ export default function AdminDashboard({ activePage }) {
                 const sb = statusBadge(req.status);
                 return (
                   <div key={req.id}
-                    style={{ display: 'grid', gridTemplateColumns: '1fr 120px 120px 110px 100px 1fr', minWidth: 780, padding: '10px 16px', borderBottom: '1px solid var(--surface-border)', alignItems: 'center', transition: 'background .15s' }}
+                    style={{ display: 'grid', gridTemplateColumns: '1fr 120px 120px 110px 100px 110px 1fr', minWidth: 900, padding: '10px 16px', borderBottom: '1px solid var(--surface-border)', alignItems: 'center', transition: 'background .15s' }}
                     onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
                     onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                     <div>
@@ -2071,6 +2101,12 @@ export default function AdminDashboard({ activePage }) {
                       <span style={{ padding: '3px 9px', borderRadius: 6, fontSize: 11.5, fontWeight: 600, color: sb.color, background: sb.bg }}>{sb.label}</span>
                     </div>
                     <div style={{ fontSize: 12, color: 'var(--text-color-secondary)' }}>{req.created_at?.split('T')[0] || '—'}</div>
+                    <div>
+                      <button onClick={() => handleViewCapReqAttachment(req.id)}
+                        style={{ padding: '5px 10px', borderRadius: 7, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <Paperclip size={12} /> {t('capRequests.view')}
+                      </button>
+                    </div>
                     {/* <div style={{ fontSize: 12, color: 'var(--text-color-secondary)' }}>{req.super_admin_note || '—'}</div> */}
                   </div>
                 );
