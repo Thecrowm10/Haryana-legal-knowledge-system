@@ -55,6 +55,9 @@ const MENU_CONFIG = {
       { icon: Layers,        label: 'sidebar.items.allUploads',      id: 'nodaluploads' },
       { icon: Link2,         label: 'sidebar.items.linkedDocuments', id: 'nodallinkedocs' },
       { icon: BookOpen,      label: 'sidebar.items.actPartsReview',  id: 'nodalactparts' },
+    ]},
+    { label: 'sidebar.groups.system', items: [
+      { icon: ArrowUpDown,   label: 'sidebar.items.capRequests',     id: 'caprequests' },
       { icon: ClipboardList, label: 'sidebar.items.misReport',       id: 'nodalauditfull' },
     ]},
   ],

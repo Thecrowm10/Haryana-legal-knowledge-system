@@ -8,6 +8,7 @@ import SelectField from '../components/ui/SelectField';
 import MultiSelectField from '../components/ui/MultiSelectField';
 import DateField from '../components/ui/DateField';
 import DocViewModal from '../components/DocViewModal';
+import CapRequestsPanel from '../components/CapRequestsPanel';
 import { getUsers, getRoles, updateUser, registerUser, getApproversByDepartment } from '../services/users';
 import { getMyDepartments } from '../services/departments';
 import { getAllDocumentsAdmin, getMyDepartmentDocuments, getAllDepartmentLinks } from '../services/pdf';
@@ -1952,6 +1953,10 @@ export default function NodalOfficerDashboard({ activePage }) {
         )}
       </div>
     );
+  }
+
+  if (activePage === 'caprequests') {
+    return <CapRequestsPanel assignableRoles={assignableRoles} />;
   }
 
   return null;
