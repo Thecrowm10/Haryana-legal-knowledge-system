@@ -356,7 +356,7 @@
       "status": "स्थिति",
       "date": "दिनांक",
       "attachment": "अटैचमेंट",
-      "AdminNote": "एडमिन नोट"
+      "superAdminNote": "एडमिन नोट"
     },
     "defaultCap": "डिफ़ॉल्ट ({{n}})"
   }

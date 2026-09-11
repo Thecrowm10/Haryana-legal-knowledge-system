@@ -297,7 +297,7 @@ export default function CapRequestsPanel({ assignableRoles }) {
                       <Paperclip size={12} /> {t('capRequests.view')}
                     </button>
                   </div>
-                  {/* <div style={{ fontSize: 12, color: 'var(--text-color-secondary)' }}>{req.super_admin_note || '—'}</div> */}
+                  <div style={{ fontSize: 12, color: 'var(--text-color-secondary)' }}>{req.super_admin_note || '—'}</div>
                 </div>
               );
             })}
