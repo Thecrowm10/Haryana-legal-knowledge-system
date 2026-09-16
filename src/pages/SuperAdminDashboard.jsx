@@ -2534,8 +2534,8 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
           <Card padding="0">
             <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, fontSize: 'var(--font-size-p1)', color: 'var(--text-heading)' }}>Pending Cap Change Requests</div>
-                <div style={{ fontSize: 12, color: 'var(--text-color-secondary)', marginTop: 2 }}>Admins are requesting changes to role user caps for their departments.</div>
+                <div style={{ fontWeight: 700, fontSize: 'var(--font-size-p1)', color: 'var(--text-heading)' }}>Pending User Limit Change Requests</div>
+                <div style={{ fontSize: 12, color: 'var(--text-color-secondary)', marginTop: 2 }}>Admins and Nodal Officers are requesting changes to role user limits for their departments.</div>
               </div>
               {pendingCapReqs.length > 0 && (
                 <span style={{ padding: '3px 10px', borderRadius: 20, background: 'rgba(255,193,7,.15)', border: '1px solid rgba(180,130,0,.25)', fontSize: 12, fontWeight: 700, color: '#b45309' }}>

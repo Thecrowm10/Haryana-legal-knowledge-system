@@ -37,7 +37,7 @@
       "complianceReport": "अनुपालन रिपोर्ट",
       "actPartsReview": "अधिनियम भाग समीक्षा",
       "roleCaps": "भूमिका उपयोगकर्ता सीमाएं",
-      "capRequests": "कैप परिवर्तन अनुरोध"
+      "capRequests": "उपयोगकर्ता सीमा परिवर्तन अनुरोध"
     }
   },
   "topbar": {
@@ -73,7 +73,7 @@
       "systemLogs": "सिस्टम लॉग",
       "masterDataManager": "मास्टर डेटा प्रबंधक",
       "roleCaps": "भूमिका उपयोगकर्ता सीमाएं",
-      "capRequests": "कैप परिवर्तन अनुरोध",
+      "capRequests": "उपयोगकर्ता सीमा परिवर्तन अनुरोध",
       "fullMisReport": "पूर्ण एमआईएस रिपोर्ट",
       "allUploads": "सभी अपलोड",
       "auditorLabel": "लेखा परीक्षक",

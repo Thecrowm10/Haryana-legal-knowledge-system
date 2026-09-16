@@ -44,6 +44,7 @@ function parseDisplayRemarks(str) {
 export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuery = null, searchPages = null, zIndex = 2000, citizenView = false }) {
   const [blobUrl, setBlobUrl]         = useState(null);
   const [pdfDoc, setPdfDoc]           = useState(null);
+  const [pdfError, setPdfError]       = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages]   = useState(1);
   const [zoom, setZoom]               = useState(100);
@@ -99,9 +100,20 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
   useEffect(() => {
     if (!blobUrl) return;
     let cancelled = false;
-    pdfjsLib.getDocument({ url: blobUrl }).promise
-      .then(pdf => { if (!cancelled) { setPdfDoc(pdf); setTotalPages(pdf.numPages); } })
-      .catch(e => console.error('PDF load:', e));
+    setPdfError(false);
+    // getDocument() itself can throw synchronously (e.g. a pdfjs-dist internal
+    // call unsupported by the current browser) before it ever returns a
+    // promise to attach .catch() to — wrap the call itself so that case is
+    // handled the same as an async rejection instead of crashing the whole
+    // app via the root ErrorBoundary.
+    try {
+      pdfjsLib.getDocument({ url: blobUrl }).promise
+        .then(pdf => { if (!cancelled) { setPdfDoc(pdf); setTotalPages(pdf.numPages); } })
+        .catch(e => { console.error('PDF load:', e); if (!cancelled) setPdfError(true); });
+    } catch (e) {
+      console.error('PDF load:', e);
+      setPdfError(true);
+    }
     return () => { cancelled = true; };
   }, [blobUrl]);
 
@@ -361,8 +373,14 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
               style={{ flex: 1, overflow: 'auto', background: '#525659', padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center' }}>
               {!pdfDoc && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 14 }}>
-                  <div style={{ width: 36, height: 36, border: '3px solid rgba(255,255,255,.2)', borderTopColor: 'rgba(255,255,255,.8)', borderRadius: '50%', animation: 'spin .7s linear infinite' }} />
-                  <span style={{ fontSize: 13, fontFamily: 'var(--mono)', color: 'rgba(255,255,255,.6)', letterSpacing: '.04em' }}>Loading document…</span>
+                  {pdfError ? (
+                    <span style={{ fontSize: 13, fontFamily: 'var(--mono)', color: 'rgba(255,255,255,.6)', letterSpacing: '.04em', textAlign: 'center', maxWidth: 280 }}>Failed to load this document. Please try reloading the page.</span>
+                  ) : (
+                    <>
+                      <div style={{ width: 36, height: 36, border: '3px solid rgba(255,255,255,.2)', borderTopColor: 'rgba(255,255,255,.8)', borderRadius: '50%', animation: 'spin .7s linear infinite' }} />
+                      <span style={{ fontSize: 13, fontFamily: 'var(--mono)', color: 'rgba(255,255,255,.6)', letterSpacing: '.04em' }}>Loading document…</span>
+                    </>
+                  )}
                 </div>
               )}
               {pdfDoc && Array.from({ length: totalPages }, (_, i) => (

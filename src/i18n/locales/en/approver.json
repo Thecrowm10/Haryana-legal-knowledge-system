@@ -49,6 +49,7 @@
     "openInNewTab": "Open in new tab",
     "rotate": "Rotate 90°",
     "loadingPdf": "Loading PDF…",
+    "loadFailed": "Failed to load this PDF. Please try reloading the page.",
     "highlight": "Highlight",
     "exitHighlight": "Exit Highlight",
     "exitHighlightMode": "Exit highlight mode",

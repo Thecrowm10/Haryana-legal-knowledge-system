@@ -273,7 +273,7 @@
     "departmentsSelected": "{{count}} departments selected"
   },
   "roleCaps": {
-    "title": "Role User Caps",
+    "title": "Role User Limits",
     "subtitle": "Set the maximum number of active users allowed per role in each department. If no custom limit is set, the system default of {{default}} applies.",
     "addTitle": "Add / Update Limit",
     "department": "Department",
@@ -297,7 +297,7 @@
       "actions": "Actions"
     },
     "errors": {
-      "loadFailed": "Failed to load role caps. Please try again.",
+      "loadFailed": "Failed to load role user limits. Please try again.",
       "saveFailed": "Failed to save limit.",
       "deleteFailed": "Failed to remove limit.",
       "deptRequired": "Please select a department.",
@@ -316,7 +316,7 @@
     "statusPending": "Pending",
     "statusApproved": "Approved",
     "statusRejected": "Rejected",
-    "newRequestTitle": "New Cap Change Request",
+    "newRequestTitle": "New User Limit Change Request",
     "newRequestSubtitle": "Request Admin to increase or decrease the maximum users allowed for a role in your department.",
     "role": "Role",
     "selectRole": "Select role",

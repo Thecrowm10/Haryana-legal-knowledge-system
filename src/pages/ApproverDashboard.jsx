@@ -179,6 +179,7 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
   const containerRef        = useRef(null);
   const canvasRefs          = useRef([]);
   const [pdfDoc, setPdfDoc] = useState(null);
+  const [pdfError, setPdfError] = useState(false);
   const suppressRef         = useRef(false);
   const scrollDetectedRef   = useRef(false);
 
@@ -202,14 +203,25 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
     if (!doc.fileUrl) return;
     let cancelled = false;
     setPdfDoc(null);
-    pdfjsLib.getDocument({ url: encodeURI(doc.fileUrl) }).promise
-      .then(pdf => {
-        if (!cancelled) {
-          setPdfDoc(pdf);
-          onTotalPagesChange?.(pdf.numPages);
-        }
-      })
-      .catch(e => console.error('PDF load:', e));
+    setPdfError(false);
+    // getDocument() itself can throw synchronously (e.g. a pdfjs-dist internal
+    // call unsupported by the current browser) before it ever returns a
+    // promise to attach .catch() to — wrap the call itself so that case is
+    // handled the same as an async rejection instead of crashing the whole
+    // app via the root ErrorBoundary.
+    try {
+      pdfjsLib.getDocument({ url: encodeURI(doc.fileUrl) }).promise
+        .then(pdf => {
+          if (!cancelled) {
+            setPdfDoc(pdf);
+            onTotalPagesChange?.(pdf.numPages);
+          }
+        })
+        .catch(e => { console.error('PDF load:', e); if (!cancelled) setPdfError(true); });
+    } catch (e) {
+      console.error('PDF load:', e);
+      setPdfError(true);
+    }
     return () => { cancelled = true; };
   }, [doc.fileUrl, onTotalPagesChange]);
 
@@ -513,8 +525,14 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
           style={{ flex: 1, overflow: 'auto', background: '#525659', padding: '12px 8px', display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center' }}>
           {!pdfDoc && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: 12 }}>
-              <div style={{ width: 28, height: 28, border: '3px solid rgba(255,255,255,.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin .7s linear infinite' }} />
-              <span style={{ fontSize: 12, fontFamily: 'var(--mono)', color: 'rgba(255,255,255,.7)' }}>{t('pdfViewer.loadingPdf')}</span>
+              {pdfError ? (
+                <span style={{ fontSize: 12, fontFamily: 'var(--mono)', color: 'rgba(255,255,255,.7)', textAlign: 'center', maxWidth: 260 }}>{t('pdfViewer.loadFailed')}</span>
+              ) : (
+                <>
+                  <div style={{ width: 28, height: 28, border: '3px solid rgba(255,255,255,.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin .7s linear infinite' }} />
+                  <span style={{ fontSize: 12, fontFamily: 'var(--mono)', color: 'rgba(255,255,255,.7)' }}>{t('pdfViewer.loadingPdf')}</span>
+                </>
+              )}
             </div>
           )}
           {pdfDoc && Array.from({ length: numPages }, (_, i) => (

@@ -49,6 +49,7 @@
     "openInNewTab": "नए टैब में खोलें",
     "rotate": "90° घुमाएं",
     "loadingPdf": "PDF लोड हो रहा है…",
+    "loadFailed": "इस PDF को लोड करने में विफल। कृपया पेज पुनः लोड करने का प्रयास करें।",
     "highlight": "हाइलाइट",
     "exitHighlight": "हाइलाइट से बाहर निकलें",
     "exitHighlightMode": "हाइलाइट मोड से बाहर निकलें",
