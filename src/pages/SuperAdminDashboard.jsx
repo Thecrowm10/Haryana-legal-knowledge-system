@@ -2487,20 +2487,24 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
 
     async function handleCapReqApprove(req) {
       const rawVal = capReqFinalCaps[req.id];
-      const finalCap = rawVal !== undefined && rawVal !== '' ? Number(rawVal) : req.requested_cap;
-      if (isNaN(finalCap) || finalCap < 0) {
-        setCapReqApproveErrors(prev => ({ ...prev, [req.id]: 'Cap must be 0 or more.' }));
+      const increment = rawVal !== undefined && rawVal !== '' ? Number(rawVal) : req.requested_cap;
+      const baseCap = req.current_cap ?? capsDefaultMax;
+      const finalCap = baseCap + increment;
+      if (isNaN(increment) || finalCap < 0) {
+        setCapReqApproveErrors(prev => ({ ...prev, [req.id]: 'Resulting cap cannot be negative.' }));
         return;
       }
       const activeCount = capReqActiveCounts[req.id];
       if (activeCount !== null && activeCount !== undefined && finalCap < activeCount) {
-        setCapReqApproveErrors(prev => ({ ...prev, [req.id]: `${activeCount} user${activeCount !== 1 ? 's' : ''} are currently active in this role. Cap must be at least ${activeCount}.` }));
+        setCapReqApproveErrors(prev => ({ ...prev, [req.id]: `${activeCount} user${activeCount !== 1 ? 's' : ''} are currently active in this role. Resulting cap must be at least ${activeCount}.` }));
         return;
       }
       setCapReqApproveErrors(prev => { const n = { ...prev }; delete n[req.id]; return n; });
       setCapReqReviewing(req.id);
       try {
-        await reviewCapRequest(req.id, { status: 'approved', approved_cap: finalCap });
+        // approved_cap is the amount to ADD to the current cap — the backend
+        // computes current + approved_cap itself using the live current cap.
+        await reviewCapRequest(req.id, { status: 'approved', approved_cap: increment });
         setPendingCapReqs(prev => prev.filter(r => r.id !== req.id));
         setCapReqFinalCaps(prev => { const n = { ...prev }; delete n[req.id]; return n; });
         setCapReqActiveCounts(prev => { const n = { ...prev }; delete n[req.id]; return n; });
@@ -2561,7 +2565,7 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
             ) : (
               <div style={{ overflowX: 'auto' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 110px 110px 1fr 180px', minWidth: 860, padding: '9px 16px', background: 'var(--surface-ground)', borderBottom: '1px solid var(--surface-border)' }}>
-                  {['Department', 'Role / Requested By', 'Current Cap', 'Requested Cap', 'Reason', 'Actions'].map(h => (
+                  {['Department', 'Role / Requested By', 'Current Cap', 'Change (+/-)', 'Reason', 'Actions'].map(h => (
                     <div key={h} style={{ ...LABEL }}>{h}</div>
                   ))}
                 </div>
@@ -2593,10 +2597,11 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
                           )}
                         </div>
                         {(() => {
-                          const rawVal  = capReqFinalCaps[req.id];
-                          const finalCap = rawVal !== undefined && rawVal !== '' ? Number(rawVal) : req.requested_cap;
+                          const rawVal   = capReqFinalCaps[req.id];
+                          const increment = rawVal !== undefined && rawVal !== '' ? Number(rawVal) : req.requested_cap;
                           const baseCap  = req.current_cap ?? capsDefaultMax;
-                          const dir = finalCap > baseCap ? 'up' : finalCap < baseCap ? 'down' : 'same';
+                          const finalCap = baseCap + increment;
+                          const dir = increment > 0 ? 'up' : increment < 0 ? 'down' : 'same';
                           const dirColor = dir === 'up' ? '#16a34a' : dir === 'down' ? '#dc3545' : 'var(--text-color-secondary)';
                           const dirSymbol = dir === 'up' ? '▲' : dir === 'down' ? '▼' : '=';
                           const belowActive = activeCount !== null && activeCount !== undefined && finalCap < activeCount;
@@ -2604,18 +2609,16 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                 <input
-                                  type="number" min={activeCount ?? 0}
+                                  type="number"
                                   value={rawVal !== undefined ? rawVal : req.requested_cap}
                                   onChange={e => { setCapReqFinalCaps(prev => ({ ...prev, [req.id]: e.target.value })); setCapReqApproveErrors(prev => { const n = { ...prev }; delete n[req.id]; return n; }); }}
                                   style={{ width: 70, padding: '5px 8px', borderRadius: 6, border: `1px solid ${belowActive ? '#dc3545' : 'var(--surface-border)'}`, background: 'var(--surface-ground)', fontSize: 13, fontFamily: 'var(--mono)', fontWeight: 600, color: 'var(--text-heading)', outline: 'none', textAlign: 'center' }}
                                 />
                                 <span style={{ fontSize: 11, fontWeight: 700, color: dirColor }}>{dirSymbol}</span>
                               </div>
-                              {activeCount !== null && activeCount !== undefined && (
-                                <span style={{ fontSize: 11, color: belowActive ? '#dc3545' : 'var(--text-color-secondary)' }}>
-                                  Min: {activeCount}
-                                </span>
-                              )}
+                              <span style={{ fontSize: 11, color: belowActive ? '#dc3545' : 'var(--text-color-secondary)' }}>
+                                = {isNaN(finalCap) ? '—' : finalCap}{activeCount !== null && activeCount !== undefined ? ` (min ${activeCount})` : ''}
+                              </span>
                             </div>
                           );
                         })()}

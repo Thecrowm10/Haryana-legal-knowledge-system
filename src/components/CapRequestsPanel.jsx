@@ -80,9 +80,11 @@ export default function CapRequestsPanel({ assignableRoles }) {
   async function handleCapReqSubmit() {
     if (!capReqForm.role_id)        { setCapReqError(t('capRequests.errors.roleRequired')); return; }
     if (capReqForm.requested_cap === '') { setCapReqError(t('capRequests.errors.capRequired')); return; }
-    const reqCap = Number(capReqForm.requested_cap);
-    if (isNaN(reqCap) || reqCap < 0) { setCapReqError(t('capRequests.errors.capInvalid')); return; }
-    if (capReqActiveCount !== null && reqCap < capReqActiveCount) {
+    const changeBy = Number(capReqForm.requested_cap);
+    if (isNaN(changeBy)) { setCapReqError(t('capRequests.errors.capInvalid')); return; }
+    const newCap = currentCap + changeBy;
+    if (newCap < 0) { setCapReqError(t('capRequests.errors.capInvalid')); return; }
+    if (capReqActiveCount !== null && newCap < capReqActiveCount) {
       setCapReqError(t('capRequests.errors.capBelowActive', { count: capReqActiveCount }));
       return;
     }
@@ -91,7 +93,7 @@ export default function CapRequestsPanel({ assignableRoles }) {
     try {
       const fd = new FormData();
       fd.append('role_id', String(Number(capReqForm.role_id)));
-      fd.append('requested_cap', String(reqCap));
+      fd.append('requested_cap', String(changeBy));
       if (capReqForm.reason.trim()) fd.append('reason', capReqForm.reason.trim());
       fd.append('file', capReqForm.file);
       await submitCapRequest(fd);
@@ -183,17 +185,20 @@ export default function CapRequestsPanel({ assignableRoles }) {
             </SelectField>
           </div>
           <div>
-            <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('capRequests.requestedMaxUsers')} <span style={{ color: '#dc3545' }}>*</span></label>
+            <label style={{ ...LABEL, display: 'block', marginBottom: 6 }}>{t('capRequests.changeAmount')} <span style={{ color: '#dc3545' }}>*</span></label>
             <input
-              type="number" min="0"
+              type="number"
               value={capReqForm.requested_cap}
               onChange={e => { setCapReqForm(f => ({ ...f, requested_cap: e.target.value })); setCapReqError(''); setCapReqSuccess(''); }}
-              placeholder={t('capRequests.enterNewCap')}
+              placeholder={t('capRequests.enterChangeAmount')}
               style={INP}
             />
             {selectedRoleId && (
               <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginTop: 5, display: 'flex', flexDirection: 'column', gap: 2 }}>
                 <span>{t('capRequests.currentCap')}: <strong style={{ color: 'var(--text-heading)', fontFamily: 'var(--mono)' }}>{currentCap}</strong>{!existingCap && <span> ({t('capRequests.systemDefault')})</span>}</span>
+                {capReqForm.requested_cap !== '' && !isNaN(Number(capReqForm.requested_cap)) && (
+                  <span>{t('capRequests.newCapPreview')}: <strong style={{ color: 'var(--text-heading)', fontFamily: 'var(--mono)' }}>{currentCap + Number(capReqForm.requested_cap)}</strong></span>
+                )}
                 <span>
                   {t('capRequests.activeUsersInRole')}:{' '}
                   {capReqActiveLoading
@@ -202,7 +207,7 @@ export default function CapRequestsPanel({ assignableRoles }) {
                       ? <strong style={{ color: capReqActiveCount > 0 ? '#b45309' : 'var(--text-heading)', fontFamily: 'var(--mono)' }}>{capReqActiveCount}</strong>
                       : '—'
                   }
-                  {capReqActiveCount !== null && <span style={{ color: 'var(--text-color-secondary)' }}> ({t('capRequests.minimumRequestableCap')})</span>}
+                  {capReqActiveCount !== null && <span style={{ color: 'var(--text-color-secondary)' }}> ({t('capRequests.resultingCapMinimum')})</span>}
                 </span>
               </div>
             )}
@@ -286,7 +291,9 @@ export default function CapRequestsPanel({ assignableRoles }) {
                   <div style={{ fontSize: 13, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>
                     {req.current_cap != null ? req.current_cap : <span style={{ fontSize: 11 }}>{t('capRequests.defaultCap', { n: capReqCaps.default_max })}</span>}
                   </div>
-                  <div style={{ fontSize: 13, fontFamily: 'var(--mono)', fontWeight: 600, color: 'var(--text-heading)' }}>{req.requested_cap}</div>
+                  <div style={{ fontSize: 13, fontFamily: 'var(--mono)', fontWeight: 600, color: req.requested_cap > 0 ? '#16a34a' : req.requested_cap < 0 ? '#dc3545' : 'var(--text-heading)' }}>
+                    {req.requested_cap > 0 ? `+${req.requested_cap}` : req.requested_cap}
+                  </div>
                   <div>
                     <span style={{ padding: '3px 9px', borderRadius: 6, fontSize: 11.5, fontWeight: 600, color: sb.color, background: sb.bg }}>{sb.label}</span>
                   </div>
