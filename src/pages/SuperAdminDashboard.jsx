@@ -7,10 +7,10 @@ import Badge from '../components/ui/Badge';
 import SelectField from '../components/ui/SelectField';
 import DateField from '../components/ui/DateField';
 import DocViewModal from '../components/DocViewModal';
-import { getUsers, getRoles, updateUser, registerUser, getApproversByDepartment } from '../services/users';
+import { getUsers, getRoles, updateUser, registerUser, getApproversByDepartment, getActiveUsersByRole } from '../services/users';
 import { getDepartments, createDepartment, toggleDepartment, getDocumentTypes, createDocumentType, toggleDocumentType } from '../services/departments';
 import { getRoleCaps, upsertRoleCap, deleteRoleCap, getActiveUserCount } from '../services/roleCaps';
-import { getAllDocumentsAdmin, getAllDepartmentLinks } from '../services/pdf';
+import { getAllDocumentsAdmin, getAllDocumentsSuperAdmin, getAllDepartmentLinks } from '../services/pdf';
 import { getAuditLogs, getAuditLogActions } from '../services/audit';
 import { getPendingCapRequests, reviewCapRequest, getCapRequestAttachment } from '../services/capRequests';
 import { useMediaQuery } from '../hooks/useMediaQuery';
@@ -192,8 +192,10 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
       .finally(() => setDocTypesLoading(false));
   }, [activePage, t]);
 
-  // All Uploads state
+  // All Uploads state — filtering/pagination happens server-side via
+  // getAllDocumentsSuperAdmin, so allDocs only ever holds the current page.
   const [allDocs, setAllDocs]           = useState([]);
+  const [allDocsTotal, setAllDocsTotal] = useState(0); // rows matching the current filters (server total, drives pagination)
   const [allDocCounts, setAllDocCounts] = useState({ count_total: 0, count_pending: 0, count_approved: 0, count_rejected: 0 });
   const [allDocsLoading, setAllDocsLoading] = useState(false);
   const [allDocsError, setAllDocsError] = useState('');
@@ -202,36 +204,74 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
   const [uploadsFilterUploader, setUploadsFilterUploader] = useState('');
   const [uploadsFilterApprover, setUploadsFilterApprover] = useState('');
   const [uploadsFilterDept, setUploadsFilterDept]         = useState('');
+  const [uploaderOptions, setUploaderOptions]             = useState([]); // scoped to uploadsFilterDept — all users when no dept selected
+  const [approverOptions, setApproverOptions]             = useState([]);
   const [viewDoc, setViewDoc]                             = useState(null);
   const [reportGenerating, setReportGenerating] = useState(false);
   const [dailyReportDate, setDailyReportDate]     = useState(() => new Date().toISOString().split('T')[0]);
   const [dailyReportLoading, setDailyReportLoading] = useState(false);
   const [dailyReportError, setDailyReportError]   = useState('');
-  const [uploadsPage, setUploadsPage] = useState(1); // client-side pagination over filteredDocs — only 10 shown at a time
+  const [uploadsPage, setUploadsPage] = useState(1); // server-side pagination — UPLOADS_PAGE_SIZE rows per page
   const UPLOADS_PAGE_SIZE = 10;
   useEffect(() => { setUploadsPage(1); }, [uploadsSearch, uploadsFilterStatus, uploadsFilterUploader, uploadsFilterApprover, uploadsFilterDept]);
+  // A department switch can invalidate the selected uploader/approver (they may
+  // belong to a different department, or not be active there at all).
+  useEffect(() => { setUploadsFilterUploader(''); setUploadsFilterApprover(''); }, [uploadsFilterDept]);
 
+  // Departments list for the filter dropdown — fetched once per visit to the tab.
+  useEffect(() => {
+    if (activePage !== 'alluploads') return;
+    getDepartments().then(res => setDepts(res.data)).catch(() => {});
+  }, [activePage]);
+
+  // Uploader/Approver dropdown options — every active user of that role when no
+  // department is selected, otherwise only those active in the selected department.
+  useEffect(() => {
+    if (activePage !== 'alluploads') return;
+    const deptId = uploadsFilterDept || undefined;
+    const toOption = u => ({ value: u.id, label: [u.first_name, u.last_name].filter(Boolean).join(' ') || u.username });
+    Promise.all([
+      getActiveUsersByRole('uploader', deptId),
+      getActiveUsersByRole('approver', deptId),
+    ])
+      .then(([upRes, apRes]) => {
+        setUploaderOptions((upRes.data || []).map(toOption));
+        setApproverOptions((apRes.data || []).map(toOption));
+      })
+      .catch(() => { setUploaderOptions([]); setApproverOptions([]); });
+  }, [activePage, uploadsFilterDept]);
+
+  // Debounced so typing in the document-name search box doesn't fire a
+  // request per keystroke.
   useEffect(() => {
     if (activePage !== 'alluploads') return;
     setAllDocsLoading(true);
     setAllDocsError('');
-    Promise.all([
-      getAllDocumentsAdmin(),
-      getDepartments(),
-    ])
-      .then(([docsRes, deptsRes]) => {
-        setAllDocs(docsRes.data.documents || []);
-        setAllDocCounts({
-          count_total:    docsRes.data.count_total    ?? 0,
-          count_pending:  docsRes.data.count_pending  ?? 0,
-          count_approved: docsRes.data.count_approved ?? 0,
-          count_rejected: docsRes.data.count_rejected ?? 0,
-        });
-        setDepts(deptsRes.data);
+    const timer = setTimeout(() => {
+      getAllDocumentsSuperAdmin({
+        skip: (uploadsPage - 1) * UPLOADS_PAGE_SIZE,
+        limit: UPLOADS_PAGE_SIZE,
+        status: uploadsFilterStatus || undefined,
+        departmentId: uploadsFilterDept || undefined,
+        uploaderId: uploadsFilterUploader || undefined,
+        approverId: uploadsFilterApprover || undefined,
+        documentNameStartsWith: uploadsSearch || undefined,
       })
-      .catch(() => setAllDocsError(t('uploads.failedToLoad')))
-      .finally(() => setAllDocsLoading(false));
-  }, [activePage, t]);
+        .then(res => {
+          setAllDocs(res.data.documents || []);
+          setAllDocsTotal(res.data.total || 0);
+          setAllDocCounts({
+            count_total:    res.data.count_total    ?? 0,
+            count_pending:  res.data.count_pending  ?? 0,
+            count_approved: res.data.count_approved ?? 0,
+            count_rejected: res.data.count_rejected ?? 0,
+          });
+        })
+        .catch(() => setAllDocsError(t('uploads.failedToLoad')))
+        .finally(() => setAllDocsLoading(false));
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [activePage, uploadsPage, uploadsFilterStatus, uploadsFilterDept, uploadsFilterUploader, uploadsFilterApprover, uploadsSearch, t]);
 
   // Audit Log state
   const [auditLogs, setAuditLogs]               = useState([]);
@@ -1849,49 +1889,11 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
     const pendingDocs  = allDocCounts.count_pending;
     const rejectedDocs = allDocCounts.count_rejected;
 
-    // unique uploaders
-    const uploaderOptions = [];
-    const seenUp = new Set();
-    for (const d of allDocs) {
-      if (d.uploader_username && !seenUp.has(d.uploader_username)) {
-        seenUp.add(d.uploader_username);
-        const label = [d.uploader_first_name, d.uploader_last_name].filter(Boolean).join(' ') || d.uploader_username;
-        uploaderOptions.push({ value: d.uploader_username, label });
-      }
-    }
-    // unique approvers
-    const approverOptions = [];
-    const seenAp = new Set();
-    for (const d of allDocs) {
-      const key = d.latest_approval?.approver_username;
-      if (key && !seenAp.has(key)) {
-        seenAp.add(key);
-        const label = [d.latest_approval.approver_first_name, d.latest_approval.approver_last_name].filter(Boolean).join(' ') || key;
-        approverOptions.push({ value: key, label });
-      }
-    }
-
-    const filteredDocs = allDocs.filter(d => {
-      if (uploadsFilterStatus && d.status !== uploadsFilterStatus) return false;
-      if (uploadsFilterUploader && d.uploader_username !== uploadsFilterUploader) return false;
-      if (uploadsFilterApprover && d.latest_approval?.approver_username !== uploadsFilterApprover) return false;
-      if (uploadsFilterDept) {
-        const dName = depts.find(dep => String(dep.id) === uploadsFilterDept)?.name;
-        if (dName && d.department_name !== dName) return false;
-      }
-      if (uploadsSearch) {
-        const q = uploadsSearch.toLowerCase();
-        const name = (d.document_name || d.original_filename || '').toLowerCase();
-        const dept = (d.department_name || '').toLowerCase();
-        const up   = (d.uploader_username || '').toLowerCase();
-        if (!name.includes(q) && !dept.includes(q) && !up.includes(q)) return false;
-      }
-      return true;
-    });
-
-    const uploadsTotalPages = Math.max(1, Math.ceil(filteredDocs.length / UPLOADS_PAGE_SIZE));
+    // allDocs is already the current page, filtered server-side by
+    // getAllDocumentsSuperAdmin — no client-side filtering/slicing needed.
+    const pageDocs = allDocs;
+    const uploadsTotalPages = Math.max(1, Math.ceil(allDocsTotal / UPLOADS_PAGE_SIZE));
     const clampedUploadsPage = Math.min(uploadsPage, uploadsTotalPages);
-    const pageDocs = filteredDocs.slice((clampedUploadsPage - 1) * UPLOADS_PAGE_SIZE, clampedUploadsPage * UPLOADS_PAGE_SIZE);
 
     const SC = {
       approved: { color: '#16a34a', bg: 'rgba(25, 135, 84,.1)',   label: t('uploads.stats.approved') },
@@ -1908,7 +1910,18 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
           ? (depts.find(d => String(d.id) === uploadsFilterDept)?.name || 'Department')
           : 'AllDepartments';
         const allDeptNames = !uploadsFilterDept ? depts.map(d => d.name) : [];
-        await downloadUploadsExcelReport({ docs: filteredDocs, departments: [], allDeptNames, fileLabel: deptLabel });
+        // Report needs every matching row, not just the current page — re-fetch
+        // with the same filters and the max page size instead of reusing allDocs.
+        const res = await getAllDocumentsSuperAdmin({
+          skip: 0,
+          limit: 1000,
+          status: uploadsFilterStatus || undefined,
+          departmentId: uploadsFilterDept || undefined,
+          uploaderId: uploadsFilterUploader || undefined,
+          approverId: uploadsFilterApprover || undefined,
+          documentNameStartsWith: uploadsSearch || undefined,
+        });
+        await downloadUploadsExcelReport({ docs: res.data.documents || [], departments: [], allDeptNames, fileLabel: deptLabel });
       } finally {
         setReportGenerating(false);
       }
@@ -2053,7 +2066,7 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
               </button>
             )}
             <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
-              {t('uploads.countOf', { shown: filteredDocs.length, total: totalDocs })}
+              {t('uploads.countOf', { shown: allDocs.length, total: allDocsTotal })}
             </div>
 
             <button onClick={handleDownloadReport} disabled={reportGenerating}
@@ -2075,7 +2088,7 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
           )}
 
           {!allDocsLoading && !allDocsError && (
-            filteredDocs.length === 0 ? (
+            allDocs.length === 0 ? (
               <div style={{ padding: '50px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>
                 {t('uploads.noMatch')}
               </div>

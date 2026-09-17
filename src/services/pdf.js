@@ -30,6 +30,20 @@ export const getApproverDocuments = (status, skip = 0, limit = 100) => api.get('
 export const reviewDocument       = (pdf_id, action, comments, annotations_json) => api.post('/pdf/review', { pdf_id, action, ...(comments ? { comments } : {}), ...(annotations_json ? { annotations_json } : {}) });
 export const getPdfFile           = (id)                              => api.get(`/pdf/${id}/file`, { responseType: 'arraybuffer' });
 export const getAllDocumentsAdmin  = (status, skip = 0, limit = 500)  => publicApi.get('/pdf/all', { params: { skip, limit, ...(status ? { status } : {}) } });
+// Super Admin — server-side filtered/paginated version of getAllDocumentsAdmin above.
+// Requires a Super Admin login (goes through the authenticated `api` client, not publicApi).
+export const getAllDocumentsSuperAdmin = ({ skip = 0, limit = 20, status, departmentId, uploaderId, approverId, documentNameStartsWith } = {}) =>
+  api.get('/pdf/super-admin/all', {
+    params: {
+      skip,
+      limit,
+      ...(status ? { status } : {}),
+      ...(departmentId ? { department_id: departmentId } : {}),
+      ...(uploaderId ? { uploader_id: uploaderId } : {}),
+      ...(approverId ? { approver_id: approverId } : {}),
+      ...(documentNameStartsWith ? { document_name_starts_with: documentNameStartsWith } : {}),
+    },
+  });
 // Nodal Officer's own department(s) only — scoped server-side from the token, unlike
 // getAllDocumentsAdmin above (which returns every document system-wide with no auth).
 export const getMyDepartmentDocuments = (status, skip = 0, limit = 500) => api.get('/pdf/my-department/all', { params: { skip, limit, ...(status ? { status } : {}) } });
