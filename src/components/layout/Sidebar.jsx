@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BarChart2, GitBranch, ClipboardList, Users, Settings, FileSearch, BarChart, Layers, Link2, BookOpen, ShieldCheck, Building2, ChevronDown, CheckCircle2, ArrowUpDown } from 'lucide-react';
+import { BarChart2, GitBranch, ClipboardList, Users, Settings, FileSearch, BarChart, Layers, Link2, BookOpen, ShieldCheck, Building2, ChevronDown, CheckCircle2, ArrowUpDown, Unlock } from 'lucide-react';
 import haryanaLogo from '../../assets/haryana-logo.png';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { switchAdminDepartment } from '../../services/pdf';
@@ -58,6 +58,7 @@ const MENU_CONFIG = {
     ]},
     { label: 'sidebar.groups.system', items: [
       { icon: ArrowUpDown,   label: 'sidebar.items.capRequests',     id: 'caprequests' },
+      { icon: Unlock,        label: 'sidebar.items.unlockRequests',  id: 'nodalunlockrequests' },
       { icon: ClipboardList, label: 'sidebar.items.misReport',       id: 'nodalauditfull' },
     ]},
   ],

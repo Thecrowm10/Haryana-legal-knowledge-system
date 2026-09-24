@@ -51,6 +51,7 @@ const BREADCRUMBS = {
   nodaluploads:   ['topbar.crumbs.nodalOfficerLabel', 'topbar.crumbs.allUploads'],
   nodalactparts:  ['topbar.crumbs.nodalOfficerLabel', 'topbar.crumbs.actPartsReview'],
   nodalauditfull: ['topbar.crumbs.nodalOfficerLabel', 'topbar.crumbs.misReport'],
+  nodalunlockrequests: ['topbar.crumbs.nodalOfficerLabel', 'topbar.crumbs.unlockRequests'],
 };
 const DEFAULT_CRUMB = ['topbar.crumbs.dashboard'];
 

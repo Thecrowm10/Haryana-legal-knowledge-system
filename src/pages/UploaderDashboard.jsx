@@ -5,7 +5,7 @@ import {
   RotateCcw, AlertCircle, Eye, GitBranch, Plus, FolderPlus,
   Layers, ChevronRight, ChevronDown, AlertTriangle, CheckSquare, Square,
   Edit3, Tag, Search, MessageSquare, MessageCircle, ZoomIn, ZoomOut, RotateCw, ExternalLink,
-  Save, ArrowRight, Paperclip,
+  Save, ArrowRight, Paperclip, Trash2,
 } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
@@ -169,6 +169,7 @@ const UD_RESPONSIVE_CSS = `
   @media (max-width: 1024px) {
     .ud-docview-grid { grid-template-columns: 1fr !important; grid-auto-rows: min-content !important; overflow-y: auto !important; }
     .ud-docview-preview { max-height: 60vh !important; }
+    .ud-stats-grid { grid-template-columns: repeat(3,1fr) !important; }
   }
   @media (max-width: 640px) {
     .ud-welcome-title { font-size: 18px !important; }
@@ -685,9 +686,9 @@ function DocViewModal({ doc, onClose }) {
     .filter(({ key }) => !TYPEEXTRA_SKIP.has(key))
     .map(({ key }) => [key, doc.typeFields?.[key] || '']);
 
-  const statusAccent = doc.status === 'approved' ? '#16a34a' : doc.status === 'rejected' ? '#dc3545' : doc.status === 'draft' ? '#64748b' : '#ffc107';
-  const statusBg     = doc.status === 'approved' ? 'rgba(25, 135, 84,.1)'  : doc.status === 'rejected' ? 'rgba(220, 53, 69,.1)'  : doc.status === 'draft' ? 'rgba(100, 116, 139,.1)' : 'rgba(255, 193, 7,.1)';
-  const StatusIconV  = doc.status === 'approved' ? CheckCircle : doc.status === 'rejected' ? XCircle : doc.status === 'draft' ? FileText : Clock;
+  const statusAccent = doc.status === 'approved' ? '#16a34a' : doc.status === 'rejected' ? '#dc3545' : doc.status === 'draft' ? '#64748b' : doc.status === 'returned' ? '#0ea5e9' : doc.status === 'deleted' ? '#6b7280' : '#ffc107';
+  const statusBg     = doc.status === 'approved' ? 'rgba(25, 135, 84,.1)'  : doc.status === 'rejected' ? 'rgba(220, 53, 69,.1)'  : doc.status === 'draft' ? 'rgba(100, 116, 139,.1)' : doc.status === 'returned' ? 'rgba(14, 165, 233,.1)' : doc.status === 'deleted' ? 'rgba(107, 114, 128,.1)' : 'rgba(255, 193, 7,.1)';
+  const StatusIconV  = doc.status === 'approved' ? CheckCircle : doc.status === 'rejected' ? XCircle : doc.status === 'draft' ? FileText : doc.status === 'returned' ? RotateCcw : doc.status === 'deleted' ? Trash2 : Clock;
   const typeColor    = TYPE_CARD_COLORS[doc.type] || { accent: '#94a3b8', bg: 'rgba(148,163,184,.12)', text: '#64748b' };
 
   const iconBtn = {
@@ -722,7 +723,7 @@ function DocViewModal({ doc, onClose }) {
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px 6px 10px', borderRadius: 20, background: statusBg, border: `1px solid ${statusAccent}44`, flexShrink: 0 }}>
           <StatusIconV size={13} color={statusAccent} />
           <span style={{ fontSize: 11.5, fontWeight: 700, color: statusAccent, fontFamily: 'var(--mono)', letterSpacing: '.04em' }}>
-            {doc.status === 'approved' ? t('common.statusApproved') : doc.status === 'rejected' ? t('common.statusRejected') : doc.status === 'draft' ? 'DRAFT' : t('common.statusPending')}
+            {doc.status === 'approved' ? t('common.statusApproved') : doc.status === 'rejected' ? t('common.statusRejected') : doc.status === 'draft' ? 'DRAFT' : doc.status === 'returned' ? t('common.statusReturned') : doc.status === 'deleted' ? t('common.statusDeleted') : t('common.statusPending')}
           </span>
         </div>
         {/* Close */}
@@ -1131,7 +1132,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   }, [showTypeChanger]);
 
   const [uploads, setUploads] = useState([]);
-  const [docCounts, setDocCounts] = useState({ total: 0, pending: 0, approved: 0, rejected: 0, draft: 0 });
+  const [docCounts, setDocCounts] = useState({ total: 0, pending: 0, approved: 0, rejected: 0, draft: 0, returned: 0 });
   const [myDocsLoading, setMyDocsLoading] = useState(false);
   const [myDocsError,   setMyDocsError]   = useState('');
   const [remarksModal,  setRemarksModal]  = useState(null);
@@ -1165,6 +1166,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       // summary:         d.summary || '',
       amendmentProvisions,
       uploadedAt:      d.created_at?.split('T')[0] || '',
+      modifiedAt:      d.modified_on?.split('T')[0] || '',
       uploader:        (d.uploader_first_name || d.uploader_last_name)
                           ? `${d.uploader_first_name || ''} ${d.uploader_last_name || ''}`.trim()
                           : (d.uploader_username || ''),
@@ -1233,6 +1235,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
           approved: myRes.data.count_approved ?? 0,
           rejected: myRes.data.count_rejected ?? 0,
           draft:    myRes.data.count_draft    ?? 0,
+          returned: myRes.data.count_returned ?? 0,
         });
         setLinkedDocs(Array.isArray(linkedRes.data) ? linkedRes.data : []);
       })
@@ -1314,6 +1317,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   function openEditDoc(doc) {
     setEditingDoc(doc);
     const initialForm = {
+      document_type_id:   doc.docTypeId ?? null,
+      document_type_name: doc.type || '',
       document_name:     doc.title || '',
       reference_number:  doc.referenceNumber || '',
       issue_date:        doc.enactmentDate || '',
@@ -1376,8 +1381,9 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     // Drafts can be saved incomplete, but resubmitting one for review must meet the same
     // required fields the upload wizard marks for this document type — otherwise a draft
     // could skip required-field validation entirely by going through Edit instead of Upload.
+    const currentEditType = editForm.document_type_name || editingDoc.type;
     if (submitForApproval) {
-      const required = EDIT_REQUIRED_FIELDS_BY_TYPE[editingDoc.type] || EDIT_REQUIRED_FIELDS_DEFAULT;
+      const required = EDIT_REQUIRED_FIELDS_BY_TYPE[currentEditType] || EDIT_REQUIRED_FIELDS_DEFAULT;
       const missingKeys = required.filter(key => !(editForm[key] || '').toString().trim());
       if (missingKeys.length > 0) {
         const missingLabels = missingKeys.map(key => t(EDIT_REQUIRED_FIELD_LABEL_KEYS[key]));
@@ -1394,12 +1400,13 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
 
     setEditSaving(true);
     const tf = editForm.typeFields || {};
-    const typeId = editingDoc.docTypeId ?? typesData.find(d => d.name === editingDoc.type)?.id ?? null;
+    const typeId = editForm.document_type_id ?? editingDoc.docTypeId ?? typesData.find(d => d.name === editingDoc.type)?.id ?? null;
     let description = editForm.description;
-    // Rejected docs always resubmit on save. Drafts only resubmit if the user explicitly
-    // hit "Submit for Approval" — saving a draft with the plain Save button must NOT
-    // flip it to pending.
-    const resubmit = editingDoc.status === 'rejected'
+    // Rejected docs, and docs returned to the uploader via an approved unlock
+    // request, always resubmit on save. Drafts only resubmit if the user
+    // explicitly hit "Submit for Approval" — saving a draft with the plain
+    // Save button must NOT flip it to pending.
+    const resubmit = (editingDoc.status === 'rejected' || editingDoc.status === 'returned')
       ? true
       : (editingDoc.status === 'draft' ? submitForApproval : false);
     try {
@@ -1471,7 +1478,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       if (!editFileSelected && resubmit) {
         setUploads(prev => prev.map(d => d.id === editingDoc.id ? { ...d, status: 'pending', approval: null } : d));
       }
-      const successMsg = editFileSelected && editingDoc.status === 'rejected'
+      const successMsg = editFileSelected && (editingDoc.status === 'rejected' || editingDoc.status === 'returned')
         ? t('toasts.fileReplacedAndResubmitted')
         : editFileSelected
           ? t('toasts.fileReplaced')
@@ -2572,6 +2579,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     const pending   = docCounts.pending;
     const rejected  = docCounts.rejected;
     const drafts    = docCounts.draft;
+    const returned  = docCounts.returned;
+    const deletedCount = uploads.filter(d => d.status === 'deleted').length;
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
@@ -2716,10 +2725,11 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
 
         {/* Full-screen edit modal */}
         {editingDoc && editForm && (() => {
-          const etypeColor = TYPE_CARD_COLORS[editingDoc.type] || { accent: '#94a3b8', bg: 'rgba(148,163,184,.12)', text: '#64748b' };
-          const estatusAccent = editingDoc.status === 'approved' ? '#16a34a' : editingDoc.status === 'rejected' ? '#dc3545' : '#ffc107';
-          const estatusBg = editingDoc.status === 'approved' ? 'rgba(25,135,84,.1)' : editingDoc.status === 'rejected' ? 'rgba(220,53,69,.1)' : 'rgba(255,193,7,.1)';
-          const EStatusIcon = editingDoc.status === 'approved' ? CheckCircle : editingDoc.status === 'rejected' ? XCircle : Clock;
+          const currentEditType = editForm.document_type_name || editingDoc.type;
+          const etypeColor = TYPE_CARD_COLORS[currentEditType] || { accent: '#94a3b8', bg: 'rgba(148,163,184,.12)', text: '#64748b' };
+          const estatusAccent = editingDoc.status === 'approved' ? '#16a34a' : editingDoc.status === 'rejected' ? '#dc3545' : editingDoc.status === 'returned' ? '#0ea5e9' : editingDoc.status === 'deleted' ? '#6b7280' : '#ffc107';
+          const estatusBg = editingDoc.status === 'approved' ? 'rgba(25,135,84,.1)' : editingDoc.status === 'rejected' ? 'rgba(220,53,69,.1)' : editingDoc.status === 'returned' ? 'rgba(14,165,233,.1)' : editingDoc.status === 'deleted' ? 'rgba(107,114,128,.1)' : 'rgba(255,193,7,.1)';
+          const EStatusIcon = editingDoc.status === 'approved' ? CheckCircle : editingDoc.status === 'rejected' ? XCircle : editingDoc.status === 'returned' ? RotateCcw : editingDoc.status === 'deleted' ? Trash2 : Clock;
           const hasEditChanges = editFileSelected !== null || JSON.stringify(editForm) !== JSON.stringify(editFormOriginal);
           const saveBtnDisabled = editSaving || editFileUploading || !(editForm?.document_name || '').trim() || !hasEditChanges;
           // Submitting a draft as-is (no field changes) is a valid action — it only flips
@@ -2755,7 +2765,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                 <div className="ud-edit-titlebox" style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{editingDoc.title}</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 20, background: etypeColor.bg, color: etypeColor.text || etypeColor.accent }}>{editingDoc.type}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 20, background: etypeColor.bg, color: etypeColor.text || etypeColor.accent }}>{currentEditType}</span>
                     <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)' }}>{editingDoc.dept}</span>
                     <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: .7 }}>· {editingDoc.year}</span>
                     {/* Version tag hidden until proper API mapping for versions is wired up — keep for future use.
@@ -2766,7 +2776,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px 6px 10px', borderRadius: 20, background: estatusBg, border: `1px solid ${estatusAccent}44`, flexShrink: 0 }}>
                   <EStatusIcon size={13} color={estatusAccent} />
                   <span style={{ fontSize: 11.5, fontWeight: 700, color: estatusAccent, fontFamily: 'var(--mono)', letterSpacing: '.04em' }}>
-                    {editingDoc.status === 'approved' ? 'APPROVED' : editingDoc.status === 'rejected' ? 'REJECTED' : editingDoc.status === 'draft' ? 'DRAFT' : 'PENDING'}
+                    {editingDoc.status === 'approved' ? 'APPROVED' : editingDoc.status === 'rejected' ? 'REJECTED' : editingDoc.status === 'draft' ? 'DRAFT' : editingDoc.status === 'returned' ? t('common.statusReturned') : editingDoc.status === 'deleted' ? 'DELETED' : 'PENDING'}
                   </span>
                 </div>
                 <button type="button" className="ud-edit-actions-btn" onClick={closeEditDoc} disabled={editSaving}
@@ -2903,7 +2913,22 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                       <input value={editForm.document_name} onChange={e => { setEditForm(f => ({ ...f, document_name: e.target.value })); clearMissingField('document_name'); }} style={{ ...INPUT_BASE, ...missingFieldStyle('document_name') }} onFocus={focusStyle} onBlur={blurStyle} />
                     </div>
                     <div>
-                      <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.referenceNo')} {editingDoc.type !== 'Miscellaneous' && <span style={{ color: '#dc3545' }}>*</span>}</div>
+                      <div style={{ ...LABEL, marginBottom: 6 }}>{t('editDocument.documentType')} <span style={{ color: '#dc3545' }}>*</span></div>
+                      <SelectField
+                        value={editForm.document_type_id ?? ''}
+                        onChange={e => {
+                          const newId = e.target.value ? Number(e.target.value) : null;
+                          const newName = typesData.find(dt => dt.id === newId)?.name || '';
+                          // The old type's fields don't apply to the new type — clear them
+                          // instead of carrying over values that no longer make sense.
+                          setEditForm(f => ({ ...f, document_type_id: newId, document_type_name: newName, typeFields: {} }));
+                        }}
+                      >
+                        {typesData.map(dt => <option key={dt.id} value={dt.id}>{dt.name}</option>)}
+                      </SelectField>
+                    </div>
+                    <div>
+                      <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.referenceNo')} {currentEditType !== 'Miscellaneous' && <span style={{ color: '#dc3545' }}>*</span>}</div>
                       <input value={editForm.reference_number} onChange={e => { setEditForm(f => ({ ...f, reference_number: e.target.value })); clearMissingField('reference_number'); }} style={{ ...INPUT_BASE, ...missingFieldStyle('reference_number') }} onFocus={focusStyle} onBlur={blurStyle} />
                     </div>
                     <div className="ud-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -2924,7 +2949,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                       <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.gazetteReference')}</div>
                       <input value={editForm.gazette_reference} onChange={e => setEditForm(f => ({ ...f, gazette_reference: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
                     </div>
-                    {editingDoc.type !== 'Act' && (
+                    {currentEditType !== 'Act' && (
                     <div>
                       <div style={{ ...LABEL, marginBottom: 6 }}>{t('docViewModal.legalAuthority')}</div>
                       <input value={editForm.legal_authority} onChange={e => setEditForm(f => ({ ...f, legal_authority: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
@@ -2932,7 +2957,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                     )}
                     <div className="ud-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                       <div>
-                        <div style={{ ...LABEL, marginBottom: 6 }}>{t('editDocument.shortTitle')} {editingDoc.type === 'Act' && <span style={{ color: '#dc3545' }}>*</span>}</div>
+                        <div style={{ ...LABEL, marginBottom: 6 }}>{t('editDocument.shortTitle')} {currentEditType === 'Act' && <span style={{ color: '#dc3545' }}>*</span>}</div>
                         <input value={editForm.short_title} onChange={e => { setEditForm(f => ({ ...f, short_title: e.target.value })); clearMissingField('short_title'); }} style={{ ...INPUT_BASE, ...missingFieldStyle('short_title') }} onFocus={focusStyle} onBlur={blurStyle} />
                       </div>
                       <div>
@@ -2956,11 +2981,11 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                         rows={4}
                         style={{ ...INPUT_BASE, resize: 'none', lineHeight: 1.6, cursor: 'pointer', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)' }} />
                     </div>
-                    {(EDIT_TYPE_FIELD_KEYS[editingDoc.type] || []).length > 0 && (
+                    {(EDIT_TYPE_FIELD_KEYS[currentEditType] || []).length > 0 && (
                       <div>
                         <div style={{ ...LABEL, marginBottom: 10 }}>{t('editDocument.typeSpecificFields')}</div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                          {EDIT_TYPE_FIELD_KEYS[editingDoc.type].map(({ key, inputType }) => (
+                          {EDIT_TYPE_FIELD_KEYS[currentEditType].map(({ key, inputType }) => (
                             <div key={key}>
                               {inputType === 'checkbox' ? (
                                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--text-color)', cursor: 'pointer' }}>
@@ -2981,7 +3006,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                         </div>
                       </div>
                     )}
-                    {(editingDoc.status === 'pending' || editingDoc.status === 'rejected' || editingDoc.status === 'draft') && (
+                    {(editingDoc.status === 'pending' || editingDoc.status === 'rejected' || editingDoc.status === 'draft' || editingDoc.status === 'returned') && (
                       <div style={{ borderTop: '1px solid var(--surface-border)', paddingTop: 16 }}>
                         <div style={{ ...LABEL, marginBottom: 8 }}>
                           {t('replaceFileModal.title')} <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-color-secondary)', textTransform: 'none', letterSpacing: 0 }}>({t('common.optional', 'optional')})</span>
@@ -3058,7 +3083,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                             <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 3, opacity: .7 }}>PDF or Word (.docx)</div>
                           </div>
                         )}
-                        {editingDoc.status === 'rejected' && editFileSelected && (
+                        {(editingDoc.status === 'rejected' || editingDoc.status === 'returned') && editFileSelected && (
                           <div style={{ marginTop: 10, padding: '8px 14px', borderRadius: 8, background: 'rgba(33,74,171,.06)', border: '1px solid rgba(33,74,171,.25)', fontSize: 12.5, color: 'var(--primary)' }}>
                             {t('replaceFileModal.resubmitDesc')}
                           </div>
@@ -3108,7 +3133,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderRadius: 10, background: 'rgba(220, 53, 69,.08)', border: '1px solid rgba(220, 53, 69,.2)', color: '#dc2626' }}>
             <AlertCircle size={15} style={{ flexShrink: 0 }} />
             <span style={{ fontSize: 13 }}>{myDocsError}</span>
-            <button onClick={() => { setMyDocsError(''); setMyDocsLoading(true); getMyDocuments().then(r => { setUploads((r.data.documents||[]).map(mapApiDoc)); setDocCounts({ total: r.data.count_total ?? (r.data.documents||[]).length, pending: r.data.count_pending ?? 0, approved: r.data.count_approved ?? 0, rejected: r.data.count_rejected ?? 0, draft: r.data.count_draft ?? 0 }); }).catch(e => setMyDocsError(e.response?.data?.detail || t('toasts.failedToLoadDocuments'))).finally(() => setMyDocsLoading(false)); }}
+            <button onClick={() => { setMyDocsError(''); setMyDocsLoading(true); getMyDocuments().then(r => { setUploads((r.data.documents||[]).map(mapApiDoc)); setDocCounts({ total: r.data.count_total ?? (r.data.documents||[]).length, pending: r.data.count_pending ?? 0, approved: r.data.count_approved ?? 0, rejected: r.data.count_rejected ?? 0, draft: r.data.count_draft ?? 0, returned: r.data.count_returned ?? 0 }); }).catch(e => setMyDocsError(e.response?.data?.detail || t('toasts.failedToLoadDocuments'))).finally(() => setMyDocsLoading(false)); }}
               style={{ marginLeft: 'auto', padding: '5px 14px', borderRadius: 7, border: '1px solid rgba(220, 53, 69,.3)', background: 'transparent', color: '#dc2626', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
               {t('common.retry')}
             </button>
@@ -3125,12 +3150,14 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
         ) : (
         <>
         <div style={{ ...LABEL }}>{t('dashboard.overviewLabel')}</div>
-        <div className="ud-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 16 }}>
+        <div className="ud-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 16 }}>
           {[
             { label: t('stats.totalUploads'),  value: docCounts.total, bg: 'rgba(33, 74, 171,.12)',  color: 'var(--primary)', icon: FileText,    filter: 'all' },
             { label: t('stats.approved'),       value: approved,        bg: 'rgba(25, 135, 84,.12)',  color: '#198754',        icon: CheckCircle, filter: 'approved' },
             { label: t('stats.pendingReview'), value: pending,         bg: 'rgba(255, 193, 7,.12)', color: '#b45309',        icon: TrendingUp,  filter: 'pending' },
             { label: t('stats.rejected'),       value: rejected,        bg: 'rgba(220, 53, 69,.12)',  color: '#dc3545',        icon: XCircle,     filter: 'rejected' },
+            { label: t('stats.returnedForEdit'), value: returned,       bg: 'rgba(14, 165, 233,.12)', color: '#0ea5e9',        icon: RotateCcw,   filter: 'returned' },
+            { label: t('stats.deleted'),        value: deletedCount,    bg: 'rgba(107, 114, 128,.12)', color: '#6b7280',       icon: Trash2,      filter: 'deleted' },
             { label: 'Drafts',                  value: drafts,          bg: 'rgba(100, 116, 139,.12)', color: '#64748b',       icon: FileText,    filter: 'draft' },
           ].map(s => {
             const isActive = filterStatus === s.filter;
@@ -3220,6 +3247,8 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                          : filterStatus === 'pending'  ? uploads.filter(d => d.status === 'pending')
                          : filterStatus === 'rejected' ? uploads.filter(d => d.status === 'rejected')
                          : filterStatus === 'draft'    ? uploads.filter(d => d.status === 'draft')
+                         : filterStatus === 'returned' ? uploads.filter(d => d.status === 'returned')
+                         : filterStatus === 'deleted'  ? uploads.filter(d => d.status === 'deleted')
                          : uploads;
           const allFiltered = baseList
             .filter(d => !tableSearch || d.title.toLowerCase().includes(tableSearch.toLowerCase()))
@@ -3281,7 +3310,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
               {/* Active status filter chip */}
               {filterStatus && filterStatus !== 'all' && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px 5px 12px', borderRadius: 20, background: 'rgba(33, 74, 171,.08)', border: '1px solid rgba(33, 74, 171,.2)', fontSize: 12, fontWeight: 600, color: 'var(--primary)', whiteSpace: 'nowrap' }}>
-                  {{ approved: t('stats.approved'), pending: t('stats.pendingReview'), rejected: t('stats.rejected'), draft: 'Drafts' }[filterStatus]}
+                  {{ approved: t('stats.approved'), pending: t('stats.pendingReview'), rejected: t('stats.rejected'), draft: 'Drafts', returned: t('stats.returnedForEdit'), deleted: t('stats.deleted') }[filterStatus]}
                   <button onClick={() => setFilterStatus('')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--primary)', display: 'flex', padding: 0, marginLeft: 2 }}><X size={11} /></button>
                 </div>
               )}
@@ -3340,10 +3369,10 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                       <button type="button" onClick={() => { setFilterType(''); setTypeDropdownOpen(false); }}
                         style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '9px 12px', borderRadius: 9, border: 'none', background: !filterType ? 'rgba(33, 74, 171,.12)' : 'transparent', color: !filterType ? 'var(--primary)' : 'var(--text-color)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                         {t('table.allTypes')}
-                        <span style={{ fontSize: 11, fontFamily: 'var(--mono)', opacity: .6 }}>{uploads.length}</span>
+                        <span style={{ fontSize: 11, fontFamily: 'var(--mono)', opacity: .6 }}>{baseList.length}</span>
                       </button>
                       {TYPES.map(type => {
-                        const count  = uploads.filter(d => d.type === type).length;
+                        const count  = baseList.filter(d => d.type === type).length;
                         const active = filterType === type;
                         const c = TYPE_CARD_COLORS[type] || { accent: '#94a3b8', bg: 'rgba(148,163,184,.1)', text: '#64748b' };
                         return (
@@ -3364,7 +3393,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               {TYPES.map(type => {
-                const count  = uploads.filter(d => d.type === type).length;
+                const count  = baseList.filter(d => d.type === type).length;
                 const active = filterType === type;
                 const c = TYPE_CARD_COLORS[type] || { accent: '#94a3b8', bg: 'rgba(148,163,184,.1)', text: '#64748b' };
                 return (
@@ -3418,14 +3447,14 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                     const isDraft      = !doc.workflowStatus || doc.workflowStatus === WORKFLOW_STATUS.DRAFT;
                     const isPublished  = doc.workflowStatus === WORKFLOW_STATUS.PUBLISHED;
                     const isSelected   = selectedIds.has(doc.id);
-                    const statusAccent = doc.status === 'approved' ? '#16a34a' : doc.status === 'rejected' ? '#dc3545' : doc.status === 'draft' ? '#64748b' : '#ffc107';
-                    const statusBg     = doc.status === 'approved' ? 'rgba(25, 135, 84,.07)' : doc.status === 'rejected' ? 'rgba(220, 53, 69,.07)' : doc.status === 'draft' ? 'rgba(100, 116, 139,.07)' : 'rgba(255, 193, 7,.07)';
-                    const statusBorder = doc.status === 'approved' ? 'rgba(25, 135, 84,.25)' : doc.status === 'rejected' ? 'rgba(220, 53, 69,.25)' : doc.status === 'draft' ? 'rgba(100, 116, 139,.25)' : 'rgba(255, 193, 7,.25)';
+                    const statusAccent = doc.status === 'approved' ? '#16a34a' : doc.status === 'rejected' ? '#dc3545' : doc.status === 'draft' ? '#64748b' : doc.status === 'returned' ? '#0ea5e9' : doc.status === 'deleted' ? '#6b7280' : '#ffc107';
+                    const statusBg     = doc.status === 'approved' ? 'rgba(25, 135, 84,.07)' : doc.status === 'rejected' ? 'rgba(220, 53, 69,.07)' : doc.status === 'draft' ? 'rgba(100, 116, 139,.07)' : doc.status === 'returned' ? 'rgba(14, 165, 233,.07)' : doc.status === 'deleted' ? 'rgba(107, 114, 128,.07)' : 'rgba(255, 193, 7,.07)';
+                    const statusBorder = doc.status === 'approved' ? 'rgba(25, 135, 84,.25)' : doc.status === 'rejected' ? 'rgba(220, 53, 69,.25)' : doc.status === 'draft' ? 'rgba(100, 116, 139,.25)' : doc.status === 'returned' ? 'rgba(14, 165, 233,.25)' : doc.status === 'deleted' ? 'rgba(107, 114, 128,.25)' : 'rgba(255, 193, 7,.25)';
                     const typeColor    = TYPE_CARD_COLORS[doc.type] || { accent: '#94a3b8', bg: 'rgba(148,163,184,.1)', text: '#64748b' };
                     const approverName = doc.approval?.approver_first_name
                       ? `${doc.approval.approver_first_name} ${doc.approval.approver_last_name || ''}`.trim()
                       : doc.approval?.approver_username;
-                    const StatusIcon = doc.status === 'approved' ? CheckCircle : doc.status === 'rejected' ? XCircle : doc.status === 'draft' ? FileText : Clock;
+                    const StatusIcon = doc.status === 'approved' ? CheckCircle : doc.status === 'rejected' ? XCircle : doc.status === 'draft' ? FileText : doc.status === 'returned' ? RotateCcw : doc.status === 'deleted' ? Trash2 : Clock;
 
                     // Mobile: the desktop layout is a fixed 5-6 column grid row (~585px of fixed
                     // columns alone) that can't be reflowed with CSS alone, so it becomes a stacked
@@ -3456,7 +3485,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px 3px 6px', borderRadius: 20, background: statusBg, border: `1px solid ${statusBorder}`, flexShrink: 0 }}>
                               <StatusIcon size={10} color={statusAccent} />
                               <span style={{ fontSize: 9.5, fontWeight: 700, color: statusAccent, fontFamily: 'var(--mono)' }}>
-                                {doc.status === 'approved' ? t('common.statusApproved') : doc.status === 'rejected' ? t('common.statusRejected') : doc.status === 'draft' ? 'DRAFT' : t('common.statusPending')}
+                                {doc.status === 'approved' ? t('common.statusApproved') : doc.status === 'rejected' ? t('common.statusRejected') : doc.status === 'draft' ? 'DRAFT' : doc.status === 'returned' ? t('common.statusReturned') : doc.status === 'deleted' ? t('common.statusDeleted') : t('common.statusPending')}
                               </span>
                             </div>
                           </div>
@@ -3543,7 +3572,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px 4px 8px', borderRadius: 20, background: statusBg, border: `1px solid ${statusBorder}`, alignSelf: 'flex-start' }}>
                             <StatusIcon size={11} color={statusAccent} />
                             <span style={{ fontSize: 10.5, fontWeight: 700, color: statusAccent, fontFamily: 'var(--mono)', letterSpacing: '.05em' }}>
-                              {doc.status === 'approved' ? t('common.statusApproved') : doc.status === 'rejected' ? t('common.statusRejected') : doc.status === 'draft' ? 'DRAFT' : t('common.statusPending')}
+                              {doc.status === 'approved' ? t('common.statusApproved') : doc.status === 'rejected' ? t('common.statusRejected') : doc.status === 'draft' ? 'DRAFT' : doc.status === 'returned' ? t('common.statusReturned') : doc.status === 'deleted' ? t('common.statusDeleted') : t('common.statusPending')}
                             </span>
                           </div>
                           {approverName && (
@@ -3567,6 +3596,14 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                             onMouseLeave={e => e.currentTarget.style.background = 'rgba(33, 74, 171,.07)'}>
                             <Eye size={13} /> {t('common.view')}
                           </button>
+                          {doc.status !== 'approved' && doc.status !== 'deleted' && (
+                            <button onClick={() => openEditDoc(doc)}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 7, border: '1px solid rgba(14, 165, 233,.35)', background: 'rgba(14, 165, 233,.08)', color: '#0ea5e9', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', whiteSpace: 'nowrap', transition: 'background .15s' }}
+                              onMouseEnter={e => e.currentTarget.style.background = 'rgba(14, 165, 233,.16)'}
+                              onMouseLeave={e => e.currentTarget.style.background = 'rgba(14, 165, 233,.08)'}>
+                              <Edit3 size={13} /> {t('editDocument.editButton')}
+                            </button>
+                          )}
                           {doc.approval?.comments && (
                             <button onClick={() => setRemarksModal(doc)}
                               style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '7px 12px', borderRadius: 7, border: `1px solid ${statusBorder}`, background: statusBg, color: statusAccent, fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', whiteSpace: 'nowrap', transition: 'opacity .15s' }}>
@@ -3878,7 +3915,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                         </td>
                       </tr>
                     ) : pageItems.map(d => {
-                      const editable = d.status !== 'approved';
+                      const editable = d.status !== 'approved' && d.status !== 'deleted';
                       return (
                         <tr key={d.id} style={{ borderTop: '1px solid var(--surface-border)' }}>
                           <td style={{ padding: '8px 12px', color: 'var(--text-heading)', fontWeight: 600 }}>{d.title || '—'}</td>
@@ -3887,7 +3924,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                           <td style={{ padding: '8px 12px', borderLeft: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)' }}>{d.dept || '—'}</td>
                           <td className="ud-editlist-version" style={{ padding: '8px 12px', borderLeft: '1px solid var(--surface-border)', fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)' }}>{d.version || '—'}</td>
                           <td style={{ padding: '8px 12px', borderLeft: '1px solid var(--surface-border)', color: 'var(--text-color-secondary)', textTransform: 'capitalize' }}>
-                            {{ approved: t('common.statusWordApproved'), pending: t('common.statusWordPending'), rejected: t('common.statusWordRejected'), draft: 'Draft' }[d.status] || d.status || '—'}
+                            {{ approved: t('common.statusWordApproved'), pending: t('common.statusWordPending'), rejected: t('common.statusWordRejected'), draft: 'Draft', returned: t('common.statusWordReturned'), deleted: t('common.statusWordDeleted') }[d.status] || d.status || '—'}
                           </td>
                           <td style={{ padding: '8px 12px', borderLeft: '1px solid var(--surface-border)' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -3933,10 +3970,11 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
 
         {/* Full-screen edit modal */}
         {editingDoc && editForm && (() => {
-          const etypeColor = TYPE_CARD_COLORS[editingDoc.type] || { accent: '#94a3b8', bg: 'rgba(148,163,184,.12)', text: '#64748b' };
-          const estatusAccent = editingDoc.status === 'approved' ? '#16a34a' : editingDoc.status === 'rejected' ? '#dc3545' : '#ffc107';
-          const estatusBg = editingDoc.status === 'approved' ? 'rgba(25,135,84,.1)' : editingDoc.status === 'rejected' ? 'rgba(220,53,69,.1)' : 'rgba(255,193,7,.1)';
-          const EStatusIcon = editingDoc.status === 'approved' ? CheckCircle : editingDoc.status === 'rejected' ? XCircle : Clock;
+          const currentEditType = editForm.document_type_name || editingDoc.type;
+          const etypeColor = TYPE_CARD_COLORS[currentEditType] || { accent: '#94a3b8', bg: 'rgba(148,163,184,.12)', text: '#64748b' };
+          const estatusAccent = editingDoc.status === 'approved' ? '#16a34a' : editingDoc.status === 'rejected' ? '#dc3545' : editingDoc.status === 'returned' ? '#0ea5e9' : editingDoc.status === 'deleted' ? '#6b7280' : '#ffc107';
+          const estatusBg = editingDoc.status === 'approved' ? 'rgba(25,135,84,.1)' : editingDoc.status === 'rejected' ? 'rgba(220,53,69,.1)' : editingDoc.status === 'returned' ? 'rgba(14,165,233,.1)' : editingDoc.status === 'deleted' ? 'rgba(107,114,128,.1)' : 'rgba(255,193,7,.1)';
+          const EStatusIcon = editingDoc.status === 'approved' ? CheckCircle : editingDoc.status === 'rejected' ? XCircle : editingDoc.status === 'returned' ? RotateCcw : editingDoc.status === 'deleted' ? Trash2 : Clock;
           const hasEditChanges = editFileSelected !== null || JSON.stringify(editForm) !== JSON.stringify(editFormOriginal);
           const saveBtnDisabled = editSaving || editFileUploading || !(editForm?.document_name || '').trim() || !hasEditChanges;
           // Submitting a draft as-is (no field changes) is a valid action — it only flips
@@ -3972,7 +4010,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                 <div className="ud-edit-titlebox" style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-heading)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{editingDoc.title}</div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 20, background: etypeColor.bg, color: etypeColor.text || etypeColor.accent }}>{editingDoc.type}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 9px', borderRadius: 20, background: etypeColor.bg, color: etypeColor.text || etypeColor.accent }}>{currentEditType}</span>
                     <span style={{ fontSize: 11.5, color: 'var(--text-color-secondary)' }}>{editingDoc.dept}</span>
                     <span style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', opacity: .7 }}>· {editingDoc.year}</span>
                     {/* Version tag hidden until proper API mapping for versions is wired up — keep for future use.
@@ -3983,7 +4021,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px 6px 10px', borderRadius: 20, background: estatusBg, border: `1px solid ${estatusAccent}44`, flexShrink: 0 }}>
                   <EStatusIcon size={13} color={estatusAccent} />
                   <span style={{ fontSize: 11.5, fontWeight: 700, color: estatusAccent, fontFamily: 'var(--mono)', letterSpacing: '.04em' }}>
-                    {editingDoc.status === 'approved' ? 'APPROVED' : editingDoc.status === 'rejected' ? 'REJECTED' : editingDoc.status === 'draft' ? 'DRAFT' : 'PENDING'}
+                    {editingDoc.status === 'approved' ? 'APPROVED' : editingDoc.status === 'rejected' ? 'REJECTED' : editingDoc.status === 'draft' ? 'DRAFT' : editingDoc.status === 'returned' ? t('common.statusReturned') : editingDoc.status === 'deleted' ? 'DELETED' : 'PENDING'}
                   </span>
                 </div>
                 <button type="button" className="ud-edit-actions-btn" onClick={closeEditDoc} disabled={editSaving}
@@ -4120,7 +4158,22 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                       <input value={editForm.document_name} onChange={e => { setEditForm(f => ({ ...f, document_name: e.target.value })); clearMissingField('document_name'); }} style={{ ...INPUT_BASE, ...missingFieldStyle('document_name') }} onFocus={focusStyle} onBlur={blurStyle} />
                     </div>
                     <div>
-                      <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.referenceNo')} {editingDoc.type !== 'Miscellaneous' && <span style={{ color: '#dc3545' }}>*</span>}</div>
+                      <div style={{ ...LABEL, marginBottom: 6 }}>{t('editDocument.documentType')} <span style={{ color: '#dc3545' }}>*</span></div>
+                      <SelectField
+                        value={editForm.document_type_id ?? ''}
+                        onChange={e => {
+                          const newId = e.target.value ? Number(e.target.value) : null;
+                          const newName = typesData.find(dt => dt.id === newId)?.name || '';
+                          // The old type's fields don't apply to the new type — clear them
+                          // instead of carrying over values that no longer make sense.
+                          setEditForm(f => ({ ...f, document_type_id: newId, document_type_name: newName, typeFields: {} }));
+                        }}
+                      >
+                        {typesData.map(dt => <option key={dt.id} value={dt.id}>{dt.name}</option>)}
+                      </SelectField>
+                    </div>
+                    <div>
+                      <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.referenceNo')} {currentEditType !== 'Miscellaneous' && <span style={{ color: '#dc3545' }}>*</span>}</div>
                       <input value={editForm.reference_number} onChange={e => { setEditForm(f => ({ ...f, reference_number: e.target.value })); clearMissingField('reference_number'); }} style={{ ...INPUT_BASE, ...missingFieldStyle('reference_number') }} onFocus={focusStyle} onBlur={blurStyle} />
                     </div>
                     <div className="ud-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -4141,7 +4194,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                       <div style={{ ...LABEL, marginBottom: 6 }}>{t('common.gazetteReference')}</div>
                       <input value={editForm.gazette_reference} onChange={e => setEditForm(f => ({ ...f, gazette_reference: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
                     </div>
-                    {editingDoc.type !== 'Act' && (
+                    {currentEditType !== 'Act' && (
                     <div>
                       <div style={{ ...LABEL, marginBottom: 6 }}>{t('docViewModal.legalAuthority')}</div>
                       <input value={editForm.legal_authority} onChange={e => setEditForm(f => ({ ...f, legal_authority: e.target.value }))} style={INPUT_BASE} onFocus={focusStyle} onBlur={blurStyle} />
@@ -4149,7 +4202,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                     )}
                     <div className="ud-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                       <div>
-                        <div style={{ ...LABEL, marginBottom: 6 }}>{t('editDocument.shortTitle')} {editingDoc.type === 'Act' && <span style={{ color: '#dc3545' }}>*</span>}</div>
+                        <div style={{ ...LABEL, marginBottom: 6 }}>{t('editDocument.shortTitle')} {currentEditType === 'Act' && <span style={{ color: '#dc3545' }}>*</span>}</div>
                         <input value={editForm.short_title} onChange={e => { setEditForm(f => ({ ...f, short_title: e.target.value })); clearMissingField('short_title'); }} style={{ ...INPUT_BASE, ...missingFieldStyle('short_title') }} onFocus={focusStyle} onBlur={blurStyle} />
                       </div>
                       <div>
@@ -4173,11 +4226,11 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                         rows={4}
                         style={{ ...INPUT_BASE, resize: 'none', lineHeight: 1.6, cursor: 'pointer', background: 'var(--surface-ground)', color: 'var(--text-color-secondary)' }} />
                     </div>
-                    {(EDIT_TYPE_FIELD_KEYS[editingDoc.type] || []).length > 0 && (
+                    {(EDIT_TYPE_FIELD_KEYS[currentEditType] || []).length > 0 && (
                       <div>
                         <div style={{ ...LABEL, marginBottom: 10 }}>{t('editDocument.typeSpecificFields')}</div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                          {EDIT_TYPE_FIELD_KEYS[editingDoc.type].map(({ key, inputType }) => (
+                          {EDIT_TYPE_FIELD_KEYS[currentEditType].map(({ key, inputType }) => (
                             <div key={key}>
                               {inputType === 'checkbox' ? (
                                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--text-color)', cursor: 'pointer' }}>
@@ -4198,7 +4251,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                         </div>
                       </div>
                     )}
-                    {(editingDoc.status === 'pending' || editingDoc.status === 'rejected' || editingDoc.status === 'draft') && (
+                    {(editingDoc.status === 'pending' || editingDoc.status === 'rejected' || editingDoc.status === 'draft' || editingDoc.status === 'returned') && (
                       <div style={{ borderTop: '1px solid var(--surface-border)', paddingTop: 16 }}>
                         <div style={{ ...LABEL, marginBottom: 8 }}>
                           {t('replaceFileModal.title')} <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-color-secondary)', textTransform: 'none', letterSpacing: 0 }}>({t('common.optional', 'optional')})</span>
@@ -4275,7 +4328,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                             <div style={{ fontSize: 11, color: 'var(--text-color-secondary)', marginTop: 3, opacity: .7 }}>PDF or Word (.docx)</div>
                           </div>
                         )}
-                        {editingDoc.status === 'rejected' && editFileSelected && (
+                        {(editingDoc.status === 'rejected' || editingDoc.status === 'returned') && editFileSelected && (
                           <div style={{ marginTop: 10, padding: '8px 14px', borderRadius: 8, background: 'rgba(33,74,171,.06)', border: '1px solid rgba(33,74,171,.25)', fontSize: 12.5, color: 'var(--primary)' }}>
                             {t('replaceFileModal.resubmitDesc')}
                           </div>

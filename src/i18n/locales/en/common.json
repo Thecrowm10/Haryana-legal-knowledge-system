@@ -37,7 +37,8 @@
       "complianceReport": "Compliance Report",
       "actPartsReview": "Act Parts Review",
       "roleCaps": "Role User Limits",
-      "capRequests": "User Limit Change Requests"
+      "capRequests": "User Limit Change Requests",
+      "unlockRequests": "Unlock Requests"
     }
   },
   "topbar": {
@@ -74,6 +75,7 @@
       "masterDataManager": "Master Data Manager",
       "roleCaps": "Role User Limits",
       "capRequests": "User Limit Change Requests",
+      "unlockRequests": "Unlock Requests",
       "fullMisReport": "Full MIS Report",
       "allUploads": "All Uploads",
       "auditorLabel": "Auditor",

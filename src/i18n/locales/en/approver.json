@@ -117,6 +117,24 @@
     "approvedHeader": "APPROVED — REVIEWER REMARKS",
     "rejectedHeader": "REJECTED — REVIEWER REMARKS"
   },
+  "unlockRequest": {
+    "heading": "Need a change to this approved document?",
+    "requestEdit": "Request Unlock to Edit",
+    "requestDelete": "Request Unlock to Delete",
+    "requestEditConfirm": "This asks the Nodal Officer of this department to unlock the document so the uploader can edit it.",
+    "requestDeleteConfirm": "This asks the Nodal Officer of this department to approve permanently removing this document from the citizen portal.",
+    "reasonLabel": "Reason",
+    "reasonRequiredPlaceholder": "Explain why this document needs to be unlocked…",
+    "reasonRequiredHint": "A reason is required before sending this request.",
+    "submitButton": "Send Request",
+    "submitting": "Sending…",
+    "cancel": "Cancel",
+    "editPending": "Unlock-to-edit request sent — awaiting Nodal Officer review.",
+    "deletePending": "Unlock-to-delete request sent — awaiting Nodal Officer review.",
+    "editPendingShort": "Edit Requested",
+    "deletePendingShort": "Delete Requested",
+    "submitFailed": "Failed to send the request. Please try again."
+  },
   "linkReview": {
     "backToRequests": "← Back to Requests",
     "requestedByPrefix": "Requested by",
@@ -185,6 +203,7 @@
       "pending": "Pending",
       "approved": "Approved",
       "rejected": "Rejected",
+      "deleted": "Deleted",
       "total": "Total"
     },
     "searchPlaceholder": "Search by title…",

@@ -9,6 +9,7 @@ import MultiSelectField from '../components/ui/MultiSelectField';
 import DateField from '../components/ui/DateField';
 import DocViewModal from '../components/DocViewModal';
 import CapRequestsPanel from '../components/CapRequestsPanel';
+import UnlockRequestsPanel from '../components/UnlockRequestsPanel';
 import { getUsers, getRoles, updateUser, registerUser, getApproversByDepartment } from '../services/users';
 import { getMyDepartments } from '../services/departments';
 import { getAllDocumentsAdmin, getMyDepartmentDocuments, getAllDepartmentLinks } from '../services/pdf';
@@ -1957,6 +1958,10 @@ export default function NodalOfficerDashboard({ activePage }) {
 
   if (activePage === 'caprequests') {
     return <CapRequestsPanel assignableRoles={assignableRoles} />;
+  }
+
+  if (activePage === 'nodalunlockrequests') {
+    return <UnlockRequestsPanel />;
   }
 
   return null;

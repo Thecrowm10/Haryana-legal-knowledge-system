@@ -73,9 +73,13 @@
     "statusApproved": "APPROVED",
     "statusRejected": "REJECTED",
     "statusPending": "PENDING",
+    "statusReturned": "RETURNED FOR EDIT",
+    "statusDeleted": "DELETED",
     "statusWordApproved": "Approved",
     "statusWordRejected": "Rejected",
     "statusWordPending": "Pending",
+    "statusWordReturned": "Returned for edit",
+    "statusWordDeleted": "Deleted",
     "untitledDocument": "Untitled Document",
     "unclassified": "Unclassified",
     "unassigned": "Unassigned"
@@ -84,7 +88,9 @@
     "totalUploads": "Total Uploads",
     "approved": "Approved",
     "pendingReview": "Pending Review",
-    "rejected": "Rejected"
+    "rejected": "Rejected",
+    "returnedForEdit": "Returned for Edit",
+    "deleted": "Deleted"
   },
   "dashboard": {
     "greeting": "Welcome, {{name}}",
@@ -232,6 +238,7 @@
     "lockedHint": "Approved documents can't be edited directly",
     "editHeading": "Edit Document Details",
     "documentName": "Document Name",
+    "documentType": "Document Type",
     "shortTitle": "Short Title",
     "typeSpecificFields": "Type-Specific Fields",
     "saveChanges": "Save Changes",

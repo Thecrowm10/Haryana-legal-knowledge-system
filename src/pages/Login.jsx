@@ -129,7 +129,7 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
           </div>
 
           {/* Two cards */}
-          <div style={{ display:'flex', gap:24, flexWrap:'wrap', justifyContent:'center' }}>
+          <div style={{ display:'flex', gap:24, flexWrap:'wrap', justifyContent:'center', alignItems:'stretch' }}>
 
             {/* Public Access */}
             <div className="lk-portal-card" role="button" tabIndex={0} onClick={() => onLogin({ role: 'citizen' })}
@@ -145,7 +145,7 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
               <div style={{ width:64, height:64, borderRadius:18, background:'rgba(74,222,128,.15)', border:'1px solid rgba(74,222,128,.3)', display:'flex', alignItems:'center', justifyContent:'center' }}>
                 <Search size={28} color='#4ade80' strokeWidth={1.8} />
               </div>
-              <div>
+              <div style={{ flex:1, display:'flex', flexDirection:'column', justifyContent:'center' }}>
                 <div style={{ fontSize: 'var(--font-size-h3)', fontWeight:800, color:'#fff', marginBottom:8 }}>{t('publicAccessTitle')}</div>
                 <div style={{ fontSize: 'var(--font-size-p2)', color:'rgba(255,255,255,.75)', lineHeight:1.65 }}>
                   {t('publicAccessDesc')}
@@ -171,7 +171,7 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
               <div style={{ width:64, height:64, borderRadius:18, background:'rgba(99,102,241,.15)', border:'1px solid rgba(99,102,241,.3)', display:'flex', alignItems:'center', justifyContent:'center' }}>
                 <Shield size={28} color='#818cf8' strokeWidth={1.8} />
               </div>
-              <div>
+              <div style={{ flex:1, display:'flex', flexDirection:'column', justifyContent:'center' }}>
                 <div style={{ fontSize: 'var(--font-size-h3)', fontWeight:800, color:'#fff', marginBottom:8 }}>{t('officialAccessTitle')}</div>
                 <div style={{ fontSize: 'var(--font-size-p2)', color:'rgba(255,255,255,.75)', lineHeight:1.65 }}>
                   {t('officialAccessDesc')}
@@ -197,7 +197,7 @@ export default function Login({ onLogin, loading, authError, initialScreen = 'po
               <div style={{ width:64, height:64, borderRadius:18, background:'rgba(129,140,248,.15)', border:'1px solid rgba(129,140,248,.3)', display:'flex', alignItems:'center', justifyContent:'center' }}>
                 <ShieldAlert size={28} color='#a5b4fc' strokeWidth={1.8} />
               </div>
-              <div>
+              <div style={{ flex:1, display:'flex', flexDirection:'column', justifyContent:'center' }}>
                 <div style={{ fontSize: 'var(--font-size-h3)', fontWeight:800, color:'#fff', marginBottom:8 }}>{t('adminAccessTitle')}</div>
                 <div style={{ fontSize: 'var(--font-size-p2)', color:'rgba(255,255,255,.75)', lineHeight:1.65 }}>
                   {t('adminAccessDesc')}

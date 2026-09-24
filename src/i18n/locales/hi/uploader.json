@@ -73,9 +73,13 @@
     "statusApproved": "स्वीकृत",
     "statusRejected": "अस्वीकृत",
     "statusPending": "लंबित",
+    "statusReturned": "संपादन हेतु वापस",
+    "statusDeleted": "हटाया गया",
     "statusWordApproved": "स्वीकृत",
     "statusWordRejected": "अस्वीकृत",
     "statusWordPending": "लंबित",
+    "statusWordReturned": "संपादन हेतु वापस",
+    "statusWordDeleted": "हटाया गया",
     "untitledDocument": "शीर्षकहीन दस्तावेज़",
     "unclassified": "अवर्गीकृत",
     "unassigned": "अनिर्धारित"
@@ -84,7 +88,9 @@
     "totalUploads": "कुल अपलोड",
     "approved": "स्वीकृत",
     "pendingReview": "समीक्षा लंबित",
-    "rejected": "अस्वीकृत"
+    "rejected": "अस्वीकृत",
+    "returnedForEdit": "संपादन हेतु वापस",
+    "deleted": "हटाया गया"
   },
   "dashboard": {
     "greeting": "स्वागत है, {{name}}",
@@ -232,6 +238,7 @@
     "lockedHint": "स्वीकृत दस्तावेज़ सीधे संपादित नहीं किए जा सकते",
     "editHeading": "दस्तावेज़ विवरण संपादित करें",
     "documentName": "दस्तावेज़ का नाम",
+    "documentType": "दस्तावेज़ प्रकार",
     "shortTitle": "संक्षिप्त शीर्षक",
     "typeSpecificFields": "प्रकार-विशिष्ट फ़ील्ड",
     "saveChanges": "परिवर्तन सहेजें",

@@ -245,6 +245,7 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
     ...(doc.type !== 'Act' ? [['Legal Authority', doc.authority || '']] : []),
     ['Uploader',        doc.uploader        || ''],
     ['Upload Date',     doc.uploadedAt      || ''],
+    ['Last Modified',   doc.modifiedAt      || ''],
     ['File',            doc.fileName        || ''],
   ];
 

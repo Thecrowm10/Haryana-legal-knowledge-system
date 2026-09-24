@@ -263,5 +263,33 @@
         "pendingDelete": "Del. Pending"
       }
     }
+  },
+  "unlockRequests": {
+    "title": "Unlock Requests",
+    "subtitle": "Approvers in your department(s) are asking to unlock approved documents for editing or deletion.",
+    "loading": "Loading…",
+    "failedToLoad": "Failed to load unlock requests.",
+    "noneReq": "No pending unlock requests.",
+    "actionFailed": "Failed to complete this action.",
+    "headers": {
+      "document": "Document",
+      "type": "Type",
+      "requestedBy": "Requested By",
+      "reason": "Reason",
+      "actions": "Actions"
+    },
+    "typeEdit": "Unlock to Edit",
+    "typeDelete": "Unlock to Delete",
+    "approve": "Approve",
+    "reject": "Reject",
+    "submitting": "Submitting…",
+    "rejectNoteLabel": "Rejection Note (optional)",
+    "rejectNotePlaceholder": "Reason for rejection…",
+    "cancel": "Cancel",
+    "confirmApproveQuestion": "Approve this unlock request for \"{{title}}\"?",
+    "confirmRejectQuestion": "Reject this unlock request for \"{{title}}\"?",
+    "confirmApproveEditBody": "The document will be sent back to the uploader for editing. It will need your original Approver's re-approval once resubmitted.",
+    "confirmApproveDeleteBody": "The document will be permanently deleted and hidden from the citizen portal. This cannot be undone.",
+    "confirmRejectBody": "The document stays approved and unchanged. The Approver will be able to see this request was rejected."
   }
 }

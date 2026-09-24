@@ -4,6 +4,7 @@ import {
   CheckCircle, XCircle, FileText, ChevronDown, Search, Clock,
   Check, X, Eye, Link, ChevronRight, ArrowRight,
   ZoomIn, ZoomOut, RotateCw, ExternalLink, Plus, Highlighter, MessageCircle, Pencil,
+  Unlock, Trash2,
 } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
@@ -13,6 +14,7 @@ import Pagination from '../components/ui/Pagination';
 import Badge from '../components/ui/Badge';
 import { useAuth } from '../hooks/useAuth';
 import { getApproverDocuments, getPdfFile, reviewDocument, getDepartmentLinkRequests, reviewDepartmentLink, saveAnnotationDraft, getAnnotationDraft } from '../services/pdf';
+import { createUnlockRequest, getMyUnlockRequests } from '../services/unlockRequests';
 import { createNotification } from '../services/notifications';
 import { getAllActPartSubmissions, getAllActParts, reviewActPart } from '../services/act_parts';
 import { useMediaQuery } from '../hooks/useMediaQuery';
@@ -106,6 +108,78 @@ function ConfirmDialog({ decision, docTitle, onConfirm, onCancel }) {
             onMouseEnter={e => e.currentTarget.style.filter = 'brightness(0.92)'}
             onMouseLeave={e => e.currentTarget.style.filter = 'none'}>
             <Icon size={14} /> {isApprove ? t('common.approve') : t('common.reject')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Approver asks the Nodal Officer to unlock an approved document for editing
+// or deletion. A reason is mandatory — there's no separate justification
+// attachment for this flow (unlike Cap Change Requests), so the reason text
+// is the only record of why the unlock was requested.
+function UnlockRequestDialog({ requestType, reason, onReasonChange, onConfirm, onCancel, submitting, error }) {
+  const { t } = useTranslation('approver');
+  const isEdit   = requestType === 'edit';
+  const accent   = isEdit ? 'var(--primary)' : 'var(--red)';
+  const accentBg = isEdit ? 'rgba(33, 74, 171,.12)' : 'rgba(220, 53, 69,.12)';
+  const Icon     = isEdit ? Unlock : Trash2;
+  const canSubmit = reason.trim().length > 0 && !submitting;
+
+  useEffect(() => {
+    const onKey = e => { if (e.key === 'Escape') onCancel(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onCancel]);
+
+  return (
+    <div role="dialog" aria-modal="true" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', zIndex: 4000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+      onClick={submitting ? undefined : onCancel}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: 'var(--surface-card)', borderRadius: 16, width: 440, maxWidth: '100%',
+        boxShadow: '0 24px 80px rgba(0,0,0,.35)', borderTop: `3px solid ${accent}`,
+        padding: '26px 26px 22px', animation: 'fadeSlideIn .18s ease',
+      }}>
+        <div style={{ display: 'flex', gap: 14, marginBottom: 18 }}>
+          <div style={{ width: 46, height: 46, borderRadius: '50%', background: accentBg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <Icon size={22} color={accent} />
+          </div>
+          <div style={{ flex: 1, paddingTop: 6, minWidth: 0 }}>
+            <div style={{ fontSize: 14.5, color: 'var(--text-color)', lineHeight: 1.5, fontFamily: 'var(--font)', fontWeight: 600, marginBottom: 6 }}>
+              {isEdit ? t('unlockRequest.requestEdit') : t('unlockRequest.requestDelete')}
+            </div>
+            <div style={{ fontSize: 12.5, color: 'var(--text-color-secondary)', lineHeight: 1.55, fontFamily: 'var(--font)' }}>
+              {isEdit ? t('unlockRequest.requestEditConfirm') : t('unlockRequest.requestDeleteConfirm')}
+            </div>
+          </div>
+        </div>
+        <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-color-secondary)', letterSpacing: '.05em', textTransform: 'uppercase', fontFamily: 'var(--mono)', display: 'block', marginBottom: 6 }}>
+          {t('unlockRequest.reasonLabel')} <span style={{ color: '#dc3545' }}>*</span>
+        </label>
+        <textarea
+          value={reason}
+          onChange={e => onReasonChange(e.target.value)}
+          placeholder={t('unlockRequest.reasonRequiredPlaceholder')}
+          rows={3}
+          autoFocus
+          disabled={submitting}
+          style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', fontSize: 13, color: 'var(--text-color)', outline: 'none', resize: 'vertical', fontFamily: 'var(--font)', boxSizing: 'border-box' }}
+        />
+        {error && (
+          <div style={{ fontSize: 12, color: '#dc3545', marginTop: 8 }}>⚠ {error}</div>
+        )}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
+          <button onClick={onCancel} disabled={submitting}
+            style={{ padding: '9px 18px', borderRadius: 8, border: '1px solid var(--surface-border)', background: 'var(--surface-ground)', color: 'var(--text-color)', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 600, cursor: submitting ? 'not-allowed' : 'pointer', transition: 'background .15s' }}
+            onMouseEnter={e => { if (!submitting) e.currentTarget.style.background = 'var(--surface-hover)'; }}
+            onMouseLeave={e => e.currentTarget.style.background = 'var(--surface-ground)'}>
+            {t('unlockRequest.cancel')}
+          </button>
+          <button onClick={onConfirm} disabled={!canSubmit}
+            title={!reason.trim() ? t('unlockRequest.reasonRequiredHint') : undefined}
+            style={{ padding: '9px 20px', borderRadius: 8, border: 'none', background: canSubmit ? accent : 'var(--surface-border)', color: canSubmit ? '#fff' : 'var(--text-color-secondary)', fontFamily: 'var(--font)', fontSize: 13, fontWeight: 700, cursor: canSubmit ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Icon size={14} /> {submitting ? t('unlockRequest.submitting') : t('unlockRequest.submitButton')}
           </button>
         </div>
       </div>
@@ -999,7 +1073,7 @@ function DocumentDetailsPanel({ doc, reviewAnnotations = [], onScrollToAnnotatio
 
 // 2-Panel Review View
 // PDF on the left, uploader-filled document details on the right.
-function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, deciding }) {
+function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, deciding, unlockPendingType, onUnlockRequested }) {
   const { t } = useTranslation('approver');
   const [confirmDecision, setConfirmDecision] = useState(null); // 'approved' | 'rejected' | null
   const [currentPage, setCurrentPage]   = useState(1);
@@ -1015,6 +1089,44 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, deciding })
   const [showDraftToast, setShowDraftToast] = useState(false);
   const pdfScrollRef = useRef(null);
   const pdfDeleteRef = useRef(null);
+
+  // Unlock request (approved docs only) — ask the Nodal Officer to unlock this
+  // document for editing or for deletion. unlockPendingType comes from the
+  // parent (fetched once for every doc, not per-row) and tracks whether a
+  // request is already awaiting review, so the buttons stay hidden instead of
+  // letting the approver fire off duplicate requests.
+  const [unlockOpenType, setUnlockOpenType]   = useState(null); // 'edit' | 'delete' | null — the form currently open
+  const [unlockReason, setUnlockReason]       = useState('');
+  const [unlockSubmitting, setUnlockSubmitting] = useState(false);
+  const [unlockError, setUnlockError]         = useState('');
+  const [unlockToast, setUnlockToast]         = useState(null); // { type: 'success', msg } | null
+
+  useEffect(() => {
+    if (!unlockToast) return;
+    const timer = setTimeout(() => setUnlockToast(null), 4500);
+    return () => clearTimeout(timer);
+  }, [unlockToast]);
+
+  async function submitUnlockRequest() {
+    if (!unlockOpenType || !unlockReason.trim()) return;
+    setUnlockSubmitting(true);
+    setUnlockError('');
+    try {
+      await createUnlockRequest(doc.id, unlockOpenType, unlockReason.trim());
+      onUnlockRequested(doc.id, unlockOpenType);
+      setUnlockToast({
+        type: 'success',
+        msg: unlockOpenType === 'edit' ? t('unlockRequest.editPending') : t('unlockRequest.deletePending'),
+      });
+      setUnlockOpenType(null);
+      setUnlockReason('');
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      setUnlockError(typeof detail === 'string' ? detail : t('unlockRequest.submitFailed'));
+    } finally {
+      setUnlockSubmitting(false);
+    }
+  }
 
   const [remarkLines, setRemarkLines] = useState(() => {
     if (!remarks) return [''];
@@ -1286,6 +1398,59 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, deciding })
               ))}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Unlock request — approved docs only. Asks the Nodal Officer of this
+          document's department to unlock it for editing or for deletion. */}
+      {doc.status === 'approved' && (
+        <div style={{ padding: '14px 20px', borderTop: '1px solid var(--surface-border)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', letterSpacing: '.05em', textTransform: 'uppercase' }}>
+            {t('unlockRequest.heading')}
+          </div>
+          {unlockPendingType ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 8, background: 'rgba(255,193,7,.08)', border: '1px solid rgba(180,130,0,.25)', color: '#b45309', fontSize: 12.5 }}>
+              {unlockPendingType === 'edit' ? <Unlock size={13} /> : <Trash2 size={13} />}
+              {unlockPendingType === 'edit' ? t('unlockRequest.editPending') : t('unlockRequest.deletePending')}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <button onClick={() => { setUnlockOpenType('edit'); setUnlockReason(''); setUnlockError(''); }}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(33, 74, 171,.3)', background: 'rgba(33, 74, 171,.07)', color: 'var(--primary)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                <Unlock size={13} /> {t('unlockRequest.requestEdit')}
+              </button>
+              <button onClick={() => { setUnlockOpenType('delete'); setUnlockReason(''); setUnlockError(''); }}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', borderRadius: 8, border: '1px solid rgba(220,53,69,.3)', background: 'rgba(220,53,69,.06)', color: '#dc3545', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                <Trash2 size={13} /> {t('unlockRequest.requestDelete')}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {unlockOpenType && (
+        <UnlockRequestDialog
+          requestType={unlockOpenType}
+          reason={unlockReason}
+          onReasonChange={setUnlockReason}
+          onConfirm={submitUnlockRequest}
+          onCancel={() => { setUnlockOpenType(null); setUnlockReason(''); setUnlockError(''); }}
+          submitting={unlockSubmitting}
+          error={unlockError}
+        />
+      )}
+
+      {/* Unlock-request toast — fixed positioning makes it viewport-anchored
+          regardless of where this row is scrolled within the document list. */}
+      {unlockToast && (
+        <div style={{ position: 'fixed', top: 20, right: 20, zIndex: 4500, display: 'flex', alignItems: 'flex-start', gap: 10, padding: '13px 16px', borderRadius: 10, background: 'var(--surface-card)', border: '1px solid #16a34a44', boxShadow: '0 12px 32px rgba(0,0,0,.18)', maxWidth: 380, animation: 'fadeSlideIn .25s ease' }}>
+          <div style={{ width: 26, height: 26, borderRadius: 7, background: 'rgba(25, 135, 84,.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <CheckCircle size={15} color="#16a34a" />
+          </div>
+          <span style={{ fontSize: 13, color: 'var(--text-color)', lineHeight: 1.5, flex: 1, paddingTop: 3, fontFamily: 'var(--font)' }}>{unlockToast.msg}</span>
+          <button type="button" onClick={() => setUnlockToast(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', flexShrink: 0, padding: 3 }}>
+            <X size={14} />
+          </button>
         </div>
       )}
     </div>
@@ -1760,6 +1925,10 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
   const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
   const [docs, setDocs]           = useState([]);
   const [docCounts, setDocCounts] = useState({ count_total: 0, count_pending: 0, count_approved: 0, count_rejected: 0 });
+  // { [pdf_id]: 'edit' | 'delete' } — this approver's own unlock requests still
+  // awaiting Nodal Officer review, so a badge can show on both the collapsed
+  // row and the expanded panel without every row fetching it independently.
+  const [unlockPendingMap, setUnlockPendingMap] = useState({});
   const [loading, setLoading]     = useState(false);
   const [apiError, setApiError]   = useState('');
   const [remarks, setRemarks]     = useState({});
@@ -1851,8 +2020,8 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
     }
     setLoading(true);
     setApiError('');
-    getApproverDocuments()
-      .then(res => {
+    Promise.all([getApproverDocuments(), getMyUnlockRequests().catch(() => ({ data: [] }))])
+      .then(([res, unlockRes]) => {
         setDocs((res.data.documents || []).map(mapApiDoc));
         setDocCounts({
           count_total:    res.data.count_total    ?? 0,
@@ -1860,6 +2029,11 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
           count_approved: res.data.count_approved ?? 0,
           count_rejected: res.data.count_rejected ?? 0,
         });
+        const map = {};
+        for (const r of (unlockRes.data || [])) {
+          if (r.status === 'pending') map[r.pdf_id] = r.request_type;
+        }
+        setUnlockPendingMap(map);
       })
       .catch(err => setApiError(err.response?.data?.detail || t('dashboard.failedToLoadDocuments')))
       .finally(() => setLoading(false));
@@ -2271,11 +2445,12 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
       {!['links', 'actparts'].includes(activePage) && (
         <div>
           <div style={{ ...LABEL, marginBottom: 10 }}>{t('dashboard.overviewLabel')}</div>
-          <div className="ap-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+          <div className="ap-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16 }}>
           {[
             { icon: Clock,       label: t('dashboard.summary.pending'),  value: docCounts.count_pending,  bg: 'rgba(255, 193, 7,.12)', color: '#b45309', key: 'pending'  },
             { icon: CheckCircle, label: t('dashboard.summary.approved'), value: docCounts.count_approved, bg: 'rgba(25, 135, 84,.12)',  color: '#198754', key: 'approved' },
             { icon: XCircle,     label: t('dashboard.summary.rejected'), value: docCounts.count_rejected, bg: 'rgba(220, 53, 69,.12)',  color: '#dc3545', key: 'rejected' },
+            { icon: Trash2,      label: t('dashboard.summary.deleted'),  value: docs.filter(d => d.status === 'deleted').length, bg: 'rgba(107, 114, 128,.12)', color: '#6b7280', key: 'deleted' },
             { icon: FileText,    label: t('dashboard.summary.total'),    value: docCounts.count_total,    bg: 'rgba(33, 74, 171,.12)',  color: 'var(--primary)', key: 'all' },
           ].map(s => {
             const isActive = cardFilter === s.key;
@@ -2478,6 +2653,18 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
                       ))}
                     </div>
                   )}
+                  {unlockPendingMap[doc.id] && (
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 20,
+                      fontSize: 10.5, fontWeight: 700, whiteSpace: 'nowrap',
+                      color: unlockPendingMap[doc.id] === 'edit' ? 'var(--primary)' : '#dc3545',
+                      background: unlockPendingMap[doc.id] === 'edit' ? 'rgba(33, 74, 171,.1)' : 'rgba(220,53,69,.1)',
+                      border: `1px solid ${unlockPendingMap[doc.id] === 'edit' ? 'rgba(33, 74, 171,.3)' : 'rgba(220,53,69,.3)'}`,
+                    }}>
+                      {unlockPendingMap[doc.id] === 'edit' ? <Unlock size={11} /> : <Trash2 size={11} />}
+                      {unlockPendingMap[doc.id] === 'edit' ? t('unlockRequest.editPendingShort') : t('unlockRequest.deletePendingShort')}
+                    </span>
+                  )}
                   <Badge label={doc.status} variant={doc.status} />
                   <span style={{ color: isOpen ? 'var(--primary)' : 'var(--text-color-secondary)', transition: 'transform .2s', transform: isOpen ? 'rotate(180deg)' : 'none', display: 'flex', alignItems: 'center' }}>
                     <ChevronDown size={17} />
@@ -2493,6 +2680,8 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
                   onRemarksChange={val => setRemarks(r => ({ ...r, [doc.id]: val }))}
                   onDecide={(decision, annots) => decide(doc.id, decision, annots)}
                   deciding={deciding?.id === doc.id ? deciding.action : null}
+                  unlockPendingType={unlockPendingMap[doc.id] || null}
+                  onUnlockRequested={(pdfId, type) => setUnlockPendingMap(prev => ({ ...prev, [pdfId]: type }))}
                 />
               )}
             </Card>
