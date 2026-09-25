@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
-import { Users, Edit2, Plus, CheckCircle, XCircle, X, Eye, EyeOff, Download, FileSpreadsheet, Layers, FileText, Clock, Search, Link2 } from 'lucide-react';
+import { Users, Edit2, Plus, CheckCircle, XCircle, X, Eye, EyeOff, Download, FileSpreadsheet, Layers, FileText, Clock, Search, Link2, Trash2 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Pagination from '../components/ui/Pagination';
 import Badge from '../components/ui/Badge';
@@ -8,9 +8,9 @@ import SelectField from '../components/ui/SelectField';
 import DateField from '../components/ui/DateField';
 import DocViewModal from '../components/DocViewModal';
 import CapRequestsPanel from '../components/CapRequestsPanel';
-import { getUsers, getRoles, updateUser, registerUser, getApproversByDepartment } from '../services/users';
+import { getUsers, getRoles, updateUser, registerUser, getApproversByDepartment, getActiveUsersByRole } from '../services/users';
 import { getDepartments } from '../services/departments';
-import { getAllDocumentsAdmin, getAllDepartmentLinks } from '../services/pdf';
+import { getAllDocumentsAdmin, getAllDocumentsAdminScoped, getAllDepartmentLinks } from '../services/pdf';
 import { getAuditLogs, getAuditLogActions } from '../services/audit';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { downloadUploadsExcelReport } from '../utils/uploadsExcelReport';
@@ -114,6 +114,7 @@ export default function AdminDashboard({ activePage }) {
 
   useEffect(() => {
     if (activePage !== 'users') return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setUsersLoading(true);
     setUsersError('');
     const skip = (usersPage - 1) * 10;
@@ -156,44 +157,84 @@ export default function AdminDashboard({ activePage }) {
       .catch(() => {});
   }, [activePage]);
 
-  // All Uploads state
+  // All Uploads state — filtering/pagination happens server-side via
+  // getAllDocumentsAdminScoped, so allDocs only ever holds the current page.
   const [allDocs, setAllDocs]           = useState([]);
-  const [allDocCounts, setAllDocCounts] = useState({ count_total: 0, count_pending: 0, count_approved: 0, count_rejected: 0 });
+  const [allDocsTotal, setAllDocsTotal] = useState(0); // rows matching the current filters (server total, drives pagination)
+  const [allDocCounts, setAllDocCounts] = useState({ count_total: 0, count_pending: 0, count_approved: 0, count_rejected: 0, count_deleted: 0 });
   const [allDocsLoading, setAllDocsLoading] = useState(false);
   const [allDocsError, setAllDocsError] = useState('');
   const [uploadsSearch, setUploadsSearch] = useState('');
   const [uploadsFilterStatus, setUploadsFilterStatus] = useState('');
   const [uploadsFilterUploader, setUploadsFilterUploader] = useState('');
   const [uploadsFilterApprover, setUploadsFilterApprover] = useState('');
+  const [uploaderOptions, setUploaderOptions]             = useState([]);
+  const [approverOptions, setApproverOptions]             = useState([]);
   const [viewDoc, setViewDoc]                             = useState(null);
   const [reportGenerating, setReportGenerating] = useState(false);
-  const [uploadsPage, setUploadsPage] = useState(1); // client-side pagination over filteredDocs — only 10 shown at a time
+  const [uploadsPage, setUploadsPage] = useState(1); // server-side pagination — UPLOADS_PAGE_SIZE rows per page
   const UPLOADS_PAGE_SIZE = 10;
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setUploadsPage(1); }, [uploadsSearch, uploadsFilterStatus, uploadsFilterUploader, uploadsFilterApprover]);
 
+  // Departments list — used elsewhere in this page (e.g. the add-user drawer),
+  // fetched once per visit to the All Uploads tab like before.
   useEffect(() => {
     if (activePage !== 'alluploads') return;
+    getDepartments().then(res => setDepts(res.data)).catch(() => {});
+  }, [activePage]);
+
+  // Uploader/Approver dropdown options — scoped to this admin's own department
+  // when they have one (mirrors the server-side scoping getAllDocumentsAdminScoped
+  // already applies), otherwise every active user of that role. Independent of
+  // the paginated document list, so it stays complete even though `allDocs` no
+  // longer is.
+  useEffect(() => {
+    if (activePage !== 'alluploads') return;
+    const deptId = user?.deptId || undefined;
+    const toOption = u => ({ value: u.id, label: [u.first_name, u.last_name].filter(Boolean).join(' ') || u.username });
+    Promise.all([
+      getActiveUsersByRole('uploader', deptId),
+      getActiveUsersByRole('approver', deptId),
+    ])
+      .then(([upRes, apRes]) => {
+        setUploaderOptions((upRes.data || []).map(toOption));
+        setApproverOptions((apRes.data || []).map(toOption));
+      })
+      .catch(() => { setUploaderOptions([]); setApproverOptions([]); });
+  }, [activePage, user?.deptId]);
+
+  // Debounced so typing in the search box doesn't fire a request per keystroke.
+  useEffect(() => {
+    if (activePage !== 'alluploads') return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setAllDocsLoading(true);
     setAllDocsError('');
-    Promise.all([
-      getAllDocumentsAdmin(),
-      getDepartments(),
-    ])
-      .then(([docsRes, deptsRes]) => {
-        const docs = docsRes.data.documents || [];
-        setAllDocs(user?.dept ? docs.filter(d => d.department_name === user.dept) : docs);
-        setAllDocCounts({
-          count_total:    docsRes.data.count_total    ?? 0,
-          count_pending:  docsRes.data.count_pending  ?? 0,
-          count_approved: docsRes.data.count_approved ?? 0,
-          count_rejected: docsRes.data.count_rejected ?? 0,
-        });
-        setDepts(deptsRes.data);
+    const timer = setTimeout(() => {
+      getAllDocumentsAdminScoped({
+        skip: (uploadsPage - 1) * UPLOADS_PAGE_SIZE,
+        limit: UPLOADS_PAGE_SIZE,
+        status: uploadsFilterStatus || undefined,
+        uploaderId: uploadsFilterUploader || undefined,
+        approverId: uploadsFilterApprover || undefined,
+        documentNameStartsWith: uploadsSearch || undefined,
       })
-      .catch(() => setAllDocsError(t('uploads.failedToLoad')))
-      .finally(() => setAllDocsLoading(false));
-  }, [activePage, t, user?.dept]);
+        .then(res => {
+          setAllDocs(res.data.documents || []);
+          setAllDocsTotal(res.data.total || 0);
+          setAllDocCounts({
+            count_total:    res.data.count_total    ?? 0,
+            count_pending:  res.data.count_pending  ?? 0,
+            count_approved: res.data.count_approved ?? 0,
+            count_rejected: res.data.count_rejected ?? 0,
+            count_deleted:  res.data.count_deleted  ?? 0,
+          });
+        })
+        .catch(() => setAllDocsError(t('uploads.failedToLoad')))
+        .finally(() => setAllDocsLoading(false));
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [activePage, uploadsPage, uploadsFilterStatus, uploadsFilterUploader, uploadsFilterApprover, uploadsSearch, t]);
 
   // Audit Log state
   const [auditLogs, setAuditLogs]               = useState([]);
@@ -222,6 +263,7 @@ export default function AdminDashboard({ activePage }) {
 
   useEffect(() => {
     if (activePage !== 'auditfull') return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setAuditLoading(true);
     setAuditError('');
     const params = { skip: auditPage * AUDIT_PAGE_SIZE, limit: AUDIT_PAGE_SIZE };
@@ -340,6 +382,7 @@ export default function AdminDashboard({ activePage }) {
 
   useEffect(() => {
     if (activePage !== 'linkedocs') return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setAllLinksLoading(true);
     setAllLinksError('');
     Promise.all([getAllDepartmentLinks(), getDepartments()])
@@ -390,6 +433,7 @@ export default function AdminDashboard({ activePage }) {
   const _addFormRoleName = roles.find(r => String(r.id) === String(addForm.role_id))?.name;
   useEffect(() => {
     if (_addFormRoleName !== 'uploader' || !addForm.department_id) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setApprovers([]);
       return;
     }
@@ -452,6 +496,7 @@ export default function AdminDashboard({ activePage }) {
   const _editFormRoleName = roles.find(r => String(r.id) === String(editForm.role_id))?.name;
   useEffect(() => {
     if (_editFormRoleName !== 'uploader' || !editForm.department_id) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setEditApprovers([]);
       return;
     }
@@ -1289,56 +1334,23 @@ export default function AdminDashboard({ activePage }) {
 
   // All Uploads
   if (activePage === 'alluploads') {
-    // When filtering by department use client-side counts (dept scope); otherwise use API totals
-    const totalDocs    = user?.dept ? allDocs.length                                       : allDocCounts.count_total;
-    const approvedDocs = user?.dept ? allDocs.filter(d => d.status === 'approved').length  : allDocCounts.count_approved;
-    const pendingDocs  = user?.dept ? allDocs.filter(d => d.status === 'pending').length   : allDocCounts.count_pending;
-    const rejectedDocs = user?.dept ? allDocs.filter(d => d.status === 'rejected').length  : allDocCounts.count_rejected;
+    // allDocs is already the current page, filtered server-side by
+    // getAllDocumentsAdminScoped — no client-side filtering/slicing needed.
+    const totalDocs    = allDocCounts.count_total;
+    const approvedDocs = allDocCounts.count_approved;
+    const pendingDocs  = allDocCounts.count_pending;
+    const rejectedDocs = allDocCounts.count_rejected;
+    const deletedDocs  = allDocCounts.count_deleted;
 
-    // unique uploaders
-    const uploaderOptions = [];
-    const seenUp = new Set();
-    for (const d of allDocs) {
-      if (d.uploader_username && !seenUp.has(d.uploader_username)) {
-        seenUp.add(d.uploader_username);
-        const label = [d.uploader_first_name, d.uploader_last_name].filter(Boolean).join(' ') || d.uploader_username;
-        uploaderOptions.push({ value: d.uploader_username, label });
-      }
-    }
-    // unique approvers
-    const approverOptions = [];
-    const seenAp = new Set();
-    for (const d of allDocs) {
-      const key = d.latest_approval?.approver_username;
-      if (key && !seenAp.has(key)) {
-        seenAp.add(key);
-        const label = [d.latest_approval.approver_first_name, d.latest_approval.approver_last_name].filter(Boolean).join(' ') || key;
-        approverOptions.push({ value: key, label });
-      }
-    }
-
-    const filteredDocs = allDocs.filter(d => {
-      if (uploadsFilterStatus && d.status !== uploadsFilterStatus) return false;
-      if (uploadsFilterUploader && d.uploader_username !== uploadsFilterUploader) return false;
-      if (uploadsFilterApprover && d.latest_approval?.approver_username !== uploadsFilterApprover) return false;
-      if (uploadsSearch) {
-        const q = uploadsSearch.toLowerCase();
-        const name = (d.document_name || d.original_filename || '').toLowerCase();
-        const dept = (d.department_name || '').toLowerCase();
-        const up   = (d.uploader_username || '').toLowerCase();
-        if (!name.includes(q) && !dept.includes(q) && !up.includes(q)) return false;
-      }
-      return true;
-    });
-
-    const uploadsTotalPages = Math.max(1, Math.ceil(filteredDocs.length / UPLOADS_PAGE_SIZE));
+    const pageDocs = allDocs;
+    const uploadsTotalPages = Math.max(1, Math.ceil(allDocsTotal / UPLOADS_PAGE_SIZE));
     const clampedUploadsPage = Math.min(uploadsPage, uploadsTotalPages);
-    const pageDocs = filteredDocs.slice((clampedUploadsPage - 1) * UPLOADS_PAGE_SIZE, clampedUploadsPage * UPLOADS_PAGE_SIZE);
 
     const SC = {
       approved: { color: '#16a34a', bg: 'rgba(25, 135, 84,.1)',   label: t('uploads.stats.approved') },
       pending:  { color: '#b45309', bg: 'rgba(255, 193, 7,.1)',  label: t('uploads.stats.pending')  },
       rejected: { color: '#dc3545', bg: 'rgba(220, 53, 69,.1)',   label: t('uploads.stats.rejected') },
+      deleted:  { color: '#6b7280', bg: 'rgba(107, 114, 128,.1)', label: t('uploads.statusDeleted') },
     };
     const cols = '4px 1fr 175px 155px 155px 90px';
     const anyFilter = uploadsSearch || uploadsFilterStatus || uploadsFilterUploader || uploadsFilterApprover;
@@ -1346,9 +1358,20 @@ export default function AdminDashboard({ activePage }) {
     async function handleDownloadReport() {
       setReportGenerating(true);
       try {
-        // allDocs is already scoped server-side to this admin's own department(s) —
-        // no department picker needed, the report just covers everything in scope.
-        await downloadUploadsExcelReport({ docs: allDocs, departments: [], fileLabel: 'Admin' });
+        // The report needs every matching row, not just the current page — re-fetch
+        // with the same filters and the max page size instead of reusing allDocs.
+        // Already scoped server-side to this admin's own department(s), same as the
+        // main list — no department picker needed, the report just covers everything
+        // in scope.
+        const res = await getAllDocumentsAdminScoped({
+          skip: 0,
+          limit: 1000,
+          status: uploadsFilterStatus || undefined,
+          uploaderId: uploadsFilterUploader || undefined,
+          approverId: uploadsFilterApprover || undefined,
+          documentNameStartsWith: uploadsSearch || undefined,
+        });
+        await downloadUploadsExcelReport({ docs: res.data.documents || [], departments: [], fileLabel: 'Admin' });
       } finally {
         setReportGenerating(false);
       }
@@ -1359,12 +1382,13 @@ export default function AdminDashboard({ activePage }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20, animation: 'fadeSlideIn .3s ease' }}>
         <style>{ADM_RESPONSIVE_CSS}</style>
         {/* Stats */}
-        <div className="adm-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
+        <div className="adm-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 16 }}>
           {[
             { label: t('uploads.stats.totalUploads'), value: totalDocs,    color: 'var(--primary)', bg: 'rgba(33, 74, 171,.12)',  icon: Layers,      key: '' },
             { label: t('uploads.stats.approved'),      value: approvedDocs, color: '#16a34a',        bg: 'rgba(25, 135, 84,.12)',  icon: CheckCircle, key: 'approved' },
             { label: t('uploads.stats.pending'),       value: pendingDocs,  color: '#b45309',        bg: 'rgba(255, 193, 7,.12)', icon: Clock,       key: 'pending'  },
             { label: t('uploads.stats.rejected'),      value: rejectedDocs, color: '#dc3545',        bg: 'rgba(220, 53, 69,.12)',  icon: XCircle,     key: 'rejected' },
+            { label: t('uploads.statusDeleted'),       value: deletedDocs,  color: '#6b7280',        bg: 'rgba(107, 114, 128,.12)', icon: Trash2,    key: 'deleted' },
           ].map(s => {
             const isActive = uploadsFilterStatus === s.key;
             return (
@@ -1412,6 +1436,7 @@ export default function AdminDashboard({ activePage }) {
               <option value="pending">{t('uploads.statusPending')}</option>
               <option value="approved">{t('uploads.statusApproved')}</option>
               <option value="rejected">{t('uploads.statusRejected')}</option>
+              <option value="deleted">{t('uploads.statusDeleted')}</option>
             </SelectField>
             {anyFilter && (
               <button onClick={() => { setUploadsSearch(''); setUploadsFilterStatus(''); setUploadsFilterUploader(''); setUploadsFilterApprover(''); }}
@@ -1420,7 +1445,7 @@ export default function AdminDashboard({ activePage }) {
               </button>
             )}
             <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
-              {t('uploads.countOf', { shown: filteredDocs.length, total: totalDocs })}
+              {t('uploads.countOf', { shown: allDocs.length, total: allDocsTotal })}
             </div>
 
             <button onClick={handleDownloadReport} disabled={reportGenerating}
@@ -1442,7 +1467,7 @@ export default function AdminDashboard({ activePage }) {
           )}
 
           {!allDocsLoading && !allDocsError && (
-            filteredDocs.length === 0 ? (
+            allDocs.length === 0 ? (
               <div style={{ padding: '50px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>
                 {t('uploads.noMatch')}
               </div>

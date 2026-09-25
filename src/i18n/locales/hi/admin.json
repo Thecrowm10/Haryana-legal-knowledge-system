@@ -211,6 +211,7 @@
     "statusPending": "लंबित",
     "statusApproved": "स्वीकृत",
     "statusRejected": "अस्वीकृत",
+    "statusDeleted": "हटाया गया",
     "clear": "साफ़ करें",
     "countOf": "{{total}} में से {{shown}}",
     "loadingDocuments": "दस्तावेज़ लोड हो रहे हैं…",

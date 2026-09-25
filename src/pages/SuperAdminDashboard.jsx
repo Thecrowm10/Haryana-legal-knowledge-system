@@ -196,7 +196,7 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
   // getAllDocumentsSuperAdmin, so allDocs only ever holds the current page.
   const [allDocs, setAllDocs]           = useState([]);
   const [allDocsTotal, setAllDocsTotal] = useState(0); // rows matching the current filters (server total, drives pagination)
-  const [allDocCounts, setAllDocCounts] = useState({ count_total: 0, count_pending: 0, count_approved: 0, count_rejected: 0 });
+  const [allDocCounts, setAllDocCounts] = useState({ count_total: 0, count_pending: 0, count_approved: 0, count_rejected: 0, count_deleted: 0 });
   const [allDocsLoading, setAllDocsLoading] = useState(false);
   const [allDocsError, setAllDocsError] = useState('');
   const [uploadsSearch, setUploadsSearch] = useState('');
@@ -265,6 +265,7 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
             count_pending:  res.data.count_pending  ?? 0,
             count_approved: res.data.count_approved ?? 0,
             count_rejected: res.data.count_rejected ?? 0,
+            count_deleted:  res.data.count_deleted  ?? 0,
           });
         })
         .catch(() => setAllDocsError(t('uploads.failedToLoad')))
@@ -1888,6 +1889,7 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
     const approvedDocs = allDocCounts.count_approved;
     const pendingDocs  = allDocCounts.count_pending;
     const rejectedDocs = allDocCounts.count_rejected;
+    const deletedDocs  = allDocCounts.count_deleted;
 
     // allDocs is already the current page, filtered server-side by
     // getAllDocumentsSuperAdmin — no client-side filtering/slicing needed.
@@ -1899,6 +1901,7 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
       approved: { color: '#16a34a', bg: 'rgba(25, 135, 84,.1)',   label: t('uploads.stats.approved') },
       pending:  { color: '#b45309', bg: 'rgba(255, 193, 7,.1)',  label: t('uploads.stats.pending')  },
       rejected: { color: '#dc3545', bg: 'rgba(220, 53, 69,.1)',   label: t('uploads.stats.rejected') },
+      deleted:  { color: '#6b7280', bg: 'rgba(107, 114, 128,.1)', label: t('uploads.statusDeleted') },
     };
     const cols = '4px 1fr 175px 155px 155px 90px';
     const anyFilter = uploadsSearch || uploadsFilterStatus || uploadsFilterUploader || uploadsFilterApprover || uploadsFilterDept;
@@ -1999,12 +2002,13 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
         </Card>
 
         {/* Stats */}
-        <div className="adm-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
+        <div className="adm-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 16 }}>
           {[
             { label: t('uploads.stats.totalUploads'), value: totalDocs,    color: 'var(--primary)', bg: 'rgba(33, 74, 171,.12)',  icon: Layers,      key: '' },
             { label: t('uploads.stats.approved'),      value: approvedDocs, color: '#16a34a',        bg: 'rgba(25, 135, 84,.12)',  icon: CheckCircle, key: 'approved' },
             { label: t('uploads.stats.pending'),       value: pendingDocs,  color: '#b45309',        bg: 'rgba(255, 193, 7,.12)', icon: Clock,       key: 'pending'  },
             { label: t('uploads.stats.rejected'),      value: rejectedDocs, color: '#dc3545',        bg: 'rgba(220, 53, 69,.12)',  icon: XCircle,     key: 'rejected' },
+            { label: t('uploads.statusDeleted'),       value: deletedDocs,  color: '#6b7280',        bg: 'rgba(107, 114, 128,.12)', icon: Trash2,    key: 'deleted' },
           ].map(s => {
             const isActive = uploadsFilterStatus === s.key;
             return (
@@ -2052,6 +2056,7 @@ export default function SuperAdminDashboard({ activePage, taxonomy = [], onUpdat
               <option value="pending">{t('uploads.statusPending')}</option>
               <option value="approved">{t('uploads.statusApproved')}</option>
               <option value="rejected">{t('uploads.statusRejected')}</option>
+              <option value="deleted">{t('uploads.statusDeleted')}</option>
             </SelectField>
             <SelectField value={uploadsFilterDept} onChange={e => setUploadsFilterDept(e.target.value)} style={{ flex: '0 0 175px' }}>
               <option value="">All Departments</option>

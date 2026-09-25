@@ -107,7 +107,8 @@
       "totalUploads": "Total Uploads",
       "approved": "Approved",
       "pending": "Pending",
-      "rejected": "Rejected"
+      "rejected": "Rejected",
+      "deleted": "Deleted"
     },
     "failedToLoad": "Failed to load documents. Please try again.",
     "searchPlaceholder": "Search documents…",
@@ -118,6 +119,7 @@
     "statusPending": "Pending",
     "statusApproved": "Approved",
     "statusRejected": "Rejected",
+    "statusDeleted": "Deleted",
     "clear": "Clear",
     "countOf": "{{shown}} of {{total}}",
     "loadingDocuments": "Loading documents…",

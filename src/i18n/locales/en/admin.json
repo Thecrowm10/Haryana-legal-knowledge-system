@@ -211,6 +211,7 @@
     "statusPending": "Pending",
     "statusApproved": "Approved",
     "statusRejected": "Rejected",
+    "statusDeleted": "Deleted",
     "clear": "Clear",
     "countOf": "{{shown}} of {{total}}",
     "loadingDocuments": "Loading documents…",

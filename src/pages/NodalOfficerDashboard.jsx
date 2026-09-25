@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
-import { Users, CheckCircle, XCircle, Plus, Edit2, X, Eye, EyeOff, Download, FileSpreadsheet, Layers, FileText, Clock, Search, Link2, Activity } from 'lucide-react';
+import { Users, CheckCircle, XCircle, Plus, Edit2, X, Eye, EyeOff, Download, FileSpreadsheet, Layers, FileText, Clock, Search, Link2, Activity, Trash2 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Pagination from '../components/ui/Pagination';
 import Badge from '../components/ui/Badge';
@@ -10,7 +10,7 @@ import DateField from '../components/ui/DateField';
 import DocViewModal from '../components/DocViewModal';
 import CapRequestsPanel from '../components/CapRequestsPanel';
 import UnlockRequestsPanel from '../components/UnlockRequestsPanel';
-import { getUsers, getRoles, updateUser, registerUser, getApproversByDepartment } from '../services/users';
+import { getUsers, getRoles, updateUser, registerUser, getApproversByDepartment, getActiveUsersByRole } from '../services/users';
 import { getMyDepartments } from '../services/departments';
 import { getAllDocumentsAdmin, getMyDepartmentDocuments, getAllDepartmentLinks } from '../services/pdf';
 import { getAuditLogs, getAuditLogActions } from '../services/audit';
@@ -163,20 +163,25 @@ export default function NodalOfficerDashboard({ activePage }) {
       .catch(() => {});
   }, [activePage]);
 
-  // All Uploads state
+  // All Uploads state — filtering/pagination happens server-side via
+  // getMyDepartmentDocuments, so allDocs only ever holds the current page.
   const [allDocs, setAllDocs]                             = useState([]);
+  const [allDocsTotal, setAllDocsTotal]                   = useState(0); // rows matching the current filters (server total, drives pagination)
+  const [allDocCounts, setAllDocCounts]                   = useState({ count_total: 0, count_pending: 0, count_approved: 0, count_rejected: 0, count_deleted: 0 });
   const [allDocsLoading, setAllDocsLoading]               = useState(false);
   const [allDocsError, setAllDocsError]                   = useState('');
   const [uploadsSearch, setUploadsSearch]                 = useState('');
   const [uploadsFilterStatus, setUploadsFilterStatus]     = useState('');
   const [uploadsFilterUploader, setUploadsFilterUploader] = useState('');
   const [uploadsFilterApprover, setUploadsFilterApprover] = useState('');
+  const [uploaderOptions, setUploaderOptions]             = useState([]);
+  const [approverOptions, setApproverOptions]             = useState([]);
   const [viewDoc, setViewDoc]                             = useState(null);
   const [showReportPanel, setShowReportPanel] = useState(false);
   const [reportDeptIds, setReportDeptIds]     = useState([]);
   const [reportGenerating, setReportGenerating] = useState(false);
   const reportPanelRef = useRef(null);
-  const [uploadsPage, setUploadsPage] = useState(1); // client-side pagination over filteredDocs — only 10 shown at a time
+  const [uploadsPage, setUploadsPage] = useState(1); // server-side pagination — UPLOADS_PAGE_SIZE rows per page
   const UPLOADS_PAGE_SIZE = 10;
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setUploadsPage(1); }, [uploadsSearch, uploadsFilterStatus, uploadsFilterUploader, uploadsFilterApprover]);
@@ -188,17 +193,52 @@ export default function NodalOfficerDashboard({ activePage }) {
     return () => document.removeEventListener('mousedown', close);
   }, [showReportPanel]);
 
+  // Uploader/Approver dropdown options — active users of that role across every
+  // department this officer is authorised for. Independent of the paginated
+  // document list, so it stays complete even though `allDocs` no longer is.
+  useEffect(() => {
+    if (activePage !== 'nodaluploads' || depts.length === 0) return;
+    const toOption = u => ({ value: u.id, label: [u.first_name, u.last_name].filter(Boolean).join(' ') || u.username });
+    const dedupe = list => { const seen = new Set(); return list.filter(o => (seen.has(o.value) ? false : (seen.add(o.value), true))); };
+    Promise.all(depts.map(d => getActiveUsersByRole('uploader', d.id)))
+      .then(reses => setUploaderOptions(dedupe(reses.flatMap(r => (r.data || []).map(toOption)))))
+      .catch(() => setUploaderOptions([]));
+    Promise.all(depts.map(d => getActiveUsersByRole('approver', d.id)))
+      .then(reses => setApproverOptions(dedupe(reses.flatMap(r => (r.data || []).map(toOption)))))
+      .catch(() => setApproverOptions([]));
+  }, [activePage, depts]);
+
+  // Debounced so typing in the search box doesn't fire a request per keystroke.
   useEffect(() => {
     if (activePage !== 'nodaluploads') return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setAllDocsLoading(true);
     setAllDocsError('');
-    // Scoped server-side to this officer's own department(s) by the token — no client-side
-    // department-name filtering needed (see deptScopedDocs below, now just an alias).
-    getMyDepartmentDocuments()
-      .then(res => setAllDocs(res.data.documents || []))
-      .catch(() => setAllDocsError(t('uploads.failedToLoad')))
-      .finally(() => setAllDocsLoading(false));
-  }, [activePage, t]);
+    const timer = setTimeout(() => {
+      getMyDepartmentDocuments(
+        uploadsFilterStatus || undefined,
+        (uploadsPage - 1) * UPLOADS_PAGE_SIZE,
+        UPLOADS_PAGE_SIZE,
+        uploadsFilterUploader || undefined,
+        uploadsFilterApprover || undefined,
+        uploadsSearch || undefined,
+      )
+        .then(res => {
+          setAllDocs(res.data.documents || []);
+          setAllDocsTotal(res.data.total || 0);
+          setAllDocCounts({
+            count_total:    res.data.count_total    ?? 0,
+            count_pending:  res.data.count_pending  ?? 0,
+            count_approved: res.data.count_approved ?? 0,
+            count_rejected: res.data.count_rejected ?? 0,
+            count_deleted:  res.data.count_deleted  ?? 0,
+          });
+        })
+        .catch(() => setAllDocsError(t('uploads.failedToLoad')))
+        .finally(() => setAllDocsLoading(false));
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [activePage, uploadsPage, uploadsFilterStatus, uploadsFilterUploader, uploadsFilterApprover, uploadsSearch, t]);
 
   // Add User drawer state
   const EMPTY_ADD_FORM = { username: '', email: '', mobile_number: '', password: '', first_name: '', last_name: '', role_id: '', department_id: '', approver_id: '' };
@@ -1045,59 +1085,23 @@ export default function NodalOfficerDashboard({ activePage }) {
   // ── All Uploads (department-scoped) ─────────────────────────────────────
   if (activePage === 'nodaluploads') {
     // /pdf/my-department/all already scopes this to the officer's own department(s)
-    // server-side (via the auth token) — no client-side name-matching filter needed.
-    const deptScopedDocs = allDocs;
+    // server-side (via the auth token), and now does true server-side pagination —
+    // allDocs only ever holds the current page for the current filters.
+    const totalDocs    = allDocCounts.count_total;
+    const approvedDocs = allDocCounts.count_approved;
+    const pendingDocs  = allDocCounts.count_pending;
+    const rejectedDocs = allDocCounts.count_rejected;
+    const deletedDocs  = allDocCounts.count_deleted;
 
-    const totalDocs    = deptScopedDocs.length;
-    const approvedDocs = deptScopedDocs.filter(d => d.status === 'approved').length;
-    const pendingDocs  = deptScopedDocs.filter(d => d.status === 'pending').length;
-    const rejectedDocs = deptScopedDocs.filter(d => d.status === 'rejected').length;
-
-    // Unique uploaders within authorised scope
-    const uploaderOptions = [];
-    const seenUp = new Set();
-    for (const d of deptScopedDocs) {
-      if (d.uploader_username && !seenUp.has(d.uploader_username)) {
-        seenUp.add(d.uploader_username);
-        const label = [d.uploader_first_name, d.uploader_last_name].filter(Boolean).join(' ') || d.uploader_username;
-        uploaderOptions.push({ value: d.uploader_username, label });
-      }
-    }
-
-    // Unique approvers within authorised scope
-    const approverOptions = [];
-    const seenAp = new Set();
-    for (const d of deptScopedDocs) {
-      const key = d.latest_approval?.approver_username;
-      if (key && !seenAp.has(key)) {
-        seenAp.add(key);
-        const label = [d.latest_approval.approver_first_name, d.latest_approval.approver_last_name].filter(Boolean).join(' ') || key;
-        approverOptions.push({ value: key, label });
-      }
-    }
-
-    const filteredDocs = deptScopedDocs.filter(d => {
-      if (uploadsFilterStatus && d.status !== uploadsFilterStatus) return false;
-      if (uploadsFilterUploader && d.uploader_username !== uploadsFilterUploader) return false;
-      if (uploadsFilterApprover && d.latest_approval?.approver_username !== uploadsFilterApprover) return false;
-      if (uploadsSearch) {
-        const q = uploadsSearch.toLowerCase();
-        const name = (d.document_name || d.original_filename || '').toLowerCase();
-        const dept = (d.department_name || '').toLowerCase();
-        const up   = (d.uploader_username || '').toLowerCase();
-        if (!name.includes(q) && !dept.includes(q) && !up.includes(q)) return false;
-      }
-      return true;
-    });
-
-    const uploadsTotalPages = Math.max(1, Math.ceil(filteredDocs.length / UPLOADS_PAGE_SIZE));
+    const pageDocs = allDocs;
+    const uploadsTotalPages = Math.max(1, Math.ceil(allDocsTotal / UPLOADS_PAGE_SIZE));
     const clampedUploadsPage = Math.min(uploadsPage, uploadsTotalPages);
-    const pageDocs = filteredDocs.slice((clampedUploadsPage - 1) * UPLOADS_PAGE_SIZE, clampedUploadsPage * UPLOADS_PAGE_SIZE);
 
     const SC = {
       approved: { color: '#16a34a', bg: 'rgba(25, 135, 84,.1)',  label: t('uploads.stats.approved') },
       pending:  { color: '#b45309', bg: 'rgba(255, 193, 7,.1)', label: t('uploads.stats.pending')  },
       rejected: { color: '#dc3545', bg: 'rgba(220, 53, 69,.1)',  label: t('uploads.stats.rejected') },
+      deleted:  { color: '#6b7280', bg: 'rgba(107, 114, 128,.1)', label: t('uploads.stats.deleted') },
     };
     const cols = '4px 1fr 175px 155px 155px 90px';
     const anyFilter = uploadsSearch || uploadsFilterStatus || uploadsFilterUploader || uploadsFilterApprover;
@@ -1106,7 +1110,17 @@ export default function NodalOfficerDashboard({ activePage }) {
       setReportGenerating(true);
       try {
         const selectedNames = depts.filter(d => reportDeptIds.includes(d.id)).map(d => d.name);
-        await downloadUploadsExcelReport({ docs: deptScopedDocs, departments: selectedNames, fileLabel: 'Nodal' });
+        // The report needs every matching row, not just the current page — re-fetch
+        // with the same filters and the max page size instead of reusing allDocs.
+        const res = await getMyDepartmentDocuments(
+          uploadsFilterStatus || undefined,
+          0,
+          1000,
+          uploadsFilterUploader || undefined,
+          uploadsFilterApprover || undefined,
+          uploadsSearch || undefined,
+        );
+        await downloadUploadsExcelReport({ docs: res.data.documents || [], departments: selectedNames, fileLabel: 'Nodal' });
         setShowReportPanel(false);
         setReportDeptIds([]);
       } finally {
@@ -1128,12 +1142,13 @@ export default function NodalOfficerDashboard({ activePage }) {
         )}
 
         {/* Stats */}
-        <div className="nod-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
+        <div className="nod-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 16 }}>
           {[
             { label: t('uploads.stats.totalUploads'), value: totalDocs,    color: 'var(--primary)', bg: 'rgba(33, 74, 171,.12)',  icon: Layers,      key: '' },
             { label: t('uploads.stats.approved'),      value: approvedDocs, color: '#16a34a',        bg: 'rgba(25, 135, 84,.12)',  icon: CheckCircle, key: 'approved' },
             { label: t('uploads.stats.pending'),       value: pendingDocs,  color: '#b45309',        bg: 'rgba(255, 193, 7,.12)', icon: Clock,       key: 'pending'  },
             { label: t('uploads.stats.rejected'),      value: rejectedDocs, color: '#dc3545',        bg: 'rgba(220, 53, 69,.12)',  icon: XCircle,     key: 'rejected' },
+            { label: t('uploads.stats.deleted'),       value: deletedDocs,  color: '#6b7280',        bg: 'rgba(107, 114, 128,.12)', icon: Trash2,    key: 'deleted' },
           ].map(s => {
             const isActive = uploadsFilterStatus === s.key;
             return (
@@ -1181,6 +1196,7 @@ export default function NodalOfficerDashboard({ activePage }) {
               <option value="pending">{t('uploads.statusPending')}</option>
               <option value="approved">{t('uploads.statusApproved')}</option>
               <option value="rejected">{t('uploads.statusRejected')}</option>
+              <option value="deleted">{t('uploads.statusDeleted')}</option>
             </SelectField>
             {anyFilter && (
               <button onClick={() => { setUploadsSearch(''); setUploadsFilterStatus(''); setUploadsFilterUploader(''); setUploadsFilterApprover(''); }}
@@ -1189,7 +1205,7 @@ export default function NodalOfficerDashboard({ activePage }) {
               </button>
             )}
             <div style={{ fontSize: 11.5, color: 'var(--text-color-secondary)', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
-              {t('uploads.countOf', { shown: filteredDocs.length, total: totalDocs })}
+              {t('uploads.countOf', { shown: allDocs.length, total: allDocsTotal })}
             </div>
 
             <div ref={reportPanelRef} style={{ position: 'relative' }}>
@@ -1236,7 +1252,7 @@ export default function NodalOfficerDashboard({ activePage }) {
           )}
 
           {!allDocsLoading && !allDocsError && (
-            filteredDocs.length === 0 ? (
+            allDocs.length === 0 ? (
               <div style={{ padding: '50px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-color-secondary)' }}>
                 {t('uploads.noMatch')}
               </div>

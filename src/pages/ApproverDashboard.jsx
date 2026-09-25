@@ -1924,7 +1924,8 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
   const isMobile = useMediaQuery('(max-width: 640px)');
   const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
   const [docs, setDocs]           = useState([]);
-  const [docCounts, setDocCounts] = useState({ count_total: 0, count_pending: 0, count_approved: 0, count_rejected: 0 });
+  const [docCounts, setDocCounts] = useState({ count_total: 0, count_pending: 0, count_approved: 0, count_rejected: 0, count_deleted: 0 });
+  const [docsListTotal, setDocsListTotal] = useState(0); // rows matching the current status/type/search filters — drives pagination
   // { [pdf_id]: 'edit' | 'delete' } — this approver's own unlock requests still
   // awaiting Nodal Officer review, so a badge can show on both the collapsed
   // row and the expanded panel without every row fetching it independently.
@@ -1943,7 +1944,7 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
   const [filter, setFilter]       = useState('');
   const [searchQ, setSearchQ]     = useState('');
   const [cardFilter, setCardFilter] = useState('pending'); // 'pending' | 'approved' | 'rejected' | 'all' — always one of these on the merged dashboard
-  const [docsPage, setDocsPage]   = useState(1); // client-side pagination over the document-card list — only 10 shown at a time
+  const [docsPage, setDocsPage]   = useState(1); // server-side pagination — skip/limit sent to the API, only 10 shown at a time
   const DOCS_PAGE_SIZE = 10;
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setDocsPage(1); }, [cardFilter, filter, searchQ]);
@@ -2020,14 +2021,29 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
     }
     setLoading(true);
     setApiError('');
-    Promise.all([getApproverDocuments(), getMyUnlockRequests().catch(() => ({ data: [] }))])
+    // True server-side pagination — skip/limit tied to the actual page shown
+    // (DOCS_PAGE_SIZE=10), with status/type/search all filtered server-side too,
+    // so switching pages, the status tab, the type filter, or the search box
+    // never silently misses documents that fell outside a single fetched batch.
+    Promise.all([
+      getApproverDocuments(
+        cardFilter === 'all' ? undefined : cardFilter,
+        (docsPage - 1) * DOCS_PAGE_SIZE,
+        DOCS_PAGE_SIZE,
+        filter || undefined,
+        searchQ || undefined,
+      ),
+      getMyUnlockRequests().catch(() => ({ data: [] })),
+    ])
       .then(([res, unlockRes]) => {
         setDocs((res.data.documents || []).map(mapApiDoc));
+        setDocsListTotal(res.data.total ?? 0);
         setDocCounts({
           count_total:    res.data.count_total    ?? 0,
           count_pending:  res.data.count_pending  ?? 0,
           count_approved: res.data.count_approved ?? 0,
           count_rejected: res.data.count_rejected ?? 0,
+          count_deleted:  res.data.count_deleted  ?? 0,
         });
         const map = {};
         for (const r of (unlockRes.data || [])) {
@@ -2037,9 +2053,16 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
       })
       .catch(err => setApiError(err.response?.data?.detail || t('dashboard.failedToLoadDocuments')))
       .finally(() => setLoading(false));
-  }, [t]);
+  }, [t, cardFilter, docsPage, filter, searchQ]);
 
-  useEffect(() => { fetchDocs(documents); }, [activePage, documents, fetchDocs]);
+  // Debounced — searchQ changes on every keystroke, and since it's a fetchDocs
+  // dependency, each keystroke would otherwise fire its own request. Typing
+  // resets the timer via the effect cleanup, so only the last keystroke's
+  // request actually goes out.
+  useEffect(() => {
+    const timer = setTimeout(() => fetchDocs(documents), 350);
+    return () => clearTimeout(timer);
+  }, [activePage, documents, fetchDocs]);
 
   useEffect(() => {
     if (activePage !== 'links') setViewingLink(null); // reset when leaving link requests
@@ -2137,19 +2160,13 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
 
   const validTypes = new Set(Object.keys(TYPE_COLORS));
 
-  const base = cardFilter === 'all' ? docs : docs.filter(d => d.status === cardFilter);
-
-  const allFiltered = base.filter(d => {
-    const mType = validTypes.has(d.type);          // hide unknown types
-    const mF    = !filter || d.type === filter;
-    const mS    = !searchQ || d.title.toLowerCase().includes(searchQ.toLowerCase());
-    return mType && mF && mS;
-  });
-
-  const list = allFiltered;
-  const docsTotalPages = Math.max(1, Math.ceil(list.length / DOCS_PAGE_SIZE));
+  // status/type/search/pagination are all applied server-side now (see
+  // fetchDocs) — docs already IS the current page. Only keep the "hide
+  // unknown types" safety net client-side, since the server doesn't know
+  // about this frontend-only type-color map.
+  const pageList = docs.filter(d => validTypes.has(d.type));
+  const docsTotalPages = Math.max(1, Math.ceil(docsListTotal / DOCS_PAGE_SIZE));
   const clampedDocsPage = Math.min(docsPage, docsTotalPages);
-  const pageList = list.slice((clampedDocsPage - 1) * DOCS_PAGE_SIZE, clampedDocsPage * DOCS_PAGE_SIZE);
 
   const allTypes = Object.keys(TYPE_COLORS);
 
@@ -2450,7 +2467,7 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
             { icon: Clock,       label: t('dashboard.summary.pending'),  value: docCounts.count_pending,  bg: 'rgba(255, 193, 7,.12)', color: '#b45309', key: 'pending'  },
             { icon: CheckCircle, label: t('dashboard.summary.approved'), value: docCounts.count_approved, bg: 'rgba(25, 135, 84,.12)',  color: '#198754', key: 'approved' },
             { icon: XCircle,     label: t('dashboard.summary.rejected'), value: docCounts.count_rejected, bg: 'rgba(220, 53, 69,.12)',  color: '#dc3545', key: 'rejected' },
-            { icon: Trash2,      label: t('dashboard.summary.deleted'),  value: docs.filter(d => d.status === 'deleted').length, bg: 'rgba(107, 114, 128,.12)', color: '#6b7280', key: 'deleted' },
+            { icon: Trash2,      label: t('dashboard.summary.deleted'),  value: docCounts.count_deleted,  bg: 'rgba(107, 114, 128,.12)', color: '#6b7280', key: 'deleted' },
             { icon: FileText,    label: t('dashboard.summary.total'),    value: docCounts.count_total,    bg: 'rgba(33, 74, 171,.12)',  color: 'var(--primary)', key: 'all' },
           ].map(s => {
             const isActive = cardFilter === s.key;
@@ -2483,7 +2500,7 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
             {searchQ && <button onClick={() => setSearchQ('')} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-color-secondary)', display: 'flex', padding: 0 }}><X size={12} /></button>}
           </div>
           <span style={{ marginLeft: 'auto', fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '2px 9px', borderRadius: 20 }}>
-            {t('dashboard.documentCount', { count: list.length })}
+            {t('dashboard.documentCount', { count: docsListTotal })}
           </span>
         </div>
         {isMobile ? (
@@ -2521,20 +2538,17 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
                   <button type="button" onClick={() => { setFilter(''); setTypeDropdownOpen(false); }}
                     style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '9px 12px', borderRadius: 9, border: 'none', background: !filter ? 'rgba(33, 74, 171,.12)' : 'transparent', color: !filter ? 'var(--primary)' : 'var(--text-color)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                     {t('dashboard.allTypesLabel')}
-                    <span style={{ fontSize: 11, fontFamily: 'var(--mono)', opacity: .6 }}>{base.length}</span>
                   </button>
                   {allTypes.map(type => {
-                    const count  = base.filter(d => d.type === type).length;
                     const active = filter === type;
                     const c = TYPE_COLORS[type] || { accent: '#94a3b8', bg: 'rgba(148,163,184,.1)', text: '#64748b' };
                     return (
                       <button key={type} type="button" onClick={() => { setFilter(active ? '' : type); setTypeDropdownOpen(false); }}
-                        style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '9px 12px', borderRadius: 9, border: 'none', background: active ? `${c.accent}20` : 'transparent', color: active ? (c.text || c.accent) : 'var(--text-color)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', opacity: count === 0 ? .5 : 1 }}>
+                        style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '9px 12px', borderRadius: 9, border: 'none', background: active ? `${c.accent}20` : 'transparent', color: active ? (c.text || c.accent) : 'var(--text-color)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                         <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           <span style={{ width: 8, height: 8, borderRadius: '50%', background: c.accent, flexShrink: 0 }} />
                           {TYPE_LABEL_KEY[type] ? t(`docTypes.${TYPE_LABEL_KEY[type]}`) : type}
                         </span>
-                        <span style={{ fontSize: 11, fontFamily: 'var(--mono)', opacity: .6 }}>{count}</span>
                       </button>
                     );
                   })}
@@ -2545,7 +2559,6 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
         ) : (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           {allTypes.map(type => {
-            const count  = base.filter(d => d.type === type).length;
             const active = filter === type;
             const c = TYPE_COLORS[type] || { accent: '#94a3b8', bg: 'rgba(148,163,184,.1)', text: '#64748b' };
             return (
@@ -2557,10 +2570,8 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
                   background: active ? c.accent : 'var(--surface-card)',
                   border: `1.5px solid ${active ? c.accent : c.accent + '55'}`,
                   color: active ? 'white' : c.text || c.accent,
-                  opacity: count === 0 ? 0.4 : 1,
                 }}>
                 {TYPE_LABEL_KEY[type] ? t(`docTypes.${TYPE_LABEL_KEY[type]}`) : type}
-                <span style={{ fontSize: 10, fontFamily: 'var(--mono)', background: active ? 'rgba(255,255,255,.25)' : 'var(--surface-ground)', color: active ? 'white' : 'var(--text-color-secondary)', padding: '0px 5px', borderRadius: 10 }}>{count}</span>
               </button>
             );
           })}
@@ -2575,7 +2586,7 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
       </div>}
 
       {/* Empty state */}
-      {!['links', 'actparts'].includes(activePage) && list.length === 0 && (
+      {!['links', 'actparts'].includes(activePage) && !loading && pageList.length === 0 && (
         <Card style={{ textAlign: 'center', padding: '64px 0' }}>
           <CheckCircle size={44} color="var(--surface-200)" style={{ margin: '0 auto 14px', display: 'block' }} />
           <div style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-color-secondary)', marginBottom: 6 }}>

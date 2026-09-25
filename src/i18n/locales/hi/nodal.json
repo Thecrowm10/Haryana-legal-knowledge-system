@@ -107,7 +107,8 @@
       "totalUploads": "कुल अपलोड",
       "approved": "स्वीकृत",
       "pending": "लंबित",
-      "rejected": "अस्वीकृत"
+      "rejected": "अस्वीकृत",
+      "deleted": "हटाया गया"
     },
     "failedToLoad": "दस्तावेज़ लोड करने में विफल। कृपया पुनः प्रयास करें।",
     "searchPlaceholder": "दस्तावेज़ खोजें…",
@@ -118,6 +119,7 @@
     "statusPending": "लंबित",
     "statusApproved": "स्वीकृत",
     "statusRejected": "अस्वीकृत",
+    "statusDeleted": "हटाया गया",
     "clear": "साफ़ करें",
     "countOf": "{{total}} में से {{shown}}",
     "loadingDocuments": "दस्तावेज़ लोड हो रहे हैं…",
