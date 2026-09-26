@@ -66,6 +66,16 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
   }, [doc.approval?.annotations_json]);
   const [actFull, setActFull] = useState(null);
   const actOutline = useMemo(() => doc.type === 'Act' && actFull ? mapActPartsToOutline(actFull.act_parts) : null, [doc.type, actFull]);
+  // actOutline is always a truthy object (with possibly-empty arrays) once actFull
+  // loads — gating the "Browse Sections & Schedules" button on actOutline alone
+  // showed it even for Acts with zero actual chapters/schedules/annexures/etc.
+  const hasAnyActPartContent = !!actOutline && (
+    actOutline.sections.chapters.reduce((n, c) => n + c.sections.length, 0) > 0 ||
+    actOutline.schedules.length > 0 ||
+    actOutline.annexures.length > 0 ||
+    actOutline.appendix.length > 0 ||
+    actOutline.forms.length > 0
+  );
   const [showActContents, setShowActContents] = useState(false);
 
   // Contents preview (badge counts on the info panel, before the reader opens)
@@ -107,7 +117,7 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
     // handled the same as an async rejection instead of crashing the whole
     // app via the root ErrorBoundary.
     try {
-      pdfjsLib.getDocument({ url: blobUrl }).promise
+      pdfjsLib.getDocument({ url: blobUrl, wasmUrl: '/pdfjs-wasm/' }).promise
         .then(pdf => { if (!cancelled) { setPdfDoc(pdf); setTotalPages(pdf.numPages); } })
         .catch(e => { console.error('PDF load:', e); if (!cancelled) setPdfError(true); });
     } catch (e) {
@@ -136,7 +146,11 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
 
     pdfDoc.getPage(activeHitPage).then(async page => {
       if (cancelled) return;
-      const vp = page.getViewport({ scale, rotation });
+      // getViewport's rotation replaces the page's own intrinsic rotation
+      // rather than adding to it — must match the render effect below exactly,
+      // or search-hit highlight boxes land in the wrong place on a page whose
+      // PDF declares its own /Rotate value.
+      const vp = page.getViewport({ scale, rotation: (page.rotate + rotation) % 360 });
       const { items } = await page.getTextContent();
       if (cancelled) return;
 
@@ -175,7 +189,11 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
       if (!canvas) continue;
       pdfDoc.getPage(i + 1).then(page => {
         if (cancelled) return;
-        const vp = page.getViewport({ scale, rotation });
+        // getViewport's rotation replaces (not adds to) the page's own
+        // intrinsic /Rotate value if passed unconditionally — combine them
+        // so a scanned page authored with its own rotation flag still
+        // displays upright instead of in its raw, uncorrected orientation.
+        const vp = page.getViewport({ scale, rotation: (page.rotate + rotation) % 360 });
         canvas.width = vp.width; canvas.height = vp.height;
         page.render({ canvasContext: canvas.getContext('2d'), viewport: vp });
       });
@@ -460,7 +478,7 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
               ))}
             </div>
 
-            {actOutline && (
+            {hasAnyActPartContent && (
               <div style={{ marginBottom: 22 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                   <ListTree size={13} color="var(--text-color-secondary)" />

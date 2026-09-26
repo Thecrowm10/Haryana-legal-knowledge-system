@@ -4,7 +4,7 @@ import {
   CheckCircle, XCircle, FileText, ChevronDown, Search, Clock,
   Check, X, Eye, Link, ChevronRight, ArrowRight,
   ZoomIn, ZoomOut, RotateCw, ExternalLink, Plus, Highlighter, MessageCircle, Pencil,
-  Unlock, Trash2,
+  Unlock, Trash2, Users, AlertTriangle,
 } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
@@ -254,6 +254,14 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
   const canvasRefs          = useRef([]);
   const [pdfDoc, setPdfDoc] = useState(null);
   const [pdfError, setPdfError] = useState(false);
+  // Per-page render failures. pageRenderErrors = both pdf.js and the PDFium
+  // fallback failed (terminal — show the "couldn't display" message). Some
+  // scanned PDFs use a JBig2 image encoding pdf.js's decoder can't handle —
+  // a currently-unfixed pdf.js limitation, not a version issue (already on
+  // the latest release). pageRenderFallback tracks the transient in-between
+  // state while the PDFium fallback is actually being attempted.
+  const [pageRenderErrors, setPageRenderErrors] = useState(() => new Set());
+  const [pageRenderFallback, setPageRenderFallback] = useState(() => new Map());
   const suppressRef         = useRef(false);
   const scrollDetectedRef   = useRef(false);
 
@@ -284,7 +292,7 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
     // handled the same as an async rejection instead of crashing the whole
     // app via the root ErrorBoundary.
     try {
-      pdfjsLib.getDocument({ url: encodeURI(doc.fileUrl) }).promise
+      pdfjsLib.getDocument({ url: encodeURI(doc.fileUrl), wasmUrl: '/pdfjs-wasm/' }).promise
         .then(pdf => {
           if (!cancelled) {
             setPdfDoc(pdf);
@@ -303,20 +311,57 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
   useEffect(() => {
     if (!pdfDoc) return;
     let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPageRenderErrors(new Set());
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPageRenderFallback(new Map());
     const scale = (zoom / 100) * 1.5;
     for (let i = 0; i < pdfDoc.numPages; i++) {
       const canvas = canvasRefs.current[i];
       if (!canvas) continue;
       pdfDoc.getPage(i + 1).then(page => {
         if (cancelled) return;
-        const vp = page.getViewport({ scale, rotation });
+        // getViewport's `rotation` REPLACES the page's own intrinsic rotation
+        // rather than adding to it (per pdf.js's own docs: "if omitted it
+        // defaults to the page rotation") — passing our manual rotate-button
+        // state directly, unconditionally, was silently discarding whatever
+        // rotation the PDF itself declares (common for scanned pages authored
+        // with a /Rotate flag instead of physically transformed content),
+        // showing the raw sideways orientation instead of the corrected one.
+        // Add the two together instead so page.rotate is always respected.
+        const effectiveRotation = (page.rotate + rotation) % 360;
+        const vp = page.getViewport({ scale, rotation: effectiveRotation });
         canvas.width  = vp.width;
         canvas.height = vp.height;
-        page.render({ canvasContext: canvas.getContext('2d'), viewport: vp });
+        // render()'s own promise can reject independently of the page load
+        // above (e.g. a JBig2-encoded scanned image inside this specific
+        // page) — left unhandled, that used to fail silently and leave the
+        // canvas blank with no indication anything went wrong. Catch it and
+        // try a PDFium-based fallback for just this one page before giving up.
+        page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise
+          .catch(async (err) => {
+            if (cancelled) return;
+            console.error(`PDF page ${i + 1} render failed, trying PDFium fallback:`, err);
+            setPageRenderFallback(prev => new Map(prev).set(i, 'trying'));
+            try {
+              if (!blobUrl) throw new Error('no blobUrl available for PDFium fallback');
+              const pdfBytes = await fetch(blobUrl).then(r => r.arrayBuffer());
+              if (cancelled) return;
+              const { renderPageWithPdfium } = await import('../utils/pdfiumFallback');
+              await renderPageWithPdfium(pdfBytes, i + 1, canvas, effectiveRotation);
+              if (cancelled) return;
+              setPageRenderFallback(prev => { const m = new Map(prev); m.delete(i); return m; });
+            } catch (fallbackErr) {
+              if (cancelled) return;
+              console.error(`PDFium fallback also failed for page ${i + 1}:`, fallbackErr);
+              setPageRenderFallback(prev => { const m = new Map(prev); m.delete(i); return m; });
+              setPageRenderErrors(prev => new Set(prev).add(i));
+            }
+          });
       });
     }
     return () => { cancelled = true; };
-  }, [pdfDoc, zoom, rotation]);
+  }, [pdfDoc, zoom, rotation, blobUrl]);
 
   // When docxHtml changes (new document loaded) reset the container and re-apply
   // any already-saved annotations via text search.  Annotations added *during*
@@ -542,7 +587,7 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       
-      <div className="table-scroll-wrap" style={{ padding: '10px 14px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surface-50)', flexShrink: 0 }}>
+      <div className="ap-pdf-toolbar" style={{ padding: '10px 14px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 8, rowGap: 8, flexWrap: 'wrap', background: 'var(--surface-50)', flexShrink: 0 }}>
         <Eye size={13} color="var(--primary)" style={{ flexShrink: 0 }} />
         <span style={{ fontSize: 'var(--font-size-small)', fontWeight: 700, color: 'var(--text-heading)', flex: '1 1 auto', minWidth: 40, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{docxHtml ? t('pdfViewer.documentPreview') : t('pdfViewer.originalPdf')}</span>
         {blobUrl && (
@@ -649,6 +694,29 @@ function PdfViewerPanel({ doc, ocrData, currentPage, onPageChange, totalPages, r
                     fill={selectedColor} stroke="#ffc107" strokeWidth="1.5" strokeDasharray="4 3" />
                 )}
               </svg>
+              {pageRenderFallback.get(i) === 'trying' && (
+                <div style={{
+                  position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: 'rgba(255,255,255,.85)', fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--text-color-secondary)', textAlign: 'center', padding: 16,
+                }}>
+                  {t('pdfViewer.pageRenderTryingAlternate', { page: i + 1 })}
+                </div>
+              )}
+              {pageRenderErrors.has(i) && (
+                <div style={{
+                  position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center',
+                  justifyContent: 'center', gap: 8, background: 'rgba(255,255,255,.95)', padding: 16, textAlign: 'center',
+                }}>
+                  <AlertTriangle size={22} color="#dc2626" />
+                  <span style={{ fontSize: 12, color: '#374151' }}>{t('pdfViewer.pageRenderFailed', { page: i + 1 })}</span>
+                  {blobUrl && (
+                    <a href={blobUrl} target="_blank" rel="noreferrer"
+                      style={{ fontSize: 11, fontWeight: 600, color: 'var(--primary)' }}>
+                      {t('pdfViewer.openInNewTab')}
+                    </a>
+                  )}
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -1318,8 +1386,8 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, deciding, u
           </div>
 
           {/* Add Remark + action buttons row */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div className="ap-review-actions" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', rowGap: 10 }}>
+            <div className="ap-review-actions-left" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               <button onClick={addRemark}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 6,
@@ -1344,7 +1412,7 @@ function ThreePanelReview({ doc, remarks, onRemarksChange, onDecide, deciding, u
                 <FileText size={13} /> {isSavingDraft ? 'Saving…' : 'Save Draft'}
               </button>
             </div>
-            <div style={{ display: 'flex', gap: 10 }}>
+            <div className="ap-review-actions-right" style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               <button onClick={() => setConfirmDecision('rejected')} disabled={!!deciding || !hasRemarks}
                 title={!hasRemarks ? t('common.enterRemarkBeforeRejecting') : undefined}
                 style={{ background: 'rgba(220, 53, 69,.08)', border: '1px solid rgba(220, 53, 69,.3)', color: '#b91c1c', padding: '9px 18px', borderRadius: 8, fontFamily: 'var(--font)', fontSize: 13, fontWeight: 600, cursor: (deciding || !hasRemarks) ? 'not-allowed' : 'pointer', opacity: (deciding && deciding !== 'rejected') || !hasRemarks ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 6 }}
@@ -1869,7 +1937,7 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
           </div>
 
           {/* Add Remark + action buttons */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div className="ap-review-actions" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', rowGap: 10 }}>
             <button onClick={addRemark}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
@@ -1881,7 +1949,7 @@ function LinkReviewPanel({ lr, onBack, onReview, deciding }) {
               onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--surface-border)'; e.currentTarget.style.background = 'transparent'; }}>
               <Plus size={13} /> {t('common.addRemark')}
             </button>
-            <div style={{ display: 'flex', gap: 10 }}>
+            <div className="ap-review-actions-right" style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               <button onClick={() => setConfirmDecision('rejected')}
                 disabled={deciding === lr.link_id || !hasRemarks}
                 title={!hasRemarks ? t('linkReview.enterRemarkBeforeRejecting') : undefined}
@@ -1924,7 +1992,7 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
   const isMobile = useMediaQuery('(max-width: 640px)');
   const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
   const [docs, setDocs]           = useState([]);
-  const [docCounts, setDocCounts] = useState({ count_total: 0, count_pending: 0, count_approved: 0, count_rejected: 0, count_deleted: 0 });
+  const [docCounts, setDocCounts] = useState({ count_total: 0, count_pending: 0, count_approved: 0, count_rejected: 0, count_deleted: 0, assigned_uploader_count: null });
   const [docsListTotal, setDocsListTotal] = useState(0); // rows matching the current status/type/search filters — drives pagination
   // { [pdf_id]: 'edit' | 'delete' } — this approver's own unlock requests still
   // awaiting Nodal Officer review, so a badge can show on both the collapsed
@@ -2044,6 +2112,7 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
           count_approved: res.data.count_approved ?? 0,
           count_rejected: res.data.count_rejected ?? 0,
           count_deleted:  res.data.count_deleted  ?? 0,
+          assigned_uploader_count: res.data.assigned_uploader_count ?? 0,
         });
         const map = {};
         for (const r of (unlockRes.data || [])) {
@@ -2215,6 +2284,12 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
           .ap-doc-row { flex-wrap: wrap !important; row-gap: 8px !important; }
           .ap-doc-title-block { flex-basis: 100% !important; order: -1 !important; }
           .ap-doc-actions { margin-left: auto !important; }
+          /* Add Remark / Save Draft / Reject / Approve used to sit in one
+             space-between row — on a narrow phone the four buttons never
+             fit, so Approve (last in DOM order) got pushed past the edge
+             of the screen instead of wrapping onto its own line. */
+          .ap-review-actions { flex-direction: column !important; align-items: stretch !important; }
+          .ap-review-actions-left, .ap-review-actions-right { width: 100%; justify-content: space-between !important; }
         }
       `}</style>
 
@@ -2455,6 +2530,19 @@ export default function ApproverDashboard({ activePage, onNavigate, onAuditLog, 
             style={{ padding: '5px 14px', borderRadius: 7, border: '1px solid rgba(220, 53, 69,.3)', background: 'transparent', color: '#dc2626', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
             {t('common.retry')}
           </button>
+        </div>
+      )}
+
+      {/* No uploaders assigned — distinguishes "you have nothing left to review"
+          from "no uploader account has ever been assigned to you", which
+          otherwise look identical (an all-zero, all-empty dashboard). */}
+      {!['links', 'actparts'].includes(activePage) && !loading && !apiError && docCounts.assigned_uploader_count === 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', borderRadius: 10, background: 'rgba(14,165,233,.07)', border: '1px solid rgba(14,165,233,.2)' }}>
+          <Users size={16} color="#0ea5e9" style={{ flexShrink: 0 }} />
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-heading)' }}>{t('dashboard.noUploadersAssigned.title')}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-color-secondary)', marginTop: 1 }}>{t('dashboard.noUploadersAssigned.desc')}</div>
+          </div>
         </div>
       )}
 

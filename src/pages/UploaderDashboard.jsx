@@ -268,7 +268,7 @@ async function extractPdfText(file) {
   if (!file || !file.name.endsWith('.pdf')) return { text: '', numPages: 1, pageTexts: [], pageWords: [] };
   try {
     const arrayBuffer = await file.arrayBuffer();
-    const pdf         = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const pdf         = await pdfjsLib.getDocument({ data: arrayBuffer, wasmUrl: '/pdfjs-wasm/' }).promise;
 
     const pages = await Promise.all(
       Array.from({ length: pdf.numPages }, async (_, i) => {
@@ -560,7 +560,7 @@ function DocViewModal({ doc, onClose }) {
   useEffect(() => {
     if (!blobUrl) return;
     let cancelled = false;
-    pdfjsLib.getDocument({ url: blobUrl }).promise
+    pdfjsLib.getDocument({ url: blobUrl, wasmUrl: '/pdfjs-wasm/' }).promise
       .then(pdf => { if (!cancelled) { setPdfDoc(pdf); setTotalPages(pdf.numPages); } })
       .catch(e => console.error('PDF load:', e));
     return () => { cancelled = true; };
@@ -609,7 +609,11 @@ function DocViewModal({ doc, onClose }) {
       if (!canvas) continue;
       pdfDoc.getPage(i + 1).then(page => {
         if (cancelled) return;
-        const vp = page.getViewport({ scale, rotation });
+        // getViewport's rotation replaces (not adds to) the page's own
+        // intrinsic /Rotate value if passed unconditionally — combine them
+        // so a scanned page authored with its own rotation flag still
+        // displays upright instead of in its raw, uncorrected orientation.
+        const vp = page.getViewport({ scale, rotation: (page.rotate + rotation) % 360 });
         canvas.width = vp.width; canvas.height = vp.height;
         page.render({ canvasContext: canvas.getContext('2d'), viewport: vp });
       });
@@ -1526,7 +1530,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   useEffect(() => {
     if (!editBlobUrl) return;
     let cancelled = false;
-    pdfjsLib.getDocument({ url: editBlobUrl }).promise
+    pdfjsLib.getDocument({ url: editBlobUrl, wasmUrl: '/pdfjs-wasm/' }).promise
       .then(pdf => { if (!cancelled) { setEditPdfDoc(pdf); setEditTotalPages(pdf.numPages); } })
       .catch(() => {});
     return () => { cancelled = true; };
@@ -1542,7 +1546,11 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
       if (!canvas) continue;
       editPdfDoc.getPage(i + 1).then(page => {
         if (cancelled) return;
-        const vp = page.getViewport({ scale, rotation: editRotation });
+        // getViewport's rotation replaces (not adds to) the page's own
+        // intrinsic /Rotate value if passed unconditionally — combine them
+        // so a scanned page authored with its own rotation flag still
+        // displays upright instead of in its raw, uncorrected orientation.
+        const vp = page.getViewport({ scale, rotation: (page.rotate + editRotation) % 360 });
         canvas.width = vp.width; canvas.height = vp.height;
         page.render({ canvasContext: canvas.getContext('2d'), viewport: vp });
       });

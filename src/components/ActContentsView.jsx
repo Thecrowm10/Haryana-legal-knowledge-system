@@ -528,7 +528,11 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
         </div>
       )}
 
-      <div className="acv-hero-title-row" style={{ position: 'relative', display: 'flex', alignItems: 'flex-start', gap: 18, marginTop: citizenView ? 168 : 0 }}>
+      {/* Non-citizen path has no masthead pushing the title row down, but the
+          Close button above still sits top:24/right:32 in this same corner —
+          without clearance here, the type badge (absolutely positioned at the
+          top-right of this row) visually collided with it. */}
+      <div className="acv-hero-title-row" style={{ position: 'relative', display: 'flex', alignItems: 'flex-start', gap: 18, marginTop: citizenView ? 168 : 52 }}>
         <div style={{ width: 56, height: 56, borderRadius: 14, background: 'rgba(255,255,255,.14)', border: '1px solid rgba(255,255,255,.24)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <HeaderTypeIcon size={26} color="#fff" strokeWidth={1.7} />
         </div>

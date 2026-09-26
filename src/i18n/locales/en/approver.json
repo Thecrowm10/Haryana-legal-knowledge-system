@@ -50,6 +50,8 @@
     "rotate": "Rotate 90°",
     "loadingPdf": "Loading PDF…",
     "loadFailed": "Failed to load this PDF. Please try reloading the page.",
+    "pageRenderFailed": "Couldn't display page {{page}} — it may contain an image format this viewer can't decode.",
+    "pageRenderTryingAlternate": "Page {{page}}: trying alternate renderer…",
     "highlight": "Highlight",
     "exitHighlight": "Exit Highlight",
     "exitHighlightMode": "Exit highlight mode",
@@ -216,6 +218,10 @@
     },
     "documentCount_one": "{{count}} document",
     "documentCount_other": "{{count}} documents",
+    "noUploadersAssigned": {
+      "title": "No uploaders assigned to you yet",
+      "desc": "You won't see any documents here until an administrator assigns at least one uploader to you."
+    },
     "emptyState": {
       "allCaughtUp": "All caught up!",
       "noPendingSubmissions": "No pending submissions to review.",
