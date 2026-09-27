@@ -95,6 +95,7 @@
   "dashboard": {
     "greeting": "Welcome, {{name}}",
     "subtitle": "Here's an overview of your document uploads",
+    "loadingDocuments": "Loading documents…",
     "quickActionsLabel": "Quick Actions",
     "quickActions": {
       "uploadTitle": "Upload New Document",

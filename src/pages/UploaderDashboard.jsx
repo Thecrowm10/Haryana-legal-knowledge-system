@@ -1139,6 +1139,14 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const [docCounts, setDocCounts] = useState({ total: 0, pending: 0, approved: 0, rejected: 0, draft: 0, returned: 0 });
   const [myDocsLoading, setMyDocsLoading] = useState(false);
   const [myDocsError,   setMyDocsError]   = useState('');
+  // "My Uploads" table — filtered/paginated server-side, independent of the
+  // full `uploads` array above (which stays a full fetch so bulk-select-all,
+  // the CSV audit-trail export, and the stat cards keep seeing everything,
+  // not just whichever page/filter the table happens to be showing).
+  const [tableDocs, setTableDocs] = useState([]);
+  const [tableDocsTotal, setTableDocsTotal] = useState(0);
+  const [tableDocsLoading, setTableDocsLoading] = useState(false);
+  const [tableDocsError, setTableDocsError] = useState('');
   const [remarksModal,  setRemarksModal]  = useState(null);
   const [viewDoc,       setViewDoc]       = useState(null);
   const [linkedDocs, setLinkedDocs] = useState([]);
@@ -1841,6 +1849,38 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
   const TABLE_PAGE_SIZE = 10;
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setTablePage(1); }, [tableSearch, filterType, filterStatus]);
+
+  // My Uploads table — real server call on every filter/page change (status,
+  // type, search), true pagination tied to the actual page shown, instead of
+  // slicing a one-time ~500-row fetch client-side.
+  const fetchTableDocs = useCallback(() => {
+    setTableDocsLoading(true);
+    setTableDocsError('');
+    getMyDocuments(
+      filterStatus || undefined,
+      (tablePage - 1) * TABLE_PAGE_SIZE,
+      TABLE_PAGE_SIZE,
+      filterType || undefined,
+      tableSearch || undefined,
+    )
+      .then(res => {
+        setTableDocs((res.data.documents || []).map(mapApiDoc));
+        setTableDocsTotal(res.data.total ?? 0);
+      })
+      .catch(err => {
+        const detail = err.response?.data?.detail;
+        setTableDocsError(typeof detail === 'string' ? detail : t('toasts.failedToLoadDocuments'));
+      })
+      .finally(() => setTableDocsLoading(false));
+  }, [filterStatus, tablePage, filterType, tableSearch, mapApiDoc, t]);
+
+  // Debounced so typing in the search box doesn't fire a request per keystroke.
+  useEffect(() => {
+    if (activePage !== 'dashboard') return;
+    if (!localStorage.getItem('token')) return;
+    const timer = setTimeout(fetchTableDocs, 350);
+    return () => clearTimeout(timer);
+  }, [activePage, fetchTableDocs]);
 
   // Full reset of the upload wizard back to its starting (no type chosen) state.
   function resetUploadForm() {
@@ -3246,30 +3286,21 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
           </Card>
         )}
 
-        {/* Uploads table */}
+        {/* Uploads table — tableDocs is already the current page, filtered
+            server-side by getMyDocuments (status/type/search) — no client-side
+            filtering/slicing needed. Sort still applies, but only within the
+            current page (same trade-off the other true-paginated dashboards
+            in this app already accept — none of them have column sort either). */}
         {(() => {
-          // Compute filtered and sorted list
           const SORT_KEY = { 'title': d => d.title, 'type': d => d.type, 'dept': d => d.dept,
             'year': d => d.year, 'uploadedAt': d => d.uploadedAt, 'status': d => d.status };
-          const baseList = filterStatus === 'approved' ? uploads.filter(d => d.status === 'approved')
-                         : filterStatus === 'pending'  ? uploads.filter(d => d.status === 'pending')
-                         : filterStatus === 'rejected' ? uploads.filter(d => d.status === 'rejected')
-                         : filterStatus === 'draft'    ? uploads.filter(d => d.status === 'draft')
-                         : filterStatus === 'returned' ? uploads.filter(d => d.status === 'returned')
-                         : filterStatus === 'deleted'  ? uploads.filter(d => d.status === 'deleted')
-                         : uploads;
-          const allFiltered = baseList
-            .filter(d => !tableSearch || d.title.toLowerCase().includes(tableSearch.toLowerCase()))
-            .filter(d => !filterType  || d.type === filterType)
-            .sort((a, b) => {
-              const ka = SORT_KEY[sortCol]?.(a) ?? '';
-              const kb = SORT_KEY[sortCol]?.(b) ?? '';
-              return sortDir === 'asc' ? (ka > kb ? 1 : -1) : (ka < kb ? 1 : -1);
-            });
-          const filtered = allFiltered;
-          const tableTotalPages = Math.max(1, Math.ceil(filtered.length / TABLE_PAGE_SIZE));
+          const pageItems = [...tableDocs].sort((a, b) => {
+            const ka = SORT_KEY[sortCol]?.(a) ?? '';
+            const kb = SORT_KEY[sortCol]?.(b) ?? '';
+            return sortDir === 'asc' ? (ka > kb ? 1 : -1) : (ka < kb ? 1 : -1);
+          });
+          const tableTotalPages = Math.max(1, Math.ceil(tableDocsTotal / TABLE_PAGE_SIZE));
           const clampedTablePage = Math.min(tablePage, tableTotalPages);
-          const pageItems = filtered.slice((clampedTablePage - 1) * TABLE_PAGE_SIZE, clampedTablePage * TABLE_PAGE_SIZE);
 
           function toggleSort(col) {
             if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -3284,7 +3315,7 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
           <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--surface-border)', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', rowGap: 8 }}>
             <div style={{ fontSize: 'var(--font-size-p2)', fontWeight: 700, color: 'var(--text-heading)' }}>{t('table.title')}</div>
             <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-color-secondary)', background: 'var(--surface-ground)', border: '1px solid var(--surface-border)', padding: '2px 9px', borderRadius: 20 }}>
-              {t('table.documentCount', { count: filtered.length })}
+              {t('table.documentCount', { count: tableDocsTotal })}
             </span>
             <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
               {bulkSelectMode ? (
@@ -3377,20 +3408,17 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
                       <button type="button" onClick={() => { setFilterType(''); setTypeDropdownOpen(false); }}
                         style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '9px 12px', borderRadius: 9, border: 'none', background: !filterType ? 'rgba(33, 74, 171,.12)' : 'transparent', color: !filterType ? 'var(--primary)' : 'var(--text-color)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                         {t('table.allTypes')}
-                        <span style={{ fontSize: 11, fontFamily: 'var(--mono)', opacity: .6 }}>{baseList.length}</span>
                       </button>
                       {TYPES.map(type => {
-                        const count  = baseList.filter(d => d.type === type).length;
                         const active = filterType === type;
                         const c = TYPE_CARD_COLORS[type] || { accent: '#94a3b8', bg: 'rgba(148,163,184,.1)', text: '#64748b' };
                         return (
                           <button key={type} type="button" onClick={() => { setFilterType(active ? '' : type); setTypeDropdownOpen(false); }}
-                            style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '9px 12px', borderRadius: 9, border: 'none', background: active ? `${c.accent}20` : 'transparent', color: active ? (c.text || c.accent) : 'var(--text-color)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)', opacity: count === 0 ? .5 : 1 }}>
+                            style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '9px 12px', borderRadius: 9, border: 'none', background: active ? `${c.accent}20` : 'transparent', color: active ? (c.text || c.accent) : 'var(--text-color)', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
                             <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                               <span style={{ width: 8, height: 8, borderRadius: '50%', background: c.accent, flexShrink: 0 }} />
                               {DOC_TYPE_KEY[type] ? t(`docTypes.${DOC_TYPE_KEY[type]}`) : type}
                             </span>
-                            <span style={{ fontSize: 11, fontFamily: 'var(--mono)', opacity: .6 }}>{count}</span>
                           </button>
                         );
                       })}
@@ -3401,14 +3429,12 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
             ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               {TYPES.map(type => {
-                const count  = baseList.filter(d => d.type === type).length;
                 const active = filterType === type;
                 const c = TYPE_CARD_COLORS[type] || { accent: '#94a3b8', bg: 'rgba(148,163,184,.1)', text: '#64748b' };
                 return (
                   <button key={type} type="button" onClick={() => setFilterType(active ? '' : type)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 20, cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 12, fontWeight: 600, transition: 'all .15s', background: active ? c.accent : 'var(--surface-card)', border: `1.5px solid ${active ? c.accent : c.accent + '55'}`, color: active ? 'white' : c.text || c.accent, opacity: count === 0 ? 0.4 : 1 }}>
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 20, cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 12, fontWeight: 600, transition: 'all .15s', background: active ? c.accent : 'var(--surface-card)', border: `1.5px solid ${active ? c.accent : c.accent + '55'}`, color: active ? 'white' : c.text || c.accent }}>
                     {DOC_TYPE_KEY[type] ? t(`docTypes.${DOC_TYPE_KEY[type]}`) : type}
-                    <span style={{ fontSize: 10, fontFamily: 'var(--mono)', background: active ? 'rgba(255,255,255,.25)' : 'var(--surface-ground)', color: active ? 'white' : 'var(--text-color-secondary)', padding: '0 5px', borderRadius: 10 }}>{count}</span>
                   </button>
                 );
               })}
@@ -3446,12 +3472,27 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
 
                 {/* ── Document rows ── */}
                 <div>
-                  {filtered.length === 0 && (
+                  {tableDocsLoading && (
+                    <div style={{ padding: '52px 0', textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>
+                      {t('dashboard.loadingDocuments')}
+                    </div>
+                  )}
+                  {!tableDocsLoading && tableDocsError && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '16px 20px', color: '#dc2626', fontSize: 13 }}>
+                      <AlertCircle size={15} style={{ flexShrink: 0 }} />
+                      <span style={{ flex: 1 }}>{tableDocsError}</span>
+                      <button onClick={fetchTableDocs}
+                        style={{ padding: '5px 14px', borderRadius: 7, border: '1px solid rgba(220, 53, 69,.3)', background: 'transparent', color: '#dc2626', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font)' }}>
+                        {t('common.retry')}
+                      </button>
+                    </div>
+                  )}
+                  {!tableDocsLoading && !tableDocsError && tableDocsTotal === 0 && (
                     <div style={{ padding: '52px 0', textAlign: 'center', color: 'var(--text-color-secondary)', fontSize: 13 }}>
                       {t('table.noDocumentsFound')}
                     </div>
                   )}
-                  {pageItems.map(doc => {
+                  {!tableDocsLoading && !tableDocsError && pageItems.map(doc => {
                     const isDraft      = !doc.workflowStatus || doc.workflowStatus === WORKFLOW_STATUS.DRAFT;
                     const isPublished  = doc.workflowStatus === WORKFLOW_STATUS.PUBLISHED;
                     const isSelected   = selectedIds.has(doc.id);
