@@ -1857,7 +1857,12 @@ export default function UploaderDashboard({ activePage, onNavigate, onAuditLog, 
     setTableDocsLoading(true);
     setTableDocsError('');
     getMyDocuments(
-      filterStatus || undefined,
+      // The "Total" stat card uses 'all' as its internal filter marker (so it
+      // can be highlighted/toggled the same way the other cards are) — it
+      // means "no status filter", not a literal status value to send. Sending
+      // it as-is made the backend match zero rows (no document's status column
+      // is literally "all").
+      (filterStatus && filterStatus !== 'all') ? filterStatus : undefined,
       (tablePage - 1) * TABLE_PAGE_SIZE,
       TABLE_PAGE_SIZE,
       filterType || undefined,
