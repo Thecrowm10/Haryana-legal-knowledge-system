@@ -242,7 +242,15 @@ function SimpleDocLayout({ doc }) {
 // document has no chapters/schedules/etc. and nothing relates to it, this
 // collapses to a plain details card (see SimpleDocLayout) instead of five
 // empty, disabled tabs.
-export default function ActContentsView({ doc: rawDoc, onClose, citizenView = false, onLoginAsOfficer }) {
+// `citizenView` controls actual citizen-only behavior: approved-only part
+// filtering, opening a related document's raw PDF directly vs. a full review
+// modal, and propagating itself to a nested DocViewModal. `showChrome`
+// controls only the visual masthead/topbar (logo, language toggle,
+// accessibility menu, breadcrumb) — decoupled so an internal viewer (Admin/
+// Nodal/Super Admin/Approver) can show the same polished chrome without also
+// switching on citizen-only content filtering. Defaults to citizenView so the
+// one existing caller (CitizenDashboard) is unaffected.
+export default function ActContentsView({ doc: rawDoc, onClose, citizenView = false, showChrome = citizenView, onLoginAsOfficer }) {
   const { t } = useTranslation('actContents');
   const { t: tc, i18n } = useTranslation('citizen');
   const orgNameHi = i18n.getFixedT('hi', 'login')('orgNamePortal');
@@ -464,7 +472,7 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
   return (
     <>
     <div style={{
-      position: 'relative', minHeight: citizenView ? '50vh' : undefined, boxSizing: 'border-box',
+      position: 'relative', minHeight: showChrome ? '50vh' : undefined, boxSizing: 'border-box',
       // Extra bottom padding when there's a related-documents card — it floats up
       // over this hero's bottom edge (see relatedDocsBand's negative marginTop), so
       // the hero needs a bit more blue behind/around it to still look balanced
@@ -483,7 +491,7 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
           the dashboard's own hero masthead, absolutely positioned below the fixed
           topbar's height so it doesn't sit underneath it, and fades out on scroll
           exactly like the dashboard's masthead does. */}
-      {citizenView ? (
+      {showChrome ? (
         <div className="acv-masthead-row"
           style={{
             position: 'absolute', top: 14, left: 32, zIndex: 3,
@@ -511,7 +519,7 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
               style={{ background: 'none', border: 'none', padding: 0, color: 'rgba(255,255,255,.75)', cursor: 'pointer', fontFamily: 'var(--font)', fontSize: 12, fontWeight: 600, transition: 'color .15s' }}
               onMouseEnter={e => e.currentTarget.style.color = '#fff'}
               onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,.75)'}>
-              {t('home')}
+              {citizenView ? t('home') : t('dashboard')}
             </button>
             <ChevronRight size={11} color="rgba(255,255,255,.5)" />
             <span style={{ color: '#fff' }}>{t('documentView')}</span>
@@ -532,7 +540,7 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
           Close button above still sits top:24/right:32 in this same corner —
           without clearance here, the type badge (absolutely positioned at the
           top-right of this row) visually collided with it. */}
-      <div className="acv-hero-title-row" style={{ position: 'relative', display: 'flex', alignItems: 'flex-start', gap: 18, marginTop: citizenView ? 168 : 52 }}>
+      <div className="acv-hero-title-row" style={{ position: 'relative', display: 'flex', alignItems: 'flex-start', gap: 18, marginTop: showChrome ? 168 : 52 }}>
         <div style={{ width: 56, height: 56, borderRadius: 14, background: 'rgba(255,255,255,.14)', border: '1px solid rgba(255,255,255,.24)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <HeaderTypeIcon size={26} color="#fff" strokeWidth={1.7} />
         </div>
@@ -649,7 +657,7 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
           condensed brand fading in as the big masthead above fades out). Holds the
           skip-link/language/accessibility/login controls always, regardless of
           scroll state — only their icon colour switches. */}
-      {citizenView && (
+      {showChrome && (
         <div className="acv-topbar" style={{
           position: 'fixed', top: 0, left: 0, right: 0, zIndex: 2110,
           height: ACV_TOP_BAR_HEIGHT, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
@@ -682,35 +690,41 @@ export default function ActContentsView({ doc: rawDoc, onClose, citizenView = fa
             <LanguageToggle iconOnly buttonStyle={scrolled ? acvTopBarIconStyleLight : acvTopBarIconStyle} />
             <AccessibilityMenu iconButtonStyle={scrolled ? acvTopBarIconStyleLight : acvTopBarIconStyle} />
 
-            <div style={{ position: 'relative' }}>
-              <button type="button" onClick={() => setLoginMenuOpen(o => !o)}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(120,128,140,.3)'}
-                onMouseLeave={e => e.currentTarget.style.background = (scrolled ? acvTopBarIconStyleLight : acvTopBarIconStyle).background}
-                aria-label={tc('profileLogin')} aria-expanded={loginMenuOpen} title={tc('profileLogin')}
-                style={{ transition: 'background .15s', ...(scrolled ? acvTopBarIconStyleLight : acvTopBarIconStyle) }}>
-                <User size={16} />
-              </button>
+            {/* "Login as officer" only makes sense for an actual anonymous citizen —
+                an internal viewer (Admin/Nodal/Super Admin/Approver) is already
+                logged in, so this whole menu is citizen-only even though the rest
+                of this topbar (language/accessibility) is shared chrome. */}
+            {citizenView && (
+              <div style={{ position: 'relative' }}>
+                <button type="button" onClick={() => setLoginMenuOpen(o => !o)}
+                  onMouseEnter={e => e.currentTarget.style.background = 'rgba(120,128,140,.3)'}
+                  onMouseLeave={e => e.currentTarget.style.background = (scrolled ? acvTopBarIconStyleLight : acvTopBarIconStyle).background}
+                  aria-label={tc('profileLogin')} aria-expanded={loginMenuOpen} title={tc('profileLogin')}
+                  style={{ transition: 'background .15s', ...(scrolled ? acvTopBarIconStyleLight : acvTopBarIconStyle) }}>
+                  <User size={16} />
+                </button>
 
-              {loginMenuOpen && (
-                <>
-                  <div onClick={() => setLoginMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 2155 }} />
-                  <div style={{
-                    position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 2160, width: 200,
-                    background: 'var(--surface-card)', color: 'var(--text-color)',
-                    border: '1px solid var(--surface-border)', borderRadius: 12,
-                    boxShadow: '0 16px 40px rgba(0,0,0,.3)', overflow: 'hidden',
-                    animation: 'fadeSlideIn .15s ease',
-                  }}>
-                    <button type="button" onClick={() => { setLoginMenuOpen(false); onLoginAsOfficer?.(); }}
-                      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: 'var(--text-color)', fontFamily: 'var(--font)', transition: 'background .12s' }}
-                      onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                      <User size={14} color="var(--primary)" /> {tc('loginAsOfficer')}
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
+                {loginMenuOpen && (
+                  <>
+                    <div onClick={() => setLoginMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 2155 }} />
+                    <div style={{
+                      position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 2160, width: 200,
+                      background: 'var(--surface-card)', color: 'var(--text-color)',
+                      border: '1px solid var(--surface-border)', borderRadius: 12,
+                      boxShadow: '0 16px 40px rgba(0,0,0,.3)', overflow: 'hidden',
+                      animation: 'fadeSlideIn .15s ease',
+                    }}>
+                      <button type="button" onClick={() => { setLoginMenuOpen(false); onLoginAsOfficer?.(); }}
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', fontSize: 13, color: 'var(--text-color)', fontFamily: 'var(--font)', transition: 'background .12s' }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-hover)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                        <User size={14} color="var(--primary)" /> {tc('loginAsOfficer')}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

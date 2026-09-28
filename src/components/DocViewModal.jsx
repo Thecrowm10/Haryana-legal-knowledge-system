@@ -69,8 +69,12 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
   // actOutline is always a truthy object (with possibly-empty arrays) once actFull
   // loads — gating the "Browse Sections & Schedules" button on actOutline alone
   // showed it even for Acts with zero actual chapters/schedules/annexures/etc.
+  // A chapter counts as content even with zero populated sections inside it
+  // (Math.max(...,1)) — matches ActContentsView's own partCounts.sections
+  // calculation exactly; without that floor, an Act with chapter titles
+  // defined but no sections filled in yet incorrectly counted as "no content".
   const hasAnyActPartContent = !!actOutline && (
-    actOutline.sections.chapters.reduce((n, c) => n + c.sections.length, 0) > 0 ||
+    actOutline.sections.chapters.reduce((n, c) => n + Math.max(c.sections.length, 1), 0) > 0 ||
     actOutline.schedules.length > 0 ||
     actOutline.annexures.length > 0 ||
     actOutline.appendix.length > 0 ||
@@ -513,8 +517,13 @@ export default function DocViewModal({ doc, onClose, initialPage = 1, searchQuer
               </div>
             )}
 
+            {/* showChrome (not citizenView) — shows the same logo/language-toggle/
+                accessibility-menu topbar as the citizen viewer, but keeps
+                citizenView itself false so content stays unfiltered by approval
+                status and related-document clicks still open the full review
+                modal instead of just the raw PDF. */}
             {showActContents && (
-              <ActContentsView doc={doc} onClose={() => setShowActContents(false)} />
+              <ActContentsView doc={doc} onClose={() => setShowActContents(false)} showChrome />
             )}
 
             {meta.length > 0 && (
